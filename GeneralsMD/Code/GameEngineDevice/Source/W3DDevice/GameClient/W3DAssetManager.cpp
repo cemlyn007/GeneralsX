@@ -850,7 +850,7 @@ RenderObjClass * W3DAssetManager::Create_Render_Obj(
 */
 int W3DAssetManager::Recolor_Asset(RenderObjClass *robj, const int color)
 {
-	if (TheGlobalData->m_headless)
+	if (TheGlobalData->m_headless && !TheGlobalData->m_headlessRender)
 		return 0;
 
 	switch (robj->Class_ID())	{
@@ -869,7 +869,7 @@ int W3DAssetManager::Recolor_Asset(RenderObjClass *robj, const int color)
 */
 int W3DAssetManager::Recolor_Mesh(RenderObjClass *robj, const int color)
 {
-	if (TheGlobalData->m_headless)
+	if (TheGlobalData->m_headless && !TheGlobalData->m_headlessRender)
 		return 0;
 
 	int i;
@@ -917,7 +917,7 @@ int W3DAssetManager::Recolor_Mesh(RenderObjClass *robj, const int color)
 
 int W3DAssetManager::Recolor_HLOD(RenderObjClass *robj, const int color)
 {
-	if (TheGlobalData->m_headless)
+	if (TheGlobalData->m_headless && !TheGlobalData->m_headlessRender)
 		return 0;
 
 	int didRecolor=0;
