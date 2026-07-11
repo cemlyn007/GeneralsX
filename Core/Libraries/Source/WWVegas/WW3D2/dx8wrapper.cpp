@@ -334,6 +334,7 @@ DX8FrameStatistics DX8Wrapper::FrameStatistics;
 static DX8FrameStatistics LastFrameStatistics;
 
 bool DX8Wrapper_IsWindowed = true;
+bool DX8Wrapper_HeadlessRender = false;  // rlgenerals: see dx8wrapper.h
 
 // FPU_PRESERVE
 int DX8Wrapper_PreserveFPU = 0;

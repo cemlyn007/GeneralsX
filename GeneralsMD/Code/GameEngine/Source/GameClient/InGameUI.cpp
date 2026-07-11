@@ -1376,8 +1376,10 @@ void InGameUI::init()
 	to order the translators when the code is not centralized so it has
 	been moved to where all the other translators are attached in game client */
 
-	// create the tactical view
-	TheTacticalView = createView(TheGlobalData->m_headless);
+	// create the tactical view. rlgenerals: in off-screen render mode we need a
+	// REAL W3DView (with a 3D camera) even though m_headless is set, so the scene
+	// can be drawn to the backbuffer; only a fully headless run gets ViewDummy.
+	TheTacticalView = createView(TheGlobalData->m_headless && !TheGlobalData->m_headlessRender);
 	if (TheTacticalView && TheDisplay)
 	{
 		TheTacticalView->init();

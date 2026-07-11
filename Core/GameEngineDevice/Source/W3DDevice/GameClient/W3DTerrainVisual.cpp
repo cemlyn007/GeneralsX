@@ -212,7 +212,10 @@ void W3DTerrainVisual::init()
 	m_terrainRenderObject->Set_Collision_Type( PICK_TYPE_TERRAIN );
 	TheTerrainRenderObject = m_terrainRenderObject;
 
-	if (!TheGlobalData->m_headless)
+	// rlgenerals: off-screen render mode needs the shadow manager (the scene's
+	// stencil-occlusion pass dereferences TheW3DShadowManager), terrain tracks and
+	// water; only a fully headless run skips them.
+	if (!TheGlobalData->m_headless || TheGlobalData->m_headlessRender)
 	{
 		// initialize track drawing system
 		TheTerrainTracksRenderObjClassSystem = NEW TerrainTracksRenderObjClassSystem;

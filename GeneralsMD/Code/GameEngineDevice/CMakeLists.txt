@@ -276,13 +276,20 @@ endif()
 # Phase 3: Video playback with FFmpeg (configured by Core/GameEngineDevice when RTS_BUILD_OPTION_FFMPEG=ON)
 # GeneralsX @feature BenderAI 21/02/2026 Video playback framework
 if(RTS_BUILD_OPTION_FFMPEG)
-    # Add VideoDevice FFmpeg implementation (video playback)
+    # Add VideoDevice FFmpeg implementation (video playback).
+    # GeneralsX @build note: the FFmpeg .cpp sources are ALREADY compiled into
+    # this target via corei_gameenginedevice_private — Core/GameEngineDevice adds
+    # FFmpegFile.cpp + FFmpegVideoPlayer.cpp to that INTERFACE when
+    # RTS_BUILD_OPTION_FFMPEG=ON (see Core/GameEngineDevice/CMakeLists.txt), and
+    # z_gameenginedevice links it (above). Re-listing the .cpp here compiled them
+    # a SECOND time into libz_gameenginedevice.a. That is harmless for on-demand
+    # linking (the z_generals exe), but -force_load consumers (the rlgenerals RL
+    # embed) pull in every member and hit duplicate symbols. The base game's
+    # g_gameenginedevice does not re-add them; match that. Headers only here.
     target_sources(z_gameenginedevice PUBLIC
         Include/VideoDevice/Bink/BinkVideoPlayer.h
         Include/VideoDevice/FFmpeg/FFmpegFile.h
         Include/VideoDevice/FFmpeg/FFmpegVideoPlayer.h
-        Source/VideoDevice/FFmpeg/FFmpegFile.cpp
-        Source/VideoDevice/FFmpeg/FFmpegVideoPlayer.cpp
     )
     target_compile_definitions(z_gameenginedevice PUBLIC SAGE_USE_FFMPEG)
     # GeneralsX @build felipebraz 20/06/2025 PkgConfig::FFMPEG is PRIVATE in corei_gameenginedevice_private so it

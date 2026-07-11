@@ -164,7 +164,11 @@ void SDL3GameEngine::init(void)
 {
 	fprintf(stderr, "INFO: SDL3GameEngine::init() starting\n");
 
-	if (TheGlobalData && TheGlobalData->m_headless) {
+	// rlgenerals: render-headless (m_headless && m_headlessRender) DOES have a
+	// hidden SDL window bound by the embed host, so it must fall through to the
+	// window-binding path below to bring up the DXVK device. Only a fully headless
+	// run skips the window.
+	if (TheGlobalData && TheGlobalData->m_headless && !TheGlobalData->m_headlessRender) {
 		// GeneralsX @bugfix Copilot 17/05/2026 Allow headless replay path to initialize engine subsystems without an SDL window.
 		fprintf(stderr, "INFO: SDL3GameEngine::init() headless mode - skipping SDL window binding\n");
 		m_SDLWindow = nullptr;

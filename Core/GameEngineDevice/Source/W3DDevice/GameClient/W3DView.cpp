@@ -728,7 +728,9 @@ Real W3DView::getMaxZoom(Real x, Real y) const
 //-------------------------------------------------------------------------------------------------
 void W3DView::updateCameraTransform()
 {
-	if (TheGlobalData->m_headless)
+	// rlgenerals: render-headless needs the camera transform built so the 3D
+	// scene draws from a real viewpoint (a fully headless run has no camera).
+	if (TheGlobalData->m_headless && !TheGlobalData->m_headlessRender)
 		return;
 
 	Vector3 sourcePos;

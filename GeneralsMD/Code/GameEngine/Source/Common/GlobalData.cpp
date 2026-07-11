@@ -653,6 +653,7 @@ GlobalData::GlobalData()
 	m_framesPerSecondLimit = 60;
 	m_chipSetType = 0;
 	m_headless = FALSE;
+	m_headlessRender = FALSE;
 	m_checkForUpdates = TRUE;
 	m_windowed = 0;
 	m_xResolution = DEFAULT_DISPLAY_WIDTH;

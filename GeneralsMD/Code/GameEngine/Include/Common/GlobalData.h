@@ -121,6 +121,15 @@ public:
 	// Run game without graphics, input or audio.
 	Bool m_headless;
 
+	// rlgenerals @feature Off-screen render mode: when TRUE *together with*
+	// m_headless, the engine still runs headless (no shell/menu/input/audio, no
+	// visible window) BUT brings up the real W3D/DXVK render device against a
+	// HIDDEN window and draws the 3D scene each frame, so a consumer can read the
+	// backbuffer back as an observation image. Every render-init site is gated as
+	// `!m_headless || m_headlessRender`; the per-frame draw as
+	// `!(m_headless && !m_headlessRender)`. Set by the RL embed (RlgBridge.cpp).
+	Bool m_headlessRender;
+
 	// GeneralsX @feature BenderAI 21/04/2026 Opt-out toggle for the in-game update checker.
 	Bool m_checkForUpdates;
 

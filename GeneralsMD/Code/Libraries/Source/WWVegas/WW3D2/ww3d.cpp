@@ -812,18 +812,23 @@ WW3DErrorType WW3D::Begin_Render(bool clear,bool clearz,const Vector3 & color, f
 	SNAPSHOT_SAY(("========== WW3D::Begin_Render ============"));
 	SNAPSHOT_SAY(("==========================================\n"));
 
-	if (DX8Wrapper::_Get_D3D_Device8() && (hr=DX8Wrapper::_Get_D3D_Device8()->TestCooperativeLevel()) != D3D_OK)
+	// rlgenerals: off-screen render mode has a hidden window with no presentable
+	// surface, so TestCooperativeLevel reports LOST/NOTRESET forever. We never
+	// present (the embed reads the backbuffer back) and the device can still
+	// render into the backbuffer VkImage, so skip the device-lost handling.
+	if (!DX8Wrapper_HeadlessRender &&
+	    DX8Wrapper::_Get_D3D_Device8() && (hr=DX8Wrapper::_Get_D3D_Device8()->TestCooperativeLevel()) != D3D_OK)
 	{
-        // If the device was lost, do not render until we get it back
-        if( D3DERR_DEVICELOST == hr )
-            return WW3D_ERROR_GENERIC;	//other app has the device
+		// If the device was lost, do not render until we get it back
+		if( D3DERR_DEVICELOST == hr )
+			return WW3D_ERROR_GENERIC;	//other app has the device
 
-        // Check if the device needs to be reset
-        if( D3DERR_DEVICENOTRESET == hr )
-        {
-            WWDEBUG_SAY(("WW3D::Begin_Render is resetting the device."));
-            DX8Wrapper::Reset_Device();
-        }
+		// Check if the device needs to be reset
+		if( D3DERR_DEVICENOTRESET == hr )
+		{
+			WWDEBUG_SAY(("WW3D::Begin_Render is resetting the device."));
+			DX8Wrapper::Reset_Device();
+		}
 
 		return WW3D_ERROR_GENERIC;
 	}
