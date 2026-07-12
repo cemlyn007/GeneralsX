@@ -66,8 +66,17 @@ void RadiusDecalTemplate::createRadiusDecal(const Coord3D& pos, Real radius, con
 	// it is now considered nonEmpty, regardless of the state of m_decal, etc
 	result.m_empty = false;
 
-	if (!m_onlyVisibleToOwningPlayer ||
-			owningPlayer->getPlayerIndex() == ThePlayerList->getLocalPlayer()->getPlayerIndex())
+	// TheProjectedShadowManager is only created by the W3D render device; in a
+	// headless (no-render) run it is null. The radius decal is purely the cosmetic
+	// ring drawn on the terrain (e.g. the area a shroud-clearing special reveals) —
+	// the underlying logic (shroud clearing, etc.) is independent — so when there
+	// is no shadow manager, skip the decal entirely rather than calling a virtual
+	// method on a null manager (fault at 0x0). Render builds have the manager and
+	// are unaffected. Matches the existing `if (TheProjectedShadowManager)` guard
+	// in W3DModelDraw.cpp.
+	if (TheProjectedShadowManager &&
+			(!m_onlyVisibleToOwningPlayer ||
+			owningPlayer->getPlayerIndex() == ThePlayerList->getLocalPlayer()->getPlayerIndex()))
 	{
 		Shadow::ShadowTypeInfo decalInfo;
 		decalInfo.allowUpdates = FALSE;										// shadow texture will never update
