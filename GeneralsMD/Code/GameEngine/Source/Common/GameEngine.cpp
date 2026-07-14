@@ -703,7 +703,14 @@ void GameEngine::init()
 		initSubsystem(TheCrateSystem,"TheCrateSystem", MSGNEW("GameEngineSubsystem") CrateSystem(), &xferCRC, "Data\\INI\\Default\\Crate", "Data\\INI\\Crate");
 		initSubsystem(ThePlayerList,"ThePlayerList", MSGNEW("GameEngineSubsystem") PlayerList(), nullptr);
 		initSubsystem(TheRecorder,"TheRecorder", createRecorder(), nullptr);
-		initSubsystem(TheRadar,"TheRadar", createRadar(TheGlobalData->m_headless), nullptr);
+		// rlgenerals: the radar is a render-only subsystem — W3DRadar's terrain /
+		// overlay / shroud textures need a live W3D device. Follow the documented
+		// gate (GlobalData.h): real radar when `!m_headless || m_headlessRender`,
+		// i.e. dummy only when headless *without* the off-screen render device.
+		// Off-screen-render envs get a real W3DRadar so the RL bridge can read the
+		// minimap back as an observation.
+		initSubsystem(TheRadar,"TheRadar",
+			createRadar(TheGlobalData->m_headless && !TheGlobalData->m_headlessRender), nullptr);
 		initSubsystem(TheVictoryConditions,"TheVictoryConditions", createVictoryConditions(), nullptr);
 
 

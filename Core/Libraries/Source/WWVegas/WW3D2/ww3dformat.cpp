@@ -430,6 +430,77 @@ unsigned Get_Bytes_Per_Pixel(WW3DFormat format)
 	return 0;
 }
 
+// rlgenerals: inverse of ARGB_Color_To_WW3D_Color. Widens each channel back to 8
+// bits by bit-replication (e.g. 5-bit 0x1F -> 0xFF, not 0xF8), so a round trip
+// through the narrow formats lands back on the value it came from rather than
+// drifting darker. Formats carrying no alpha report a = 0xFF (opaque).
+unsigned WW3D_Color_To_ARGB_Color(WW3DFormat format, unsigned pixel)
+{
+	// widen an n-bit channel to 8 bits: replicate the high bits into the low ones
+	#define W5(v) (((v) << 3) | ((v) >> 2))
+	#define W6(v) (((v) << 2) | ((v) >> 4))
+	#define W4(v) (((v) << 4) | (v))
+	#define W3(v) (((v) << 5) | ((v) << 2) | ((v) >> 1))
+	#define W2(v) (((v) << 6) | ((v) << 4) | ((v) << 2) | (v))
+	#define W1(v) ((v) ? 0xFFu : 0x00u)
+	#define ARGB(a, r, g, b) \
+		((((a) & 0xFFu) << 24) | (((r) & 0xFFu) << 16) | (((g) & 0xFFu) << 8) | ((b) & 0xFFu))
+
+	switch (format)
+	{
+	case WW3D_FORMAT_R8G8B8:
+		return ARGB(0xFF, pixel >> 16, pixel >> 8, pixel);
+
+	case WW3D_FORMAT_A8R8G8B8:
+		return pixel;
+
+	case WW3D_FORMAT_X8R8G8B8:
+		return ARGB(0xFF, pixel >> 16, pixel >> 8, pixel);
+
+	case WW3D_FORMAT_R5G6B5:
+		return ARGB(0xFF, W5((pixel >> 11) & 0x1F), W6((pixel >> 5) & 0x3F), W5(pixel & 0x1F));
+
+	case WW3D_FORMAT_X1R5G5B5:
+		return ARGB(0xFF, W5((pixel >> 10) & 0x1F), W5((pixel >> 5) & 0x1F), W5(pixel & 0x1F));
+
+	case WW3D_FORMAT_A1R5G5B5:
+		return ARGB(W1((pixel >> 15) & 0x1), W5((pixel >> 10) & 0x1F),
+		            W5((pixel >> 5) & 0x1F), W5(pixel & 0x1F));
+
+	case WW3D_FORMAT_A4R4G4B4:
+		return ARGB(W4((pixel >> 12) & 0xF), W4((pixel >> 8) & 0xF),
+		            W4((pixel >> 4) & 0xF), W4(pixel & 0xF));
+
+	case WW3D_FORMAT_X4R4G4B4:
+		return ARGB(0xFF, W4((pixel >> 8) & 0xF), W4((pixel >> 4) & 0xF), W4(pixel & 0xF));
+
+	case WW3D_FORMAT_R3G3B2:
+		return ARGB(0xFF, W3((pixel >> 5) & 0x7), W3((pixel >> 2) & 0x7), W2(pixel & 0x3));
+
+	case WW3D_FORMAT_A8:
+		return ARGB(pixel & 0xFF, 0, 0, 0);
+
+	case WW3D_FORMAT_A8R3G3B2:
+		return ARGB((pixel >> 8) & 0xFF, W3((pixel >> 5) & 0x7),
+		            W3((pixel >> 2) & 0x7), W2(pixel & 0x3));
+
+	case WW3D_FORMAT_L8:
+		return ARGB(0xFF, pixel & 0xFF, pixel & 0xFF, pixel & 0xFF);
+
+	default:
+		// Compressed / YUV / depth formats have no meaningful per-pixel widening.
+		return 0;
+	}
+
+	#undef W5
+	#undef W6
+	#undef W4
+	#undef W3
+	#undef W2
+	#undef W1
+	#undef ARGB
+}
+
 unsigned ARGB_Color_To_WW3D_Color(WW3DFormat format, unsigned argb)
 {
 	unsigned a = (argb >> 24) & 0xFF;

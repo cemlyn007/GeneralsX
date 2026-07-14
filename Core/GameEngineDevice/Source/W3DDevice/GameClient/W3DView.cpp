@@ -2085,7 +2085,13 @@ void W3DView::draw()
 	TheGameClient->iterateDrawablesInRegion( &axisAlignedRegion, drawablePostDraw, this );
 	TheDisplay->endBatch();
 
-	TheGameClient->flushTextBearingDrawables();
+	// rlgenerals: in off-screen RL render mode, skip the world-space drawable text
+	// (the floating "Building: 48%" construction labels, health bars, veterancy
+	// pips). Same reasoning as the HUD suppression in W3DDisplay::draw(): the frame
+	// is a policy observation, and this is fixed-pixel text that dominates a small
+	// render. Construction/health are already in the units observation.
+	if (!(TheGlobalData->m_headless && TheGlobalData->m_headlessRender))
+		TheGameClient->flushTextBearingDrawables();
 
 	// Render 2D scene
 	W3DDisplay::m_2DScene->doRender( m_2DCamera );

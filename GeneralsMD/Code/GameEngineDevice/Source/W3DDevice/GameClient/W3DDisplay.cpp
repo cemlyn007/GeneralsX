@@ -2155,7 +2155,15 @@ AGAIN:
 				drawViews();
 
 				// draw the user interface
-				TheInGameUI->DRAW();
+				// rlgenerals: skip the whole HUD in off-screen RL render mode. The
+				// frame is a policy observation there, and the UI is fixed-pixel-size
+				// text (clock, game timer, control bar) that does not scale with the
+				// render size — at 128x96 it swallows the frame. Everything the policy
+				// needs from it (money, power, clock) is already in the scalar obs, so
+				// nothing is lost by dropping the pixels. Normal gameplay is unaffected
+				// (m_headless is FALSE there); a fully headless env never reaches draw().
+				if (!(TheGlobalData->m_headless && TheGlobalData->m_headlessRender))
+					TheInGameUI->DRAW();
 
 				// end of video example code
 

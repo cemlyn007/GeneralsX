@@ -214,6 +214,16 @@ public:
 
 	virtual void draw( Int pixelX, Int pixelY, Int width, Int height ) = 0;	///< draw the radar
 
+	/// rlgenerals: composite the radar into a caller-supplied RGB buffer (`out` must
+	/// hold outW*outH*3 bytes), as an observation for the embedded RL bridge. This is
+	/// the radar as the *player* sees it, not ground truth: it obeys the same
+	/// no-radar / shroud / blip-visibility rules draw() does, so shrouded ground reads
+	/// black and enemy blips appear only where the player is entitled to see them.
+	/// Requires a live render device; the default (and so RadarDummy, which is what a
+	/// fully headless engine builds) has no textures and reports FALSE.
+	/// Returns TRUE if `out` was filled.
+	virtual Bool copyToRGB( UnsignedByte *out, Int outW, Int outH ) { return FALSE; }
+
 	/// empty the entire shroud
 	virtual void clearShroud() = 0;
 
