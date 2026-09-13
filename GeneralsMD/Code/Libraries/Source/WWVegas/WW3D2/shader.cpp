@@ -1033,7 +1033,17 @@ void ShaderClass::Apply()
 	if (diff&ShaderClass::MASK_NPATCHENABLE) {
 		float level=1.0f;
 		if (Get_NPatch_Enable()) level=float(WW3D::Get_NPatches_Level());
-		DX8Wrapper::Set_DX8_Render_State(D3DRS_PATCHSEGMENTS,*((DWORD*)&level));
+		// rlgenerals: D3DRS_PATCHSEGMENTS=1.0 means "no tessellation", which is the
+		// device default and the only value this build ever sends (N-patches are
+		// never enabled, and DXVK cannot tessellate anyway). Invalidate_Cached_
+		// Render_States wipes the cache (to 0x12345678) several times per frame,
+		// so the no-op 1.0 would otherwise be re-sent on every Apply and DXVK's
+		// D3D8 layer would warn "Unimplemented render state D3DRS_PATCHSEGMENTS"
+		// each time. Only send it when tessellation is actually wanted, or the
+		// cache still holds a known value that needs resetting to 1.0.
+		if (level!=1.0f || DX8Wrapper::Get_DX8_Render_State(D3DRS_PATCHSEGMENTS)!=0x12345678) {
+			DX8Wrapper::Set_DX8_Render_State(D3DRS_PATCHSEGMENTS,*((DWORD*)&level));
+		}
 	}
 
 	// Enable/disable alpha test
