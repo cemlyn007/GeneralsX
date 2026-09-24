@@ -61,10 +61,6 @@
 #include "stripoptimizer.h"
 #include "meshgeometry.h"
 
-/*
-** Global Instance of the DX8MeshRender
-*/
-DX8MeshRendererClass TheDX8MeshRenderer;
 bool DX8TextureCategoryClass::m_gForceMultiply = false; // Forces opaque materials to use the multiply blend - pseudo transparent effect.  jba.
 // ----------------------------------------------------------------------------
 
@@ -74,6 +70,18 @@ static DynamicVectorClass<Vector3>				_TempNormalBuffer;
 static MultiListClass<MeshModelClass>			_RegisteredMeshList;
 static TextureCategoryList							texture_category_delete_list;
 static FVFCategoryList								fvf_category_container_delete_list;
+
+// GeneralsX @bugfix cemlyn007 24/09/2026 Define TheDX8MeshRenderer after the statics it tears down
+/*
+** Global Instance of the DX8MeshRender
+**
+** Defined after the file statics above, which its Shutdown uses: statics in
+** one file are destroyed in reverse order of definition, so this goes first
+** and still finds them alive. Defined before them, it ran against
+** already-destroyed temp buffers and freed their memory a second time when a
+** process exited without shutting the device down first.
+*/
+DX8MeshRendererClass TheDX8MeshRenderer;
 
 // helper data structure
 class PolyRemover : public MultiListObjectClass
@@ -2048,9 +2056,14 @@ DX8MeshRendererClass::DX8MeshRendererClass()
 {
 }
 
+// GeneralsX @bugfix cemlyn007 24/09/2026 Do not tear down GPU state during static destruction
 DX8MeshRendererClass::~DX8MeshRendererClass()
 {
-	Shutdown();
+	// Shutdown() runs from DX8Wrapper::Do_Onetime_Device_Dependent_Shutdowns.
+	// If it never ran, the process is exiting with the device alive: deleting
+	// the containers here would release D3D resources from a static destructor,
+	// after other translation units and the D3D library may have torn down.
+	// Leave them to the OS instead.
 }
 
 void DX8MeshRendererClass::Init()
