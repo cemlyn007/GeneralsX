@@ -284,7 +284,10 @@ BaseHeightMapRenderObjClass::BaseHeightMapRenderObjClass()
 #endif
 	m_bridgeBuffer = NEW W3DBridgeBuffer;
 
-	if (TheGlobalData->m_headless)
+	// rlgenerals: off-screen render mode needs the terrain decoration buffers AND
+	// the shroud (the terrain shader binds the shroud as texture stage 0), so do
+	// not skip them; only a fully headless run bails here.
+	if (TheGlobalData->m_headless && !TheGlobalData->m_headlessRender)
 		return;
 
 	m_treeBuffer = NEW W3DTreeBuffer;

@@ -35,7 +35,6 @@
 #include <cctype>
 #include <cstring>
 #include <cstdio>
-#include <unistd.h>   // _exit()
 #include <glob.h>     // glob() for Vulkan ICD discovery
 
 // USER INCLUDES (match WinMain.cpp pattern)
@@ -388,13 +387,7 @@ int main(int argc, char* argv[])
 
 	fprintf(stderr, "\nExiting with code %d\n", exitcode);
 
-	// GeneralsX @bugfix BenderAI 25/02/2026 — use _exit() to skip C++ global destructors.
-	// On macOS, __cxa_finalize_ranges runs ObjectPoolClass<X,256> global dtors after main() returns.
-	// Those dtors crash with a corrupted BlockListHead (SIGSEGV at 0x4ade32ec4ade0018) because
-	// pool block memory was already reused/overwritten during game shutdown.
-	// Windows never had this problem — ExitProcess() terminates without running C++ global dtors.
-	// _exit() matches that behavior. Explicit cleanup already done above (SDL_Quit, shutdownMemoryManager).
-	_exit(exitcode);
+	return exitcode;
 }
 
 #endif // !_WIN32

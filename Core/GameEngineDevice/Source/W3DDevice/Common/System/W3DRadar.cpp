@@ -75,6 +75,22 @@ inline Bool legalRadarPoint( Int px, Int py )
 }
 
 //-------------------------------------------------------------------------------------------------
+/** rlgenerals: read one raw pixel out of a locked surface. The counterpart to
+	* SurfaceClass::Draw_Pixel, which writes with the same memcpy-of-bytesPerPixel rule;
+	* widen the result with WW3D_Color_To_ARGB_Color to get ARGB. Used by copyToRGB. */
+// ------------------------------------------------------------------------------------------------
+static inline unsigned readSurfacePixel( const void *bits, Int pitch, unsigned bytesPerPixel,
+																				 Int x, Int y )
+{
+	const unsigned char *src =
+		static_cast<const unsigned char *>( bits ) + (size_t)y * (size_t)pitch
+		+ (size_t)x * (size_t)bytesPerPixel;
+	unsigned value = 0;
+	memcpy( &value, src, bytesPerPixel );
+	return value;
+}
+
+//-------------------------------------------------------------------------------------------------
 // ------------------------------------------------------------------------------------------------
 static WW3DFormat findFormat(const WW3DFormat formats[], WW3DFormat fallback = WW3D_FORMAT_X8R8G8B8)
 {
@@ -1464,6 +1480,131 @@ void W3DRadar::endSetShroudLevel()
 	* any direction that would cause the map to be distorted.  Extra blank space is drawn
 	* around the radar images to keep the whole radar area covered when the map displayed
 	* is "long" or "tall" */
+//-------------------------------------------------------------------------------------------------
+/** rlgenerals: read the radar back into an RGB buffer for the embedded RL bridge.
+	*
+	* Layers the same three textures draw() does, in the same order — terrain, then the
+	* object blips over it, then the shroud — so the result is what the *player* is
+	* entitled to see rather than ground truth: no radar means nothing at all, shrouded
+	* ground reads black, and blips appear only for objects canRenderObject() admits.
+	*
+	* This composites on the CPU from textures the engine already maintains, so it costs
+	* a lock and a 128x128 walk, not a GPU render pass. */
+//-------------------------------------------------------------------------------------------------
+Bool W3DRadar::copyToRGB( UnsignedByte *out, Int outW, Int outH )
+{
+	if( out == nullptr || outW != m_textureWidth || outH != m_textureHeight )
+		return FALSE;
+
+	const size_t outBytes = (size_t)outW * (size_t)outH * 3u;
+
+	// draw()'s very first line: a player with no radar sees nothing. Mirror it, so the
+	// observation goes black exactly when the human's radar would.
+	if( !rts::localPlayerHasRadar() )
+	{
+		memset( out, 0, outBytes );
+		return TRUE;
+	}
+
+	if( m_terrainTexture == nullptr )
+		return FALSE;
+
+	// draw() refreshes the blips on a timer. Nothing calls draw() when the engine runs
+	// headless for RL, so refresh them here or the overlay would stay frozen forever.
+	updateObjectTexture( m_overlayTexture );
+
+	SurfaceClass *terrainSurf = m_terrainTexture->Get_Surface_Level();
+	if( terrainSurf == nullptr )
+		return FALSE;
+	SurfaceClass *overlaySurf = m_overlayTexture ? m_overlayTexture->Get_Surface_Level() : nullptr;
+#if ENABLE_CONFIGURABLE_SHROUD
+	const Bool useShroud = TheGlobalData->m_shroudOn;
+#else
+	const Bool useShroud = TRUE;
+#endif
+	SurfaceClass *shroudSurf =
+		(useShroud && m_shroudTexture) ? m_shroudTexture->Get_Surface_Level() : nullptr;
+
+	SurfaceClass::SurfaceDescription td, od, sd;
+	terrainSurf->Get_Description( td );
+	if( overlaySurf ) overlaySurf->Get_Description( od );
+	if( shroudSurf )  shroudSurf->Get_Description( sd );
+
+	Int tPitch = 0, oPitch = 0, sPitch = 0;
+	const void *tBits = terrainSurf->Lock( &tPitch );
+	const void *oBits = overlaySurf ? overlaySurf->Lock( &oPitch ) : nullptr;
+	const void *sBits = shroudSurf  ? shroudSurf->Lock( &sPitch )  : nullptr;
+
+	if( tBits == nullptr )
+	{
+		if( oBits ) overlaySurf->Unlock();
+		if( sBits ) shroudSurf->Unlock();
+		REF_PTR_RELEASE( terrainSurf );
+		REF_PTR_RELEASE( overlaySurf );
+		REF_PTR_RELEASE( shroudSurf );
+		return FALSE;
+	}
+
+	const unsigned tBpp = Get_Bytes_Per_Pixel( td.Format );
+	const unsigned oBpp = oBits ? Get_Bytes_Per_Pixel( od.Format ) : 0;
+	const unsigned sBpp = sBits ? Get_Bytes_Per_Pixel( sd.Format ) : 0;
+
+	for( Int y = 0; y < outH; ++y )
+	{
+		for( Int x = 0; x < outW; ++x )
+		{
+			const unsigned t = WW3D_Color_To_ARGB_Color(
+				td.Format, readSurfacePixel( tBits, tPitch, tBpp, x, y ) );
+			Int r = (t >> 16) & 0xFF;
+			Int g = (t >>  8) & 0xFF;
+			Int b = (t >>  0) & 0xFF;
+
+			// blips over terrain, weighted by the blip's own alpha (stealthed units
+			// deliberately carry a low alpha so they twinkle rather than sit solid)
+			if( oBits )
+			{
+				const unsigned o = WW3D_Color_To_ARGB_Color(
+					od.Format, readSurfacePixel( oBits, oPitch, oBpp, x, y ) );
+				const Int a = (o >> 24) & 0xFF;
+				if( a )
+				{
+					r = ( r * (255 - a) + ((o >> 16) & 0xFF) * a ) / 255;
+					g = ( g * (255 - a) + ((o >>  8) & 0xFF) * a ) / 255;
+					b = ( b * (255 - a) + ((o >>  0) & 0xFF) * a ) / 255;
+				}
+			}
+
+			// shroud is black at alpha 255 (unexplored) / 127 (fogged) / 0 (visible),
+			// so it just darkens whatever is underneath
+			if( sBits )
+			{
+				const unsigned s = WW3D_Color_To_ARGB_Color(
+					sd.Format, readSurfacePixel( sBits, sPitch, sBpp, x, y ) );
+				const Int a = (s >> 24) & 0xFF;
+				if( a )
+				{
+					r = ( r * (255 - a) ) / 255;
+					g = ( g * (255 - a) ) / 255;
+					b = ( b * (255 - a) ) / 255;
+				}
+			}
+
+			UnsignedByte *px = out + 3u * ( (size_t)y * (size_t)outW + (size_t)x );
+			px[ 0 ] = (UnsignedByte)r;
+			px[ 1 ] = (UnsignedByte)g;
+			px[ 2 ] = (UnsignedByte)b;
+		}
+	}
+
+	terrainSurf->Unlock();
+	if( oBits ) overlaySurf->Unlock();
+	if( sBits ) shroudSurf->Unlock();
+	REF_PTR_RELEASE( terrainSurf );
+	REF_PTR_RELEASE( overlaySurf );
+	REF_PTR_RELEASE( shroudSurf );
+	return TRUE;
+}
+
 //-------------------------------------------------------------------------------------------------
 void W3DRadar::draw( Int pixelX, Int pixelY, Int width, Int height )
 {

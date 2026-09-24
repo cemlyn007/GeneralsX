@@ -104,7 +104,7 @@ protected:
 **
 ** Notes:
 ** - The array forms of new and delete are not supported
-** - You must define the instance of the static object pool (Allocator)
+** - You must define the object pool accessor (Allocator) with DEFINE_AUTO_POOL
 ** - You can't derive a class from a class that is derived from AutoPoolClass
 **   because its size won't match but it will try to use the same pool...
 **
@@ -119,7 +119,7 @@ protected:
 ** };
 **
 ** ListNode.cpp:
-** DEFINE_AUTO_POOL(ListNodeClass);
+** DEFINE_AUTO_POOL(ListNodeClass,256);
 **
 ** function do_stuff() {
 **		ListNodeClass * node = new ListNodeClass;
@@ -141,8 +141,8 @@ private:
 	static void *	operator new [] (size_t size);
 	static void		operator delete[] (void * memory);
 
-	// This must be staticly declared by user
-	static ObjectPoolClass<T,BLOCK_SIZE>	Allocator;
+	// This must be defined by the user (DEFINE_AUTO_POOL)
+	static ObjectPoolClass<T,BLOCK_SIZE> &	Allocator();
 
 };
 
@@ -150,14 +150,35 @@ private:
 ** DEFINE_AUTO_POOL(T,BLOCKSIZE)
 ** Macro to declare the allocator for your class.  Put this in the cpp file for
 ** the class.
+**
+** The allocator is constructed on first use and never destroyed. As a static
+** object it was destroyed at exit in whatever order the linker chose, freeing
+** every block it had handed out while other statics still held pooled objects:
+** e.g. TheDX8MeshRenderer's destructor walks MultiListClass nodes, and exiting
+** a process that had rendered without first shutting the device down (so
+** without emptying those lists) crashed inside it. Leaving the pool to the
+** OS at exit makes the order irrelevant.
+**
+** The trailing extern declaration takes the semicolon written after the macro.
 */
+// GeneralsX @bugfix cemlyn007 24/09/2026 Never destroy AutoPoolClass allocators
 #if defined(_MSC_VER) && _MSC_VER < 1300
 #define DEFINE_AUTO_POOL(T,BLOCKSIZE) \
-ObjectPoolClass<T,BLOCKSIZE> AutoPoolClass<T,BLOCKSIZE>::Allocator;
+ObjectPoolClass<T,BLOCKSIZE> & AutoPoolClass<T,BLOCKSIZE>::Allocator() \
+{ \
+	static ObjectPoolClass<T,BLOCKSIZE> * const allocator = new ObjectPoolClass<T,BLOCKSIZE>; \
+	return *allocator; \
+} \
+extern int DEFINE_AUTO_POOL_requires_semicolon
 #else
 #define DEFINE_AUTO_POOL(T,BLOCKSIZE) \
-template<>\
-ObjectPoolClass<T,BLOCKSIZE> AutoPoolClass<T,BLOCKSIZE>::Allocator = {}
+template<> \
+ObjectPoolClass<T,BLOCKSIZE> & AutoPoolClass<T,BLOCKSIZE>::Allocator() \
+{ \
+	static ObjectPoolClass<T,BLOCKSIZE> * const allocator = new ObjectPoolClass<T,BLOCKSIZE>; \
+	return *allocator; \
+} \
+extern int DEFINE_AUTO_POOL_requires_semicolon
 #endif
 
 
@@ -286,8 +307,10 @@ T * ObjectPoolClass<T,BLOCK_SIZE>::Allocate_Object_Memory()
 		// Link this block into the block list
 		*(void **)BlockListHead = tmp_block_head;
 
-		// Link the objects in the block into the free object list
-		FreeListHead = (T*)(BlockListHead + 1);
+		// Link the objects in the block into the free object list. The block header
+		// is one pointer (sizeof(void*)) wide, so on 64-bit the first object must
+		// start after the whole pointer, not after the first uint32 of it.
+		FreeListHead = (T*)((void**)BlockListHead + 1);
 		for ( int i = 0; i < BLOCK_SIZE; i++ ) {
 			*(T**)(&(FreeListHead[i])) = &(FreeListHead[i+1]);	// link up the elements
 		}
@@ -345,7 +368,7 @@ template<class T, int BLOCK_SIZE>
 void * AutoPoolClass<T,BLOCK_SIZE>::operator new( size_t size )
 {
 	WWASSERT(size == sizeof(T));
-	return (void *)(Allocator.Allocate_Object_Memory());
+	return (void *)(Allocator().Allocate_Object_Memory());
 }
 
 
@@ -365,5 +388,5 @@ template<class T, int BLOCK_SIZE>
 void AutoPoolClass<T,BLOCK_SIZE>::operator delete( void * memory )
 {
 	if ( memory == nullptr ) return;
-	Allocator.Free_Object_Memory((T*)memory);
+	Allocator().Free_Object_Memory((T*)memory);
 }

@@ -144,6 +144,12 @@ struct DX8FrameStatistics
 
 extern bool _DX8SingleThreaded;
 
+// rlgenerals: off-screen render mode. When true, WW3D::Begin_Render does NOT
+// bail on a failed TestCooperativeLevel — the swapchain can't present to the
+// hidden window, but the device can still render into the backbuffer, which the
+// RL embed reads back (it never presents).
+extern bool DX8Wrapper_HeadlessRender;
+
 void DX8_Assert();
 void Log_DX8_ErrorCode(unsigned res);
 

@@ -191,6 +191,13 @@ unsigned Get_Bytes_Per_Pixel(WW3DFormat format);
 
 unsigned ARGB_Color_To_WW3D_Color(WW3DFormat format, unsigned argb);
 
+// rlgenerals: the inverse of ARGB_Color_To_WW3D_Color — widen a pixel in `format`
+// back to 8-bit-per-channel ARGB. Unlike SurfaceClass::Get_Pixel (which yields RGB
+// only), this preserves alpha, which is what makes it possible to read a locked
+// surface back and composite it: the radar's blip overlay and its shroud both carry
+// their meaning in the alpha channel. Formats with no alpha widen to a = 0xFF.
+unsigned WW3D_Color_To_ARGB_Color(WW3DFormat format, unsigned pixel);
+
 void Get_WW3D_Format_Name(WW3DFormat format, StringClass& name);
 void Get_WW3D_ZFormat_Name(WW3DZFormat format, StringClass& name);
 

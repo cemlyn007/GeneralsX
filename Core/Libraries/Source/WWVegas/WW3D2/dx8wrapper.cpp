@@ -399,6 +399,7 @@ DX8FrameStatistics DX8Wrapper::FrameStatistics;
 static DX8FrameStatistics LastFrameStatistics;
 
 bool DX8Wrapper_IsWindowed = true;
+bool DX8Wrapper_HeadlessRender = false;  // rlgenerals: see dx8wrapper.h
 
 // FPU_PRESERVE
 int DX8Wrapper_PreserveFPU = 0;
@@ -1031,6 +1032,59 @@ bool DX8Wrapper::Reset_Device(bool reload_assets)
 	return false;
 }
 
+// GeneralsX @bugfix cemlyn007 24/09/2026 Wait for the device to go idle before releasing it
+/*
+** Block until the device has run everything queued on it, by reading one
+** back-buffer pixel back: the lock cannot complete before the copy, and the
+** copy runs after all earlier work. Releasing the device is not enough on its
+** own when resources are still alive: every live device child holds a
+** reference on the device (DXVK), so the device, its worker threads and
+** whatever they are still compiling outlive the release, and a process that
+** exits next unloads the GPU driver under those threads.
+**
+** A multisampled back buffer cannot be copied from, so in that case clear a
+** lockable 1x1 render target instead and read that back: it is submitted
+** after all earlier work, so the lock still waits for everything queued.
+*/
+static void Wait_For_Device_Idle(IDirect3DDevice8* device)
+{
+	IDirect3DSurface8* back_buffer = nullptr;
+	if (FAILED(device->GetBackBuffer(0, D3DBACKBUFFER_TYPE_MONO, &back_buffer)) || back_buffer == nullptr) {
+		WWDEBUG_WARNING(("Wait_For_Device_Idle: no back buffer, releasing the device without waiting"));
+		return;
+	}
+	bool waited = false;
+	D3DSURFACE_DESC desc;
+	if (SUCCEEDED(back_buffer->GetDesc(&desc))) {
+		D3DLOCKED_RECT locked;
+		IDirect3DSurface8* readback = nullptr;
+		if (desc.MultiSampleType == D3DMULTISAMPLE_NONE) {
+			if (SUCCEEDED(device->CreateImageSurface(1, 1, desc.Format, &readback)) && readback != nullptr) {
+				RECT source = {0, 0, 1, 1};
+				POINT destination = {0, 0};
+				if (SUCCEEDED(device->CopyRects(back_buffer, &source, 1, readback, &destination)) &&
+					SUCCEEDED(readback->LockRect(&locked, nullptr, D3DLOCK_READONLY))) {
+					readback->UnlockRect();
+					waited = true;
+				}
+				readback->Release();
+			}
+		} else if (SUCCEEDED(device->CreateRenderTarget(1, 1, desc.Format, D3DMULTISAMPLE_NONE, TRUE, &readback)) && readback != nullptr) {
+			if (SUCCEEDED(device->SetRenderTarget(readback, nullptr)) &&
+				SUCCEEDED(device->Clear(0, nullptr, D3DCLEAR_TARGET, 0, 1.0f, 0)) &&
+				SUCCEEDED(readback->LockRect(&locked, nullptr, D3DLOCK_READONLY))) {
+				readback->UnlockRect();
+				waited = true;
+			}
+			readback->Release();
+		}
+	}
+	back_buffer->Release();
+	if (!waited) {
+		WWDEBUG_WARNING(("Wait_For_Device_Idle: readback failed, releasing the device without waiting"));
+	}
+}
+
 void DX8Wrapper::Release_Device()
 {
 	Pillarbox_Cleanup();
@@ -1063,9 +1117,11 @@ void DX8Wrapper::Release_Device()
 		Do_Onetime_Device_Dependent_Shutdowns();
 
 		/*
-		** Release the device
+		** Release the device, once it has finished its queued work (see
+		** Wait_For_Device_Idle)
 		*/
 
+		Wait_For_Device_Idle(D3DDevice);
 		D3DDevice->Release();
 		D3DDevice=nullptr;
 	}

@@ -63,6 +63,10 @@ public:
 
 	virtual void draw( Int pixelX, Int pixelY, Int width, Int height ) override;		///< draw the radar
 
+	/// rlgenerals: read the radar back as RGB for the RL bridge (see Radar::copyToRGB).
+	/// outW/outH must match the radar's own texture size (RADAR_CELL_WIDTH/HEIGHT).
+	virtual Bool copyToRGB( UnsignedByte *out, Int outW, Int outH ) override;
+
 	virtual void clearShroud() override;
 	virtual void setShroudLevel(Int x, Int y, CellShroudStatus setting) override; ///< set the shroud level at shroud cell x,y
 	virtual void beginSetShroudLevel() override; ///< call this once before multiple calls to setShroudLevel for better performance

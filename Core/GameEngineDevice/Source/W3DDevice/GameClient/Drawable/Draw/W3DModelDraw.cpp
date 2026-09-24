@@ -3706,7 +3706,11 @@ Bool W3DModelDraw::handleWeaponFireFX(WeaponSlotType wslot, Int specificBarrelTo
 
 	Bool handled = false;
 
-	if (specificBarrelToUse < 0 || specificBarrelToUse > wbvec.size())
+	// Clamp the barrel index into range. NOTE: this used to test `> wbvec.size()`,
+	// which let an index EQUAL to size() through and then read one past the end of
+	// wbvec below (garbage m_fxBone/m_recoilBone -> downstream null/OOB deref).
+	// wbvec is non-empty here (checked above), so 0 is always a valid fallback.
+	if (specificBarrelToUse < 0 || specificBarrelToUse >= (Int)wbvec.size())
 		specificBarrelToUse = 0;
 
 	const ModelConditionInfo::WeaponBarrelInfo& info = wbvec[specificBarrelToUse];
@@ -3715,7 +3719,12 @@ Bool W3DModelDraw::handleWeaponFireFX(WeaponSlotType wslot, Int specificBarrelTo
 	{
 		if (info.m_fxBone && m_renderObject)
 		{
-			const Object *logicObject = getDrawable()->getObject();// This is slow, so store it
+			// Guard a null drawable (getObject() off a null getDrawable() faults at
+			// 0x0). logicObject is only dereferenced in the else-branch below, which
+			// is entered only when it is non-null, so treating null as "no object"
+			// preserves behavior.
+			Drawable* draw = getDrawable();
+			const Object *logicObject = draw ? draw->getObject() : nullptr;// This is slow, so store it
 			if( ! m_renderObject->Is_Hidden() || (logicObject == nullptr) )
 			{
 				// I can ask the drawable's bone position if I am not hidden (if I have no object I have no choice)
@@ -3753,10 +3762,17 @@ Bool W3DModelDraw::handleWeaponFireFX(WeaponSlotType wslot, Int specificBarrelTo
 	if (info.m_recoilBone || info.m_muzzleFlashBone)
 	{
 		//DEBUG_LOG(("START muzzleflash %08lx for Draw %08lx state %s at frame %d",info.m_muzzleFlashBone,this,m_curState->m_description.str(),TheGameLogic->getFrame()));
-		WeaponRecoilInfo& recoil = m_weaponRecoilInfoVec[wslot][specificBarrelToUse];
-		recoil.m_state = WeaponRecoilInfo::RECOIL_START;
-		recoil.m_recoilRate = getW3DModelDrawModuleData()->m_initialRecoil;
-		if (info.m_muzzleFlashBone != 0)
+		// The recoil vector is NOT guaranteed to be as long as the barrel vector
+		// (see the barrel!=recoil count assert/clamp in adjustAnimation); index it
+		// only when in range so a short recoil vector can't corrupt memory.
+		WeaponRecoilInfoVec& recoils = m_weaponRecoilInfoVec[wslot];
+		if (specificBarrelToUse < (Int)recoils.size())
+		{
+			WeaponRecoilInfo& recoil = recoils[specificBarrelToUse];
+			recoil.m_state = WeaponRecoilInfo::RECOIL_START;
+			recoil.m_recoilRate = getW3DModelDrawModuleData()->m_initialRecoil;
+		}
+		if (info.m_muzzleFlashBone != 0 && m_renderObject)
 			info.setMuzzleFlashHidden(m_renderObject, false);
 	}
 

@@ -484,14 +484,14 @@ W3DDisplay::~W3DDisplay()
 
 	// shutdown
 	Debug_Statistics::Shutdown_Statistics();
-	if (!TheGlobalData->m_headless)
+	if (!TheGlobalData->m_headless || TheGlobalData->m_headlessRender)
 		W3DShaderManager::shutdown();
 	m_assetManager->Free_Assets();
 	delete m_assetManager;
-	if (!TheGlobalData->m_headless)
+	if (!TheGlobalData->m_headless || TheGlobalData->m_headlessRender)
 		WW3D::Shutdown();
 	WWMath::Shutdown();
-	if (!TheGlobalData->m_headless)
+	if (!TheGlobalData->m_headless || TheGlobalData->m_headlessRender)
 		DX8WebBrowser::Shutdown();
 	delete TheW3DFileSystem;
 	TheW3DFileSystem = nullptr;
@@ -921,7 +921,7 @@ void W3DDisplay::init()
 	// init the Westwood math library
 	WWMath::Init();
 
-	if (!TheGlobalData->m_headless)
+	if (!TheGlobalData->m_headless || TheGlobalData->m_headlessRender)
 	{
 
 		// create our 3D interface scene
@@ -976,7 +976,7 @@ void W3DDisplay::init()
 	m_assetManager->Register_Prototype_Loader(&_AggregateLoader);
 	m_assetManager->Set_WW3D_Load_On_Demand( true );
 
-	if (!TheGlobalData->m_headless)
+	if (!TheGlobalData->m_headless || TheGlobalData->m_headlessRender)
 	{
 
 		if (TheGlobalData->m_incrementalAGPBuf)
@@ -1013,7 +1013,9 @@ void W3DDisplay::init()
 		// GeneralsX @bugfix felipebraz 16/02/2026 Show window after DirectX8/DXVK initialized
 		#ifndef _WIN32
 		extern SDL_Window* TheSDL3Window;
-		if (TheSDL3Window) {
+		// rlgenerals: keep the window HIDDEN in off-screen render mode — we render
+		// to its backbuffer and read it back, never presenting to a visible window.
+		if (TheSDL3Window && !TheGlobalData->m_headlessRender) {
 			fprintf(stderr, "DEBUG: Showing SDL3 window after WW3D init...\n");
 			SDL_ShowWindow(TheSDL3Window);
 		}
@@ -1138,7 +1140,7 @@ void W3DDisplay::init()
 
 	initAssets();
 
-	if (!TheGlobalData->m_headless)
+	if (!TheGlobalData->m_headless || TheGlobalData->m_headlessRender)
 	{
 		init2DScene();
 		init3DScene();
@@ -1939,7 +1941,10 @@ void W3DDisplay::calculateTerrainLOD()
 			{	// draw all views of the world
 				drawViews();
 				// render is all done!
-				WW3D::End_Render();
+				// rlgenerals: in off-screen render mode do NOT flip/Present — the
+				// backbuffer must retain the frame so the embed can read it back
+				// (the readback's GetRenderTargetData flushes the GPU work anyway).
+				WW3D::End_Render(!TheGlobalData->m_headlessRender);
 			}
 			Int64 time64 = getPerformanceCounter();
 			timeForFrame = (float)((double)(time64-startTime64) / (double)(freq64));
@@ -2013,7 +2018,8 @@ void W3DDisplay::draw()
 		return;
 	}
 
-	if (TheGlobalData->m_headless)
+	// rlgenerals: render-headless still draws (to a hidden-window backbuffer).
+	if (TheGlobalData->m_headless && !TheGlobalData->m_headlessRender)
 		return;
 
 	// TheSuperHackers @feature bobtista 10/07/2026 Show messages for screenshots finished by the screenshot thread.
@@ -2201,7 +2207,10 @@ AGAIN:
 					TheInGameUI->draw();
 					if( TheMouse )
 						TheMouse->draw();	//keep applying the current cursor style so it remains hidden if needed.
-					WW3D::End_Render();
+					// rlgenerals: in off-screen render mode do NOT flip/Present — the
+				// backbuffer must retain the frame so the embed can read it back
+				// (the readback's GetRenderTargetData flushes the GPU work anyway).
+				WW3D::End_Render(!TheGlobalData->m_headlessRender);
 					continue;
 				}
 				couldRender = true;
@@ -2213,7 +2222,15 @@ AGAIN:
 				drawViews();
 
 				// draw the user interface
-				TheInGameUI->DRAW();
+				// rlgenerals: skip the whole HUD in off-screen RL render mode. The
+				// frame is a policy observation there, and the UI is fixed-pixel-size
+				// text (clock, game timer, control bar) that does not scale with the
+				// render size — at 128x96 it swallows the frame. Everything the policy
+				// needs from it (money, power, clock) is already in the scalar obs, so
+				// nothing is lost by dropping the pixels. Normal gameplay is unaffected
+				// (m_headless is FALSE there); a fully headless env never reaches draw().
+				if (!(TheGlobalData->m_headless && TheGlobalData->m_headlessRender))
+					TheInGameUI->DRAW();
 
 				// end of video example code
 
@@ -2292,7 +2309,10 @@ AGAIN:
 				}
 #endif
 				// render is all done!
-				WW3D::End_Render();
+				// rlgenerals: in off-screen render mode do NOT flip/Present — the
+				// backbuffer must retain the frame so the embed can read it back
+				// (the readback's GetRenderTargetData flushes the GPU work anyway).
+				WW3D::End_Render(!TheGlobalData->m_headlessRender);
 			}
 			else
 			{

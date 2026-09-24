@@ -1391,8 +1391,10 @@ void InGameUI::init()
 	to order the translators when the code is not centralized so it has
 	been moved to where all the other translators are attached in game client */
 
-	// create the tactical view
-	TheTacticalView = createView(TheGlobalData->m_headless);
+	// create the tactical view. rlgenerals: in off-screen render mode we need a
+	// REAL W3DView (with a 3D camera) even though m_headless is set, so the scene
+	// can be drawn to the backbuffer; only a fully headless run gets ViewDummy.
+	TheTacticalView = createView(TheGlobalData->m_headless && !TheGlobalData->m_headlessRender);
 	if (TheTacticalView && TheDisplay)
 	{
 		TheTacticalView->init();
@@ -5977,10 +5979,13 @@ void InGameUI::updateIdleWorker()
 
 void InGameUI::resetIdleWorker()
 {
-	if(m_idleWorkerWin)
-	{
-		GadgetButtonSetText(m_idleWorkerWin, UnicodeString::TheEmptyString);
-	}
+	// TheSuperHackers @bugfix rlgenerals 12/07/2026 Drop the cached idle-worker
+	// button instead of clearing its text: the button belongs to the game-scoped
+	// window layouts, which are torn down with the game this reset() ends. Keeping
+	// the pointer made the NEXT game's first updateIdleWorker() call
+	// hide/showIdleWorkerLayout on freed memory (jump through a nulled callback).
+	// show/hideIdleWorkerLayout re-resolve it lazily.
+	m_idleWorkerWin = nullptr;
 	m_currentIdleWorkerDisplay = -1;
 	for(Int i = 0; i < MAX_PLAYER_COUNT; ++i)
 	{

@@ -213,7 +213,10 @@ void W3DTerrainVisual::init()
 	m_terrainRenderObject->Set_Collision_Type( PICK_TYPE_TERRAIN );
 	TheTerrainRenderObject = m_terrainRenderObject;
 
-	if (!TheGlobalData->m_headless)
+	// rlgenerals: off-screen render mode needs the shadow manager (the scene's
+	// stencil-occlusion pass dereferences TheW3DShadowManager), terrain tracks and
+	// water; only a fully headless run skips them.
+	if (!TheGlobalData->m_headless || TheGlobalData->m_headlessRender)
 	{
 		// initialize track drawing system
 		TheTerrainTracksRenderObjClassSystem = NEW TerrainTracksRenderObjClassSystem;
@@ -1170,6 +1173,17 @@ void W3DTerrainVisual::xfer( Xfer *xfer )
 #else
 	XferVersion currentVersion = 3;
 #endif
+	// rlgenerals: a fully headless run never creates the terrain render object's
+	// client-side tree/prop buffers (see the matching early return in
+	// BaseHeightMapRenderObjClass's constructor), and version 3 xfers them, so
+	// XferSave::xferSnapshot(nullptr) threw and saveGame always failed headless.
+	// Write version 2 there instead: everything but those visual-only buffers,
+	// which a load in render mode then keeps from the map, as for any version 2
+	// file. Loading a version 3 file headless still fails (the buffers it
+	// carries have nowhere to go, and a block cannot be skipped part-way).
+	if( xfer->getXferMode() != XFER_LOAD && currentVersion > 2 &&
+			TheGlobalData->m_headless && !TheGlobalData->m_headlessRender )
+		currentVersion = 2;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
