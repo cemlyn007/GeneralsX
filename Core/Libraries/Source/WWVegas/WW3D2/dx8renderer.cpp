@@ -61,10 +61,6 @@
 #include "stripoptimizer.h"
 #include "meshgeometry.h"
 
-/*
-** Global Instance of the DX8MeshRender
-*/
-DX8MeshRendererClass TheDX8MeshRenderer;
 bool DX8TextureCategoryClass::m_gForceMultiply = false; // Forces opaque materials to use the multiply blend - pseudo transparent effect.  jba.
 // ----------------------------------------------------------------------------
 
@@ -74,6 +70,17 @@ static DynamicVectorClass<Vector3>				_TempNormalBuffer;
 static MultiListClass<MeshModelClass>			_RegisteredMeshList;
 static TextureCategoryList							texture_category_delete_list;
 static FVFCategoryList								fvf_category_container_delete_list;
+
+/*
+** Global Instance of the DX8MeshRender
+**
+** Defined after the file statics above, which its destructor (Shutdown) uses:
+** statics in one file are destroyed in reverse order of definition, so this
+** goes first and still finds them alive. Defined before them, it ran against
+** already-destroyed temp buffers and freed their memory a second time when a
+** process exited without shutting the device down first.
+*/
+DX8MeshRendererClass TheDX8MeshRenderer;
 
 // helper data structure
 class PolyRemover : public MultiListObjectClass
