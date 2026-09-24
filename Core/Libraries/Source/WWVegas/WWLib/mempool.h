@@ -104,7 +104,7 @@ protected:
 **
 ** Notes:
 ** - The array forms of new and delete are not supported
-** - You must define the instance of the static object pool (Allocator)
+** - You must define the object pool accessor (Allocator) with DEFINE_AUTO_POOL
 ** - You can't derive a class from a class that is derived from AutoPoolClass
 **   because its size won't match but it will try to use the same pool...
 **
@@ -119,7 +119,7 @@ protected:
 ** };
 **
 ** ListNode.cpp:
-** DEFINE_AUTO_POOL(ListNodeClass);
+** DEFINE_AUTO_POOL(ListNodeClass,256);
 **
 ** function do_stuff() {
 **		ListNodeClass * node = new ListNodeClass;
@@ -158,14 +158,28 @@ private:
 ** a process that had rendered without first shutting the device down (so
 ** without emptying those lists) crashed inside it. Leaving the pool to the
 ** OS at exit makes the order irrelevant.
+**
+** The trailing extern declaration takes the semicolon written after the macro.
 */
+// GeneralsX @bugfix cemlyn007 24/09/2026 Never destroy AutoPoolClass allocators
+#if defined(_MSC_VER) && _MSC_VER < 1300
+#define DEFINE_AUTO_POOL(T,BLOCKSIZE) \
+ObjectPoolClass<T,BLOCKSIZE> & AutoPoolClass<T,BLOCKSIZE>::Allocator() \
+{ \
+	static ObjectPoolClass<T,BLOCKSIZE> * const allocator = new ObjectPoolClass<T,BLOCKSIZE>; \
+	return *allocator; \
+} \
+extern int DEFINE_AUTO_POOL_requires_semicolon
+#else
 #define DEFINE_AUTO_POOL(T,BLOCKSIZE) \
 template<> \
 ObjectPoolClass<T,BLOCKSIZE> & AutoPoolClass<T,BLOCKSIZE>::Allocator() \
 { \
 	static ObjectPoolClass<T,BLOCKSIZE> * const allocator = new ObjectPoolClass<T,BLOCKSIZE>; \
 	return *allocator; \
-}
+} \
+extern int DEFINE_AUTO_POOL_requires_semicolon
+#endif
 
 
 /***********************************************************************************************
