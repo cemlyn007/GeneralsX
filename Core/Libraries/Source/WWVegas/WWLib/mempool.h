@@ -141,8 +141,8 @@ private:
 	static void *	operator new [] (size_t size);
 	static void		operator delete[] (void * memory);
 
-	// This must be staticly declared by user
-	static ObjectPoolClass<T,BLOCK_SIZE>	Allocator;
+	// This must be defined by the user (DEFINE_AUTO_POOL)
+	static ObjectPoolClass<T,BLOCK_SIZE> &	Allocator();
 
 };
 
@@ -150,15 +150,22 @@ private:
 ** DEFINE_AUTO_POOL(T,BLOCKSIZE)
 ** Macro to declare the allocator for your class.  Put this in the cpp file for
 ** the class.
+**
+** The allocator is constructed on first use and never destroyed. As a static
+** object it was destroyed at exit in whatever order the linker chose, freeing
+** every block it had handed out while other statics still held pooled objects:
+** e.g. TheDX8MeshRenderer's destructor walks MultiListClass nodes, and exiting
+** a process that had rendered without first shutting the device down (so
+** without emptying those lists) crashed inside it. Leaving the pool to the
+** OS at exit makes the order irrelevant.
 */
-#if defined(_MSC_VER) && _MSC_VER < 1300
 #define DEFINE_AUTO_POOL(T,BLOCKSIZE) \
-ObjectPoolClass<T,BLOCKSIZE> AutoPoolClass<T,BLOCKSIZE>::Allocator;
-#else
-#define DEFINE_AUTO_POOL(T,BLOCKSIZE) \
-template<>\
-ObjectPoolClass<T,BLOCKSIZE> AutoPoolClass<T,BLOCKSIZE>::Allocator = {}
-#endif
+template<> \
+ObjectPoolClass<T,BLOCKSIZE> & AutoPoolClass<T,BLOCKSIZE>::Allocator() \
+{ \
+	static ObjectPoolClass<T,BLOCKSIZE> * const allocator = new ObjectPoolClass<T,BLOCKSIZE>; \
+	return *allocator; \
+}
 
 
 /***********************************************************************************************
@@ -347,7 +354,7 @@ template<class T, int BLOCK_SIZE>
 void * AutoPoolClass<T,BLOCK_SIZE>::operator new( size_t size )
 {
 	WWASSERT(size == sizeof(T));
-	return (void *)(Allocator.Allocate_Object_Memory());
+	return (void *)(Allocator().Allocate_Object_Memory());
 }
 
 
@@ -367,5 +374,5 @@ template<class T, int BLOCK_SIZE>
 void AutoPoolClass<T,BLOCK_SIZE>::operator delete( void * memory )
 {
 	if ( memory == nullptr ) return;
-	Allocator.Free_Object_Memory((T*)memory);
+	Allocator().Free_Object_Memory((T*)memory);
 }
