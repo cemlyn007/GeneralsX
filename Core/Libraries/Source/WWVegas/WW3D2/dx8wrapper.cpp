@@ -967,6 +967,37 @@ bool DX8Wrapper::Reset_Device(bool reload_assets)
 	return false;
 }
 
+/*
+** Block until the device has run everything queued on it, by reading one
+** back-buffer pixel back: the lock cannot complete before the copy, and the
+** copy runs after all earlier work. Releasing the device is not enough on its
+** own when resources are still alive: every live device child holds a
+** reference on the device (DXVK), so the device, its worker threads and
+** whatever they are still compiling outlive the release, and a process that
+** exits next unloads the GPU driver under those threads.
+*/
+static void Wait_For_Device_Idle(IDirect3DDevice8* device)
+{
+	IDirect3DSurface8* back_buffer = nullptr;
+	if (FAILED(device->GetBackBuffer(0, D3DBACKBUFFER_TYPE_MONO, &back_buffer)) || back_buffer == nullptr) {
+		return;
+	}
+	D3DSURFACE_DESC desc;
+	IDirect3DSurface8* readback = nullptr;
+	if (SUCCEEDED(back_buffer->GetDesc(&desc)) &&
+		SUCCEEDED(device->CreateImageSurface(1, 1, desc.Format, &readback)) && readback != nullptr) {
+		RECT source = {0, 0, 1, 1};
+		POINT destination = {0, 0};
+		D3DLOCKED_RECT locked;
+		if (SUCCEEDED(device->CopyRects(back_buffer, &source, 1, readback, &destination)) &&
+			SUCCEEDED(readback->LockRect(&locked, nullptr, D3DLOCK_READONLY))) {
+			readback->UnlockRect();
+		}
+		readback->Release();
+	}
+	back_buffer->Release();
+}
+
 void DX8Wrapper::Release_Device()
 {
 	Pillarbox_Cleanup();
@@ -999,9 +1030,11 @@ void DX8Wrapper::Release_Device()
 		Do_Onetime_Device_Dependent_Shutdowns();
 
 		/*
-		** Release the device
+		** Release the device, once it has finished its queued work (see
+		** Wait_For_Device_Idle)
 		*/
 
+		Wait_For_Device_Idle(D3DDevice);
 		D3DDevice->Release();
 		D3DDevice=nullptr;
 	}
