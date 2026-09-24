@@ -1917,7 +1917,11 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 			else
 			{
 				// remove shroud for the player in MP games
-				if (!TheMultiplayerSettings->isShroudInMultiplayer())
+				// GeneralsX @feature Unless the game itself says otherwise (a replay
+				// carries its recording game's setting; see GameInfo::hasUseShroud).
+				const Bool useShroud = TheGameInfo->hasUseShroud() ? TheGameInfo->getUseShroud()
+					: TheMultiplayerSettings->isShroudInMultiplayer();
+				if (!useShroud)
 					ThePartitionManager->revealMapForPlayer( player->getPlayerIndex() );
 			}
 		}
