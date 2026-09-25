@@ -321,6 +321,7 @@ void GameInfo::reset()
 	m_mapSize = 0;
   m_superweaponRestriction = 0;
   m_startingCash = TheGlobalData->m_defaultStartingCash;
+	clearUseShroud();
 
 	for (Int i=0; i<MAX_SLOTS; ++i)
 	{
@@ -999,6 +1000,13 @@ static AsciiString buildGameInfoAsciiString(const GameInfo& game, const AsciiStr
 		game.getMapCRC(), game.getMapSize(), game.getSeed(), game.getCRCInterval(), game.getSuperweaponRestriction(),
 		game.getStartingCash().countMoney(), game.oldFactionsOnly() ? 'Y' : 'N' );
 #endif
+	// GeneralsX @feature Only when the game sets it (see GameInfo::hasUseShroud).
+	if (game.hasUseShroud())
+	{
+		AsciiString useShroud;
+		useShroud.format("SH=%d;", game.getUseShroud() ? 1 : 0);
+		optionsString.concat(useShroud);
+	}
 
 	//add player info for each slot
 	optionsString.concat(slotListID);
@@ -1185,6 +1193,8 @@ Bool ParseAsciiStringToGameInfo(GameInfo *game, AsciiString options)
 	Bool sawSuperweaponRestriction = FALSE;
 	Bool sawStartingCash = FALSE;
 	Bool sawOldFactions = FALSE;
+	Bool useShroud = FALSE;
+	Bool sawUseShroud = FALSE;
 
 	//DEBUG_LOG(("Saw options of %s", options.str()));
 	DEBUG_LOG(("ParseAsciiStringToGameInfo - parsing [%s]", options.str()));
@@ -1310,6 +1320,12 @@ Bool ParseAsciiStringToGameInfo(GameInfo *game, AsciiString options)
       oldFactionsOnly = ( val.compareNoCase( "Y" ) == 0 );
       sawOldFactions = TRUE;
     }
+		// GeneralsX @feature Per-game shroud (see GameInfo::hasUseShroud).
+		else if (key.compare("SH") == 0)
+		{
+			useShroud = (atoi(val.str()) != 0);
+			sawUseShroud = TRUE;
+		}
 		else if (key.getLength() == 1 && *key.str() == slotListID)
 		{
 			sawSlotlist = true;
@@ -1713,6 +1729,10 @@ Bool ParseAsciiStringToGameInfo(GameInfo *game, AsciiString options)
 		game->setSuperweaponRestriction(restriction);
 		game->setStartingCash(startingCash);
 		game->setOldFactionsOnly(oldFactionsOnly);
+		if (sawUseShroud)
+			game->setUseShroud(useShroud);
+		else
+			game->clearUseShroud();
 
 		return true;
 	}

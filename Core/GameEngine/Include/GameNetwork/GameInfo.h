@@ -232,6 +232,16 @@ public:
   inline Bool oldFactionsOnly() const;
   inline void setOldFactionsOnly( Bool oldFactionsOnly );
 
+	// GeneralsX @feature Whether the game starts shrouded (GameLogic::startNewGame then
+	// skips revealing the map to each player), when this game sets it; otherwise
+	// Multiplayer.ini's UseShroud decides. A set value travels in the options string
+	// ("SH="), so a replay plays back with the shroud it was recorded with. Unset by
+	// default, and then not written at all, so stock options strings are unchanged.
+	inline Bool hasUseShroud() const;
+	inline Bool getUseShroud() const;
+	inline void setUseShroud( Bool useShroud );
+	inline void clearUseShroud();
+
 protected:
 	Int m_preorderMask;
 	Int m_crcInterval;
@@ -253,6 +263,8 @@ protected:
   Money         m_startingCash;
   UnsignedShort m_superweaponRestriction;
   Bool m_oldFactionsOnly; // Only USA, China, GLA -- not USA Air Force General, GLA Toxic General, et al
+	Bool m_hasUseShroud;
+	Bool m_useShroud;
 };
 
 extern GameInfo *TheGameInfo;
@@ -274,6 +286,10 @@ const Money&GameInfo::getStartingCash() const         { return m_startingCash; }
 UnsignedShort GameInfo::getSuperweaponRestriction() const { return m_superweaponRestriction; }
 Bool        GameInfo::oldFactionsOnly() const           { return m_oldFactionsOnly; }
 void        GameInfo::setOldFactionsOnly( Bool oldFactionsOnly ) { m_oldFactionsOnly = oldFactionsOnly; }
+Bool        GameInfo::hasUseShroud() const              { return m_hasUseShroud; }
+Bool        GameInfo::getUseShroud() const              { return m_useShroud; }
+void        GameInfo::setUseShroud( Bool useShroud )    { m_hasUseShroud = TRUE; m_useShroud = useShroud; }
+void        GameInfo::clearUseShroud()                  { m_hasUseShroud = FALSE; m_useShroud = FALSE; }
 
 AsciiString GameInfoToAsciiString( const GameInfo *game );
 Bool ParseAsciiStringToGameInfo( GameInfo *game, AsciiString options );
