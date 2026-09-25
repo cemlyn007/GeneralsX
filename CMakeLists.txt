@@ -160,10 +160,5 @@ if(RTS_BUILD_GENERALS)
     endif()
 endif()
 
-# rlgenerals RL bridge (local integration; safe to remove)
-if(DEFINED RLG_BRIDGE_DIR AND EXISTS "${RLG_BRIDGE_DIR}/engine/g_generals_embed.cmake")
-    include("${RLG_BRIDGE_DIR}/engine/g_generals_embed.cmake")
-endif()
-
 feature_summary(WHAT ENABLED_FEATURES DESCRIPTION "Enabled features:")
 feature_summary(WHAT DISABLED_FEATURES DESCRIPTION "Disabled features:")
