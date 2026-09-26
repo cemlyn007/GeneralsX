@@ -48,6 +48,7 @@
 #include "GameClient/View.h"
 #include "GameClient/CampaignManager.h"
 
+#include "GameLogic/AIDecisionObserver.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/ObjectTypes.h"
@@ -6943,6 +6944,7 @@ void ScriptEngine::checkConditionsForTeamNames(Script *pScript)
 //-------------------------------------------------------------------------------------------------
 void ScriptEngine::executeScript( Script *pScript )
 {
+	AIDecisionScope decisions(AI_DECISION_SCRIPT, pScript->getName().str());
 
 	pScript->setCurTime(0);
 	// If script is not active, return.
@@ -7626,6 +7628,7 @@ Bool ScriptEngine::evaluateConditions( Script *pScript, Team *thisTeam, Player *
 //-------------------------------------------------------------------------------------------------
 void ScriptEngine::executeActions( ScriptAction *pActionHead )
 {
+	AIDecisionScope decisions(AI_DECISION_SCRIPT);
 	ScriptAction *pCurAction;
 	UnicodeString uStr1;
 	for (pCurAction = pActionHead; pCurAction; pCurAction = pCurAction->getNext()) {

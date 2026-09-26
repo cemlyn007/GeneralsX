@@ -48,6 +48,7 @@
 #include "GameClient/GameText.h"
 #include "GameClient/InGameUI.h"
 
+#include "GameLogic/AIDecisionObserver.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Module/CreateModule.h"
 #include "GameLogic/Module/ParkingPlaceBehavior.h"
@@ -314,6 +315,8 @@ Bool ProductionUpdate::queueUpgrade( const UpgradeTemplate *upgrade )
 	// add this upgrade as in progress in the player
 	player->addUpgrade( upgrade, UPGRADE_STATUS_IN_PRODUCTION );
 
+	AIDecisionHook::queueUpgrade( getObject(), upgrade );
+
 
 
 	return TRUE;  // queued
@@ -423,6 +426,8 @@ Bool ProductionUpdate::queueCreateUnit( const ThingTemplate *unitType, Productio
 
 	// tie to the end of the production queue
 	addToProductionQueue( production );
+
+	AIDecisionHook::queueUnit( getObject(), unitType );
 
 	return TRUE;  // unit queued
 
@@ -1059,6 +1064,8 @@ Bool ProductionUpdate::cancelUpgrade( ProductionEntry *production )
 	if( upgrade->getUpgradeType() == UPGRADE_TYPE_PLAYER && player->hasUpgradeInProduction( upgrade ) == FALSE )
 		return FALSE;
 
+	AIDecisionHook::cancelUpgrade( getObject(), upgrade );
+
 	// refund money back to the player
 	Money *money = player->getMoney();
 	money->deposit( production->m_upgradeToResearch->calcCostToBuild( player ), TRUE, FALSE );
@@ -1092,6 +1099,8 @@ Bool ProductionUpdate::cancelUnitCreate( ProductionEntry *production )
 	if( production->getProductionQuantityRemaining() < production->getProductionQuantity() )
 		return FALSE;
 #endif
+
+	AIDecisionHook::cancelUnit( getObject(), production->m_objectToProduce );
 
 	// give the player the cost of the object back
 	Money *money = player->getMoney();

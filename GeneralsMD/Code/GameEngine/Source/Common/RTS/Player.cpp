@@ -669,7 +669,10 @@ void Player::addToPriorityBuildList(AsciiString templateName, Coord3D *pos, Real
 void Player::update()
 {
 	if (m_ai)
+	{
+		AIDecisionScope decisions(AI_DECISION_AI_PLAYER);
 		m_ai->update();
+	}
 
 	// Allow the teams this player owns to update themselves.
 	for( PlayerTeamList::iterator it = m_playerTeamPrototypes.begin(); it != m_playerTeamPrototypes.end(); ++it )
@@ -1541,6 +1544,7 @@ void Player::repairStructure(ObjectID structureID)
 {
 	if (m_ai)
 	{
+		AIDecisionScope decisions(AI_DECISION_AI_PLAYER);
 		m_ai->repairStructure(structureID);
 	}
 }
@@ -1559,7 +1563,10 @@ void Player::onUnitCreated( Object *factory, Object *unit )
 
 	// ai notification callback
 	if( m_ai )
+	{
+		AIDecisionScope decisions(AI_DECISION_AI_PLAYER);
 		m_ai->onUnitProduced( factory, unit );
+	}
 }
 
 
@@ -1602,7 +1609,10 @@ void Player::guardSupplyCenter( Team *team, Int minSupplies  )
 {
 	// ai action
 	if( m_ai )
+	{
+		AIDecisionScope decisions(AI_DECISION_AI_PLAYER);
 		m_ai->guardSupplyCenter( team, minSupplies );
+	}
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1612,7 +1622,10 @@ void Player::preTeamDestroy( const Team *team )
 {
 	// ai notification callback
 	if( m_ai )
+	{
+		AIDecisionScope decisions(AI_DECISION_AI_PLAYER);
 		m_ai->aiPreTeamDestroy( team );
+	}
 
 	// TheSuperHackers @bugfix Mauller/Xezon 03/05/2025 Clear the default team to prevent dangling pointer usage
 	if( m_defaultTeam == team )
@@ -1651,7 +1664,10 @@ void Player::onStructureConstructionComplete( Object *builder, Object *structure
 
 	// ai notification callback
 	if( m_ai )
+	{
+		AIDecisionScope decisions(AI_DECISION_AI_PLAYER);
 		m_ai->onStructureProduced( builder, structure );
+	}
 
 	// the GUI needs to re-evaluate the information being displayed to the user now
 	if( TheControlBar )
@@ -2370,6 +2386,7 @@ void Player::buildSpecificTeam( TeamPrototype *teamProto)
 	if (m_ai)
 	{
 		// Do a priority build.
+		AIDecisionScope decisions(AI_DECISION_AI_PLAYER);
 		m_ai->buildSpecificAITeam(teamProto, true);
 	}
 }
@@ -2637,6 +2654,8 @@ Bool Player::attemptToPurchaseScience(ScienceType science)
 		DEBUG_CRASH(("isCapableOfPurchasingScience: need other prereqs/points to purchase, request is ignored!"));
 		return false;
 	}
+
+	AIDecisionHook::purchaseScience(this, science);
 
 	Int cost = TheScienceStore->getSciencePurchaseCost(science);
 	addSciencePurchasePoints(-cost);

@@ -2702,6 +2702,7 @@ void AIGroup::groupDoSpecialPower( UnsignedInt specialPowerID, UnsignedInt comma
 			{
 				if( TheActionManager->canDoSpecialPower( object, spTemplate, CMD_FROM_PLAYER, commandOptions ) )
 				{
+					AIDecisionHook::specialPower( object, spTemplate, nullptr, nullptr, nullptr, commandOptions );
 					mod->doSpecialPower( commandOptions );
 
 					object->friend_setUndetectedDefector( FALSE );// My secret is out
@@ -2750,6 +2751,7 @@ void AIGroup::groupDoSpecialPowerAtLocation( UnsignedInt specialPowerID, const C
 			{
 				if( TheActionManager->canDoSpecialPowerAtLocation( object, location, CMD_FROM_PLAYER, spTemplate, objectInWay, commandOptions ) )
 				{
+					AIDecisionHook::specialPower( object, spTemplate, location, nullptr, nullptr, commandOptions );
 					mod->doSpecialPowerAtLocation( location, angle, commandOptions );
 
 					object->friend_setUndetectedDefector( FALSE );// My secret is out
@@ -2790,6 +2792,7 @@ void AIGroup::groupDoSpecialPowerAtObject( UnsignedInt specialPowerID, Object *t
 			{
 				if( TheActionManager->canDoSpecialPowerAtObject( object, target, CMD_FROM_PLAYER, spTemplate, commandOptions ) )
 				{
+					AIDecisionHook::specialPower( object, spTemplate, nullptr, target, nullptr, commandOptions );
 					mod->doSpecialPowerAtObject( target, commandOptions );
 
 					object->friend_setUndetectedDefector( FALSE );// My secret is out

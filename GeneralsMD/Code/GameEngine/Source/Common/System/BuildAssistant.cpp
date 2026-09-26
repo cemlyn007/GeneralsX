@@ -362,7 +362,10 @@ Object *BuildAssistant::buildObjectNow( Object *constructorObject, const ThingTe
 		if( ai )
 		{
 			ai->aiIdle(CMD_FROM_AI); // stop any current behavior.
-			return ai->construct( what, pos, angle, owningPlayer, FALSE );
+			Object *obj = ai->construct( what, pos, angle, owningPlayer, FALSE );
+			if( obj )
+				AIDecisionHook::buildStructure( constructorObject, obj, owningPlayer );
+			return obj;
 		}
 		return nullptr;
 
@@ -426,6 +429,8 @@ Object *BuildAssistant::buildObjectNow( Object *constructorObject, const ThingTe
 
 		// Creation is another valid and essential time to call this. This building now Looks.
 		obj->handlePartitionCellMaintenance();
+
+		AIDecisionHook::buildStructure( constructorObject, obj, owningPlayer );
 
 		return obj;
 
@@ -1527,6 +1532,8 @@ void BuildAssistant::sellObject( Object *obj )
 	}
 	if( sellInfo != nullptr )
 		return;
+
+	AIDecisionHook::sell( obj );
 
 	// set the construction percent of this object just below 100.0% so we can start counting down
 	obj->setConstructionPercent( 99.9f );
