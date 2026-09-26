@@ -34,6 +34,7 @@
 #include "Common/GameType.h"
 #include "GameLogic/Damage.h"
 #include "Common/STLTypedefs.h"
+#include "GameLogic/AIDecisionObserver.h"
 
 class AIGroup;
 class AttackPriorityInfo;
@@ -466,6 +467,18 @@ class AICommandInterface
 public:
 
 	virtual void aiDoCommand(const AICommandParms* parms) = 0;
+
+	// GeneralsX @feature Claude 26/09/2026 Report orders to AIDecisionObserver.
+	// Every order wrapper below passes a non-const AICommandParms*, so it resolves to this
+	// overload rather than the virtual: the one place an order enters an object from outside
+	// (a player, a script, an AIPlayer, another object), before any AIUpdate subclass defers
+	// or rewrites it. Subclasses' own aiDoCommand(&parms) calls, e.g. replaying a deferred
+	// order, see only the virtual (their override hides this) and are not reported again.
+	void aiDoCommand(AICommandParms* parms)
+	{
+		AIDecisionHook::UnitCommand decision(this, parms);
+		aiDoCommand(static_cast<const AICommandParms*>(parms));
+	}
 
 	void aiMoveToPosition( const Coord3D *pos, CommandSourceType cmdSource )
 	{

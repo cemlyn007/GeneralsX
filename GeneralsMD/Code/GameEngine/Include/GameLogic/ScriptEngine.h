@@ -273,6 +273,8 @@ public:
 	///< if pThisTeam is specified, then scripts in here can use <This Team> to mean the team this script is attached to.
 	virtual Bool evaluateConditions( Script *pScript, Team *pThisTeam = nullptr, Player *pPlayer=nullptr );
 	virtual void friend_executeAction( ScriptAction *pActionHead, Team *pThisTeam = nullptr);	///< Use this at yer peril.
+	// GeneralsX @feature Claude 26/09/2026 friend_executeAction for a whole script, its decisions reported to AIDecisionObserver under its name.
+	void friend_executeScriptActions( const Script *script, Team *pThisTeam = nullptr );
 
 	virtual Object *getUnitNamed(const AsciiString& unitName); ///< Gets the named unit. May be null.
 	virtual Bool didUnitExist(const AsciiString& unitName);

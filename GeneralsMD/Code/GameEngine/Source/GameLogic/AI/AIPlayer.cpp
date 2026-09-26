@@ -2542,7 +2542,7 @@ void AIPlayer::buildSpecificAITeam( TeamPrototype *teamProto, Bool priorityBuild
 			if (team->m_team->getPrototype()->getTemplateInfo()->m_executeActions) {
 				const Script *script = TheScriptEngine->findScriptByName(team->m_team->getPrototype()->getTemplateInfo()->m_productionCondition);
 				if (script && script->getAction()) {
-					TheScriptEngine->friend_executeAction(script->getAction(), team->m_team);
+					TheScriptEngine->friend_executeScriptActions(script, team->m_team); // GeneralsX @feature Claude 26/09/2026 Named for AIDecisionObserver.
 				}
 			}
 		} else {
@@ -2908,7 +2908,7 @@ void AIPlayer::checkQueuedTeams()
 				if (team->m_team->getPrototype()->getTemplateInfo()->m_executeActions) {
 					const Script *script = TheScriptEngine->findScriptByName(team->m_team->getPrototype()->getTemplateInfo()->m_productionCondition);
 					if (script) {
-						TheScriptEngine->friend_executeAction(script->getAction(), team->m_team);
+						TheScriptEngine->friend_executeScriptActions(script, team->m_team); // GeneralsX @feature Claude 26/09/2026 Named for AIDecisionObserver.
 					}
 				}
 			}

@@ -48,6 +48,7 @@
 #include "GameClient/View.h"
 #include "GameClient/CampaignManager.h"
 
+#include "GameLogic/AIDecisionObserver.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/ObjectTypes.h"
@@ -6943,6 +6944,8 @@ void ScriptEngine::checkConditionsForTeamNames(Script *pScript)
 //-------------------------------------------------------------------------------------------------
 void ScriptEngine::executeScript( Script *pScript )
 {
+	// GeneralsX @feature Claude 26/09/2026 Attribute the script's decisions to it, by name, for AIDecisionObserver.
+	AIDecisionScope decisions(AI_DECISION_SCRIPT, pScript->getName().str());
 
 	pScript->setCurTime(0);
 	// If script is not active, return.
@@ -7078,6 +7081,16 @@ void ScriptEngine::friend_executeAction( ScriptAction *pActionHead, Team *pThisT
 	executeActions(pActionHead);
 	m_callingTeam = pSavCallingTeam;
 	m_currentPlayer = pSavPlayer;
+}
+
+//-------------------------------------------------------------------------------------------------
+// GeneralsX @feature Claude 26/09/2026 Execute a script's actions (friend_executeAction), attributing
+// the decisions they make to the script, by name, for AIDecisionObserver.
+//-------------------------------------------------------------------------------------------------
+void ScriptEngine::friend_executeScriptActions( const Script *script, Team *pThisTeam )
+{
+	AIDecisionScope decisions(AI_DECISION_SCRIPT, script->getName().str());
+	friend_executeAction(script->getAction(), pThisTeam);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -7964,6 +7977,8 @@ void ScriptEngine::evaluateAndProgressAllSequentialScripts()
 
 				int instruction = seqScript->m_currentInstruction;
 				ScriptAction *action = seqScript->m_scriptToExecuteSequentially->getAction();
+				// GeneralsX @feature Claude 26/09/2026 Attribute the script's decisions to it, by name, for AIDecisionObserver.
+				AIDecisionScope decisions(AI_DECISION_SCRIPT, seqScript->m_scriptToExecuteSequentially->getName().str());
 				while (action && instruction) {
 					--instruction;
 					action = action->getNext();

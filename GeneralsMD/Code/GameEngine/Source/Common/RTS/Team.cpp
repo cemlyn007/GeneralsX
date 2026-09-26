@@ -352,7 +352,7 @@ Team *TeamFactory::createInactiveTeam(const AsciiString& name)
 			if (tp->getTemplateInfo()->m_executeActions) {
 				const Script *script = TheScriptEngine->findScriptByName(tp->getTemplateInfo()->m_productionCondition);
 				if (script) {
-					TheScriptEngine->friend_executeAction(script->getAction());
+					TheScriptEngine->friend_executeScriptActions(script); // GeneralsX @feature Claude 26/09/2026 Named for AIDecisionObserver.
 				}
 			}
 			return t;
@@ -363,7 +363,7 @@ Team *TeamFactory::createInactiveTeam(const AsciiString& name)
 	if (tp->getTemplateInfo()->m_executeActions) {
 		const Script *script = TheScriptEngine->findScriptByName(tp->getTemplateInfo()->m_productionCondition);
 		if (script) {
-			TheScriptEngine->friend_executeAction(script->getAction());
+			TheScriptEngine->friend_executeScriptActions(script); // GeneralsX @feature Claude 26/09/2026 Named for AIDecisionObserver.
 		}
 	}
 
@@ -2550,7 +2550,7 @@ void Team::updateGenericScripts()
 					if (script->isOneShot()) {
 						m_shouldAttemptGenericScript[i] = false;
 					}
-					TheScriptEngine->friend_executeAction(script->getAction(), this);
+					TheScriptEngine->friend_executeScriptActions(script, this); // GeneralsX @feature Claude 26/09/2026 Named for AIDecisionObserver.
 					AsciiString msg = "Generic script '";
 					msg.concat(script->getName());
 					msg.concat("' run on team ");

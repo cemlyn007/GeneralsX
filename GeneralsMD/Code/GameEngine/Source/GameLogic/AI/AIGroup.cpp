@@ -2702,7 +2702,8 @@ void AIGroup::groupDoSpecialPower( UnsignedInt specialPowerID, UnsignedInt comma
 			{
 				if( TheActionManager->canDoSpecialPower( object, spTemplate, CMD_FROM_PLAYER, commandOptions ) )
 				{
-					mod->doSpecialPower( commandOptions );
+					// GeneralsX @feature Claude 26/09/2026 Through Object's funnel (same checks, forced past canUse), which reports it to AIDecisionObserver.
+					object->doSpecialPower( spTemplate, commandOptions, TRUE );
 
 					object->friend_setUndetectedDefector( FALSE );// My secret is out
 				}
@@ -2750,7 +2751,8 @@ void AIGroup::groupDoSpecialPowerAtLocation( UnsignedInt specialPowerID, const C
 			{
 				if( TheActionManager->canDoSpecialPowerAtLocation( object, location, CMD_FROM_PLAYER, spTemplate, objectInWay, commandOptions ) )
 				{
-					mod->doSpecialPowerAtLocation( location, angle, commandOptions );
+					// GeneralsX @feature Claude 26/09/2026 Through Object's funnel (same checks, forced past canUse), which reports it to AIDecisionObserver.
+					object->doSpecialPowerAtLocation( spTemplate, location, angle, commandOptions, TRUE );
 
 					object->friend_setUndetectedDefector( FALSE );// My secret is out
 				}
@@ -2790,7 +2792,8 @@ void AIGroup::groupDoSpecialPowerAtObject( UnsignedInt specialPowerID, Object *t
 			{
 				if( TheActionManager->canDoSpecialPowerAtObject( object, target, CMD_FROM_PLAYER, spTemplate, commandOptions ) )
 				{
-					mod->doSpecialPowerAtObject( target, commandOptions );
+					// GeneralsX @feature Claude 26/09/2026 Through Object's funnel (same checks, forced past canUse), which reports it to AIDecisionObserver.
+					object->doSpecialPowerAtObject( spTemplate, target, commandOptions, TRUE );
 
 					object->friend_setUndetectedDefector( FALSE );// My secret is out
 				}

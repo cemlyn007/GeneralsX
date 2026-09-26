@@ -4614,6 +4614,8 @@ void Object::onCapture( Player *oldOwner, Player *newOwner )
 	if (oldOwner!=newOwner && newOwner->isSkirmishAIPlayer()) {
 		// The skirmish ai doesn't know what to do with captured faction buildings except sell them.
 		if (isFactionStructure()) {
+			// GeneralsX @feature Claude 26/09/2026 This sale is the skirmish AI's rule, not the building's behaviour.
+			AIDecisionScope decisions(AI_DECISION_AI_PLAYER);
 			TheBuildAssistant->sellObject( this );
 		}
 	}
@@ -5411,7 +5413,11 @@ void Object::doSpecialPower( const SpecialPowerTemplate *specialPowerTemplate, U
 	// get the module and execute
 	SpecialPowerModuleInterface *mod = getSpecialPowerModule( specialPowerTemplate );
 	if( mod )
+	{
+		// GeneralsX @feature Claude 26/09/2026 Report the power to AIDecisionObserver; every caller of a power module funnels here.
+		AIDecisionHook::SpecialPower decision( this, mod, specialPowerTemplate, nullptr, nullptr, nullptr, commandOptions );
 		mod->doSpecialPower( commandOptions );
+	}
 
 }
 
@@ -5431,7 +5437,11 @@ void Object::doSpecialPowerAtObject( const SpecialPowerTemplate *specialPowerTem
 	// get the module and execute
 	SpecialPowerModuleInterface *mod = getSpecialPowerModule( specialPowerTemplate );
 	if( mod )
+	{
+		// GeneralsX @feature Claude 26/09/2026 Report the power to AIDecisionObserver; every caller of a power module funnels here.
+		AIDecisionHook::SpecialPower decision( this, mod, specialPowerTemplate, nullptr, obj, nullptr, commandOptions );
 		mod->doSpecialPowerAtObject( obj, commandOptions );
+	}
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -5451,7 +5461,11 @@ void Object::doSpecialPowerAtLocation( const SpecialPowerTemplate *specialPowerT
 	// get the module and execute
 	SpecialPowerModuleInterface *mod = getSpecialPowerModule( specialPowerTemplate );
 	if( mod )
+	{
+		// GeneralsX @feature Claude 26/09/2026 Report the power to AIDecisionObserver; every caller of a power module funnels here.
+		AIDecisionHook::SpecialPower decision( this, mod, specialPowerTemplate, loc, nullptr, nullptr, commandOptions );
 		mod->doSpecialPowerAtLocation( loc, angle, commandOptions );
+	}
 
 }
 
@@ -5471,7 +5485,11 @@ void Object::doSpecialPowerUsingWaypoints( const SpecialPowerTemplate *specialPo
 	// get the module and execute
 	SpecialPowerModuleInterface *mod = getSpecialPowerModule( specialPowerTemplate );
 	if( mod )
+	{
+		// GeneralsX @feature Claude 26/09/2026 Report the power to AIDecisionObserver; every caller of a power module funnels here.
+		AIDecisionHook::SpecialPower decision( this, mod, specialPowerTemplate, nullptr, nullptr, way, commandOptions );
 		mod->doSpecialPowerUsingWaypoints( way, commandOptions );
+	}
 
 }
 
@@ -5508,7 +5526,9 @@ void Object::doCommandButton( const CommandButton *commandButton, CommandSourceT
 				{
 					WeaponSlotType weaponSlot = commandButton->getWeaponSlot();
 					// GUI_COMMAND_SWITCH_WEAPON switches until un-switched, or switched to something else.
-					setWeaponLock( weaponSlot, LOCKED_PERMANENTLY );
+					// GeneralsX @feature Claude 26/09/2026 Report the switch to AIDecisionObserver (the skirmish AI's Rangers switch by script).
+					if( setWeaponLock( weaponSlot, LOCKED_PERMANENTLY ) )
+						AIDecisionHook::switchWeapon( this, commandButton, weaponSlot );
 					return;
 				}
 

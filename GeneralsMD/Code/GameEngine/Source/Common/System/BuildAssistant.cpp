@@ -342,6 +342,9 @@ Object *BuildAssistant::buildObjectNow( Object *constructorObject, const ThingTe
 	if( (constructorObject != nullptr) && !isPossibleToMakeUnit(constructorObject, what) )
 		return nullptr;
 
+	// GeneralsX @feature Claude 26/09/2026 Report the build to AIDecisionObserver, and what it does on the way one level deeper.
+	AIDecisionHook::Build decision;
+
 	// clear out any objects from the building area that are "auto-clearable" when building
 	clearRemovableForConstruction( what, pos, angle );
 
@@ -362,7 +365,10 @@ Object *BuildAssistant::buildObjectNow( Object *constructorObject, const ThingTe
 		if( ai )
 		{
 			ai->aiIdle(CMD_FROM_AI); // stop any current behavior.
-			return ai->construct( what, pos, angle, owningPlayer, FALSE );
+			Object *obj = ai->construct( what, pos, angle, owningPlayer, FALSE );
+			if( obj )
+				decision.report( constructorObject, obj, owningPlayer );
+			return obj;
 		}
 		return nullptr;
 
@@ -426,6 +432,8 @@ Object *BuildAssistant::buildObjectNow( Object *constructorObject, const ThingTe
 
 		// Creation is another valid and essential time to call this. This building now Looks.
 		obj->handlePartitionCellMaintenance();
+
+		decision.report( constructorObject, obj, owningPlayer );
 
 		return obj;
 
@@ -1527,6 +1535,9 @@ void BuildAssistant::sellObject( Object *obj )
 	}
 	if( sellInfo != nullptr )
 		return;
+
+	// GeneralsX @feature Claude 26/09/2026 Report the sale to AIDecisionObserver, and what it does on the way one level deeper.
+	AIDecisionHook::Sale decision( obj );
 
 	// set the construction percent of this object just below 100.0% so we can start counting down
 	obj->setConstructionPercent( 99.9f );
