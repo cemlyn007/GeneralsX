@@ -342,7 +342,12 @@ Bool ProductionUpdate::cancelUpgrade( const UpgradeTemplate *upgrade )
 		if( production->m_type == PRODUCTION_UPGRADE &&
 				production->m_upgradeToResearch == upgrade )
 		{
-			return cancelUpgrade( production );
+			// reported here, not in cancelUpgrade( ProductionEntry * ): the engine's own
+			// cascades (a sale, a lost prerequisite) cancel through that one
+			if( !cancelUpgrade( production ) )
+				return FALSE;
+			AIDecisionHook::cancelUpgrade( getObject(), upgrade );
+			return TRUE;
 		}
 
 	}
@@ -446,7 +451,13 @@ Bool ProductionUpdate::cancelUnitCreate( ProductionID productionID )
 		// are we at the one we want get rid of it
 		if( production->m_productionID == productionID )
 		{
-			return cancelUnitCreate( production );
+			// reported here, not in cancelUnitCreate( ProductionEntry * ): the engine's own
+			// cascades (a sale, a lost prerequisite) cancel through that one
+			const ThingTemplate *unitType = production->getProductionObject();
+			if( !cancelUnitCreate( production ) )
+				return FALSE;
+			AIDecisionHook::cancelUnit( getObject(), unitType );
+			return TRUE;
 		}
 	}
 
@@ -1064,8 +1075,6 @@ Bool ProductionUpdate::cancelUpgrade( ProductionEntry *production )
 	if( upgrade->getUpgradeType() == UPGRADE_TYPE_PLAYER && player->hasUpgradeInProduction( upgrade ) == FALSE )
 		return FALSE;
 
-	AIDecisionHook::cancelUpgrade( getObject(), upgrade );
-
 	// refund money back to the player
 	Money *money = player->getMoney();
 	money->deposit( production->m_upgradeToResearch->calcCostToBuild( player ), TRUE, FALSE );
@@ -1099,8 +1108,6 @@ Bool ProductionUpdate::cancelUnitCreate( ProductionEntry *production )
 	if( production->getProductionQuantityRemaining() < production->getProductionQuantity() )
 		return FALSE;
 #endif
-
-	AIDecisionHook::cancelUnit( getObject(), production->m_objectToProduce );
 
 	// give the player the cost of the object back
 	Money *money = player->getMoney();

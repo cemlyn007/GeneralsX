@@ -7967,6 +7967,7 @@ void ScriptEngine::evaluateAndProgressAllSequentialScripts()
 
 				int instruction = seqScript->m_currentInstruction;
 				ScriptAction *action = seqScript->m_scriptToExecuteSequentially->getAction();
+				AIDecisionScope decisions(AI_DECISION_SCRIPT, seqScript->m_scriptToExecuteSequentially->getName().str());
 				while (action && instruction) {
 					--instruction;
 					action = action->getNext();

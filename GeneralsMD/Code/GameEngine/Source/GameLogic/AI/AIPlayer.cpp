@@ -2542,6 +2542,7 @@ void AIPlayer::buildSpecificAITeam( TeamPrototype *teamProto, Bool priorityBuild
 			if (team->m_team->getPrototype()->getTemplateInfo()->m_executeActions) {
 				const Script *script = TheScriptEngine->findScriptByName(team->m_team->getPrototype()->getTemplateInfo()->m_productionCondition);
 				if (script && script->getAction()) {
+					AIDecisionScope decisions(AI_DECISION_SCRIPT, script->getName().str());
 					TheScriptEngine->friend_executeAction(script->getAction(), team->m_team);
 				}
 			}
@@ -2908,6 +2909,7 @@ void AIPlayer::checkQueuedTeams()
 				if (team->m_team->getPrototype()->getTemplateInfo()->m_executeActions) {
 					const Script *script = TheScriptEngine->findScriptByName(team->m_team->getPrototype()->getTemplateInfo()->m_productionCondition);
 					if (script) {
+						AIDecisionScope decisions(AI_DECISION_SCRIPT, script->getName().str());
 						TheScriptEngine->friend_executeAction(script->getAction(), team->m_team);
 					}
 				}

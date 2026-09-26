@@ -84,7 +84,7 @@ struct AIDecision
 	Int m_player;                 // index of the player the actor belongs to, -1 if none
 	const Object *m_actor;        // the unit ordered, producer, builder, seller or power source
 	AICommandType m_aiCommand;    // AICMD_NO_COMMAND unless m_kind == AI_DECISION_UNIT_COMMAND
-	CommandSourceType m_commandSource;
+	CommandSourceType m_commandSource; // UNIT_COMMAND only (the order's own source); undefined otherwise
 	const Coord3D *m_pos;         // target position, or null
 	const Object *m_target;       // target object, or null
 	const Object *m_other;        // AICommandParms::m_otherObj, or null
@@ -122,7 +122,17 @@ private:
 	Bool m_savedActive;
 };
 
-// The emit points. Each is a no-op without an observer.
+// RAII: reports nothing while alive, for engine bookkeeping that goes through a call
+// which is otherwise a decision (e.g. cancelling a duplicate upgrade after a player
+// gains it). Nests.
+class AIDecisionMute
+{
+public:
+	AIDecisionMute();
+	~AIDecisionMute();
+};
+
+// The emit points. Each is a no-op without an observer or while muted.
 namespace AIDecisionHook
 {
 	// Brackets one AICommandInterface order (see AICommandInterface::aiDoCommand's

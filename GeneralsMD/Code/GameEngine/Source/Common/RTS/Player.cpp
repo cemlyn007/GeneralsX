@@ -2171,6 +2171,7 @@ void Player::transferAssetsFromThat(Player *that)
 	for (std::vector<const UpgradeTemplate*>::iterator cancelIt = upgradesToCancel.begin(); cancelIt != upgradesToCancel.end(); ++cancelIt)
 	{
 		const UpgradeTemplate* upgradeTemplate = *cancelIt;
+		AIDecisionMute bookkeeping; // a duplicate upgrade, not anyone's decision to cancel it
 		that->iterateObjects(cancelUpgradeInProduction, const_cast<UpgradeTemplate*>(upgradeTemplate));
 	}
 

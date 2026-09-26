@@ -38,6 +38,7 @@ namespace
 	AIDecisionOrigin s_origin = AI_DECISION_REFLEX;
 	const char *s_script = nullptr;
 	UnsignedByte s_depth = 0;
+	Int s_muted = 0;
 	UnsignedInt s_seq = 0;
 
 	AIDecision makeDecision(AIDecisionKind kind, const Object *actor)
@@ -57,10 +58,14 @@ namespace
 		}
 		d.m_actor = actor;
 		d.m_aiCommand = AICMD_NO_COMMAND;
-		d.m_commandSource = CMD_FROM_AI;
 		d.m_science = SCIENCE_INVALID;
 		d.m_script = s_script;
 		return d;
+	}
+
+	Bool active()
+	{
+		return s_observer != nullptr && s_muted == 0;
 	}
 
 	void emit(const AIDecision &d)
@@ -96,10 +101,21 @@ AIDecisionScope::~AIDecisionScope()
 }
 
 //-------------------------------------------------------------------------------------------------
+AIDecisionMute::AIDecisionMute()
+{
+	++s_muted;
+}
+
+AIDecisionMute::~AIDecisionMute()
+{
+	--s_muted;
+}
+
+//-------------------------------------------------------------------------------------------------
 AIDecisionHook::UnitCommand::UnitCommand(const AICommandInterface *ai, const AICommandParms *parms)
 	: m_counted(FALSE)
 {
-	if (!s_observer)
+	if (!active())
 		return;
 
 	// AIUpdateInterface is the only AICommandInterface.
@@ -132,7 +148,7 @@ AIDecisionHook::UnitCommand::~UnitCommand()
 //-------------------------------------------------------------------------------------------------
 void AIDecisionHook::queueUnit(const Object *producer, const ThingTemplate *thing)
 {
-	if (!s_observer)
+	if (!active())
 		return;
 	AIDecision d = makeDecision(AI_DECISION_QUEUE_UNIT, producer);
 	d.m_thing = thing;
@@ -141,7 +157,7 @@ void AIDecisionHook::queueUnit(const Object *producer, const ThingTemplate *thin
 
 void AIDecisionHook::queueUpgrade(const Object *producer, const UpgradeTemplate *upgrade)
 {
-	if (!s_observer)
+	if (!active())
 		return;
 	AIDecision d = makeDecision(AI_DECISION_QUEUE_UPGRADE, producer);
 	d.m_upgrade = upgrade;
@@ -150,7 +166,7 @@ void AIDecisionHook::queueUpgrade(const Object *producer, const UpgradeTemplate 
 
 void AIDecisionHook::cancelUnit(const Object *producer, const ThingTemplate *thing)
 {
-	if (!s_observer)
+	if (!active())
 		return;
 	AIDecision d = makeDecision(AI_DECISION_CANCEL_UNIT, producer);
 	d.m_thing = thing;
@@ -159,7 +175,7 @@ void AIDecisionHook::cancelUnit(const Object *producer, const ThingTemplate *thi
 
 void AIDecisionHook::cancelUpgrade(const Object *producer, const UpgradeTemplate *upgrade)
 {
-	if (!s_observer)
+	if (!active())
 		return;
 	AIDecision d = makeDecision(AI_DECISION_CANCEL_UPGRADE, producer);
 	d.m_upgrade = upgrade;
@@ -168,7 +184,7 @@ void AIDecisionHook::cancelUpgrade(const Object *producer, const UpgradeTemplate
 
 void AIDecisionHook::buildStructure(const Object *builder, const Object *structure, const Player *owner)
 {
-	if (!s_observer)
+	if (!active())
 		return;
 	AIDecision d = makeDecision(AI_DECISION_BUILD_STRUCTURE, builder);
 	if (owner)
@@ -181,7 +197,7 @@ void AIDecisionHook::buildStructure(const Object *builder, const Object *structu
 
 void AIDecisionHook::sell(const Object *structure)
 {
-	if (!s_observer)
+	if (!active())
 		return;
 	AIDecision d = makeDecision(AI_DECISION_SELL, structure);
 	d.m_pos = structure->getPosition();
@@ -190,7 +206,7 @@ void AIDecisionHook::sell(const Object *structure)
 
 void AIDecisionHook::purchaseScience(const Player *player, ScienceType science)
 {
-	if (!s_observer)
+	if (!active())
 		return;
 	AIDecision d = makeDecision(AI_DECISION_PURCHASE_SCIENCE, nullptr);
 	d.m_player = player->getPlayerIndex();
@@ -201,7 +217,7 @@ void AIDecisionHook::purchaseScience(const Player *player, ScienceType science)
 void AIDecisionHook::specialPower(const Object *source, const SpecialPowerTemplate *power,
 	const Coord3D *pos, const Object *target, const Waypoint *waypoint, UnsignedInt commandOptions)
 {
-	if (!s_observer)
+	if (!active())
 		return;
 	AIDecision d = makeDecision(AI_DECISION_SPECIAL_POWER, source);
 	d.m_specialPower = power;
