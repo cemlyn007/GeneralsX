@@ -588,6 +588,7 @@ public:
 	// For the attack move, that switches from move to attack, and the attack is CMD_FROM_AI,
 	// while the move is the original command source.  John A.
 	void friend_setLastCommandSource( CommandSourceType source ) {m_lastCommandSource = source;}
+	// GeneralsX @feature Claude 26/09/2026 For AIDecisionObserver.
 	const Object *friend_getCommandedObject() const { return getObject(); } ///< for AIDecisionObserver
 
 	Bool canAutoAcquire() const { return getAIUpdateModuleData()->m_autoAcquireEnemiesWhenIdle; }

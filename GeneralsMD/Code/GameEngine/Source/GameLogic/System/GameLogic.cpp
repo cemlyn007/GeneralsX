@@ -2754,6 +2754,7 @@ void GameLogic::processCommandList( CommandList *list )
 #ifdef RTS_DEBUG
 		DEBUG_ASSERTCRASH(msg != nullptr && msg != (GameMessage*)0xdeadbeef, ("bad msg"));
 #endif
+		// GeneralsX @feature Claude 26/09/2026 Attribute a message's decisions to it for AIDecisionObserver.
 		AIDecisionScope decisions(AI_DECISION_MESSAGE);
 		logicMessageDispatcher( msg, nullptr );
 	}

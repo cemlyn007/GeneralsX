@@ -27,6 +27,7 @@
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/Module/AIUpdate.h"
+#include "GameLogic/Module/SpecialPowerModule.h"
 
 namespace
 {
@@ -58,6 +59,7 @@ namespace
 		}
 		d.m_actor = actor;
 		d.m_aiCommand = AICMD_NO_COMMAND;
+		d.m_commandSource = (CommandSourceType)-1;
 		d.m_science = SCIENCE_INVALID;
 		d.m_script = s_script;
 		return d;
@@ -71,6 +73,15 @@ namespace
 	void emit(const AIDecision &d)
 	{
 		s_observer(d, s_userData);
+	}
+
+	// What a decision does on the way is reported one level deeper.
+	Bool enterDecision()
+	{
+		if (!active())
+			return FALSE;
+		++s_depth;
+		return TRUE;
 	}
 }
 
@@ -135,8 +146,7 @@ AIDecisionHook::UnitCommand::UnitCommand(const AICommandInterface *ai, const AIC
 	d.m_commandButton = parms->m_commandButton;
 	emit(d);
 
-	++s_depth;
-	m_counted = TRUE;
+	m_counted = enterDecision();
 }
 
 AIDecisionHook::UnitCommand::~UnitCommand()
@@ -182,11 +192,24 @@ void AIDecisionHook::cancelUpgrade(const Object *producer, const UpgradeTemplate
 	emit(d);
 }
 
-void AIDecisionHook::buildStructure(const Object *builder, const Object *structure, const Player *owner)
+AIDecisionHook::Build::Build()
+	: m_outerDepth(s_depth)
+{
+	m_counted = enterDecision();
+}
+
+AIDecisionHook::Build::~Build()
+{
+	if (m_counted)
+		--s_depth;
+}
+
+void AIDecisionHook::Build::report(const Object *builder, const Object *structure, const Player *owner)
 {
 	if (!active())
 		return;
 	AIDecision d = makeDecision(AI_DECISION_BUILD_STRUCTURE, builder);
+	d.m_depth = m_outerDepth;
 	if (owner)
 		d.m_player = owner->getPlayerIndex();
 	d.m_target = structure;
@@ -195,12 +218,32 @@ void AIDecisionHook::buildStructure(const Object *builder, const Object *structu
 	emit(d);
 }
 
-void AIDecisionHook::sell(const Object *structure)
+//-------------------------------------------------------------------------------------------------
+AIDecisionHook::Sale::Sale(const Object *structure)
+	: m_counted(FALSE)
 {
 	if (!active())
 		return;
 	AIDecision d = makeDecision(AI_DECISION_SELL, structure);
 	d.m_pos = structure->getPosition();
+	emit(d);
+	m_counted = enterDecision();
+}
+
+AIDecisionHook::Sale::~Sale()
+{
+	if (m_counted)
+		--s_depth;
+}
+
+//-------------------------------------------------------------------------------------------------
+void AIDecisionHook::switchWeapon(const Object *actor, const CommandButton *button, Int weaponSlot)
+{
+	if (!active())
+		return;
+	AIDecision d = makeDecision(AI_DECISION_SWITCH_WEAPON, actor);
+	d.m_commandButton = button;
+	d.m_intValue = weaponSlot;
 	emit(d);
 }
 
@@ -214,11 +257,23 @@ void AIDecisionHook::purchaseScience(const Player *player, ScienceType science)
 	emit(d);
 }
 
-void AIDecisionHook::specialPower(const Object *source, const SpecialPowerTemplate *power,
-	const Coord3D *pos, const Object *target, const Waypoint *waypoint, UnsignedInt commandOptions)
+//-------------------------------------------------------------------------------------------------
+AIDecisionHook::SpecialPower::SpecialPower(const Object *source, const SpecialPowerModuleInterface *module,
+	const SpecialPowerTemplate *power, const Coord3D *pos, const Object *target,
+	const Waypoint *waypoint, UnsignedInt commandOptions)
+	: m_counted(FALSE)
 {
 	if (!active())
 		return;
+
+	// The cases in which SpecialPowerModule::doSpecialPower* and its overrides do nothing.
+	// SpecialPowerModule is the only SpecialPowerModuleInterface. A missile launcher under
+	// construction rejects the intent and parks its ready frame at 0xFFFFFFFF.
+	const SpecialPowerModule *spm = static_cast<const SpecialPowerModule *>(module);
+	if (source->isDisabled() || spm->isPaused() || source->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION)
+		|| module->getReadyFrame() == 0xFFFFFFFF)
+		return;
+
 	AIDecision d = makeDecision(AI_DECISION_SPECIAL_POWER, source);
 	d.m_specialPower = power;
 	d.m_pos = pos ? pos : (target ? target->getPosition() : nullptr);
@@ -226,4 +281,11 @@ void AIDecisionHook::specialPower(const Object *source, const SpecialPowerTempla
 	d.m_waypoint = waypoint;
 	d.m_commandOptions = commandOptions;
 	emit(d);
+	m_counted = enterDecision();
+}
+
+AIDecisionHook::SpecialPower::~SpecialPower()
+{
+	if (m_counted)
+		--s_depth;
 }

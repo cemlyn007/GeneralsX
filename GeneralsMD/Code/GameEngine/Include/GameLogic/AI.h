@@ -468,6 +468,7 @@ public:
 
 	virtual void aiDoCommand(const AICommandParms* parms) = 0;
 
+	// GeneralsX @feature Claude 26/09/2026 Report orders to AIDecisionObserver.
 	// Every order wrapper below passes a non-const AICommandParms*, so it resolves to this
 	// overload rather than the virtual: the one place an order enters an object from outside
 	// (a player, a script, an AIPlayer, another object), before any AIUpdate subclass defers

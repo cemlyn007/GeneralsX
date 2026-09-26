@@ -39,6 +39,7 @@ class CommandButton;
 class Object;
 class Player;
 class PolygonTrigger;
+class SpecialPowerModuleInterface;
 class SpecialPowerTemplate;
 class Team;
 class ThingTemplate;
@@ -56,7 +57,7 @@ enum AIDecisionOrigin CPP_11(: Byte)
 {
 	AI_DECISION_REFLEX = 0,
 	AI_DECISION_AI_PLAYER,  // an AIPlayer, via Player's calls into it
-	AI_DECISION_SCRIPT,     // a script action (ScriptEngine::executeActions)
+	AI_DECISION_SCRIPT,     // a script (executeScript, a sequential script, friend_executeScriptActions)
 	AI_DECISION_MESSAGE,    // a GameMessage (GameLogic::logicMessageDispatcher)
 };
 
@@ -70,7 +71,8 @@ enum AIDecisionKind CPP_11(: Byte)
 	AI_DECISION_BUILD_STRUCTURE,   // BuildAssistant::buildObjectNow
 	AI_DECISION_SELL,
 	AI_DECISION_PURCHASE_SCIENCE,
-	AI_DECISION_SPECIAL_POWER,     // a special power module fired by a group or a script
+	AI_DECISION_SPECIAL_POWER,     // Object::doSpecialPower*
+	AI_DECISION_SWITCH_WEAPON,     // a SWITCH_WEAPON command button (Object::doCommandButton); see m_intValue
 };
 
 // One decision. Pointers are only valid for the duration of the observer call.
@@ -80,12 +82,14 @@ struct AIDecision
 	UnsignedInt m_seq;            // running count of decisions reported, for ordering
 	AIDecisionOrigin m_origin;
 	AIDecisionKind m_kind;
-	UnsignedByte m_depth;         // unit commands issued while carrying out another one
+	UnsignedByte m_depth;         // > 0: issued while carrying out another decision (a unit command,
+	                              // build, sale or special power), e.g. units moved off a building site
 	Int m_player;                 // index of the player the actor belongs to, -1 if none
 	const Object *m_actor;        // the unit ordered, producer, builder, seller or power source
 	AICommandType m_aiCommand;    // AICMD_NO_COMMAND unless m_kind == AI_DECISION_UNIT_COMMAND
-	CommandSourceType m_commandSource; // UNIT_COMMAND only (the order's own source); undefined otherwise
-	const Coord3D *m_pos;         // target position, or null
+	CommandSourceType m_commandSource; // UNIT_COMMAND: the order's own source; (CommandSourceType)-1 otherwise
+	const Coord3D *m_pos;         // target position, or null; UNIT_COMMAND: always the order's m_pos,
+	                              // meaningful only for positional commands
 	const Object *m_target;       // target object, or null
 	const Object *m_other;        // AICommandParms::m_otherObj, or null
 	const Team *m_team;           // AICommandParms::m_team, or null
@@ -93,8 +97,8 @@ struct AIDecision
 	const PolygonTrigger *m_polygon;
 	const Coord3D *m_coords;      // AICommandParms::m_coords
 	Int m_numCoords;
-	Int m_intValue;               // AICommandParms::m_intValue
-	const CommandButton *m_commandButton;
+	Int m_intValue;               // AICommandParms::m_intValue; SWITCH_WEAPON: the WeaponSlotType locked
+	const CommandButton *m_commandButton; // AICommandParms::m_commandButton; SWITCH_WEAPON: the button
 	const ThingTemplate *m_thing; // unit queued / structure built
 	const UpgradeTemplate *m_upgrade;
 	ScienceType m_science;
@@ -150,9 +154,45 @@ namespace AIDecisionHook
 	void queueUpgrade(const Object *producer, const UpgradeTemplate *upgrade);
 	void cancelUnit(const Object *producer, const ThingTemplate *thing);
 	void cancelUpgrade(const Object *producer, const UpgradeTemplate *upgrade);
-	void buildStructure(const Object *builder, const Object *structure, const Player *owner);
-	void sell(const Object *structure);
 	void purchaseScience(const Player *player, ScienceType science);
-	void specialPower(const Object *source, const SpecialPowerTemplate *power,
-		const Coord3D *pos, const Object *target, const Waypoint *waypoint, UnsignedInt commandOptions);
+	void switchWeapon(const Object *actor, const CommandButton *button, Int weaponSlot);
+
+	// Brackets one BuildAssistant::buildObjectNow: what it does on the way (units moved off
+	// the site, the dozer stopped) is reported one level deeper, then report() reports the
+	// build itself, at the outer level, once the structure exists.
+	class Build
+	{
+	public:
+		Build();
+		~Build();
+		void report(const Object *builder, const Object *structure, const Player *owner);
+	private:
+		Bool m_counted;
+		UnsignedByte m_outerDepth;
+	};
+
+	// Brackets one BuildAssistant::sellObject: reports the sale, and what it does on the way
+	// (the building stopped, its occupants evacuated) one level deeper.
+	class Sale
+	{
+	public:
+		Sale(const Object *structure);
+		~Sale();
+	private:
+		Bool m_counted;
+	};
+
+	// Brackets one Object::doSpecialPower* call: reports the power if the module will act on it
+	// (the source is not disabled, under construction or paused, nor a rejected launcher), and
+	// what the power does on the way one level deeper.
+	class SpecialPower
+	{
+	public:
+		SpecialPower(const Object *source, const SpecialPowerModuleInterface *module,
+			const SpecialPowerTemplate *power, const Coord3D *pos, const Object *target,
+			const Waypoint *waypoint, UnsignedInt commandOptions);
+		~SpecialPower();
+	private:
+		Bool m_counted;
+	};
 }

@@ -670,6 +670,7 @@ void Player::update()
 {
 	if (m_ai)
 	{
+		// GeneralsX @feature Claude 26/09/2026 Attribute the AI player's decisions to it for AIDecisionObserver.
 		AIDecisionScope decisions(AI_DECISION_AI_PLAYER);
 		m_ai->update();
 	}
@@ -1544,6 +1545,7 @@ void Player::repairStructure(ObjectID structureID)
 {
 	if (m_ai)
 	{
+		// GeneralsX @feature Claude 26/09/2026 Attribute the AI player's decisions to it for AIDecisionObserver.
 		AIDecisionScope decisions(AI_DECISION_AI_PLAYER);
 		m_ai->repairStructure(structureID);
 	}
@@ -1564,6 +1566,7 @@ void Player::onUnitCreated( Object *factory, Object *unit )
 	// ai notification callback
 	if( m_ai )
 	{
+		// GeneralsX @feature Claude 26/09/2026 Attribute the AI player's decisions to it for AIDecisionObserver.
 		AIDecisionScope decisions(AI_DECISION_AI_PLAYER);
 		m_ai->onUnitProduced( factory, unit );
 	}
@@ -1610,6 +1613,7 @@ void Player::guardSupplyCenter( Team *team, Int minSupplies  )
 	// ai action
 	if( m_ai )
 	{
+		// GeneralsX @feature Claude 26/09/2026 Attribute the AI player's decisions to it for AIDecisionObserver.
 		AIDecisionScope decisions(AI_DECISION_AI_PLAYER);
 		m_ai->guardSupplyCenter( team, minSupplies );
 	}
@@ -1623,6 +1627,7 @@ void Player::preTeamDestroy( const Team *team )
 	// ai notification callback
 	if( m_ai )
 	{
+		// GeneralsX @feature Claude 26/09/2026 Attribute the AI player's decisions to it for AIDecisionObserver.
 		AIDecisionScope decisions(AI_DECISION_AI_PLAYER);
 		m_ai->aiPreTeamDestroy( team );
 	}
@@ -1665,6 +1670,7 @@ void Player::onStructureConstructionComplete( Object *builder, Object *structure
 	// ai notification callback
 	if( m_ai )
 	{
+		// GeneralsX @feature Claude 26/09/2026 Attribute the AI player's decisions to it for AIDecisionObserver.
 		AIDecisionScope decisions(AI_DECISION_AI_PLAYER);
 		m_ai->onStructureProduced( builder, structure );
 	}
@@ -2171,6 +2177,7 @@ void Player::transferAssetsFromThat(Player *that)
 	for (std::vector<const UpgradeTemplate*>::iterator cancelIt = upgradesToCancel.begin(); cancelIt != upgradesToCancel.end(); ++cancelIt)
 	{
 		const UpgradeTemplate* upgradeTemplate = *cancelIt;
+		// GeneralsX @feature Claude 26/09/2026 Engine bookkeeping, not a decision, for AIDecisionObserver.
 		AIDecisionMute bookkeeping; // a duplicate upgrade, not anyone's decision to cancel it
 		that->iterateObjects(cancelUpgradeInProduction, const_cast<UpgradeTemplate*>(upgradeTemplate));
 	}
@@ -2387,6 +2394,7 @@ void Player::buildSpecificTeam( TeamPrototype *teamProto)
 	if (m_ai)
 	{
 		// Do a priority build.
+		// GeneralsX @feature Claude 26/09/2026 Attribute the AI player's decisions to it for AIDecisionObserver.
 		AIDecisionScope decisions(AI_DECISION_AI_PLAYER);
 		m_ai->buildSpecificAITeam(teamProto, true);
 	}
@@ -2656,6 +2664,7 @@ Bool Player::attemptToPurchaseScience(ScienceType science)
 		return false;
 	}
 
+	// GeneralsX @feature Claude 26/09/2026 Report the purchase to AIDecisionObserver.
 	AIDecisionHook::purchaseScience(this, science);
 
 	Int cost = TheScienceStore->getSciencePurchaseCost(science);

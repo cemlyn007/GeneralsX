@@ -41,7 +41,6 @@
 #include "Common/Xfer.h"
 #include "GameClient/Drawable.h"
 
-#include "GameLogic/AIDecisionObserver.h"
 #include "GameLogic/SidesList.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/Module/BodyModule.h"
@@ -353,8 +352,7 @@ Team *TeamFactory::createInactiveTeam(const AsciiString& name)
 			if (tp->getTemplateInfo()->m_executeActions) {
 				const Script *script = TheScriptEngine->findScriptByName(tp->getTemplateInfo()->m_productionCondition);
 				if (script) {
-					AIDecisionScope decisions(AI_DECISION_SCRIPT, script->getName().str());
-					TheScriptEngine->friend_executeAction(script->getAction());
+					TheScriptEngine->friend_executeScriptActions(script); // GeneralsX @feature Claude 26/09/2026 Named for AIDecisionObserver.
 				}
 			}
 			return t;
@@ -365,8 +363,7 @@ Team *TeamFactory::createInactiveTeam(const AsciiString& name)
 	if (tp->getTemplateInfo()->m_executeActions) {
 		const Script *script = TheScriptEngine->findScriptByName(tp->getTemplateInfo()->m_productionCondition);
 		if (script) {
-			AIDecisionScope decisions(AI_DECISION_SCRIPT, script->getName().str());
-			TheScriptEngine->friend_executeAction(script->getAction());
+			TheScriptEngine->friend_executeScriptActions(script); // GeneralsX @feature Claude 26/09/2026 Named for AIDecisionObserver.
 		}
 	}
 
@@ -2553,8 +2550,7 @@ void Team::updateGenericScripts()
 					if (script->isOneShot()) {
 						m_shouldAttemptGenericScript[i] = false;
 					}
-					AIDecisionScope decisions(AI_DECISION_SCRIPT, script->getName().str());
-					TheScriptEngine->friend_executeAction(script->getAction(), this);
+					TheScriptEngine->friend_executeScriptActions(script, this); // GeneralsX @feature Claude 26/09/2026 Named for AIDecisionObserver.
 					AsciiString msg = "Generic script '";
 					msg.concat(script->getName());
 					msg.concat("' run on team ");

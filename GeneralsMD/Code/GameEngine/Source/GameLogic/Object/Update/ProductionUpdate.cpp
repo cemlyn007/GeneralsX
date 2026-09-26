@@ -315,6 +315,7 @@ Bool ProductionUpdate::queueUpgrade( const UpgradeTemplate *upgrade )
 	// add this upgrade as in progress in the player
 	player->addUpgrade( upgrade, UPGRADE_STATUS_IN_PRODUCTION );
 
+	// GeneralsX @feature Claude 26/09/2026 Report the order to AIDecisionObserver.
 	AIDecisionHook::queueUpgrade( getObject(), upgrade );
 
 
@@ -342,6 +343,7 @@ Bool ProductionUpdate::cancelUpgrade( const UpgradeTemplate *upgrade )
 		if( production->m_type == PRODUCTION_UPGRADE &&
 				production->m_upgradeToResearch == upgrade )
 		{
+			// GeneralsX @feature Claude 26/09/2026 Report the cancel to AIDecisionObserver.
 			// reported here, not in cancelUpgrade( ProductionEntry * ): the engine's own
 			// cascades (a sale, a lost prerequisite) cancel through that one
 			if( !cancelUpgrade( production ) )
@@ -432,6 +434,7 @@ Bool ProductionUpdate::queueCreateUnit( const ThingTemplate *unitType, Productio
 	// tie to the end of the production queue
 	addToProductionQueue( production );
 
+	// GeneralsX @feature Claude 26/09/2026 Report the order to AIDecisionObserver.
 	AIDecisionHook::queueUnit( getObject(), unitType );
 
 	return TRUE;  // unit queued
@@ -451,6 +454,7 @@ Bool ProductionUpdate::cancelUnitCreate( ProductionID productionID )
 		// are we at the one we want get rid of it
 		if( production->m_productionID == productionID )
 		{
+			// GeneralsX @feature Claude 26/09/2026 Report the cancel to AIDecisionObserver.
 			// reported here, not in cancelUnitCreate( ProductionEntry * ): the engine's own
 			// cascades (a sale, a lost prerequisite) cancel through that one
 			const ThingTemplate *unitType = production->getProductionObject();

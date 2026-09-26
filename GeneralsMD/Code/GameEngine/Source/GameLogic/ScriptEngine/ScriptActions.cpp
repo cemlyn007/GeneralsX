@@ -4217,8 +4217,8 @@ void ScriptActions::doNamedFireSpecialPowerAtWaypoint( const AsciiString& unit, 
 			if (!way) {
 				return;
 			}
-			AIDecisionHook::specialPower( theObj, power, way->getLocation(), nullptr, way, COMMAND_FIRED_BY_SCRIPT );
-			mod->doSpecialPowerAtLocation(way->getLocation(), INVALID_ANGLE, COMMAND_FIRED_BY_SCRIPT );
+			// GeneralsX @feature Claude 26/09/2026 Through Object's funnel (same checks, forced past canUse), which reports it to AIDecisionObserver.
+			theObj->doSpecialPowerAtLocation( power, way->getLocation(), INVALID_ANGLE, COMMAND_FIRED_BY_SCRIPT, TRUE );
 		}
 	}
 }
@@ -4289,8 +4289,8 @@ void ScriptActions::doSkirmishFireSpecialPowerAtMostCost( const AsciiString &pla
 
 					if( locationFound && location.lengthSqr() > 0.0f )
 					{
-						AIDecisionHook::specialPower( pObj, power, &location, nullptr, nullptr, COMMAND_FIRED_BY_SCRIPT );
-						mod->doSpecialPowerAtLocation( &location, INVALID_ANGLE, COMMAND_FIRED_BY_SCRIPT );
+						// GeneralsX @feature Claude 26/09/2026 Through Object's funnel (same checks, forced past canUse), which reports it to AIDecisionObserver.
+						pObj->doSpecialPowerAtLocation( power, &location, INVALID_ANGLE, COMMAND_FIRED_BY_SCRIPT, TRUE );
 					}
 					break;
 				}
@@ -4312,8 +4312,8 @@ void ScriptActions::doNamedFireSpecialPowerAtNamed( const AsciiString& unit, con
 		SpecialPowerModuleInterface *mod = theObj->getSpecialPowerModule(power);
 		if (mod)
 		{
-			AIDecisionHook::specialPower( theObj, power, nullptr, theTarget, nullptr, COMMAND_FIRED_BY_SCRIPT );
-			mod->doSpecialPowerAtObject(theTarget, COMMAND_FIRED_BY_SCRIPT );
+			// GeneralsX @feature Claude 26/09/2026 Through Object's funnel (same checks, forced past canUse), which reports it to AIDecisionObserver.
+			theObj->doSpecialPowerAtObject( power, theTarget, COMMAND_FIRED_BY_SCRIPT, TRUE );
 		}
 	}
 }

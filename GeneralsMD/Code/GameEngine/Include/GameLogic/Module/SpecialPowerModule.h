@@ -131,6 +131,8 @@ public:
 	virtual void setReadyFrame( UnsignedInt frame ) override;
 	UnsignedInt getReadyFrame() { return m_availableOnFrame; }// USED BY PLAYER TO KEEP RECHARGE TIMERS IN SYNC
 	virtual void pauseCountdown( Bool pause ) override;
+	// GeneralsX @feature Claude 26/09/2026 Read by AIDecisionObserver: a paused power ignores doSpecialPower*.
+	Bool isPaused() const { return m_pausedCount > 0; }
 
 	//
 	// the following methods should be *EXTENDED* for any special power module implementations
