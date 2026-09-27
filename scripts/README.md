@@ -63,6 +63,9 @@ Utilities for large-scale code refactoring and fixes:
 - `run-bundled-game.sh` - Test bundled binary after deployment
 - `collect-flatpak-vulkan-wsi-report.sh` - Collect reproducible Flatpak Vulkan/XCB diagnostics for upstream runtime issues
 
+#### `qa/` (top level) - Other Checks
+- `test-gamememorynull-exports-linux.sh` - Check that a `RTS_GAMEMEMORY_ENABLE=OFF` engine hides the replaceable `operator new`/`delete` and exports the `NEW` forms. Pass a shared object (for example rlgenerals' `libgeneralsx.so`), or `--build-dir <dir>` to rebuild `GameMemoryNull.cpp` from that build's `compile_commands.json` (run it where that build runs, e.g. inside the Docker builder)
+
 ### `legacy/` - Deprecated & Compatibility
 
 #### `legacy/compat/` - Old Scripts

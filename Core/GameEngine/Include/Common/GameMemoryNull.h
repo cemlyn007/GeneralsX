@@ -20,10 +20,22 @@
 
 #define allocateBytes(ARGCOUNT,ARGLITERAL)          allocateBytesImplementation(ARGCOUNT)
 #define allocateBytesDoNotZero(ARGCOUNT,ARGLITERAL) allocateBytesDoNotZeroImplementation(ARGCOUNT)
+
+// GeneralsX @bugfix cemlyn007 27/09/2026 Allocate through the engine's exported (size_t, const char *, int) new
+// The replaceable operator new is hidden on ELF, so a plain new in code built outside the engine module (an
+// embedding host, or header code it instantiates) would use the host's operator new, which does not zero.
+// No other library defines this overload, so these always reach the engine's zero-filling new.
+#ifndef DISABLE_GAMEMEMORY_NEW_OPERATORS
+#define newInstanceDesc(ARGCLASS,ARGLITERAL)        new(__FILE__, __LINE__) ARGCLASS
+#define newInstance(ARGCLASS)                       new(__FILE__, __LINE__) ARGCLASS
+#define MSGNEW(MSG)                                 new(__FILE__, __LINE__)
+#define NEW                                         new(__FILE__, __LINE__)
+#else
 #define newInstanceDesc(ARGCLASS,ARGLITERAL)        new ARGCLASS
 #define newInstance(ARGCLASS)                       new ARGCLASS
 #define MSGNEW(MSG)                                 new
 #define NEW                                         new
+#endif
 
 
 /**
