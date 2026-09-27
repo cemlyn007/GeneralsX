@@ -25,6 +25,11 @@
 #include <malloc.h>
 #endif
 
+// GeneralsX @bugfix cemlyn007 27/09/2026 For the size_t check next to the hidden new operators
+#if defined(__ELF__)
+#include <type_traits>
+#endif
+
 #include "Common/GameMemoryNull.h"
 
 static Bool theMainInitFlag = false;
@@ -162,6 +167,43 @@ void shutdownMemoryManager()
 
 
 #ifndef DISABLE_GAMEMEMORY_NEW_OPERATORS
+
+// GeneralsX @bugfix cemlyn007 27/09/2026 Keep the zero-filling operators out of the ELF dynamic symbol table
+// Exported, they are bound through the PLT, so the first operator new in the lookup scope wins. An
+// LD_PRELOAD allocator (jemalloc), or a C++ library loaded RTLD_GLOBAL before a dlopen'd engine, then
+// hands the engine memory that is not zeroed. In a clean load these instead replace operator new for
+// every C++ library loaded after the engine. Hidden, each engine call binds to them at link time.
+// A visibility attribute cannot do this: <new> declares the replaceable forms with default visibility,
+// so GCC ignores the attribute and Clang rejects it. The assembler directive sets it on the definitions.
+// Memory still crosses the boundary: libstdc++'s out-of-line code allocates with its own operator new
+// and engine code can free it, or the reverse. That is safe only because both sides are malloc/free,
+// so the pooled GameMemory.cpp operators must not be hidden. Code outside the linked module (an
+// embedding host) now allocates engine types with its own operator new, which does not zero.
+// Address sanitizer builds keep the exported operators: ASan's operator new would serve the libraries,
+// and it reports memory freed across the boundary as an alloc-dealloc-mismatch.
+#if defined(__SANITIZE_ADDRESS__)
+#define GAMEMEMORYNULL_ASAN 1
+#elif defined(__has_feature)
+#if __has_feature(address_sanitizer)
+#define GAMEMEMORYNULL_ASAN 1
+#endif
+#endif
+
+#if defined(__ELF__) && !defined(GAMEMEMORYNULL_ASAN)
+static_assert(std::is_same_v<size_t, unsigned long>, "The names below mangle size_t as unsigned long (m)");
+__asm__(
+	".hidden _Znwm\n"      // operator new(size_t)
+	".hidden _ZdlPv\n"     // operator delete(void *)
+	".hidden _ZdlPvm\n"    // operator delete(void *, size_t)
+	".hidden _Znam\n"      // operator new[](size_t)
+	".hidden _ZdaPv\n"     // operator delete[](void *)
+	".hidden _ZdaPvm\n"    // operator delete[](void *, size_t)
+	".hidden _ZnwmPKci\n"  // operator new(size_t, const char *, int)
+	".hidden _ZdlPvPKci\n" // operator delete(void *, const char *, int)
+	".hidden _ZnamPKci\n"  // operator new[](size_t, const char *, int)
+	".hidden _ZdaPvPKci\n" // operator delete[](void *, const char *, int)
+);
+#endif
 
 void * __cdecl operator new(size_t size)
 {
