@@ -40,6 +40,7 @@
 #include "Common/GameState.h"
 #include "Common/GameStateMap.h"
 #include "Common/LatchRestore.h"
+#include "Common/LocalFileSystem.h"
 #include "Common/MapObject.h"
 #include "Common/PlayerList.h"
 #include "Common/RandomValue.h"
@@ -317,17 +318,6 @@ GameState::~GameState()
 
 	// clear any available game
 	clearAvailableGames();
-
-	// GeneralsX @bugfix cemlyn007 27/09/2026 Moved here from ~GameStateMap, which ran after this
-	// destructor and so read the save directory through a deleted TheGameState. TheGameStateMap is
-	// initialised before TheGameState (GameState::init registers it as a snapshot block), so it is
-	// still alive here.
-	//
-	// clear the save directory of any temporary "scratch pad" maps that were extracted
-	// from any previously loaded save game files
-	//
-	if( TheGameStateMap )
-		TheGameStateMap->clearScratchPadMaps( getSaveDirectory() );
 
 }
 
@@ -689,7 +679,7 @@ SaveCode GameState::loadGame( AvailableGameInfo gameInfo )
 	// clear the save directory of any temporary "scratch pad" maps that were extracted
 	// from any previously loaded save game files
 	//
-	TheGameStateMap->clearScratchPadMaps( getSaveDirectory() );
+	TheGameStateMap->clearScratchPadMaps();
 
 	AsciiString filepath = getSaveGamePathForRead(gameInfo.filename);
 
@@ -841,7 +831,7 @@ void GameState::loadQueuedSaveGame()
 }
 
 //-------------------------------------------------------------------------------------------------
-AsciiString GameState::getSaveDirectory() const
+AsciiString GameState::getSaveDirectory()
 {
 	AsciiString tmp = TheGlobalData->getPath_UserData();
 	// GeneralsX @bugfix copilot 12/03/2026 Use POSIX separator on non-Windows so saves are created inside a real Save directory.
@@ -854,7 +844,7 @@ AsciiString GameState::getSaveDirectory() const
 }
 
 //-------------------------------------------------------------------------------------------------
-AsciiString GameState::getFilePathInSaveDirectory(const AsciiString& leaf) const
+AsciiString GameState::getFilePathInSaveDirectory(const AsciiString& leaf)
 {
 	AsciiString tmp = getSaveDirectory();
 	tmp.concat(leaf);
@@ -862,7 +852,7 @@ AsciiString GameState::getFilePathInSaveDirectory(const AsciiString& leaf) const
 }
 
 //-------------------------------------------------------------------------------------------------
-AsciiString GameState::getSaveGamePathForRead(const AsciiString& filenameOrPath) const
+AsciiString GameState::getSaveGamePathForRead(const AsciiString& filenameOrPath)
 {
 	if (isAbsolutePath(filenameOrPath.str()))
 	{
@@ -873,7 +863,7 @@ AsciiString GameState::getSaveGamePathForRead(const AsciiString& filenameOrPath)
 }
 
 //-------------------------------------------------------------------------------------------------
-Bool GameState::isInSaveDirectory(const AsciiString& path) const
+Bool GameState::isInSaveDirectory(const AsciiString& path)
 {
 	return FileSystem::isPathInDirectory(path, getSaveDirectory());
 }
@@ -1353,121 +1343,25 @@ void GameState::iterateSaveFiles( IterateSaveFileCallback callback, void *userDa
 	if( callback == nullptr )
 		return;
 
-	// save the current directory
-#ifdef _WIN32
-	char currentDirectory[ _MAX_PATH ];
-	GetCurrentDirectory( _MAX_PATH, currentDirectory );
+	// GeneralsX @bugfix cemlyn007 27/09/2026 List the save directory by absolute path instead of switching the
+	// process into it, which changed the working directory under every other thread. The local file system lists
+	// the directory on every platform, and a save directory that does not exist yet lists nothing. The listing is
+	// complete before any callback runs, so a callback that throws leaves no directory state behind to restore;
+	// callbacks handle their own errors, as addGameToAvailableList does.
+	FilenameList saveFiles;
+	TheLocalFileSystem->getFileListInDirectory( AsciiString::TheEmptyString, getSaveDirectory(), "*.sav", saveFiles, FALSE );
 
-	// switch into the save directory
-	SetCurrentDirectory( getSaveDirectory().str() );
-
-	// iterate all items in the directory
-	WIN32_FIND_DATA item;  // search item
-	HANDLE hFile = INVALID_HANDLE_VALUE;  // handle for search resources
-#else
-	// GeneralsX @bugfix Copilot 02/04/2026 Add robust save-file iteration on macOS/Linux.
-	std::filesystem::path currentDirectory;
-	Bool changedDirectory = FALSE;
-	AsciiString saveDirPath = getSaveDirectory();
-
-	try {
-		currentDirectory = std::filesystem::current_path();
-		const char *saveDir = saveDirPath.str();
-		std::filesystem::current_path( saveDir );
-		changedDirectory = TRUE;
-
-		for( const auto &entry : std::filesystem::directory_iterator(".") ) {
-			if( entry.is_regular_file() ) {
-				std::string filename_str = entry.path().filename().string();
-
-				// See if there is a ".sav" at end of this filename
-				const char *c = strrchr( filename_str.c_str(), '.' );
-				if( c && stricmp( c, ".sav" ) == 0 ) {
-					AsciiString filename;
-					filename.set( filename_str.c_str() );
-					callback( filename, userData );
-				}
-			}
-		}
-	} catch( const std::filesystem::filesystem_error &e ) {
-#ifdef _DEBUG
-		DEBUG_LOG(( "GameState::iterateSaveFiles failed while iterating save directory '%s': %s\r\n", saveDirPath.str(), e.what() ));
-#endif
-	} catch( ... ) {
-#ifdef _DEBUG
-		DEBUG_LOG(( "GameState::iterateSaveFiles failed with unknown exception while iterating save directory '%s'\r\n", saveDirPath.str() ));
-#endif
-	}
-
-	if( changedDirectory ) {
-		try {
-			std::filesystem::current_path( currentDirectory );
-		} catch( const std::filesystem::filesystem_error &e ) {
-#ifdef _DEBUG
-			DEBUG_LOG(( "GameState::iterateSaveFiles failed to restore current directory '%s': %s\r\n", currentDirectory.string().c_str(), e.what() ));
-#endif
-		} catch( ... ) {
-#ifdef _DEBUG
-			DEBUG_LOG(( "GameState::iterateSaveFiles failed with unknown exception while restoring current directory\r\n" ));
-#endif
-		}
-	}
-	return;
-#endif
-
-#ifdef _WIN32
-	Bool done = FALSE;
-	Bool first = TRUE;
-	while( done == FALSE )
+	for( FilenameList::const_iterator it = saveFiles.begin(); it != saveFiles.end(); ++it )
 	{
 
-		// if our first time through we need to start the search
-		if( first )
-		{
+		// Win32 wildcards also match longer extensions through 8.3 short names, so check the extension itself
+		if( it->endsWithNoCase( SAVE_GAME_EXTENSION ) == FALSE )
+			continue;
 
-			// start search
-			hFile = FindFirstFile( "*", &item );
-			if( hFile == INVALID_HANDLE_VALUE )
-				return;
-
-			// we are no longer on our first item
-			first = FALSE;
-
-		}
-
-		// see if this is a file, and therefore a possible save file
-		if( !(item.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) )
-		{
-
-			// see if there is a ".sav" at end of this filename
-			Char *c = strrchr( item.cFileName, '.' );
-			if( c && stricmp( c, ".sav" ) == 0 )
-			{
-
-				// construction asciistring filename
-				AsciiString filename;
-				filename.set( item.cFileName );
-
-				// call the callback
-				callback( filename, userData );
-
-			}
-
-		}
-
-		// on to the next file
-		if( FindNextFile( hFile, &item ) == 0 )
-			done = TRUE;
+		// the callbacks take the leaf name and resolve it with getSaveGamePathForRead
+		callback( getMapLeafName( *it ), userData );
 
 	}
-
-	// close search resources
-	FindClose( hFile );
-
-	// restore the current directory
-	SetCurrentDirectory( currentDirectory );
-
-#endif
 
 }
 

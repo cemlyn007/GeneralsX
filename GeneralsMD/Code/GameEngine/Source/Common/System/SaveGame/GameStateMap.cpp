@@ -35,6 +35,7 @@
 #include "Common/GameState.h"
 #include "Common/GameStateMap.h"
 #include "Common/GlobalData.h"
+#include "Common/LocalFileSystem.h"
 #include "Common/Xfer.h"
 #include "GameClient/CampaignManager.h"
 #include "GameClient/GameClient.h"
@@ -52,6 +53,28 @@ GameStateMap *TheGameStateMap = nullptr;
 // ------------------------------------------------------------------------------------------------
 GameStateMap::GameStateMap()
 {
+
+}
+
+// ------------------------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------------------
+void GameStateMap::init()
+{
+
+	m_saveDirectory = GameState::getSaveDirectory();
+
+}
+
+// ------------------------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------------------
+GameStateMap::~GameStateMap()
+{
+
+	//
+	// clear the save directory of any temporary "scratch pad" maps that were extracted
+	// from any previously loaded save game files
+	//
+	clearScratchPadMaps();
 
 }
 
@@ -442,78 +465,37 @@ void GameStateMap::xfer( Xfer *xfer )
 	* their own file so that those map files could be loaded as a part of the load game
 	* process */
 // ------------------------------------------------------------------------------------------------
-void GameStateMap::clearScratchPadMaps( const AsciiString &saveDirectory )
+void GameStateMap::clearScratchPadMaps()
 {
 
-	// remember the current directory
-	char currentDirectory[ _MAX_PATH ];
-	GetCurrentDirectory( _MAX_PATH, currentDirectory );
-
-	// GeneralsX @bugfix cemlyn007 27/09/2026 Stop if the save directory cannot be entered (it does not
-	// exist until the first save), otherwise the scan below deletes *.map files in the current directory.
-	// switch into the save directory
-	if( SetCurrentDirectory( saveDirectory.str() ) == 0 )
+	// GeneralsX @bugfix cemlyn007 27/09/2026 Use the save directory cached in init(): ~GameStateMap calls
+	// this at shutdown, after shutdownAll has deleted TheGameState (initialized after TheGameStateMap).
+	if( m_saveDirectory.isEmpty() )
 		return;
 
-	// iterate all items in the directory
-	AsciiString fileToDelete;
-	WIN32_FIND_DATA item;  // search item
-	HANDLE hFile = INVALID_HANDLE_VALUE;  // handle for search resources
-	Bool done = FALSE;
-	Bool first = TRUE;
-	while( done == FALSE )
+	// GeneralsX @bugfix cemlyn007 27/09/2026 List and delete by absolute path instead of switching the process
+	// into the save directory. On macOS/Linux the switch failed silently while the save directory did not exist
+	// yet (nothing saved so far), so every *.map in the working directory (usually the install directory) was
+	// deleted. The switch also changed the working directory under every other thread. The local file system
+	// lists the directory on every platform, and a save directory that does not exist yet lists nothing.
+	// TheLocalFileSystem is initialized before TheGameStateMap, so it is still alive in ~GameStateMap.
+	FilenameList mapFiles;
+	TheLocalFileSystem->getFileListInDirectory( AsciiString::TheEmptyString, m_saveDirectory, "*.map", mapFiles, FALSE );
+
+	for( FilenameList::const_iterator it = mapFiles.begin(); it != mapFiles.end(); ++it )
 	{
 
-		// first, clear flag for deleting file
-		fileToDelete.clear();
+		// Win32 wildcards also match longer extensions through 8.3 short names, so check the extension itself
+		if( it->endsWithNoCase( ".map" ) == FALSE )
+			continue;
 
-		// if our first time through we need to start the search
-		if( first )
+		// a scratch pad map left behind would be picked up by a later load, so say when one cannot be deleted
+		if( DeleteFile( it->str() ) == 0 )
 		{
-
-			// start search
-			hFile = FindFirstFile( "*", &item );
-			if( hFile == INVALID_HANDLE_VALUE )
-			{
-				// GeneralsX @bugfix cemlyn007 27/09/2026 Restore the current directory before returning.
-				SetCurrentDirectory( currentDirectory );
-				return;
-			}
-
-			// we are no longer on our first item
-			first = FALSE;
-
+			fprintf( stderr, "GameStateMap::clearScratchPadMaps - Unable to delete scratch pad map '%s'\n", it->str() );
+			fflush( stderr );
 		}
-
-		// see if this is a file, and therefore a possible .map file
-		if( !(item.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) )
-		{
-
-			// see if there is a ".map" at end of this filename
-			Char *c = strrchr( item.cFileName, '.' );
-			if( c && stricmp( c, ".map" ) == 0 )
-				fileToDelete.set( item.cFileName );  // we want to delete this one
-
-		}
-
-		//
-		// find the next file before we delete this one, this is probably not necessary
-		// to structure things this way so that the find next occurs before the file
-		// delete, but it seems more correct to do so
-		//
-		if( FindNextFile( hFile, &item ) == 0 )
-			done = TRUE;
-
-		// delete file if set
-		if( fileToDelete.isEmpty() == FALSE )
-			DeleteFile( fileToDelete.str() );
 
 	}
-
-	// close search resources
-	FindClose( hFile );
-
-	// restore our directory to the current directory
-	SetCurrentDirectory( currentDirectory );
 
 }

@@ -197,10 +197,12 @@ public:
 	void setPristineMapName( AsciiString name ) { m_gameInfo.pristineMapName = name; }
 	AsciiString getPristineMapName() { return m_gameInfo.pristineMapName; }
 
-	AsciiString getSaveDirectory() const;
-	AsciiString getFilePathInSaveDirectory(const AsciiString& leaf) const;
-	AsciiString getSaveGamePathForRead(const AsciiString& filenameOrPath) const;
-	Bool isInSaveDirectory(const AsciiString& path) const;
+	// GeneralsX @bugfix cemlyn007 27/09/2026 Static because they read only TheGlobalData, so
+	// they can be resolved without going through TheGameState.
+	static AsciiString getSaveDirectory();
+	static AsciiString getFilePathInSaveDirectory(const AsciiString& leaf);
+	static AsciiString getSaveGamePathForRead(const AsciiString& filenameOrPath);
+	static Bool isInSaveDirectory(const AsciiString& path);
 
 	AsciiString realMapPathToPortableMapPath(const AsciiString& in) const;
 	AsciiString portableMapPathToRealMapPath(const AsciiString& in) const;

@@ -45,9 +45,10 @@ class GameStateMap : public SubsystemInterface,
 public:
 
 	GameStateMap();
+	virtual ~GameStateMap() override;
 
 	// subsystem interface methods
-	virtual void init() override { }
+	virtual void init() override;
 	virtual void reset() override { }
 	virtual void update() override { }
 
@@ -56,11 +57,13 @@ public:
 	virtual void xfer( Xfer *xfer ) override;
 	virtual void loadPostProcess() override { }
 
-	// GeneralsX @bugfix cemlyn007 27/09/2026 Take the save directory from the caller instead of TheGameState.
-	void clearScratchPadMaps( const AsciiString &saveDirectory );		///< clear any scratch pad maps from the save directory
+	void clearScratchPadMaps();		///< clear any scratch pad maps from the save directory
 
 protected:
 
+	// GeneralsX @bugfix cemlyn007 27/09/2026 Resolved once in init() so the teardown cleanup in
+	// ~GameStateMap depends on no other subsystem still being alive.
+	AsciiString m_saveDirectory;
 
 };
 

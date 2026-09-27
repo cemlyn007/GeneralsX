@@ -34,6 +34,21 @@ NGMPGameSlot::NGMPGameSlot()
 
 NGMPGame::NGMPGame()
 {
+	// GeneralsX @bugfix cemlyn007 27/09/2026 Initialise members that previously relied on the engine's
+	// zero-filling operator new. Stack instances, host-side allocations and non-zeroing allocators got garbage.
+	// Values match the old zero-fill; set before cleanUpSlotPointers()/enterGame()/SyncWithLobby() so their writes win.
+	m_id = 0;
+	m_requiresPassword = FALSE;
+	m_allowObservers = FALSE;
+	m_version = 0;
+	m_exeCRC = 0;
+	m_iniCRC = 0;
+	m_isQM = FALSE;
+	m_pingInt = 0;
+	m_reportedNumPlayers = 0;
+	m_reportedMaxPlayers = 0;
+	m_reportedNumObservers = 0;
+
 	cleanUpSlotPointers();
 	setLocalIP(0);
 	m_ladderIP.clear();
