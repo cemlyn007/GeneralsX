@@ -411,6 +411,20 @@ void W3DPropBuffer::xfer( Xfer *xfer )
 }
 
 // ------------------------------------------------------------------------------------------------
+// GeneralsX @bugfix cemlyn007 27/09/2026 Reads a saved prop buffer (just its version, as xfer()
+// writes) and drops it, for an engine that has none to load it into (a fully headless run).
+// ------------------------------------------------------------------------------------------------
+void W3DPropBuffer::skipXfer( Xfer *xfer )
+{
+
+	// version
+	XferVersion currentVersion = 1;
+	XferVersion version = currentVersion;
+	xfer->xferVersion( &version, currentVersion );
+
+}
+
+// ------------------------------------------------------------------------------------------------
 /** Load post process */
 // ------------------------------------------------------------------------------------------------
 void W3DPropBuffer::loadPostProcess()

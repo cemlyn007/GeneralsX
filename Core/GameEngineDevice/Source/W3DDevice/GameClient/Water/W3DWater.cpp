@@ -3516,6 +3516,35 @@ void WaterRenderObjClass::xfer( Xfer *xfer )
 }
 
 // ------------------------------------------------------------------------------------------------
+// GeneralsX @bugfix cemlyn007 27/09/2026 Reads the layout xfer() writes and drops it, for an engine
+// that has no water render object to load it into. The mesh has a one-point border (see enableWaterGrid).
+// ------------------------------------------------------------------------------------------------
+void WaterRenderObjClass::skipXfer( Xfer *xfer )
+{
+
+	// version
+	XferVersion currentVersion = 1;
+	XferVersion version = currentVersion;
+	xfer->xferVersion( &version, currentVersion );
+
+	Int cellsX = 0;
+	xfer->xferInt( &cellsX );
+	Int cellsY = 0;
+	xfer->xferInt( &cellsY );
+
+	WaterMeshData point;
+	const UnsignedInt meshDataSize = (cellsX+1+2)*(cellsY+1+2);
+	for( UnsignedInt i = 0; i < meshDataSize; ++i )
+	{
+		xfer->xferReal( &point.height );
+		xfer->xferReal( &point.velocity );
+		xfer->xferUnsignedByte( &point.status );
+		xfer->xferUnsignedByte( &point.preferredHeight );
+	}
+
+}
+
+// ------------------------------------------------------------------------------------------------
 /** Load post process */
 // ------------------------------------------------------------------------------------------------
 void WaterRenderObjClass::loadPostProcess()
