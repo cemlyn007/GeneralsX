@@ -40,6 +40,7 @@
 #include "Common/GameState.h"
 #include "Common/GameStateMap.h"
 #include "Common/LatchRestore.h"
+#include "Common/LocalFileSystem.h"
 #include "Common/MapObject.h"
 #include "Common/PlayerList.h"
 #include "Common/RandomValue.h"
@@ -1342,94 +1343,25 @@ void GameState::iterateSaveFiles( IterateSaveFileCallback callback, void *userDa
 	if( callback == nullptr )
 		return;
 
-	// GeneralsX @bugfix cemlyn007 27/09/2026 Search by absolute path instead of switching the process into the save
-	// directory, which changed the working directory under every other thread. The callbacks resolve the leaf name
-	// with getSaveGamePathForRead, so they do not depend on the working directory. On macOS/Linux the non-throwing
-	// std::filesystem overloads keep the iteration free of filesystem exceptions, as the try/catch did before.
-	AsciiString saveDirectory = getSaveDirectory();
+	// GeneralsX @bugfix cemlyn007 27/09/2026 List the save directory by absolute path instead of switching the
+	// process into it, which changed the working directory under every other thread. The local file system lists
+	// the directory on every platform, and a save directory that does not exist yet lists nothing. The listing is
+	// complete before any callback runs, so a callback that throws leaves no directory state behind to restore;
+	// callbacks handle their own errors, as addGameToAvailableList does.
+	FilenameList saveFiles;
+	TheLocalFileSystem->getFileListInDirectory( AsciiString::TheEmptyString, getSaveDirectory(), "*.sav", saveFiles, FALSE );
 
-#ifdef _WIN32
-	// iterate all items in the save directory
-	AsciiString searchPattern = saveDirectory;
-	searchPattern.concat( "*" );
-	WIN32_FIND_DATA item;  // search item
-	HANDLE hFile = INVALID_HANDLE_VALUE;  // handle for search resources
-	Bool done = FALSE;
-	Bool first = TRUE;
-	while( done == FALSE )
+	for( FilenameList::const_iterator it = saveFiles.begin(); it != saveFiles.end(); ++it )
 	{
 
-		// if our first time through we need to start the search
-		if( first )
-		{
-
-			// start search
-			hFile = FindFirstFile( searchPattern.str(), &item );
-			if( hFile == INVALID_HANDLE_VALUE )
-				return;
-
-			// we are no longer on our first item
-			first = FALSE;
-
-		}
-
-		// see if this is a file, and therefore a possible save file
-		if( !(item.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) )
-		{
-
-			// see if there is a ".sav" at end of this filename
-			Char *c = strrchr( item.cFileName, '.' );
-			if( c && stricmp( c, ".sav" ) == 0 )
-			{
-
-				// construction asciistring filename
-				AsciiString filename;
-				filename.set( item.cFileName );
-
-				// call the callback
-				callback( filename, userData );
-
-			}
-
-		}
-
-		// on to the next file
-		if( FindNextFile( hFile, &item ) == 0 )
-			done = TRUE;
-
-	}
-
-	// close search resources
-	FindClose( hFile );
-#else
-	// a save directory that does not exist yet holds no save files
-	std::error_code ec;
-	const std::filesystem::directory_iterator end;
-	for( std::filesystem::directory_iterator it( saveDirectory.str(), ec ); !ec && it != end; it.increment( ec ) )
-	{
-
-		// see if this is a file, and therefore a possible save file
-		std::error_code entryError;
-		if( !it->is_regular_file( entryError ) )
+		// Win32 wildcards also match longer extensions through 8.3 short names, so check the extension itself
+		if( it->endsWithNoCase( SAVE_GAME_EXTENSION ) == FALSE )
 			continue;
 
-		// see if there is a ".sav" at end of this filename
-		const std::string leafName = it->path().filename().string();
-		const char *c = strrchr( leafName.c_str(), '.' );
-		if( c && stricmp( c, ".sav" ) == 0 )
-		{
-
-			// construction asciistring filename
-			AsciiString filename;
-			filename.set( leafName.c_str() );
-
-			// call the callback
-			callback( filename, userData );
-
-		}
+		// the callbacks take the leaf name and resolve it with getSaveGamePathForRead
+		callback( getMapLeafName( *it ), userData );
 
 	}
-#endif
 
 }
 
