@@ -645,6 +645,8 @@ GlobalData::GlobalData()
 	m_skirmishTickRate = LOGICFRAMES_PER_SECOND;
 	m_chipSetType = 0;
 	m_headless = FALSE;
+	// GeneralsX @bugfix cemlyn007 27/09/2026 Off-screen render mode is off by default, as in Zero Hour.
+	m_headlessRender = FALSE;
 	// GeneralsX @feature BenderAI 21/04/2026 Default to TRUE; user can override via Options.ini
 	m_checkForUpdates = TRUE;
 	m_windowed = 0;
