@@ -125,6 +125,11 @@ public:
 	// Run game without graphics, input or audio.
 	Bool m_headless;
 
+	// GeneralsX @bugfix cemlyn007 27/09/2026 Exists only so the shared Core device code
+	// (BaseHeightMap, W3DTerrainVisual, W3DView) compiles; see the Zero Hour GlobalData.h.
+	// Must stay FALSE: Generals' W3DDisplay/InGameUI/SDL3GameEngine have no render-mode path.
+	Bool m_headlessRender;
+
 	// GeneralsX @feature BenderAI 21/04/2026 Allow user to opt out of the in-game update checker
 	Bool m_checkForUpdates;
 
