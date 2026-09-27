@@ -831,7 +831,7 @@ void GameState::loadQueuedSaveGame()
 }
 
 //-------------------------------------------------------------------------------------------------
-AsciiString GameState::getSaveDirectory() const
+AsciiString GameState::getSaveDirectory()
 {
 	AsciiString tmp = TheGlobalData->getPath_UserData();
 	// GeneralsX @bugfix copilot 12/03/2026 Use POSIX separator on non-Windows so saves are created inside a real Save directory.
@@ -844,7 +844,7 @@ AsciiString GameState::getSaveDirectory() const
 }
 
 //-------------------------------------------------------------------------------------------------
-AsciiString GameState::getFilePathInSaveDirectory(const AsciiString& leaf) const
+AsciiString GameState::getFilePathInSaveDirectory(const AsciiString& leaf)
 {
 	AsciiString tmp = getSaveDirectory();
 	tmp.concat(leaf);
@@ -852,7 +852,7 @@ AsciiString GameState::getFilePathInSaveDirectory(const AsciiString& leaf) const
 }
 
 //-------------------------------------------------------------------------------------------------
-AsciiString GameState::getSaveGamePathForRead(const AsciiString& filenameOrPath) const
+AsciiString GameState::getSaveGamePathForRead(const AsciiString& filenameOrPath)
 {
 	if (isAbsolutePath(filenameOrPath.str()))
 	{
@@ -863,7 +863,7 @@ AsciiString GameState::getSaveGamePathForRead(const AsciiString& filenameOrPath)
 }
 
 //-------------------------------------------------------------------------------------------------
-Bool GameState::isInSaveDirectory(const AsciiString& path) const
+Bool GameState::isInSaveDirectory(const AsciiString& path)
 {
 	return FileSystem::isPathInDirectory(path, getSaveDirectory());
 }

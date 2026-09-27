@@ -58,6 +58,15 @@ GameStateMap::GameStateMap()
 
 // ------------------------------------------------------------------------------------------------
 // ------------------------------------------------------------------------------------------------
+void GameStateMap::init()
+{
+
+	m_saveDirectory = GameState::getSaveDirectory();
+
+}
+
+// ------------------------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------------------
 GameStateMap::~GameStateMap()
 {
 
@@ -459,13 +468,19 @@ void GameStateMap::xfer( Xfer *xfer )
 void GameStateMap::clearScratchPadMaps()
 {
 
+	// GeneralsX @bugfix cemlyn007 27/09/2026 Use the save directory cached in init(): ~GameStateMap calls
+	// this at shutdown, after shutdownAll has deleted TheGameState (initialized after TheGameStateMap).
+	if( m_saveDirectory.isEmpty() )
+		return;
+
 	// GeneralsX @bugfix cemlyn007 27/09/2026 List and delete by absolute path instead of switching the process
 	// into the save directory. On macOS/Linux the switch failed silently while the save directory did not exist
 	// yet (nothing saved so far), so every *.map in the working directory (usually the install directory) was
 	// deleted. The switch also changed the working directory under every other thread. The local file system
 	// lists the directory on every platform, and a save directory that does not exist yet lists nothing.
+	// TheLocalFileSystem is initialized before TheGameStateMap, so it is still alive in ~GameStateMap.
 	FilenameList mapFiles;
-	TheLocalFileSystem->getFileListInDirectory( AsciiString::TheEmptyString, TheGameState->getSaveDirectory(), "*.map", mapFiles, FALSE );
+	TheLocalFileSystem->getFileListInDirectory( AsciiString::TheEmptyString, m_saveDirectory, "*.map", mapFiles, FALSE );
 
 	for( FilenameList::const_iterator it = mapFiles.begin(); it != mapFiles.end(); ++it )
 	{
