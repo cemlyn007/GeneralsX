@@ -35,6 +35,7 @@
 #include "Common/GameState.h"
 #include "Common/GameStateMap.h"
 #include "Common/GlobalData.h"
+#include "Common/LocalFileSystem.h"
 #include "Common/Xfer.h"
 #include "GameClient/CampaignManager.h"
 #include "GameClient/GameClient.h"
@@ -472,76 +473,29 @@ void GameStateMap::clearScratchPadMaps()
 	if( m_saveDirectory.isEmpty() )
 		return;
 
-	// remember the current directory
-	char currentDirectory[ _MAX_PATH ];
-	if( GetCurrentDirectory( _MAX_PATH, currentDirectory ) == 0 )
-		return;
+	// GeneralsX @bugfix cemlyn007 27/09/2026 List and delete by absolute path instead of switching the process
+	// into the save directory. On macOS/Linux the switch failed silently while the save directory did not exist
+	// yet (nothing saved so far), so every *.map in the working directory (usually the install directory) was
+	// deleted. The switch also changed the working directory under every other thread. The local file system
+	// lists the directory on every platform, and a save directory that does not exist yet lists nothing.
+	// TheLocalFileSystem is initialized before TheGameStateMap, so it is still alive in ~GameStateMap.
+	FilenameList mapFiles;
+	TheLocalFileSystem->getFileListInDirectory( AsciiString::TheEmptyString, m_saveDirectory, "*.map", mapFiles, FALSE );
 
-	// switch into the save directory
-	// GeneralsX @bugfix cemlyn007 27/09/2026 Bail out if the save directory can't be entered (e.g. it
-	// was never created), otherwise the search below deletes every .map in the current directory.
-	if( SetCurrentDirectory( m_saveDirectory.str() ) == 0 )
-		return;
-
-	// iterate all items in the directory
-	AsciiString fileToDelete;
-	WIN32_FIND_DATA item;  // search item
-	HANDLE hFile = INVALID_HANDLE_VALUE;  // handle for search resources
-	Bool done = FALSE;
-	Bool first = TRUE;
-	while( done == FALSE )
+	for( FilenameList::const_iterator it = mapFiles.begin(); it != mapFiles.end(); ++it )
 	{
 
-		// first, clear flag for deleting file
-		fileToDelete.clear();
+		// Win32 wildcards also match longer extensions through 8.3 short names, so check the extension itself
+		if( it->endsWithNoCase( ".map" ) == FALSE )
+			continue;
 
-		// if our first time through we need to start the search
-		if( first )
+		// a scratch pad map left behind would be picked up by a later load, so say when one cannot be deleted
+		if( DeleteFile( it->str() ) == 0 )
 		{
-
-			// start search
-			hFile = FindFirstFile( "*", &item );
-			if( hFile == INVALID_HANDLE_VALUE )
-			{
-				// GeneralsX @bugfix cemlyn007 27/09/2026 Restore the working directory before bailing out.
-				SetCurrentDirectory( currentDirectory );
-				return;
-			}
-
-			// we are no longer on our first item
-			first = FALSE;
-
+			fprintf( stderr, "GameStateMap::clearScratchPadMaps - Unable to delete scratch pad map '%s'\n", it->str() );
+			fflush( stderr );
 		}
-
-		// see if this is a file, and therefore a possible .map file
-		if( !(item.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) )
-		{
-
-			// see if there is a ".map" at end of this filename
-			Char *c = strrchr( item.cFileName, '.' );
-			if( c && stricmp( c, ".map" ) == 0 )
-				fileToDelete.set( item.cFileName );  // we want to delete this one
-
-		}
-
-		//
-		// find the next file before we delete this one, this is probably not necessary
-		// to structure things this way so that the find next occurs before the file
-		// delete, but it seems more correct to do so
-		//
-		if( FindNextFile( hFile, &item ) == 0 )
-			done = TRUE;
-
-		// delete file if set
-		if( fileToDelete.isEmpty() == FALSE )
-			DeleteFile( fileToDelete.str() );
 
 	}
-
-	// close search resources
-	FindClose( hFile );
-
-	// restore our directory to the current directory
-	SetCurrentDirectory( currentDirectory );
 
 }
