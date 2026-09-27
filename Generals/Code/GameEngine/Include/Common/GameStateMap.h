@@ -45,7 +45,6 @@ class GameStateMap : public SubsystemInterface,
 public:
 
 	GameStateMap();
-	virtual ~GameStateMap() override;
 
 	// subsystem interface methods
 	virtual void init() override { }
@@ -57,7 +56,8 @@ public:
 	virtual void xfer( Xfer *xfer ) override;
 	virtual void loadPostProcess() override { }
 
-	void clearScratchPadMaps();		///< clear any scratch pad maps from the save directory
+	// GeneralsX @bugfix cemlyn007 27/09/2026 Take the save directory from the caller instead of TheGameState.
+	void clearScratchPadMaps( const AsciiString &saveDirectory );		///< clear any scratch pad maps from the save directory
 
 protected:
 

@@ -54,17 +54,6 @@ GameStateMap::GameStateMap()
 }
 
 // ------------------------------------------------------------------------------------------------
-// ------------------------------------------------------------------------------------------------
-GameStateMap::~GameStateMap()
-{
-
-	// GeneralsX @bugfix cemlyn007 27/09/2026 The scratch pad maps are cleared by ~GameState instead.
-	// TheGameStateMap is initialised before TheGameState, so it is destroyed after it, and clearing
-	// here read the save directory through the already deleted TheGameState.
-
-}
-
-// ------------------------------------------------------------------------------------------------
 /** Embed the pristine map into the xfer stream */
 // ------------------------------------------------------------------------------------------------
 static void embedPristineMap( AsciiString map, Xfer *xfer )
@@ -439,15 +428,18 @@ void GameStateMap::xfer( Xfer *xfer )
 	* their own file so that those map files could be loaded as a part of the load game
 	* process */
 // ------------------------------------------------------------------------------------------------
-void GameStateMap::clearScratchPadMaps()
+void GameStateMap::clearScratchPadMaps( const AsciiString &saveDirectory )
 {
 
 	// remember the current directory
 	char currentDirectory[ _MAX_PATH ];
 	GetCurrentDirectory( _MAX_PATH, currentDirectory );
 
+	// GeneralsX @bugfix cemlyn007 27/09/2026 Stop if the save directory cannot be entered (it does not
+	// exist until the first save), otherwise the scan below deletes *.map files in the current directory.
 	// switch into the save directory
-	SetCurrentDirectory( TheGameState->getSaveDirectory().str() );
+	if( SetCurrentDirectory( saveDirectory.str() ) == 0 )
+		return;
 
 	// iterate all items in the directory
 	AsciiString fileToDelete;
@@ -468,7 +460,11 @@ void GameStateMap::clearScratchPadMaps()
 			// start search
 			hFile = FindFirstFile( "*", &item );
 			if( hFile == INVALID_HANDLE_VALUE )
+			{
+				// GeneralsX @bugfix cemlyn007 27/09/2026 Restore the current directory before returning.
+				SetCurrentDirectory( currentDirectory );
 				return;
+			}
 
 			// we are no longer on our first item
 			first = FALSE;

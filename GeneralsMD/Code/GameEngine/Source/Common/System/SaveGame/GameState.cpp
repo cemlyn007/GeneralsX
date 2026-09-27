@@ -326,7 +326,8 @@ GameState::~GameState()
 	// clear the save directory of any temporary "scratch pad" maps that were extracted
 	// from any previously loaded save game files
 	//
-	TheGameStateMap->clearScratchPadMaps();
+	if( TheGameStateMap )
+		TheGameStateMap->clearScratchPadMaps( getSaveDirectory() );
 
 }
 
@@ -687,7 +688,7 @@ SaveCode GameState::loadGame( AvailableGameInfo gameInfo )
 	// clear the save directory of any temporary "scratch pad" maps that were extracted
 	// from any previously loaded save game files
 	//
-	TheGameStateMap->clearScratchPadMaps();
+	TheGameStateMap->clearScratchPadMaps( getSaveDirectory() );
 
 	AsciiString filepath = getSaveGamePathForRead(gameInfo.filename);
 
