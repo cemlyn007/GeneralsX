@@ -37,15 +37,15 @@ its constructor), so the fix sets it in `GameInfo::GameInfo()` before `reset()`.
 constructors (`LANGameInfo`, `GameSpyStagingRoom`, `NGMPGame`) run afterwards and still set their
 own value. `ReplayGameInfo` and `SkirmishGameInfo` keep 0, as zero-fill gave them.
 
-## Remaining candidates (not fixed)
+## Remaining candidates
 
-These are only built by engine code (`NEW` / pool), so they still get zero-fill today. They
+Except where a row says **Fixed**, these are only built by engine code (`NEW` / pool), so they still get zero-fill today. They
 become live bugs if they are ever built on the stack, by a host, or under a non-zeroing
 allocator.
 
 | Type | File | Members no constructor sets |
 |---|---|---|
-| `NGMPGame` | `GeneralsMD/Code/GameEngine/Include/GameNetwork/GeneralsOnline/NGMPGame.h` | `m_id`, `m_requiresPassword`, `m_allowObservers`, `m_version`, `m_exeCRC`, `m_iniCRC`, `m_isQM`, `m_pingInt`, `m_reportedNumPlayers`, `m_reportedMaxPlayers`, `m_reportedNumObservers` (only callers of the setters fill them) |
+| `NGMPGame` | `GeneralsMD/Code/GameEngine/Include/GameNetwork/GeneralsOnline/NGMPGame.h` | `m_id`, `m_requiresPassword`, `m_allowObservers`, `m_version`, `m_exeCRC`, `m_iniCRC`, `m_isQM`, `m_pingInt`, `m_reportedNumPlayers`, `m_reportedMaxPlayers`, `m_reportedNumObservers`. **Fixed**: `NGMPGame::NGMPGame()` now sets them to `0` / `FALSE` before `cleanUpSlotPointers()` / `enterGame()` / `SyncWithLobby()` (`NGMPGameSlot` already set all its members) |
 | `GameSpyStagingRoom` | `Core/GameEngine/Include/GameNetwork/GameSpy/StagingRoomGameInfo.h` | `m_id`, `m_requiresPassword`, `m_allowObservers`, `m_version`, `m_exeCRC`, `m_iniCRC`, `m_isQM`, `m_pingInt`, `m_reportedNum*`. GameSpy is being retired (NGMP policy), so low priority |
 | `GameSpyGameInfo` / `GameSpyGameSlot` | `Generals*/Code/GameEngine/Source/GameNetwork/GameSpyGameInfo.cpp` | Several; the file is commented out of both CMake builds, so dead code |
 | Engine-wide | `MemoryPoolObject` subclasses | Pool allocation zero-fills; members not set by constructors are not audited. A wider sweep needs a tool (see below) |
