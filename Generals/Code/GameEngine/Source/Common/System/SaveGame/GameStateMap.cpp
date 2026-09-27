@@ -58,11 +58,9 @@ GameStateMap::GameStateMap()
 GameStateMap::~GameStateMap()
 {
 
-	//
-	// clear the save directory of any temporary "scratch pad" maps that were extracted
-	// from any previously loaded save game files
-	//
-	clearScratchPadMaps();
+	// GeneralsX @bugfix cemlyn007 27/09/2026 The scratch pad maps are cleared by ~GameState instead.
+	// TheGameStateMap is initialised before TheGameState, so it is destroyed after it, and clearing
+	// here read the save directory through the already deleted TheGameState.
 
 }
 

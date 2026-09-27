@@ -318,6 +318,16 @@ GameState::~GameState()
 	// clear any available game
 	clearAvailableGames();
 
+	// GeneralsX @bugfix cemlyn007 27/09/2026 Moved here from ~GameStateMap, which ran after this
+	// destructor and so read the save directory through a deleted TheGameState. TheGameStateMap is
+	// initialised before TheGameState (GameState::init registers it as a snapshot block), so it is
+	// still alive here.
+	//
+	// clear the save directory of any temporary "scratch pad" maps that were extracted
+	// from any previously loaded save game files
+	//
+	TheGameStateMap->clearScratchPadMaps();
+
 }
 
 // ------------------------------------------------------------------------------------------------
