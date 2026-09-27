@@ -26,7 +26,6 @@ set(GAMEENGINE_SRC
     Include/Common/DataChunk.h
 #    Include/Common/Debug.h
 #    Include/Common/Dict.h
-    Include/Common/Directory.h
     Include/Common/DisabledTypes.h
 #    Include/Common/DiscreteCircle.h
     Include/Common/DrawModule.h
@@ -592,7 +591,6 @@ set(GAMEENGINE_SRC
     Source/Common/System/CriticalSection.cpp
     Source/Common/System/DataChunk.cpp
 #    Source/Common/System/Debug.cpp
-    Source/Common/System/Directory.cpp
     Source/Common/System/DisabledTypes.cpp
     Source/Common/System/encrypt.cpp
 #    Source/Common/System/File.cpp
