@@ -1340,70 +1340,18 @@ void GameState::iterateSaveFiles( IterateSaveFileCallback callback, void *userDa
 	if( callback == nullptr )
 		return;
 
-	// save the current directory
+	// GeneralsX @bugfix cemlyn007 27/09/2026 Search by absolute path instead of switching the process into the save
+	// directory, which changed the working directory under every other thread. The callbacks resolve the leaf name
+	// with getSaveGamePathForRead, so they do not depend on the working directory. On macOS/Linux the non-throwing
+	// std::filesystem overloads keep the iteration free of filesystem exceptions, as the try/catch did before.
+	AsciiString saveDirectory = getSaveDirectory();
+
 #ifdef _WIN32
-	char currentDirectory[ _MAX_PATH ];
-	GetCurrentDirectory( _MAX_PATH, currentDirectory );
-
-	// switch into the save directory
-	SetCurrentDirectory( getSaveDirectory().str() );
-
-	// iterate all items in the directory
+	// iterate all items in the save directory
+	AsciiString searchPattern = saveDirectory;
+	searchPattern.concat( "*" );
 	WIN32_FIND_DATA item;  // search item
 	HANDLE hFile = INVALID_HANDLE_VALUE;  // handle for search resources
-#else
-	// GeneralsX @bugfix Copilot 02/04/2026 Guard save-directory iteration against filesystem exceptions and invalid path lifetimes on macOS/Linux
-	std::filesystem::path currentDirectory;
-	Bool changedDirectory = FALSE;
-	AsciiString saveDirPath = getSaveDirectory();
-
-	try {
-		currentDirectory = std::filesystem::current_path();
-		const char *saveDir = saveDirPath.str();
-		std::filesystem::current_path( saveDir );
-		changedDirectory = TRUE;
-
-		for( const auto &entry : std::filesystem::directory_iterator(".") ) {
-			if( entry.is_regular_file() ) {
-				std::string filename_str = entry.path().filename().string();
-
-				// See if there is a ".sav" at end of this filename
-				const char *c = strrchr( filename_str.c_str(), '.' );
-				if( c && stricmp( c, ".sav" ) == 0 ) {
-					AsciiString filename;
-					filename.set( filename_str.c_str() );
-					callback( filename, userData );
-				}
-			}
-		}
-	} catch( const std::filesystem::filesystem_error &e ) {
-#ifdef _DEBUG
-		DEBUG_LOG(( "GameState::iterateSaveFiles failed while iterating save directory '%s': %s\r\n", saveDirPath.str(), e.what() ));
-#endif
-	} catch( ... ) {
-#ifdef _DEBUG
-		DEBUG_LOG(( "GameState::iterateSaveFiles failed with unknown exception while iterating save directory '%s'\r\n", saveDirPath.str() ));
-#endif
-	}
-
-	if( changedDirectory ) {
-		try {
-			std::filesystem::current_path( currentDirectory );
-		} catch( const std::filesystem::filesystem_error &e ) {
-#ifdef _DEBUG
-			DEBUG_LOG(( "GameState::iterateSaveFiles failed to restore current directory '%s': %s\r\n", currentDirectory.string().c_str(), e.what() ));
-#endif
-		} catch( ... ) {
-#ifdef _DEBUG
-			DEBUG_LOG(( "GameState::iterateSaveFiles failed with unknown exception while restoring current directory\r\n" ));
-#endif
-		}
-	}
-	return;
-#endif
-
-// GeneralsX @build BenderAI 11/02/2026 - Windows file iteration (protected for Linux build)
-#ifdef _WIN32
 	Bool done = FALSE;
 	Bool first = TRUE;
 	while( done == FALSE )
@@ -1414,7 +1362,7 @@ void GameState::iterateSaveFiles( IterateSaveFileCallback callback, void *userDa
 		{
 
 			// start search
-			hFile = FindFirstFile( "*", &item );
+			hFile = FindFirstFile( searchPattern.str(), &item );
 			if( hFile == INVALID_HANDLE_VALUE )
 				return;
 
@@ -1451,9 +1399,34 @@ void GameState::iterateSaveFiles( IterateSaveFileCallback callback, void *userDa
 
 	// close search resources
 	FindClose( hFile );
+#else
+	// a save directory that does not exist yet holds no save files
+	std::error_code ec;
+	const std::filesystem::directory_iterator end;
+	for( std::filesystem::directory_iterator it( saveDirectory.str(), ec ); !ec && it != end; it.increment( ec ) )
+	{
 
-	// restore the current directory
-	SetCurrentDirectory( currentDirectory );
+		// see if this is a file, and therefore a possible save file
+		std::error_code entryError;
+		if( !it->is_regular_file( entryError ) )
+			continue;
+
+		// see if there is a ".sav" at end of this filename
+		const std::string leafName = it->path().filename().string();
+		const char *c = strrchr( leafName.c_str(), '.' );
+		if( c && stricmp( c, ".sav" ) == 0 )
+		{
+
+			// construction asciistring filename
+			AsciiString filename;
+			filename.set( leafName.c_str() );
+
+			// call the callback
+			callback( filename, userData );
+
+		}
+
+	}
 #endif
 
 }

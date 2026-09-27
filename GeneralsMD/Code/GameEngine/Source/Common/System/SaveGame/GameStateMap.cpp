@@ -30,6 +30,11 @@
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
 #include "PreRTS.h"
 
+// GeneralsX @bugfix cemlyn007 27/09/2026 std::filesystem iterates the save directory on macOS/Linux
+#ifndef _WIN32
+#include <filesystem>
+#endif
+
 #include "Common/file.h"
 #include "Common/FileSystem.h"
 #include "Common/GameState.h"
@@ -458,14 +463,16 @@ void GameStateMap::xfer( Xfer *xfer )
 void GameStateMap::clearScratchPadMaps()
 {
 
-	// remember the current directory
-	char currentDirectory[ _MAX_PATH ];
-	GetCurrentDirectory( _MAX_PATH, currentDirectory );
+	// GeneralsX @bugfix cemlyn007 27/09/2026 Search and delete by absolute path instead of switching the process
+	// into the save directory. On macOS/Linux the switch failed silently while the save directory did not exist
+	// yet (nothing saved so far), so every *.map in the working directory (usually the install directory) was
+	// deleted. The switch also changed the working directory under every other thread.
+	AsciiString saveDirectory = TheGameState->getSaveDirectory();
 
-	// switch into the save directory
-	SetCurrentDirectory( TheGameState->getSaveDirectory().str() );
-
-	// iterate all items in the directory
+#ifdef _WIN32
+	// iterate all items in the save directory
+	AsciiString searchPattern = saveDirectory;
+	searchPattern.concat( "*" );
 	AsciiString fileToDelete;
 	WIN32_FIND_DATA item;  // search item
 	HANDLE hFile = INVALID_HANDLE_VALUE;  // handle for search resources
@@ -482,7 +489,7 @@ void GameStateMap::clearScratchPadMaps()
 		{
 
 			// start search
-			hFile = FindFirstFile( "*", &item );
+			hFile = FindFirstFile( searchPattern.str(), &item );
 			if( hFile == INVALID_HANDLE_VALUE )
 				return;
 
@@ -498,7 +505,11 @@ void GameStateMap::clearScratchPadMaps()
 			// see if there is a ".map" at end of this filename
 			Char *c = strrchr( item.cFileName, '.' );
 			if( c && stricmp( c, ".map" ) == 0 )
-				fileToDelete.set( item.cFileName );  // we want to delete this one
+			{
+				// we want to delete this one
+				fileToDelete = saveDirectory;
+				fileToDelete.concat( item.cFileName );
+			}
 
 		}
 
@@ -518,8 +529,25 @@ void GameStateMap::clearScratchPadMaps()
 
 	// close search resources
 	FindClose( hFile );
+#else
+	// a save directory that does not exist yet holds no scratch pad maps
+	std::error_code ec;
+	const std::filesystem::directory_iterator end;
+	for( std::filesystem::directory_iterator it( saveDirectory.str(), ec ); !ec && it != end; it.increment( ec ) )
+	{
 
-	// restore our directory to the current directory
-	SetCurrentDirectory( currentDirectory );
+		// see if this is a file, and therefore a possible .map file
+		std::error_code entryError;
+		if( !it->is_regular_file( entryError ) )
+			continue;
+
+		// see if there is a ".map" at end of this filename
+		const std::string filename = it->path().filename().string();
+		const char *c = strrchr( filename.c_str(), '.' );
+		if( c && stricmp( c, ".map" ) == 0 )
+			std::filesystem::remove( it->path(), entryError );
+
+	}
+#endif
 
 }
