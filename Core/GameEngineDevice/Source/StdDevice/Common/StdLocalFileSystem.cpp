@@ -33,6 +33,7 @@
 #include "StdDevice/Common/StdLocalFile.h"
 
 #include <algorithm>
+#include <cstdio>
 #include <filesystem>
 
 #ifndef _WIN32
@@ -278,6 +279,20 @@ Bool StdLocalFileSystem::doesFileExist(const Char *filename) const
 	return std::filesystem::exists(path, ec);
 }
 
+// GeneralsX @bugfix cemlyn007 27/09/2026 A directory that does not exist is an ordinary empty listing, but any
+// other failure (permissions, I/O) is reported on the console, since DEBUG_LOG is compiled out of release builds
+// and a silently short listing (e.g. a save directory whose scratch pad maps were never cleared) is hard to trace.
+static void reportDirectoryListingError(const char *what, const std::string &directory, const std::error_code &ec)
+{
+	if (ec == std::errc::no_such_file_or_directory) {
+		DEBUG_LOG(("StdLocalFileSystem::getFileListInDirectory - %s %s: %s", what, directory.c_str(), ec.message().c_str()));
+		return;
+	}
+
+	fprintf(stderr, "StdLocalFileSystem::getFileListInDirectory - %s '%s': %s\n", what, directory.c_str(), ec.message().c_str());
+	fflush(stderr);
+}
+
 void StdLocalFileSystem::getFileListInDirectory(const AsciiString& currentDirectory, const AsciiString& originalDirectory, const AsciiString& searchName, FilenameList & filenameList, Bool searchSubdirectories) const
 {
 
@@ -309,7 +324,7 @@ void StdLocalFileSystem::getFileListInDirectory(const AsciiString& currentDirect
 	done = iter == std::filesystem::directory_iterator();
 
 	if (ec) {
-		DEBUG_LOG(("StdLocalFileSystem::getFileListInDirectory - Error opening directory %s", fixedDirectory.c_str()));
+		reportDirectoryListingError("Error opening directory", fixedDirectory, ec);
 		return;
 	}
 
@@ -322,7 +337,16 @@ void StdLocalFileSystem::getFileListInDirectory(const AsciiString& currentDirect
 #else
 		const Bool extMatches = (strcasecmp(fileExtStr.c_str(), searchExtStr.c_str()) == 0);
 #endif
-		if (!iter->is_directory() && extMatches &&
+		// GeneralsX @bugfix cemlyn007 27/09/2026 Use the non-throwing overloads so a failing entry or directory read
+		// is reported instead of throwing out of the caller. A dangling symlink reports "not found", which the
+		// throwing overload treated as "not a directory", so it is still listed.
+		std::error_code entryError;
+		const Bool isDirectory = iter->is_directory(entryError);
+		const Bool entryReadable = !entryError || entryError == std::errc::no_such_file_or_directory;
+		if (!entryReadable) {
+			reportDirectoryListingError("Error reading entry in", fixedDirectory, entryError);
+		}
+		if (entryReadable && !isDirectory && extMatches &&
 			(strcmp(filenameStr.c_str(), ".") != 0 && strcmp(filenameStr.c_str(), "..") != 0)) {
 			// if we haven't already, add this filename to the list.
 			// a stl set should only allow one copy of each filename
@@ -332,7 +356,11 @@ void StdLocalFileSystem::getFileListInDirectory(const AsciiString& currentDirect
 			}
 		}
 
-		iter++;
+		iter.increment(ec);
+		if (ec) {
+			reportDirectoryListingError("Error reading directory", fixedDirectory, ec);
+			return;
+		}
 		done = iter == std::filesystem::directory_iterator();
 	}
 
@@ -340,7 +368,7 @@ void StdLocalFileSystem::getFileListInDirectory(const AsciiString& currentDirect
 		auto iter = std::filesystem::directory_iterator(fixedDirectory, ec);
 
 		if (ec) {
-			DEBUG_LOG(("StdLocalFileSystem::getFileListInDirectory - Error opening subdirectory %s", fixedDirectory.c_str()));
+			reportDirectoryListingError("Error opening subdirectory", fixedDirectory, ec);
 			return;
 		}
 
@@ -349,7 +377,12 @@ void StdLocalFileSystem::getFileListInDirectory(const AsciiString& currentDirect
 
 		while (!done) {
 			std::string filenameStr = iter->path().filename().string();
-			if(iter->is_directory() &&
+			std::error_code entryError;
+			const Bool isDirectory = iter->is_directory(entryError);
+			if (entryError && entryError != std::errc::no_such_file_or_directory) {
+				reportDirectoryListingError("Error reading entry in", fixedDirectory, entryError);
+			}
+			if(!entryError && isDirectory &&
 				(strcmp(filenameStr.c_str(), ".") != 0 && strcmp(filenameStr.c_str(), "..") != 0)) {
 				// GeneralsX @bugfix felipebraz 16/09/2026 Maintain cumulative relative path for subdirectory traversal
 				AsciiString tempsearchstr = currentDirectory;
@@ -363,7 +396,11 @@ void StdLocalFileSystem::getFileListInDirectory(const AsciiString& currentDirect
 				getFileListInDirectory(tempsearchstr, originalDirectory, searchName, filenameList, searchSubdirectories);
 			}
 
-			iter++;
+			iter.increment(ec);
+			if (ec) {
+				reportDirectoryListingError("Error reading directory", fixedDirectory, ec);
+				return;
+			}
 			done = iter == std::filesystem::directory_iterator();
 		}
 	}

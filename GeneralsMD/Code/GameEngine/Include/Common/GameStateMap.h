@@ -48,7 +48,7 @@ public:
 	virtual ~GameStateMap() override;
 
 	// subsystem interface methods
-	virtual void init() override { }
+	virtual void init() override;
 	virtual void reset() override { }
 	virtual void update() override { }
 
@@ -61,6 +61,9 @@ public:
 
 protected:
 
+	// GeneralsX @bugfix cemlyn007 27/09/2026 Resolved once in init() so the teardown cleanup in
+	// ~GameStateMap depends on no other subsystem still being alive.
+	AsciiString m_saveDirectory;
 
 };
 

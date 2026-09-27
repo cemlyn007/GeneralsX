@@ -295,6 +295,11 @@ GameInfo::GameInfo()
 	{
 		m_slot[i] = nullptr;
 	}
+	// GeneralsX @bugfix cemlyn007 27/09/2026 reset() deliberately leaves m_localIP alone, so no
+	// constructor set it and its value came from the zero-filling engine operator new. An object
+	// built by an embedding host's new, on the stack or under a non-zeroing allocator read garbage.
+	// Zero it here, the value zero-fill produced; LANGameInfo and the online games still set it.
+	m_localIP = 0;
 	reset();
 }
 
