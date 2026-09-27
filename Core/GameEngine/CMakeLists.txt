@@ -1185,6 +1185,11 @@ target_link_libraries(corei_gameengine_private INTERFACE
     core_profile_legacy
 )
 
+# GeneralsX @build cemlyn007 27/09/2026 GameMemoryNull.cpp forwards its hidden operator new/delete through dlsym on ELF
+if(NOT RTS_GAMEMEMORY_ENABLE AND UNIX AND NOT APPLE)
+    target_link_libraries(corei_gameengine_private INTERFACE ${CMAKE_DL_LIBS})
+endif()
+
 target_compile_definitions(corei_gameengine_private INTERFACE
     IG_DEBUG_STACKTRACE
 )
