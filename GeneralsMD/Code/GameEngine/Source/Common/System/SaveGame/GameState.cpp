@@ -829,7 +829,7 @@ void GameState::loadQueuedSaveGame()
 }
 
 //-------------------------------------------------------------------------------------------------
-AsciiString GameState::getSaveDirectory() const
+AsciiString GameState::getSaveDirectory()
 {
 	AsciiString tmp = TheGlobalData->getPath_UserData();
 	// GeneralsX @bugfix copilot 12/03/2026 Use POSIX separator on non-Windows so saves are created inside a real Save directory.

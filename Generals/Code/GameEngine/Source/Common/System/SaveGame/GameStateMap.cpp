@@ -449,7 +449,9 @@ void GameStateMap::clearScratchPadMaps()
 	GetCurrentDirectory( _MAX_PATH, currentDirectory );
 
 	// switch into the save directory
-	SetCurrentDirectory( TheGameState->getSaveDirectory().str() );
+	// GeneralsX @bugfix cemlyn007 27/09/2026 Don't go through TheGameState: ~GameStateMap calls this
+	// at shutdown, and shutdownAll deletes TheGameState (initialized after TheGameStateMap) first.
+	SetCurrentDirectory( GameState::getSaveDirectory().str() );
 
 	// iterate all items in the directory
 	AsciiString fileToDelete;
