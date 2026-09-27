@@ -178,6 +178,8 @@ public:
 	void unitMoved(Object *unit);
 	/// Add a type of tree.  Name is the w3d model name.
 	Int addTreeType(const W3DTreeDrawModuleData *data);
+	// GeneralsX @bugfix cemlyn007 27/09/2026 Read past a saved tree buffer for an engine without one (fully headless)
+	static void skipXfer( Xfer *xfer );
 	/// Updates a tree's location.
 	Bool updateTreePosition(DrawableID id, Coord3D location, Real angle);
 	void pushAsideTree( DrawableID id, const Coord3D *pusherPos,

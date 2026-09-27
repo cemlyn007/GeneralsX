@@ -262,6 +262,10 @@ protected:
 	virtual void xfer( Xfer *xfer ) override;
 	virtual void loadPostProcess() override;
 
+public:
+	// GeneralsX @bugfix cemlyn007 27/09/2026 Read past a saved water grid for an engine without a water render object (fully headless)
+	static void skipXfer( Xfer *xfer );
+
 };
 
 //Public inline function declarations

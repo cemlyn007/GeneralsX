@@ -1138,21 +1138,6 @@ void W3DTerrainVisual::replaceSkyboxTextures(const AsciiString *oldTexName[5], c
 }
 
 // ------------------------------------------------------------------------------------------------
-/** Terrain visual state is only partially initialized in headless mode, so it is excluded from save game data */
-// ------------------------------------------------------------------------------------------------
-Bool W3DTerrainVisual::isXferEnabled() const
-{
-	// rlgenerals: keep this block in headless saves. It holds the only saved copy
-	// of the logic height map (TerrainLogic::xfer carries boundaries and water
-	// only), and flattenTerrain / createCraterInTerrain lower that map whenever a
-	// dozer starts a building or a crater is dug, so leaving it out loads every
-	// headless save with the map's pristine heights under those buildings.
-	// xfer() writes version 2 headless (no render-only tree/prop buffers), so the
-	// block is safe to write there.
-	return TRUE;
-}
-
-// ------------------------------------------------------------------------------------------------
 /** CRC */
 // ------------------------------------------------------------------------------------------------
 void W3DTerrainVisual::crc( Xfer *xfer )
@@ -1186,8 +1171,8 @@ void W3DTerrainVisual::xfer( Xfer *xfer )
 	// XferSave::xferSnapshot(nullptr) threw and saveGame always failed headless.
 	// Write version 2 there instead: everything but those visual-only buffers,
 	// which a load in render mode then keeps from the map, as for any version 2
-	// file. Loading a version 3 file headless still fails (the buffers it
-	// carries have nowhere to go, and a block cannot be skipped part-way).
+	// file. Loading a version 3 file headless reads past those buffers instead
+	// (see BaseHeightMapRenderObjClass::xfer).
 	if( xfer->getXferMode() != XFER_LOAD && currentVersion > 2 &&
 			TheGlobalData->m_headless && !TheGlobalData->m_headlessRender )
 		currentVersion = 2;
@@ -1198,9 +1183,12 @@ void W3DTerrainVisual::xfer( Xfer *xfer )
 	TerrainVisual::xfer( xfer );
 
 	// flag for whether or not the water grid is enabled
-	Bool gridEnabled = m_isWaterGridRenderingEnabled;
+	// GeneralsX @bugfix cemlyn007 27/09/2026 A fully headless run enables the water grid without a
+	// water render object to hold it, so it saves the grid as disabled and reads past a saved one.
+	// A load that has a grid but finds none saved keeps the grid's reset state.
+	Bool gridEnabled = m_isWaterGridRenderingEnabled && m_waterRenderObject != nullptr;
 	xfer->xferBool( &gridEnabled );
-	if( gridEnabled != m_isWaterGridRenderingEnabled )
+	if( gridEnabled && !m_isWaterGridRenderingEnabled )
 	{
 
 		DEBUG_CRASH(( "W3DTerrainVisual::xfer - m_isWaterGridRenderingEnabled mismatch" ));
@@ -1210,7 +1198,12 @@ void W3DTerrainVisual::xfer( Xfer *xfer )
 
 	// xfer grid data if enabled
 	if( gridEnabled )
-		xfer->xferSnapshot( m_waterRenderObject );
+	{
+		if( m_waterRenderObject )
+			xfer->xferSnapshot( m_waterRenderObject );
+		else
+			WaterRenderObjClass::skipXfer( xfer );
+	}
 
 /*
 	{
@@ -1243,6 +1236,10 @@ void W3DTerrainVisual::xfer( Xfer *xfer )
 */
 
 	// Write out the terrain height data.
+	// GeneralsX @bugfix cemlyn007 27/09/2026 This is the only saved copy of the logic height map
+	// (TerrainLogic::xfer carries boundaries and water only), which flattenTerrain and
+	// createCraterInTerrain lower during play, so this block is saved headless too (upstream
+	// PR #3001's isXferEnabled override that left it out headless is removed).
 	if (version >= 2) {
 		UnsignedByte *data = m_logicHeightMap->getDataPtr();
 		Int len = m_logicHeightMap->getXExtent()*m_logicHeightMap->getYExtent();

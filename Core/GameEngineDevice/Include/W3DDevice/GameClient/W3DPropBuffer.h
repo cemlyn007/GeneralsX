@@ -122,6 +122,8 @@ public:
 	void drawProps(RenderInfoClass &rinfo);
 	/// Called when the view changes, and sort key needs to be recalculated.
 	void doFullUpdate() {m_doCull = true;};
+	// GeneralsX @bugfix cemlyn007 27/09/2026 Read past a saved prop buffer for an engine without one (fully headless)
+	static void skipXfer( Xfer *xfer );
 
 protected:
 	// snapshot methods

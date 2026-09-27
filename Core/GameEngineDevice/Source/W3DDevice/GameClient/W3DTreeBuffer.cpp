@@ -1854,6 +1854,58 @@ void W3DTreeBuffer::crc( Xfer *xfer )
 }
 
 // ------------------------------------------------------------------------------------------------
+// GeneralsX @refactor cemlyn007 27/09/2026 The version and per-tree layout of W3DTreeBuffer::xfer,
+// shared with W3DTreeBuffer::skipXfer so both walk exactly what a save wrote.
+// ------------------------------------------------------------------------------------------------
+static XferVersion xferTreeBufferVersion( Xfer *xfer )
+{
+#if RETAIL_COMPATIBLE_XFER_SAVE
+	XferVersion currentVersion = 1;
+#else
+	XferVersion currentVersion = 2;
+#endif
+	XferVersion version = currentVersion;
+	xfer->xferVersion( &version, currentVersion );
+	return version;
+}
+
+static void xferTreeRecord( Xfer *xfer, XferVersion version, TTree *tree, AsciiString *modelName, AsciiString *modelTexture )
+{
+	xfer->xferAsciiString(modelName);
+	xfer->xferAsciiString(modelTexture);
+
+	xfer->xferReal(&tree->location.X);
+	xfer->xferReal(&tree->location.Y);
+	xfer->xferReal(&tree->location.Z);
+
+	xfer->xferReal(&tree->scale);	///< Scale at location.
+	xfer->xferReal(&tree->sin);	///< Sine of the rotation angle at location.
+	xfer->xferReal(&tree->cos);	///< Cosine of the rotation angle at location.
+
+	xfer->xferDrawableID(&tree->drawableID);	///< Drawable this tree corresponds to.
+
+	// Topple parameters. [7/7/2003]
+	xfer->xferReal(&tree->m_angularVelocity);	///< Velocity in degrees per frame (or is it radians per frame?)
+	xfer->xferReal(&tree->m_angularAcceleration);	///< Acceleration angularVelocity is increasing
+	xfer->xferCoord3D(&tree->m_toppleDirection);	///< Z-less direction we are toppling
+	xfer->xferUser(&tree->m_toppleState, sizeof(tree->m_toppleState));	///< Stage this module is in.
+	xfer->xferReal(&tree->m_angularAccumulation);	///< How much have I rotated so I know when to bounce.
+	xfer->xferUnsignedInt(&tree->m_options);	///< topple options
+	xfer->xferMatrix3D(&tree->m_mtx);
+
+	if (version <= 1)
+	{
+		UnsignedInt sinkFramesLeft = (UnsignedInt)tree->m_sinkFramesLeft;
+		xfer->xferUnsignedInt(&sinkFramesLeft);	///< Toppled trees sink into the terrain & disappear, how many frames left.
+		tree->m_sinkFramesLeft = (Real)sinkFramesLeft;
+	}
+	else
+	{
+		xfer->xferReal(&tree->m_sinkFramesLeft);	///< Toppled trees sink into the terrain & disappear, how many frames left.
+	}
+}
+
+// ------------------------------------------------------------------------------------------------
 /** Xfer
 	* Version Info:
 	* 1: Initial version
@@ -1864,13 +1916,7 @@ void W3DTreeBuffer::xfer( Xfer *xfer )
 {
 
 	// version
-#if RETAIL_COMPATIBLE_XFER_SAVE
-	XferVersion currentVersion = 1;
-#else
-	XferVersion currentVersion = 2;
-#endif
-	XferVersion version = currentVersion;
-	xfer->xferVersion( &version, currentVersion );
+	XferVersion version = xferTreeBufferVersion( xfer );
 
 	Int i;
 	Int numTrees = m_numTrees;
@@ -1897,8 +1943,7 @@ void W3DTreeBuffer::xfer( Xfer *xfer )
 				modelTexture = m_treeTypes[treeType].m_data->m_textureName;
 			}
 		}
-		xfer->xferAsciiString(&modelName);
-		xfer->xferAsciiString(&modelTexture);
+		xferTreeRecord(xfer, version, &tree, &modelName, &modelTexture);
 		if (xfer->getXferMode() == XFER_LOAD) {
 			Int j;
 			for (j=0; j<m_numTreeTypes; j++) {
@@ -1908,36 +1953,6 @@ void W3DTreeBuffer::xfer( Xfer *xfer )
 					break;
 				}
 			}
-		}
-
-		xfer->xferReal(&tree.location.X);
-		xfer->xferReal(&tree.location.Y);
-		xfer->xferReal(&tree.location.Z);
-
-		xfer->xferReal(&tree.scale);	///< Scale at location.
-		xfer->xferReal(&tree.sin);	///< Sine of the rotation angle at location.
-		xfer->xferReal(&tree.cos);	///< Cosine of the rotation angle at location.
-
-		xfer->xferDrawableID(&tree.drawableID);	///< Drawable this tree corresponds to.
-
-		// Topple parameters. [7/7/2003]
-		xfer->xferReal(&tree.m_angularVelocity);	///< Velocity in degrees per frame (or is it radians per frame?)
-		xfer->xferReal(&tree.m_angularAcceleration);	///< Acceleration angularVelocity is increasing
-		xfer->xferCoord3D(&tree.m_toppleDirection);	///< Z-less direction we are toppling
-		xfer->xferUser(&tree.m_toppleState, sizeof(tree.m_toppleState));	///< Stage this module is in.
-		xfer->xferReal(&tree.m_angularAccumulation);	///< How much have I rotated so I know when to bounce.
-		xfer->xferUnsignedInt(&tree.m_options);	///< topple options
-		xfer->xferMatrix3D(&tree.m_mtx);
-
-		if (version <= 1)
-		{
-			UnsignedInt sinkFramesLeft = (UnsignedInt)tree.m_sinkFramesLeft;
-			xfer->xferUnsignedInt(&sinkFramesLeft);	///< Toppled trees sink into the terrain & disappear, how many frames left.
-			tree.m_sinkFramesLeft = (Real)sinkFramesLeft;
-		}
-		else
-		{
-			xfer->xferReal(&tree.m_sinkFramesLeft);	///< Toppled trees sink into the terrain & disappear, how many frames left.
 		}
 
 		if (xfer->getXferMode() == XFER_LOAD && treeType != DELETED_TREE_TYPE && treeType < m_numTreeTypes) {
@@ -1956,6 +1971,27 @@ void W3DTreeBuffer::xfer( Xfer *xfer )
 				curTree->m_sinkFramesLeft = tree.m_sinkFramesLeft;
 			}
 		}
+	}
+
+}
+
+// ------------------------------------------------------------------------------------------------
+// GeneralsX @bugfix cemlyn007 27/09/2026 Reads a saved tree buffer and drops it, for an engine that
+// has none to load it into (a fully headless run; see BaseHeightMapRenderObjClass's constructor).
+// ------------------------------------------------------------------------------------------------
+void W3DTreeBuffer::skipXfer( Xfer *xfer )
+{
+
+	XferVersion version = xferTreeBufferVersion( xfer );
+
+	Int numTrees = 0;
+	xfer->xferInt(&numTrees);
+	for (Int i=0; i<numTrees; i++) {
+		TTree tree;
+		memset(&tree, 0, sizeof(tree));
+		AsciiString modelName;
+		AsciiString modelTexture;
+		xferTreeRecord(xfer, version, &tree, &modelName, &modelTexture);
 	}
 
 }

@@ -2824,8 +2824,16 @@ void BaseHeightMapRenderObjClass::xfer( Xfer *xfer )
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
-	xfer->xferSnapshot( m_treeBuffer );
-	xfer->xferSnapshot( m_propBuffer );
+	// GeneralsX @bugfix cemlyn007 27/09/2026 A fully headless run has no tree or prop buffer (see the
+	// constructor), so it reads past the ones a render-mode save carries instead of failing the load.
+	if( m_treeBuffer )
+		xfer->xferSnapshot( m_treeBuffer );
+	else
+		W3DTreeBuffer::skipXfer( xfer );
+	if( m_propBuffer )
+		xfer->xferSnapshot( m_propBuffer );
+	else
+		W3DPropBuffer::skipXfer( xfer );
 
 
 }
