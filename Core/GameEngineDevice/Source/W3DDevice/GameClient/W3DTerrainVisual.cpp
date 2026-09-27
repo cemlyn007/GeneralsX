@@ -1142,7 +1142,14 @@ void W3DTerrainVisual::replaceSkyboxTextures(const AsciiString *oldTexName[5], c
 // ------------------------------------------------------------------------------------------------
 Bool W3DTerrainVisual::isXferEnabled() const
 {
-	return TheGlobalData->m_headless == FALSE;
+	// rlgenerals: keep this block in headless saves. It holds the only saved copy
+	// of the logic height map (TerrainLogic::xfer carries boundaries and water
+	// only), and flattenTerrain / createCraterInTerrain lower that map whenever a
+	// dozer starts a building or a crater is dug, so leaving it out loads every
+	// headless save with the map's pristine heights under those buildings.
+	// xfer() writes version 2 headless (no render-only tree/prop buffers), so the
+	// block is safe to write there.
+	return TRUE;
 }
 
 // ------------------------------------------------------------------------------------------------
