@@ -843,7 +843,7 @@ AsciiString GameState::getSaveDirectory()
 }
 
 //-------------------------------------------------------------------------------------------------
-AsciiString GameState::getFilePathInSaveDirectory(const AsciiString& leaf) const
+AsciiString GameState::getFilePathInSaveDirectory(const AsciiString& leaf)
 {
 	AsciiString tmp = getSaveDirectory();
 	tmp.concat(leaf);
@@ -851,7 +851,7 @@ AsciiString GameState::getFilePathInSaveDirectory(const AsciiString& leaf) const
 }
 
 //-------------------------------------------------------------------------------------------------
-AsciiString GameState::getSaveGamePathForRead(const AsciiString& filenameOrPath) const
+AsciiString GameState::getSaveGamePathForRead(const AsciiString& filenameOrPath)
 {
 	if (isAbsolutePath(filenameOrPath.str()))
 	{
@@ -862,7 +862,7 @@ AsciiString GameState::getSaveGamePathForRead(const AsciiString& filenameOrPath)
 }
 
 //-------------------------------------------------------------------------------------------------
-Bool GameState::isInSaveDirectory(const AsciiString& path) const
+Bool GameState::isInSaveDirectory(const AsciiString& path)
 {
 	return FileSystem::isPathInDirectory(path, getSaveDirectory());
 }

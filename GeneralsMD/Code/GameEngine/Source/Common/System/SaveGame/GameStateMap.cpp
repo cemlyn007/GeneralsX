@@ -57,6 +57,15 @@ GameStateMap::GameStateMap()
 
 // ------------------------------------------------------------------------------------------------
 // ------------------------------------------------------------------------------------------------
+void GameStateMap::init()
+{
+
+	m_saveDirectory = GameState::getSaveDirectory();
+
+}
+
+// ------------------------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------------------
 GameStateMap::~GameStateMap()
 {
 
@@ -458,14 +467,21 @@ void GameStateMap::xfer( Xfer *xfer )
 void GameStateMap::clearScratchPadMaps()
 {
 
+	// GeneralsX @bugfix cemlyn007 27/09/2026 Use the save directory cached in init(): ~GameStateMap calls
+	// this at shutdown, after shutdownAll has deleted TheGameState (initialized after TheGameStateMap).
+	if( m_saveDirectory.isEmpty() )
+		return;
+
 	// remember the current directory
 	char currentDirectory[ _MAX_PATH ];
-	GetCurrentDirectory( _MAX_PATH, currentDirectory );
+	if( GetCurrentDirectory( _MAX_PATH, currentDirectory ) == 0 )
+		return;
 
 	// switch into the save directory
-	// GeneralsX @bugfix cemlyn007 27/09/2026 Don't go through TheGameState: ~GameStateMap calls this
-	// at shutdown, and shutdownAll deletes TheGameState (initialized after TheGameStateMap) first.
-	SetCurrentDirectory( GameState::getSaveDirectory().str() );
+	// GeneralsX @bugfix cemlyn007 27/09/2026 Bail out if the save directory can't be entered (e.g. it
+	// was never created), otherwise the search below deletes every .map in the current directory.
+	if( SetCurrentDirectory( m_saveDirectory.str() ) == 0 )
+		return;
 
 	// iterate all items in the directory
 	AsciiString fileToDelete;
@@ -486,7 +502,11 @@ void GameStateMap::clearScratchPadMaps()
 			// start search
 			hFile = FindFirstFile( "*", &item );
 			if( hFile == INVALID_HANDLE_VALUE )
+			{
+				// GeneralsX @bugfix cemlyn007 27/09/2026 Restore the working directory before bailing out.
+				SetCurrentDirectory( currentDirectory );
 				return;
+			}
 
 			// we are no longer on our first item
 			first = FALSE;
