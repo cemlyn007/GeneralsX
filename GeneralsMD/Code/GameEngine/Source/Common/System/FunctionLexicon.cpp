@@ -402,7 +402,12 @@ void FunctionLexicon::loadTable( TableEntry *table,
 	{
 
 		// assign key from name key based on name provided in table
-		entry->key = TheNameKeyGenerator->nameToKey( entry->name );
+		// GeneralsX @feature cemlyn007 28/09/2026 Written only when it changes: the tables are process-wide and every
+		// engine's init interns the same names (PLAN-023 Decision 2), so only the first boot writes a key and later
+		// boots do not write while other engines look functions up on their threads (PLAN-023 Phase 5b).
+		const NameKeyType key = TheNameKeyGenerator->nameToKey( entry->name );
+		if( entry->key != key )
+			entry->key = key;
 
 		// next table entry please
 		entry++;

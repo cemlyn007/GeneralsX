@@ -34,7 +34,9 @@
 #                                             phase changed (to `unreviewed` included) or a listed name with
 #                                             a new instance (more TUs define it); with --strict also if the
 #                                             TSV is stale in any way (a new symbol a safe rule classifies, a
-#                                             vanished symbol, a moved definition)
+#                                             vanished symbol, a moved definition). In every mode also exit 1
+#                                             on any per-engine symbol, in the library or the list: PLAN-023
+#                                             Phase 5b emptied the per-engine list, so one is a regression
 #   engine_state_symbols.py report [LIB.so]   print the per-engine work list grouped by phase, the counts
 #                                             per class and the unreviewed symbols (from the TSV, or from
 #                                             the library when given)
@@ -829,6 +831,14 @@ def cmd_check(args):
             stale += st
     for key in sorted(set(recorded) - set(symbols)):
         stale.append(f"gone from the library: {key}")
+    # GeneralsX @feature cemlyn007 28/09/2026 No per-engine state may be left shared (PLAN-023 Phase 5b): every
+    # per-engine symbol is an error in every mode, whether the TSV lists it or not.
+    for key, sym in sorted(symbols.items()):
+        if sym.cls == PER:
+            errors.append(f"per-engine state left process-wide (move it into the engine, PLAN-023): {key} ({sym.source})")
+    for key, row in sorted(recorded.items()):
+        if row["class"] == PER and key not in symbols:
+            errors.append(f"the list still has a per-engine entry: {key}")
     for line in errors:
         print(f"error: {line}")
     for line in stale:

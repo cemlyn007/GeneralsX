@@ -103,7 +103,15 @@
 
 
 #if (OPTIMIZE_PLANEEQ_RAM)
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 28/09/2026 Per engine (PLAN-023 Phase 5b): the plane-equation scratch get_planes hands
+// out, so that engines on separate threads do not share it. A slot, not thread_local: it owns a heap array
+// that grows.
+static rts::PerEngineStatic<SimpleVecClass<Vector4> > _PlaneEQArray_perEngine([](SimpleVecClass<Vector4>& planes) { planes.Resize(1024); });
+#define _PlaneEQArray (_PlaneEQArray_perEngine.get())
+#else
 static SimpleVecClass<Vector4> _PlaneEQArray(1024);
+#endif
 #endif
 
 

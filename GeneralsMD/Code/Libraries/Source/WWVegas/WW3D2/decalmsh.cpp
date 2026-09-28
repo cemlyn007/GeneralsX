@@ -700,8 +700,17 @@ bool RigidDecalMeshClass::Delete_Decal(uint32 id)
 ** These buffers are used by the skin code for temporary storage of the deformed vertices and
 ** vertex normals.
 */
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 28/09/2026 Per engine, so that engines on separate threads do not share them
+// (PLAN-023 Phase 5b).
+static rts::PerEngineStatic<SimpleVecClass<Vector3> > _TempVertexBuffer_perEngine;
+static rts::PerEngineStatic<SimpleVecClass<Vector3> > _TempNormalBuffer_perEngine;
+#define _TempVertexBuffer (_TempVertexBuffer_perEngine.get())
+#define _TempNormalBuffer (_TempNormalBuffer_perEngine.get())
+#else
 static SimpleVecClass<Vector3>	_TempVertexBuffer;
 static SimpleVecClass<Vector3>	_TempNormalBuffer;
+#endif
 
 
 /*

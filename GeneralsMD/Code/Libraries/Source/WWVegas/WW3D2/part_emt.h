@@ -301,8 +301,10 @@ class ParticleEmitterClass : public RenderObjClass
 		// Initialize one new particle at the given NewParticleStruct
 		// address, with the given age and emitter transform (expressed as a
 		// quaternion and origin vector). (must check if address is nullptr).
+		// GeneralsX @feature cemlyn007 28/09/2026 inherited_vel is the emitter's worldspace velocity, passed in rather
+		// than through a global, so that engines on separate threads do not share it (PLAN-023 Phase 5b).
 		void Initialize_Particle(NewParticleStruct * newpart, unsigned int age,
-			const Quaternion & quat, const Vector3 & orig);
+			const Quaternion & quat, const Vector3 & orig, const Vector3 & inherited_vel);
 
 		unsigned int				EmitRate;			// Emission rate (1/milliseconds).
 		unsigned int				BurstSize;			// Burst size (how many particles in each emission).

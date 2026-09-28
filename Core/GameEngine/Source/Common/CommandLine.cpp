@@ -41,6 +41,8 @@
 #include "GameClient/GameText.h"
 #include "GameNetwork/NetworkDefs.h"
 
+#include <atomic>
+
 
 
 
@@ -421,7 +423,8 @@ Int parseHeadless(char *args[], int num)
 	// TheSuperHackers @fix bobtista 03/02/2026 Set DX8Wrapper_IsWindowed to false in headless
 	// mode so that ignoringAsserts() works correctly throughout the entire process lifetime,
 	// including during shutdown after TheGlobalData has been destroyed.
-	extern bool DX8Wrapper_IsWindowed;
+	// GeneralsX @feature cemlyn007 28/09/2026 Atomic (see dx8wrapper.cpp; PLAN-023 Phase 5b).
+	extern std::atomic<bool> DX8Wrapper_IsWindowed;
 	DX8Wrapper_IsWindowed = false;
 
 	return 1;

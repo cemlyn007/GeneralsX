@@ -1,6 +1,6 @@
 # PLAN-023: Multiple Engine Instances in One Process
 
-**Status**: Phase 0 done (see [Phase 0](#phase-0-prerequisites-that-are-bugs-today)); Phase 1's mechanism and lifecycle done behind `RTS_ENGINE_CONTEXT` (see [Phase 1](#phase-1-enginecontext-core)): one engine at a time can be created, destroyed and created again in a process, and Decision 2's perturbation gate passed (Option A stands); the `nm` classification done (see [the Phase 1 deliverable](#phase-1-deliverable-the-nm-classification)), which gives Phases 2-4 their work list; Phase 2 done for engines stepped on one thread (see [Phase 2](#phase-2-simulation-statics-that-must-become-per-engine)), with Phase 3's water and weather settings pulled forward: two engines alive in one process play bit-identically to their solo runs in every harness variant, and the next failure is Phase 3's (`W3DDisplay`'s class statics at the second teardown); Phases 3-4 done for engines stepped on one thread (see [Phase 3](#phase-3-device-layer-state-that-headless-still-uses) and [Phase 4](#phase-4-caches-and-remaining-statics)); the delivery's stop point reached on the consumer side (rlgenerals R1: several `Env`s per process through its public API, each bit-identical to its solo run), with a minimal Phase 5 (a per-engine user-data directory, see [Phase 5](#phase-5-host-contract-and-process-resources)); the threaded work and the rest of Phase 5 are past this delivery
+**Status**: Phase 0 done (see [Phase 0](#phase-0-prerequisites-that-are-bugs-today)); Phase 1's mechanism and lifecycle done behind `RTS_ENGINE_CONTEXT` (see [Phase 1](#phase-1-enginecontext-core)): one engine at a time can be created, destroyed and created again in a process, and Decision 2's perturbation gate passed (Option A stands); the `nm` classification done (see [the Phase 1 deliverable](#phase-1-deliverable-the-nm-classification)), which gives Phases 2-4 their work list; Phase 2 done for engines stepped on one thread (see [Phase 2](#phase-2-simulation-statics-that-must-become-per-engine)), with Phase 3's water and weather settings pulled forward: two engines alive in one process play bit-identically to their solo runs in every harness variant, and the next failure is Phase 3's (`W3DDisplay`'s class statics at the second teardown); Phases 3-4 done for engines stepped on one thread (see [Phase 3](#phase-3-device-layer-state-that-headless-still-uses) and [Phase 4](#phase-4-caches-and-remaining-statics)); the delivery's stop point reached on the consumer side (rlgenerals R1: several `Env`s per process through its public API, each bit-identical to its solo run), with a minimal Phase 5 (a per-engine user-data directory, see [Phase 5](#phase-5-host-contract-and-process-resources)); the threaded work is planned as [Phase 5b](#phase-5b-engines-on-separate-threads) (second delivery), whose items 1-3 are done (no per-engine state left in the classification, no process-wide write after the first boot, and `Scope` restores the per-thread floating-point mode and locale), and the rest of Phase 5 is past it
 **Scope**: Zero Hour first (GeneralsMD + Core), then the Generals backport
 **Consumer**: rlgenerals (embeds `libgeneralsx.so`, wants N engines per process)
 **Baseline**: `main` @ `7ea7bf8ef`. The investigation's line references were checked against `f9c894410` and may have drifted; re-check them before editing.
@@ -14,6 +14,8 @@ This plan is being delivered as a stack of PRs (each paired with the rlgenerals 
 - `checkfortransitionsnum` as `thread_local` (on one thread the depth count is already correct);
 - the TSan work in Phase 7;
 - the thread-migration, GIL-release and vector-env work on the consumer side.
+
+A second delivery, [Phase 5b](#phase-5b-engines-on-separate-threads), takes it to **several engines on separate threads at the same time**, each still bit-identical to its solo run. It brings forward the threads-only statics, `Scope`'s per-thread invariants from Phase 5 and the TSan work from Phase 7. The string locks, the allocator locks and `calculateZones` stay deferred: they limit scaling, not correctness.
 
 ## Consumer answers
 
@@ -467,6 +469,112 @@ The two-engine harness (rlgenerals' `multi_engine_test`) gained a long AI-heavy 
   - `timeGetTime` in `GameLogic.cpp:1976,2072` drives only load-progress UI updates. `lastHeardFrom`/`testTimeOut`/`initTimeOutValues` (`:4860-4912`) are network-load timeouts gated on `TheNetwork`, which is null in skirmish. Both are harmless for headless RL.
   - `getenv("HOME")` in `MapUtil.cpp:493,1234` (user map search) and `getenv("APPDATA"/"USERPROFILE"/"HOME")` in `WWLib/registryini.cpp:59-69`, as well as `XDG_DATA_HOME`. All of these move into `BootConfig`, and hosts call no `setenv` after the first engine starts.
 - **Game LOD.** Pin static LOD and disable dynamic LOD per engine. Dynamic LOD follows wall-clock FPS, and LOD feeds logic in `SlowDeathBehavior`, `ObjectCreationList` and `GameLogic.cpp:1940`.
+
+### Phase 5b: Engines on separate threads
+
+**Status: planned (second delivery; rlgenerals stage RT in `docs/planning/MULTI_ENGINE_CONSUMER.md`). Items 1-3 are done (RT1); items 4-5 and the validation are next (RT2 onwards).**
+
+- **Item 1 (RT1).** The classification has no per-engine entries: 3,817 symbols, 0 per-engine, 0 unreviewed. `engine_state_symbols.py check` now fails in every mode, `--strict` or not, on any symbol classified per-engine, so rlgenerals' CI check keeps the list empty. The fixes:
+  - `thread_local` (small, trivially constructible, and correct OFF, so unconditional through `THREAD_LOCAL`): `ParticleSystem`'s `point`/`newVel`/`newPos` and `BuildAssistant`'s `tileInfo`.
+  - `PER_ENGINE_STATIC`s (ON only; OFF keeps the file statics): `generateParticleInfo`'s `info` (280 bytes with a constructor, too big for static TLS); `WorldHeightMap`'s `s_buffer`/`s_blendBuffer`; `_PlaneEQArray` (made with its upstream 1,024 entries); the `mesh.cpp` and `decalmsh.cpp` temp buffers. `dx8renderer.cpp`'s pair moved into `DX8MeshRendererState`, before the renderer whose `Shutdown` frees them.
+  - Locals (unconditional): `CollisionContext`/`IntersectContext`, made on the stack by `CollisionMath::Collide`/`Intersection_Test` and passed to the helpers; `InheritedWorldSpaceEmitterVel`, now an argument of `Initialize_Particle`; the four quoted-printable `dest` buffers.
+  - Dropped: `meshmdl.cpp`'s unused pair.
+  - A lock: `AssetStatusClass::Instance` stays one process-wide report, and `Add_To_Report` takes a mutex.
+  - The library's static TLS grew from 58 to 122 bytes.
+- **Item 2 (RT1).** Every process-global entry whose note said a boot, a map load, a teardown or every call writes it:
+  - `DX8Wrapper_IsWindowed`: a `std::atomic<bool>`, declared so in all five places, both games included.
+  - `GameSpyColor`: a `PER_ENGINE_STATIC` (ON), made from the defaults in `Chat.cpp`.
+  - The `.wnd` scratch strings: only the `~GameWindowManager` of a manager that parsed a `.wnd` file clears them (`m_parsedScript`), so a headless engine's teardown never writes them.
+  - Written only when the value changes, so after the first boot nothing writes: `TheW3DFrameLengthInMsec` (`W3DGameClient::setFrameRate`), the `FunctionLexicon` tables' keys (every boot still interns the names, in the same order), `_TheFileFactory` and `s_assetFallbackPath`. The engines of a process share one install.
+  - Constants: `ScoreKeeper`'s `scoringBuilding*Mask`, built at static initialisation rather than by every `reset`. `ModuleInfo::clearCopiedFromDefaultEntries`'s two masks are locals.
+  - `Object::Object`'s eight helper `ModuleData`s are made and tagged once, under the static-initialisation guard (`taggedHelperModuleData<T>`); every `Object` used to write the tag again.
+  - `W3DAssetManager`'s `warning_count`s are atomic.
+  - Boot/shutdown only, serialised by the host, and read by no stepping engine: `__argc`/`__argv`, `rts::WorkingDirectory`, the NGMP instance (made at teardown, under its static-initialisation guard) and the memory manager's and `WWMath`'s counts (already under their mutexes).
+  - Phase 4's process-global strings are unchanged: each is written once before any engine steps.
+  - Every note in the classification says which of these applies.
+- **Item 3 (RT1).** An `rts::Scope` that switches the thread to a different engine calls `enterEngineThreadInvariants` (`EngineContext.cpp`), and the matching exit restores the thread's state.
+  - On entry it saves the thread's `fenv` (`fegetenv`) and the x87 control word, calls `setFPMode()`, and `uselocale`s a "C" locale made once under `std::call_once`. Windows has no `uselocale`, so there the thread keeps its locale.
+  - On exit it restores all three.
+  - Nested scopes on the current engine, and scopes for `g_noEngine`, do nothing extra.
+  - The saved state is opaque in the header (32 bytes of `fenv_t` storage, the locale as a `void*`), so `EngineContext.h` still includes neither `<cfenv>` nor `<locale.h>`. `rts::Scope` is now 64 bytes, and rlgenerals' `EnterEngine` reserves 128.
+  - Cost on rlgenerals' step loops, context on, before and after, medians of five interleaved runs (2026-09-28):
+    - headless `Env` NOOP steps: 10,871 → 10,699/s, 1.6% (about 1.5 µs per step, over the step's several outermost scopes);
+    - AI skirmish `update()` frames: 11,028 → 11,102/s (noise).
+- **Checks (RT1).**
+  - The solo per-frame CRC (seed 7, Tournament Desert, 3,000 frames) is still md5 `ebf7cb56...`, with the context off and on.
+  - rlgenerals' `engine_tests` pass with and without the context, `multi_env_test` and the multi-engine harness pass, and `--config=fast` is green.
+  - OFF CMake `GeneralsX` and `GeneralsXZH` build.
+  - No test uses threads yet (RT2).
+
+Goal: N engines in one process, each stepped on its own thread at the same time, each bit-identical to its solo run. This phase is about correctness, not speed. Engines run in parallel, but the process-wide string and allocator locks stay, so scaling will be below linear; removing them is a later performance phase (see "Out of scope" below).
+
+**Starting point (after Phases 0-4 and the minimal Phase 5).**
+- Every piece of simulation, device and cache state a headless engine uses is per engine.
+- The current engine is the `constinit thread_local` `t_engine`, so each thread's `Scope` selects its own engine.
+- `NameKeyGenerator` is shared and thread-safe (Decision 2).
+- The lazily built tables are built under `std::call_once`, and `initMemoryManager`/`shutdownMemoryManager` and `WWMath::Init`/`Shutdown` count their users under a mutex.
+- With the host's critical sections installed, strings and the memory pools take one process-wide lock each (`TheAsciiStringCriticalSection`, `TheUnicodeStringCriticalSection`, `TheMemoryPoolCriticalSection`, `TheDmaCriticalSection`). That serialises them, but it is correct across threads.
+- Checked, no work needed:
+  - **Dynamic LOD.** `W3DDisplay::draw` returns before `findDynamicLODLevel` when an engine is headless and does not render, and at most one engine per process renders (consumer answer 2).
+  - **Thread stacks.** Linux threads get an 8 MiB stack by default, against a 152 KiB engine peak, so `calculateZones` stays deferred. It only matters for small explicit stacks, and macOS's 512 KiB secondary-thread default is still enough.
+
+**Threading contract (the host enforces it; the engine relies on it).**
+- **One thread inside an engine at a time.** The host claims an engine for a thread in its outermost scope on that engine, and refuses a second thread while it is claimed.
+- **An engine may move between threads between calls.** The host closes engines from its main thread (`atexit`, garbage collection). The engine's per-thread state allows this: `checkfortransitionsnum` and `inCRCGen` return to their initial values after every call tree, and the `thread_local` scratch values are consumed within one call.
+- **Boots and shutdowns are serialised by the host** (one process mutex). A boot or shutdown still touches process-wide state:
+  - the `.wnd` parser's libc `strtok` (`GameWindowManagerScript.cpp`);
+  - the host's `chdir`;
+  - the memory manager's and `WWMath`'s counts;
+  - static-initialisation order.
+
+**Change list.**
+
+1. **The 18 "threads only" statics** in the classification become per-engine or per-call.
+
+   | Symbols | Fix |
+   |---|---|
+   | `ParticleSystem::computePointOnUnitSphere::point`, `computeParticleVelocity::newVel`, `computeParticlePosition::newPos`, `generateParticleInfo::info` | `thread_local` (small; returned by pointer and consumed before the next call on the thread) |
+   | `BuildAssistant::buildTiledLocations::tileInfo`, `InheritedWorldSpaceEmitterVel` (`part_emt.cpp`), `_PlaneEQArray` (`meshgeometry.cpp`) | `thread_local` (small) |
+   | `CollisionContext`, `IntersectContext` (`colmathaabtri.cpp`, 320 and 232 bytes) | Locals passed down, or `PER_ENGINE_STATIC` |
+   | The `_TempVertexBuffer`/`_TempNormalBuffer` pairs (`dx8renderer.cpp`, `mesh.cpp`, `decalmsh.cpp`, `meshmdl.cpp`) | `PER_ENGINE_STATIC` (they own heap arrays that grow) |
+   | `WorldHeightMap`'s `s_buffer`/`s_blendBuffer` (256 KiB each) | `PER_ENGINE_STATIC` |
+   | The four `QuotedPrintable.cpp` `dest` buffers (1-4 KiB) | `PER_ENGINE_STATIC`, or a local `std::vector` |
+   | `AssetStatusClass::Instance` (written by every engine, read by none) | Per engine, or its writes under a mutex |
+
+   Large buffers must not become `thread_local`. The library's TLS is initial-exec, and a `dlopen`ed library only gets glibc's small static TLS surplus: the 5 KB `XferLoad` buffers already made it fail to load (Phase 2). A per-engine slot is as good as a per-thread one under the one-thread-at-a-time contract.
+
+   Afterwards the classification has no per-engine entries, and `engine_state_symbols.py check --strict` keeps it so. The `thread_local`s are listed as process-global (per thread by design), as Phase 2's are.
+2. **Process-wide state written after priming.** Shared state must be written once, during the first boot, and only read afterwards. A later boot rewriting it with the same value is still a data race with the engines already stepping. Known cases, all reclassified process-global in Phase 4 because every boot writes them:
+   - `DX8Wrapper_IsWindowed` (every headless command line);
+   - `GameSpyColor` (every boot's INI parse);
+   - the `.wnd` parser's scratch strings (every `~GameWindowManager`).
+
+   Walk every process-global entry whose note says a boot, a map load or a teardown writes it. Make each write-once (`std::call_once`, or skipped once primed), atomic or per engine, and say which in its note. The same rule covers the process-global `AsciiString`s listed in Phase 4: the string lock covers the refcount, not an in-place write through `ensureUniqueBufferOfSize`.
+3. **`Scope` restores the per-thread invariants** (this part of Phase 5 comes forward).
+   - **When:** only when a `Scope` changes `t_engine` to a different context. Nested scopes on the same engine do nothing, so the cost stays at the outermost call.
+   - **On entry:** save the thread's floating-point environment and locale, then call `setFPMode()` and `uselocale` a C locale created once under `std::call_once`.
+   - **On exit:** restore both.
+   - **Why:** `setFPMode` sets the x87/SSE control words of the calling thread only, and only the boot, INI and load-screen paths call it. Without this, an engine handed to another thread, or stepped on a thread whose mode the host changed, can drift from its solo run.
+   - **Cost:** measure it on rlgenerals' NOOP step loop.
+   - **OFF build:** unchanged (no `Scope`).
+4. **Engine-started threads.** Confirm, with a test on the host side, that a headless, device-free engine starts no thread of its own: no audio, screenshot or file-loading thread. The ones a rendering engine starts already carry their context (Phase 1).
+5. **Sanitiser builds.** A CMake cache option (`RTS_SANITIZE=thread|address`) that adds `-fsanitize=...` to every engine target and the vcpkg-free parts, so the host can link a TSan or ASan `libgeneralsx`. The host's test is the proof: a C++ driver with no Python, running four engines on four threads against their solo runs. It must report no data race; any suppression is for third-party code only (SDL, DXVK, OpenAL) and is checked in with a reason.
+
+**Validation (rlgenerals owns the harness).** Each of N = 4 engines on its own thread must be bit-identical to its solo run: frame by frame (`getCRC(CRC_RECALC)`) in a C++ driver, and step by step (observation digests) through `Env` on Python threads with the GIL released. Variants:
+- same seed and map;
+- different maps and seeds;
+- staggered starts;
+- one engine closed and rebooted while the others play;
+- one engine faulting while the others play;
+- engines handed to the main thread and closed there.
+
+The solo per-frame CRC (seed 7, Tournament Desert, 3,000 frames, md5 `ebf7cb56...`) must stay unchanged, with the context off and on.
+
+**Out of scope (a later performance phase).**
+- Dropping the string locks with an atomic refcount (Phase 0's deferred row).
+- Per-thread or per-engine memory pools instead of the two allocator locks.
+- Caching `ctx()` in hot functions: the engine context costs 4-7% on one engine (rlgenerals, 2026-09-28: NOOP `Env` steps 10,576 → 10,103/s, AI skirmish frames 10,964 → 10,237/s, context off → on; context off equals `main`).
+- `calculateZones`.
 
 ### Phase 6: Consumer (rlgenerals)
 
