@@ -602,6 +602,13 @@ public:
 	// the trailing '\' is included!
   const AsciiString &getPath_UserData() const { return m_userDataDir; }
 
+	// GeneralsX @feature cemlyn007 28/09/2026 An embedding host's per-engine user data directory (PLAN-023
+	// Phase 5's user-data root): a host with several engines in one process gives each its own, so their
+	// replays, SagePatch.ini and MapCache.ini do not overwrite each other. Set on the original instance
+	// right after the startup parse creates it, before GameEngine::init reads the path; `dir` ends with the
+	// path separator and exists. Nothing upstream calls it, so an engine that is not embedded is unchanged.
+	void setPath_UserData(const AsciiString &dir) { m_userDataDir = dir; }
+
 private:
 
 	static UnsignedInt generateExeCRC();
