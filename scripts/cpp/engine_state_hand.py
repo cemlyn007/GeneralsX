@@ -61,10 +61,12 @@ HAND = [
     # are EngineContext fields or PER_ENGINE_STATICs now (so gone from the library; their slot indexes are
     # rule:per-engine-static), as are Phase 3's TheWaterTransparency, TheWeatherSetting, WaterSettings[], rand4
     # and CameraShakerSystem.
-    # thread_local (per thread by design, so process-global here): both checkfortransitionsnum, inCRCGen and
+    # thread_local (per thread by design, so process-global here): both checkfortransitionsnum, inCRCGen,
+    # dx8renderer.cpp's DX8MeshRendererState_destroying and
     # PathNode::computeDirectionVector()'s dir. The two XferLoad buffers are locals now (so gone).
     (GLOBAL, "", "re:State::friend_check(For|ForSleep)Transitions\\(StateReturnType\\)::checkfortransitionsnum", "thread_local call-depth counter (PLAN-023 Phase 2): per thread by design"),
     (GLOBAL, "", "TerrainLogic::m_gridWaterHandle", "an address-only sentinel (the grid water's WaterHandle is compared by address and never written), the same for every engine"),
+    (GLOBAL, "", "re:\\(anonymous namespace\\)::DX8MeshRendererState_destroying", "thread_local, set only while this thread runs an engine's DX8MeshRendererState destructor (PLAN-023 Phase 3): per thread by design"),
     (GLOBAL, "", "inCRCGen", "thread_local, set only while this thread runs GameLogic::getCRC (PLAN-023 Phase 2): per thread by design"),
     (GLOBAL, "", "re:PathNode::computeDirectionVector\\(\\)::dir", "thread_local returned-by-pointer scratch, consumed at once (PLAN-023 Phase 2): per thread by design"),
     (PER, 4, "re:BuildAssistant::buildTiledLocations\\(.*\\)::tileInfo", "threads only: returned-by-pointer scratch, consumed at once"),

@@ -75,6 +75,8 @@ namespace
 {
 struct DX8MeshRendererState
 {
+	~DX8MeshRendererState();
+
 	MultiListClass<MeshModelClass>	registeredMeshList;
 	TextureCategoryList					textureCategoryDeleteList;
 	FVFCategoryList						fvfCategoryContainerDeleteList;
@@ -82,16 +84,27 @@ struct DX8MeshRendererState
 };
 
 rts::PerEngineStatic<DX8MeshRendererState> DX8MeshRendererState_perEngine;
+
+// The state whose destructor is running: its slot is already cleared then (EngineContext::destroySlots),
+// so the renderer's teardown reaches its lists, and TheDX8MeshRenderer, through this instead.
+thread_local DX8MeshRendererState* DX8MeshRendererState_destroying = nullptr;
+
+DX8MeshRendererState& DX8_Current_Mesh_Renderer_State()
+{
+	if (DX8MeshRendererState_destroying != nullptr)
+		return *DX8MeshRendererState_destroying;
+	return DX8MeshRendererState_perEngine.get();
+}
 }
 
 DX8MeshRendererClass & DX8_Current_Mesh_Renderer()
 {
-	return DX8MeshRendererState_perEngine.get().renderer;
+	return DX8_Current_Mesh_Renderer_State().renderer;
 }
 
-#define _RegisteredMeshList (DX8MeshRendererState_perEngine.get().registeredMeshList)
-#define texture_category_delete_list (DX8MeshRendererState_perEngine.get().textureCategoryDeleteList)
-#define fvf_category_container_delete_list (DX8MeshRendererState_perEngine.get().fvfCategoryContainerDeleteList)
+#define _RegisteredMeshList (DX8_Current_Mesh_Renderer_State().registeredMeshList)
+#define texture_category_delete_list (DX8_Current_Mesh_Renderer_State().textureCategoryDeleteList)
+#define fvf_category_container_delete_list (DX8_Current_Mesh_Renderer_State().fvfCategoryContainerDeleteList)
 #else
 static MultiListClass<MeshModelClass>			_RegisteredMeshList;
 static TextureCategoryList							texture_category_delete_list;
@@ -2320,6 +2333,21 @@ void DX8MeshRendererClass::Invalidate( bool shutdown)
 
 	texture_category_container_lists_rigid.Delete_All();
 }
+
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @bugfix cemlyn007 28/09/2026 Release what Shutdown() would have when the engine goes
+// (PLAN-023 Phase 3). Shutdown() runs only from the device teardown, which headless never reaches, so
+// without this every engine leaked the category containers and pending-delete lists its renderer made. The
+// engine is still alive here (its ~GameEngine destroys its slots), unlike the static destruction that
+// ~DX8MeshRendererClass avoids. After a Shutdown() there is nothing left, so this does nothing.
+DX8MeshRendererState::~DX8MeshRendererState()
+{
+	DX8MeshRendererState_destroying = this;
+	renderer.Invalidate(true);
+	renderer.Clear_Pending_Delete_Lists();
+	DX8MeshRendererState_destroying = nullptr;
+}
+#endif
 
 
 
