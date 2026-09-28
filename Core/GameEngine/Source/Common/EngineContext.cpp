@@ -24,7 +24,9 @@
 
 #include "Common/EngineContext.h"
 
+#include <algorithm>
 #include <atomic>
+#include <cstdio>
 #include <vector>
 
 namespace rts
@@ -57,11 +59,42 @@ struct EngineSlotTable
 	std::vector<Owned> inCreationOrder;
 };
 
+#ifdef DEBUG_CRASHING
+namespace
+{
+// Appends each live field's name to a bounded, comma-separated list (for the ~EngineContext assert).
+struct LiveFieldNames
+{
+	char text[512] = "";
+	std::size_t length = 0;
+};
+
+void appendLiveFieldName(const char* name, void* user)
+{
+	LiveFieldNames& names = *static_cast<LiveFieldNames*>(user);
+	const std::size_t room = sizeof(names.text) - names.length;
+	if (room <= 1)
+		return;
+	const int written = std::snprintf(names.text + names.length, room, "%s%s", names.length == 0 ? "" : ", ", name);
+	if (written > 0)
+		names.length += std::min<std::size_t>((std::size_t)written, room - 1);
+}
+}
+#endif
+
 EngineContext::~EngineContext()
 {
-	DEBUG_ASSERTCRASH(this == &g_noEngine || (countLiveSingletons() == 0 && originalGlobalData == nullptr && !wwMathInitialized),
-		("EngineContext destroyed with %u live singletons: its engine was not shut down, or its shutdown left some",
-		(unsigned)countLiveSingletons()));
+#ifdef DEBUG_CRASHING
+	if (this != &g_noEngine && (countLiveSingletons() != 0 || originalGlobalData != nullptr || wwMathInitialized))
+	{
+		LiveFieldNames names;
+		const std::size_t live = forEachLiveSingleton(&appendLiveFieldName, &names);
+		DEBUG_CRASH(("EngineContext destroyed before its engine was shut down, or its shutdown left state: "
+			"%u live singleton/pointer fields (%s), originalGlobalData %s, wwMathInitialized %s",
+			(unsigned)live, live != 0 ? names.text : "none", originalGlobalData != nullptr ? "set" : "null",
+			wwMathInitialized ? "true" : "false"));
+	}
+#endif
 	DEBUG_ASSERTCRASH(this == &g_noEngine || noEngineIsPristine(), ("g_noEngine was written: engine state leaked outside every Scope"));
 
 	destroySlots();
