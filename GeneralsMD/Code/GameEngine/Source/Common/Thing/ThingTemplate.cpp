@@ -421,7 +421,9 @@ Bool ModuleInfo::clearModuleDataWithTag(const AsciiString& tagToClear, AsciiStri
 //-------------------------------------------------------------------------------------------------
 Bool ModuleInfo::clearCopiedFromDefaultEntries(Int interfaceMask, const AsciiString &newName, const ThingTemplate *fullTemplate )
 {
-  static KindOfMaskType ImmuneToGPSScramblerMask;
+  // GeneralsX @feature cemlyn007 28/09/2026 Locals, not statics: every call set the same bits again, a process-wide
+  // write that engines on separate threads would race on (PLAN-023 Phase 5b).
+  KindOfMaskType ImmuneToGPSScramblerMask;
   KindOfMaskType &m = ImmuneToGPSScramblerMask;
   m.set(KINDOF_AIRCRAFT);// NO PLANES or helicopters
   m.set(KINDOF_SHRUBBERY);// NO trees or bushes
@@ -441,7 +443,7 @@ Bool ModuleInfo::clearCopiedFromDefaultEntries(Int interfaceMask, const AsciiStr
   m.set(KINDOF_BRIDGE_TOWER);
   Bool disallowed =  fullTemplate->isAnyKindOf( ImmuneToGPSScramblerMask );
 
-  static KindOfMaskType CandidateForGPSScramblerMask;
+  KindOfMaskType CandidateForGPSScramblerMask;
   CandidateForGPSScramblerMask.set(KINDOF_SCORE);
   CandidateForGPSScramblerMask.set(KINDOF_VEHICLE);
   CandidateForGPSScramblerMask.set(KINDOF_INFANTRY);

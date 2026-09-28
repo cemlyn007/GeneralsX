@@ -1225,7 +1225,9 @@ BuildAssistant::TileBuildInfo *BuildAssistant::buildTiledLocations( const ThingT
 	}
 
 	// return a struct filled out with the actual tiles used and the array of locations
-	static TileBuildInfo tileInfo;
+	// GeneralsX @feature cemlyn007 28/09/2026 thread_local: returned-by-pointer scratch the caller consumes at once, on its own
+	// thread (PLAN-023 Phase 5b).
+	static THREAD_LOCAL TileBuildInfo tileInfo;
 	tileInfo.tilesUsed = tilesUsed;
 	tileInfo.positions = positions;
 	return &tileInfo;

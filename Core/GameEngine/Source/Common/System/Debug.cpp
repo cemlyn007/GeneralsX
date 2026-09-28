@@ -84,7 +84,10 @@
 #endif
 
 // Horrible reference, but we really, really need to know if we are windowed.
-extern bool DX8Wrapper_IsWindowed;
+// GeneralsX @feature cemlyn007 28/09/2026 Atomic: every headless engine's command line writes it and any engine's
+// assert path reads it, so engines on separate threads would race on a plain bool (PLAN-023 Phase 5b).
+#include <atomic>
+extern std::atomic<bool> DX8Wrapper_IsWindowed;
 extern HWND ApplicationHWnd;
 
 extern const char *gAppPrefix; /// So WB can have a different log file name.

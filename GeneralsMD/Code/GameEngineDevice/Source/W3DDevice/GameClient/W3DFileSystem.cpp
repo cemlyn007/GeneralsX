@@ -528,7 +528,11 @@ FileFactoryClass *engineW3DFileFactory()
 W3DFileSystem::W3DFileSystem()
 {
 #if RTS_ENGINE_CONTEXT
-	_TheFileFactory = engineW3DFileFactory();
+	// GeneralsX @feature cemlyn007 28/09/2026 Written by the first engine's boot only: a later boot finds it set, so no
+	// boot writes the process-wide pointer while other engines read it on their threads (PLAN-023 Phase 5b).
+	FileFactoryClass *factory = engineW3DFileFactory();
+	if (_TheFileFactory != factory)
+		_TheFileFactory = factory;
 #else
 	_TheFileFactory = this; // override the w3d file factory.
 #endif

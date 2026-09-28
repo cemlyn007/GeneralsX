@@ -146,7 +146,14 @@ static SimpleDynVecClass<uint32> temp_apt;
 /*
 ** Temporary storage used during decal creation
 */
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 28/09/2026 Per engine, so that engines on separate threads do not share it
+// (PLAN-023 Phase 5b); also the skinned vis-render scratch below.
+static rts::PerEngineStatic<DynamicVectorClass<Vector3> > _TempVertexBuffer_perEngine;
+#define _TempVertexBuffer (_TempVertexBuffer_perEngine.get())
+#else
 static DynamicVectorClass<Vector3>	_TempVertexBuffer;
+#endif
 
 
 /***********************************************************************************************

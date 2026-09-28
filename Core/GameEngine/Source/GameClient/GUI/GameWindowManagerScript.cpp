@@ -2707,6 +2707,8 @@ GameWindow *GameWindowManager::winCreateFromScript( AsciiString filenameString,
 	WindowLayoutInfo scriptInfo;
 	AsciiString asciibuf;
 
+	m_parsedScript = TRUE; // GeneralsX @feature cemlyn007 28/09/2026 see ~GameWindowManager (PLAN-023 Phase 5b)
+
 	// zero info struct
 	//memset( &scriptInfo, 0, sizeof( WindowLayoutInfo ) ); // it's a class - use a constructor
 

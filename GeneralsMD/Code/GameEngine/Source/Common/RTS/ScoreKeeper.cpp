@@ -84,21 +84,22 @@ ScoreKeeper::~ScoreKeeper()
 
 }
 
-static KindOfMaskType scoringBuildingMask;
-static KindOfMaskType scoringBuildingDestroyMask;
-static KindOfMaskType scoringBuildingCreateMask;
+// GeneralsX @feature cemlyn007 28/09/2026 Constants built once at static initialisation, where every ScoreKeeper::reset
+// used to set the same bits again: a process-wide write at every game start would race with engines already
+// scoring on other threads (PLAN-023 Phase 5b).
+static KindOfMaskType makeScoringMask(KindOfType a, KindOfType b)
+{
+	KindOfMaskType mask;
+	mask.set(a);
+	mask.set(b);
+	return mask;
+}
+static const KindOfMaskType scoringBuildingMask = makeScoringMask(KINDOF_STRUCTURE, KINDOF_SCORE);
+static const KindOfMaskType scoringBuildingDestroyMask = makeScoringMask(KINDOF_STRUCTURE, KINDOF_SCORE_DESTROY);
+static const KindOfMaskType scoringBuildingCreateMask = makeScoringMask(KINDOF_STRUCTURE, KINDOF_SCORE_CREATE);
 
 void ScoreKeeper::reset( Int playerIdx )
 {
-	scoringBuildingMask.set(KINDOF_STRUCTURE);
-	scoringBuildingMask.set(KINDOF_SCORE);
-
-	scoringBuildingCreateMask.set(KINDOF_STRUCTURE);
-	scoringBuildingCreateMask.set(KINDOF_SCORE_CREATE);
-
-	scoringBuildingDestroyMask.set(KINDOF_STRUCTURE);
-	scoringBuildingDestroyMask.set(KINDOF_SCORE_DESTROY);
-
 	m_totalMoneyEarned = m_totalMoneySpent = 0;
 	m_totalUnitsLost = m_totalUnitsBuilt = 0;
 	m_totalBuildingsLost = m_totalBuildingsBuilt = 0;

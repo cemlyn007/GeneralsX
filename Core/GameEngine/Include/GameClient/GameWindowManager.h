@@ -353,6 +353,11 @@ protected:
 	GameWindowList m_tabList;			// we have to register a tab list to make a tab list.
 	const Image *m_cursorBitmap;
 	UnsignedInt m_captureFlags;
+	// GeneralsX @feature cemlyn007 28/09/2026 Whether this manager parsed a .wnd file (GameWindowManager's own
+	// winCreateFromScript; GameWindowManagerDummy's parses nothing): only then does its destructor clear the
+	// parser's process-wide scratch strings, so a headless engine's teardown never writes them while the one
+	// UI engine parses (PLAN-023 Phase 5b).
+	Bool m_parsedScript;
 
 };
 

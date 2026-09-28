@@ -55,8 +55,8 @@
 ** These buffers are used by the skin code for temporary storage of the deformed vertices and
 ** vertex normals.
 */
-static DynamicVectorClass<Vector3>	_TempVertexBuffer;
-static DynamicVectorClass<Vector3>	_TempNormalBuffer;
+// GeneralsX @feature cemlyn007 28/09/2026 The unused _TempVertexBuffer/_TempNormalBuffer pair is dropped (PLAN-023
+// Phase 5b: nothing in this file used it, and a file static would be shared by engines on separate threads).
 static DynamicVectorClass<Vector4>	_TempTransformedVertexBuffer;
 static DynamicVectorClass<unsigned long> _TempClipFlagBuffer;
 

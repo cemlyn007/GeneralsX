@@ -237,17 +237,48 @@ inline EngineContext* ctx() noexcept
 // PerEngineStatic, outside a Scope).
 RTS_ENGINE_CONTEXT_API bool noEngineIsPristine();
 
+// GeneralsX @feature cemlyn007 28/09/2026 The per-thread state an engine relies on (PLAN-023 Phase 5b): the calling
+// thread's floating-point environment (with the x87 control word) and its locale, saved by a Scope that enters
+// an engine. Opaque here, so that this force-included header pulls in neither <cfenv> nor <locale.h>;
+// EngineContext.cpp checks that fenv_t and locale_t fit.
+struct ThreadInvariants
+{
+	alignas(8) unsigned char floatingPointEnvironment[32];
+	void* locale;
+	unsigned short x87ControlWord;
+};
+
+// Saves the calling thread's invariants into `saved`, then sets the engine's: setFPMode()'s rounding and
+// precision, and the "C" locale (made once per process) for this thread.
+RTS_ENGINE_CONTEXT_API void enterEngineThreadInvariants(ThreadInvariants& saved) noexcept;
+// Restores what enterEngineThreadInvariants saved.
+RTS_ENGINE_CONTEXT_API void leaveEngineThreadInvariants(const ThreadInvariants& saved) noexcept;
+
 // Makes `context` the current context for its lifetime, then restores the previous one. Scopes nest.
 // A null context means g_noEngine.
+//
+// GeneralsX @feature cemlyn007 28/09/2026 A Scope that switches the thread to a different engine also sets the
+// engine's per-thread invariants (PLAN-023 Phase 5b): the floating-point mode setFPMode() sets and the "C"
+// locale, which the engine's boot, INI and load-screen paths set only on the thread that ran them. An engine
+// may be stepped on another thread than it booted on, or on one whose mode the host changed, and must still
+// run as it would alone. The thread's own mode and locale come back when the Scope ends. A nested Scope on
+// the engine already current, and a Scope for g_noEngine, do nothing more than before, so the cost is paid
+// once per outermost call into an engine.
 class [[nodiscard]] Scope
 {
 public:
 	explicit Scope(EngineContext* context) noexcept : m_previous(t_engine)
 	{
-		t_engine = context != nullptr ? context : &g_noEngine;
+		EngineContext* const next = context != nullptr ? context : &g_noEngine;
+		m_entered = next != m_previous && next != &g_noEngine;
+		t_engine = next;
+		if (m_entered)
+			enterEngineThreadInvariants(m_saved);
 	}
 	~Scope()
 	{
+		if (m_entered)
+			leaveEngineThreadInvariants(m_saved);
 		t_engine = m_previous;
 	}
 
@@ -256,6 +287,8 @@ public:
 
 private:
 	EngineContext* m_previous;
+	bool m_entered;
+	ThreadInvariants m_saved; // set only when m_entered
 };
 
 // GeneralsX @feature cemlyn007 28/09/2026 PER_ENGINE_STATIC (PLAN-023 Phases 2-4)

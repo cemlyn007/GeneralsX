@@ -119,7 +119,9 @@ static Bool decodeQuotedPrintableByte(const unsigned char *&src, unsigned char &
 // Convert unicode strings into ascii quoted-printable strings
 AsciiString UnicodeStringToQuotedPrintable(UnicodeString original)
 {
-	static char dest[1024];
+	// GeneralsX @feature cemlyn007 28/09/2026 A local, not a static: the result is copied into the returned string, and
+	// engines on separate threads must not share the buffer (PLAN-023 Phase 5b).
+	char dest[1024];
 	const WideChar *src = original.str();
 	int i = 0;
 
@@ -148,7 +150,9 @@ AsciiString UnicodeStringToQuotedPrintable(UnicodeString original)
 // Convert ascii strings into ascii quoted-printable strings
 AsciiString AsciiStringToQuotedPrintable(AsciiString original)
 {
-	static char dest[1024];
+	// GeneralsX @feature cemlyn007 28/09/2026 A local, not a static: the result is copied into the returned string, and
+	// engines on separate threads must not share the buffer (PLAN-023 Phase 5b).
+	char dest[1024];
 	const unsigned char *src = reinterpret_cast<const unsigned char *>(original.str());
 	int i=0;
 	while ( src[0]!='\0' && i<1021 )
@@ -173,7 +177,9 @@ AsciiString AsciiStringToQuotedPrintable(AsciiString original)
 // Convert ascii quoted-printable strings into unicode strings
 UnicodeString QuotedPrintableToUnicodeString(AsciiString original)
 {
-	static WideChar dest[1024];
+	// GeneralsX @feature cemlyn007 28/09/2026 A local, not a static: the result is copied into the returned string, and
+	// engines on separate threads must not share the buffer (PLAN-023 Phase 5b).
+	WideChar dest[1024];
 	int i = 0;
 	const unsigned char *src = reinterpret_cast<const unsigned char *>(original.str());
 
@@ -209,7 +215,9 @@ UnicodeString QuotedPrintableToUnicodeString(AsciiString original)
 // Convert ascii quoted-printable strings into ascii strings
 AsciiString QuotedPrintableToAsciiString(AsciiString original)
 {
-	static char dest[1024];
+	// GeneralsX @feature cemlyn007 28/09/2026 A local, not a static: the result is copied into the returned string, and
+	// engines on separate threads must not share the buffer (PLAN-023 Phase 5b).
+	char dest[1024];
 	int i=0;
 
 	unsigned char *c = reinterpret_cast<unsigned char *>(dest);

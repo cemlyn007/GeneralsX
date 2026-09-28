@@ -130,7 +130,10 @@ protected:
 	/// factory for creating the snow manager
 	virtual SnowManager *createSnowManager() override { return NEW W3DSnowManager; }
 
-	virtual void setFrameRate(Real msecsPerFrame) override { TheW3DFrameLengthInMsec = msecsPerFrame; }
+	// GeneralsX @feature cemlyn007 28/09/2026 Written only when it changes: every engine's GameClient::init sets the
+	// initial value, so once static initialisation is done no engine writes the process-wide value while another
+	// reads it (PLAN-023 Phase 5b).
+	virtual void setFrameRate(Real msecsPerFrame) override { if (TheW3DFrameLengthInMsec != msecsPerFrame) TheW3DFrameLengthInMsec = msecsPerFrame; }
 
 };
 
