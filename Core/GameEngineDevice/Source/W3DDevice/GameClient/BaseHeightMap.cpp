@@ -269,7 +269,8 @@ BaseHeightMapRenderObjClass::BaseHeightMapRenderObjClass()
 	m_depthFade.Z = 0.0f;
 	m_useDepthFade = false;
 	m_disableTextures = false;
-	TheTerrainRenderObject = this;
+	// PLAN-023: the constructor no longer registers itself as TheTerrainRenderObject
+	// (that wrote whichever engine's context was current); its owner does.
 
 	m_treeBuffer = nullptr;
 	m_propBuffer = nullptr;
@@ -358,11 +359,13 @@ void BaseHeightMapRenderObjClass::adjustTerrainLOD(Int adj)
 		newROBJ = TheHeightMap;
 		if (newROBJ==nullptr) {
 			newROBJ = NEW_REF( HeightMapRenderObjClass, () );
+			TheTerrainRenderObject = newROBJ;	// PLAN-023: was the constructor's self-registration
 		}
 	}	else {
 		newROBJ = TheFlatHeightMap;
 		if (newROBJ==nullptr) {
 			newROBJ = NEW_REF( FlatHeightMapRenderObjClass, () );
+			TheTerrainRenderObject = newROBJ;	// PLAN-023: was the constructor's self-registration
 		}
 	}
 
