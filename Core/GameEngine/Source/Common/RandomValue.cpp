@@ -33,6 +33,7 @@
 #include "Common/crc.h"
 #include "Common/Debug.h"
 #include "GameLogic/GameLogic.h"
+#include "Common/RandomValueSeeds.h"
 
 #undef DEBUG_RANDOM_AUDIO
 #undef DEBUG_RANDOM_CLIENT
@@ -55,21 +56,12 @@ static const Real theMultFactor = 1.0f / static_cast<float>(UINT_MAX);
 #define theGameLogicSeed (::rts::ctx()->gameLogicSeed)
 #define theGameLogicBaseSeed (::rts::ctx()->gameLogicBaseSeed)
 #else
-// Initial seed values.
-static UnsignedInt theGameAudioSeed[6] =
-{
-	0xf22d0e56L, 0x883126e9L, 0xc624dd2fL, 0x702c49cL, 0x9e353f7dL, 0x6fdf3b64L
-};
+// Initial seed values (shared with the per-engine seeds).
+static UnsignedInt theGameAudioSeed[6] = RTS_RANDOM_SEED_INITIAL_VALUES;
 
-static UnsignedInt theGameClientSeed[6] =
-{
-	0xf22d0e56L, 0x883126e9L, 0xc624dd2fL, 0x702c49cL, 0x9e353f7dL, 0x6fdf3b64L
-};
+static UnsignedInt theGameClientSeed[6] = RTS_RANDOM_SEED_INITIAL_VALUES;
 
-static UnsignedInt theGameLogicSeed[6] =
-{
-	0xf22d0e56L, 0x883126e9L, 0xc624dd2fL, 0x702c49cL, 0x9e353f7dL, 0x6fdf3b64L
-};
+static UnsignedInt theGameLogicSeed[6] = RTS_RANDOM_SEED_INITIAL_VALUES;
 
 static UnsignedInt theGameLogicBaseSeed = 0;
 #endif

@@ -129,6 +129,19 @@ std::size_t EngineContext::forEachLiveSingleton(void (*visit)(const char* name, 
 #undef RTS_ENGINE_SINGLETON
 #undef RTS_ENGINE_SINGLETON_STRUCT
 #undef RTS_ENGINE_SINGLETON_ZH
+	// The direct pointer fields, which the engine's teardown frees and nulls just as it does the singletons.
+#define RTS_ENGINE_CONTEXT_POINTER(n) if (n != nullptr) { ++live; visit(#n, user); }
+	RTS_ENGINE_CONTEXT_POINTER(pathfindCellInfoArray)
+	RTS_ENGINE_CONTEXT_POINTER(pathfindCellInfoFirstFree)
+	RTS_ENGINE_CONTEXT_POINTER(polygonTriggerList)
+	RTS_ENGINE_CONTEXT_POINTER(mapObjectList)
+	RTS_ENGINE_CONTEXT_POINTER(partitionContactList)
+	RTS_ENGINE_CONTEXT_POINTER(w3dDisplay3DScene)
+	RTS_ENGINE_CONTEXT_POINTER(w3dDisplay2DScene)
+	RTS_ENGINE_CONTEXT_POINTER(w3dDisplay3DInterfaceScene)
+	RTS_ENGINE_CONTEXT_POINTER(w3dDisplayAssetManager)
+	RTS_ENGINE_CONTEXT_POINTER(ww3dAssetManager)
+#undef RTS_ENGINE_CONTEXT_POINTER
 	return live;
 }
 

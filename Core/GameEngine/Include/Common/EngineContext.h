@@ -59,6 +59,8 @@
 #include <type_traits>
 #include <utility>
 
+#include "RandomValueSeeds.h"
+
 // initial-exec TLS: one 8-byte pointer in the static TLS block, read with a single %fs-relative load and no
 // __tls_get_addr call. ELF only; Mach-O has only the TLV model, and Windows its own implicit TLS.
 #if defined(__ELF__)
@@ -88,6 +90,11 @@ class PathfindCellInfo;
 class PolygonTrigger;
 class MapObject;
 class PartitionContactList;
+class RTS3DScene;
+class RTS2DScene;
+class RTS3DInterfaceScene;
+class W3DAssetManager;
+class WW3DAssetManager;
 
 namespace rts
 {
@@ -140,9 +147,9 @@ struct RTS_ENGINE_CONTEXT_API EngineContext
 	// lookup (PLAN-023 Phases 2-3).
 
 	// RandomValue.cpp's seeds (theGameAudioSeed, ...), with their upstream initial values.
-	std::uint32_t gameAudioSeed[6] = {0xf22d0e56U, 0x883126e9U, 0xc624dd2fU, 0x702c49cU, 0x9e353f7dU, 0x6fdf3b64U};
-	std::uint32_t gameClientSeed[6] = {0xf22d0e56U, 0x883126e9U, 0xc624dd2fU, 0x702c49cU, 0x9e353f7dU, 0x6fdf3b64U};
-	std::uint32_t gameLogicSeed[6] = {0xf22d0e56U, 0x883126e9U, 0xc624dd2fU, 0x702c49cU, 0x9e353f7dU, 0x6fdf3b64U};
+	std::uint32_t gameAudioSeed[6] = RTS_RANDOM_SEED_INITIAL_VALUES;
+	std::uint32_t gameClientSeed[6] = RTS_RANDOM_SEED_INITIAL_VALUES;
+	std::uint32_t gameLogicSeed[6] = RTS_RANDOM_SEED_INITIAL_VALUES;
 	std::uint32_t gameLogicBaseSeed = 0;
 
 	// PathfindCellInfo::s_infoArray/s_firstFree: the pathfinder's cell-info pool and its free list
@@ -169,6 +176,25 @@ struct RTS_ENGINE_CONTEXT_API EngineContext
 	// REPLAY_CRC_INTERVAL (Recorder.cpp): the logic CRC interval of a solo game or replay.
 	std::int32_t replayCrcInterval = 100;
 
+	// W3DDisplay's scenes and asset manager (W3DDisplay::m_3DScene, ...; PLAN-023 Phase 3). Headless
+	// builds them too, and each engine's GameClient::reset resets its own.
+	::RTS3DScene* w3dDisplay3DScene = nullptr;
+	::RTS2DScene* w3dDisplay2DScene = nullptr;
+	::RTS3DInterfaceScene* w3dDisplay3DInterfaceScene = nullptr;
+	::W3DAssetManager* w3dDisplayAssetManager = nullptr;
+
+	// WW3DAssetManager::TheInstance: the asset manager the W3D loaders use (bones and meshes, headless
+	// too); the same object as w3dDisplayAssetManager once W3DDisplay has made it.
+	::WW3DAssetManager* ww3dAssetManager = nullptr;
+
+	// WW3D's timing statics (WW3D::SyncTime, ...), with their upstream initial values: the animation clock
+	// (bones are posed headless too), advanced by this engine's frames only. 1000.0f / WWSyncPerSecond.
+	float ww3dLogicFrameTimeMs = 1000.0f / 30;
+	float ww3dFractionalSyncMs = 0.0f;
+	unsigned int ww3dSyncTime = 0;
+	unsigned int ww3dPreviousSyncTime = 0;
+	int ww3dFrameCount = 0;
+
 	// Per-engine slot objects, by allocateEngineSlotIndex() index; null until set.
 	void* getSlot(std::size_t index) const;
 	// Stores a slot object that this context owns and destroys with `destroy`. The index must not be set.
@@ -179,10 +205,11 @@ struct RTS_ENGINE_CONTEXT_API EngineContext
 	// Whether this context holds any slot object (for the lifecycle checks: g_noEngine must hold none).
 	bool hasSlotObjects() const;
 
-	// The number of singleton fields that are not null (for the lifecycle checks).
+	// The number of singleton fields and direct pointer fields (pathfindCellInfoArray, ...) that are not
+	// null (for the lifecycle checks).
 	std::size_t countLiveSingletons() const;
-	// Calls `visit` with the name (`TheXxx`) of every singleton field that is not null, in list order,
-	// and returns how many there were.
+	// Calls `visit` with the name (`TheXxx`, or the field's name for a direct pointer field) of every such
+	// field that is not null, singletons first in list order, and returns how many there were.
 	std::size_t forEachLiveSingleton(void (*visit)(const char* name, void* user), void* user) const;
 
 private:
@@ -304,6 +331,17 @@ struct ContextField
 	T operator++(int) const noexcept
 	{
 		return (ctx()->*Field)++;
+	}
+	// Compound assignment needs members: a built-in `+=` takes no user-defined conversion of its left operand.
+	template <typename U>
+	T& operator+=(const U& value) const noexcept
+	{
+		return ctx()->*Field += value;
+	}
+	template <typename U>
+	T& operator-=(const U& value) const noexcept
+	{
+		return ctx()->*Field -= value;
 	}
 };
 

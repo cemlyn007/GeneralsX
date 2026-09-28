@@ -70,24 +70,21 @@ HAND = [
     (PER, 4, "re:BuildAssistant::buildTiledLocations\\(.*\\)::tileInfo", "threads only: returned-by-pointer scratch, consumed at once"),
     # ---------------------------------------------------------------------------------------------------
     # PLAN-023 Phase 3: device-layer state a headless engine uses.
-    (PER, 3, "re:W3DDisplay::m_(3DScene|2DScene|3DInterfaceScene|assetManager)", "W3DDisplay class static (94 references): PerEnginePtr<T> proxy"),
-    (PER, 3, "WW3DAssetManager::TheInstance", "the asset manager (bones and meshes headless): change only Get_Instance/Delete_This"),
-    (PER, 3, "TheDX8MeshRenderer", "mutated on every map load (Free_Assets_With_Exclusion_List) and mesh destruction: per engine (T3: not a T* field)"),
-    (PER, 3, "re:_RegisteredMeshList|texture_category_delete_list|fvf_category_container_delete_list", "TheDX8MeshRenderer's file-static lists: per engine with it"),
+    # Done (PLAN-023 Phase 3 PR): W3DDisplay's scenes and asset manager, WW3DAssetManager::TheInstance and
+    # WW3D's timing statics are EngineContext fields behind rts::ContextField stand-ins; TheDX8MeshRenderer
+    # and its three lists, the particle buffers' rand_gen and the mesh/material/texture/decal ID counters are
+    # PER_ENGINE_STATICs; WorldHeightMap::m_alphaTiles is a member (so gone from the library, the slot
+    # indexes rule:per-engine-static). What is left here is process-wide by design.
+    (GLOBAL, "", "_TheFileFactory", "with RTS_ENGINE_CONTEXT, always the one permanent W3D file factory (W3DFileSystem.cpp) that forwards to the current engine's W3DFileSystem (PLAN-023 Phase 3); every W3DFileSystem stores the same pointer and none nulls it"),
+    (GLOBAL, "", "_TheSimpleFileFactory", "never reassigned by the engine (only the tools do): always the process-global default factory"),
+    (GLOBAL, "", "filtertable", "motchan's filter table: built once per process under std::call_once from constants (PLAN-023 Phase 3)"),
+    (GLOBAL, "", "re:(Sphere|Ring)MeshArray|(Sphere|Ring)LODCosts", "sphere/ring LOD meshes: built once per process under std::call_once from constants (PLAN-023 Phase 3); only the one rendering engine's draw re-sets their alpha/scale, right before it draws them"),
+    (GLOBAL, "", "re:_Fast(Acos|Asin|Sin|InvSin)Table", "WWMath::Init tables: built by the first of the counted WWMath::Init calls (PLAN-023 Phase 3), the same values every time"),
+    (GLOBAL, "", "TheW3DFrameLengthInMsec", "never written: the upstream tunable keeps its initial value, the same for every engine"),
+    (GLOBAL, "", "re:W3DAssetManager::Create_Render_Obj\\(.*\\)::warning_count|WW3DAssetManager::Create_Render_Obj\\(.*\\)::warning_count", "missing-asset log limiter: bounds a log message count, and no engine state depends on it"),
+    (PER, 3, "AssetStatusClass::Instance", "threads only: the missing-asset report, written by every engine and read by none (the WWDEBUG destructor writes it out at exit); concurrent engines need a lock"),
     (PER, 3, "re:_TempVertexBuffer|_TempNormalBuffer", "threads only: one pair per TU (dx8renderer.cpp's skinned-mesh deform scratch, cleared by TheDX8MeshRenderer's teardown; mesh.cpp's ray-cast/decal skin scratch; decalmsh.cpp's decal scratch; meshmdl.cpp's unused pair), each resized, filled and consumed within one call"),
-    (PER, 3, "WorldHeightMap::m_alphaTiles", "built lazily from the first map's tiles: build once and make immutable, or a member"),
     (PER, 3, "re:s_buffer|s_blendBuffer", "threads only: WorldHeightMap tile scratch, filled and consumed in one call"),
-    (PER, 3, "re:filtertable|table_valid", "motchan's lazily built filter table (animation decompression, headless too): std::call_once"),
-    (PER, 3, "re:(Sphere|Ring)_Array_Valid|(Sphere|Ring)MeshArray|(Sphere|Ring)LODCosts", "lazily built sphere/ring LOD meshes: std::call_once (or per engine)"),
-    (PER, 3, "AssetStatusClass::Instance", "asset-status report object: std::call_once / per engine"),
-    (PER, 3, "re:_Fast(Acos|Asin|Sin|InvSin)Table", "WWMath::Init tables: refcount WWMath::Init/Shutdown (same values every time)"),
-    (PER, 3, "re:MeshDebugIdCount|unique|unused_texture_id|DecalSystemClass::DecalIDGenerator", "W3D mesh/material/texture/decal ID counter: per engine (IDs continue from the previous engine)"),
-    (PER, 3, "rand_gen", "ParticleBufferClass's Random4Class: per engine"),
-    (PER, 3, "re:WW3D::(SyncTime|PreviousSyncTime|FractionalSyncMs|LogicFrameTimeMs|FrameCount)", "WW3D timing statics that drive animation time (bones headless too): per engine"),
-    (PER, 3, "TheW3DFrameLengthInMsec", "W3D frame timing value (T3: not a T* field): per engine"),
-    (PER, 3, "_TheFileFactory", "WW file factory the W3D loaders read through: one permanent process-wide factory dispatching to the current engine's TheFileSystem"),
-    (PER, 3, "_TheSimpleFileFactory", "with _TheFileFactory"),
-    (PER, 3, "re:W3DAssetManager::Create_Render_Obj\\(.*\\)::warning_count|WW3DAssetManager::Create_Render_Obj\\(.*\\)::warning_count", "missing-asset warning limiter: harmless shared, per engine with the asset manager"),
     (PER, 3, "_PlaneEQArray", "threads only: MeshGeometryClass plane-equation scratch (ray casts), filled and consumed in one call"),
     (PER, 3, "re:CollisionContext|IntersectContext", "threads only: WWMath AAB-tree collision scratch, filled and consumed in one call"),
     (PER, 3, "InheritedWorldSpaceEmitterVel", "threads only: set by ParticleEmitterClass::Emit and read by Initialize_Particle within the same call"),
@@ -159,7 +156,7 @@ HAND = [
     (GLOBAL, "", "re:IndexClass<int, INI(Entry|Section)\\*>::operator\\[\\]\\(int const&\\) const::x", "default value returned for a missing index, never written"),
     (CONST, "", "BufferedFileClass::_DesiredBufferSize", "buffer-size setting, never changed"),
     (GLOBAL, "", "INIClass::KeepBlankEntries", "WWLib INI parser option, never changed"),
-    (GLOBAL, "", "re:_DefaultFileFactory|_DefaultWritingFileFactory|_TheWritingFileFactory", "WWLib default (raw) file factories; the per-engine one is _TheFileFactory"),
+    (GLOBAL, "", "re:_DefaultFileFactory|_DefaultWritingFileFactory|_TheWritingFileFactory", "WWLib default (raw) file factories"),
     (GLOBAL, "", "re:SaveLoadSystemClass::\\w+|DefinitionFactoryMgrClass::_FactoryListHead|_TheDefinitionMgr|DefinitionMgrClass::\\w+|text_mutex|status_text|status_count|_(alloc|load|reg)_time", "WWSaveLoad registries (persist factories registered at static init; the definition manager is used only by W3DView/tools)"),
     (GLOBAL, "", "LookupTableMgrClass::Tables", "WWMath lookup-table manager (tools/W3DView); not used by the game"),
     (GLOBAL, "", "re:CollisionMath::Stats", "collision-math statistics counters (debug display)"),

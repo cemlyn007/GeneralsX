@@ -3731,7 +3731,7 @@ void GameLogic::destroyObject( Object *obj )
 // ------------------------------------------------------------------------------------------------
 // GeneralsX @feature cemlyn007 28/09/2026 thread_local: set only while this thread runs GameLogic::getCRC, so another thread's
 // engine does not see it (PLAN-023 Phase 2).
-thread_local Bool inCRCGen = FALSE;
+THREAD_LOCAL Bool inCRCGen = FALSE;
 UnsignedInt GameLogic::getCRC( Int mode, AsciiString deepCRCFileName )
 {
 	if (mode != CRC_RECALC)

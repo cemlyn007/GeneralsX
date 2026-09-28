@@ -56,6 +56,17 @@
 #define IUNKNOWN_NOEXCEPT
 #endif
 
+// GeneralsX @feature cemlyn007 28/09/2026 Thread-local storage (PLAN-023): C++11's thread_local; else
+// MSVC's __declspec(thread), since VC6 has no thread_local (constant-initialised variables only); else
+// plain static storage, one per process as before.
+#if __cplusplus >= 201103L
+#define THREAD_LOCAL thread_local
+#elif defined(_MSC_VER)
+#define THREAD_LOCAL __declspec(thread)
+#else
+#define THREAD_LOCAL
+#endif
+
 #if defined(_MSC_VER) && _MSC_VER >= 1300
 #define NOINLINE __declspec(noinline)
 #elif defined(__GNUC__) || defined(__clang__)

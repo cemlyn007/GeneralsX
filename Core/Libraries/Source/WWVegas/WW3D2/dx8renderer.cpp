@@ -67,6 +67,32 @@ bool DX8TextureCategoryClass::m_gForceMultiply = false; // Forces opaque materia
 static DynamicVectorClass<Vector3>				_TempVertexBuffer;
 static DynamicVectorClass<Vector3>				_TempNormalBuffer;
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 28/09/2026 Per engine: the mesh renderer and the lists it tears down, one
+// object (PLAN-023 Phase 3). The renderer is the last member, so it is destroyed first and still finds the
+// lists alive, as with the file statics below.
+namespace
+{
+struct DX8MeshRendererState
+{
+	MultiListClass<MeshModelClass>	registeredMeshList;
+	TextureCategoryList					textureCategoryDeleteList;
+	FVFCategoryList						fvfCategoryContainerDeleteList;
+	DX8MeshRendererClass					renderer;
+};
+
+rts::PerEngineStatic<DX8MeshRendererState> DX8MeshRendererState_perEngine;
+}
+
+DX8MeshRendererClass & DX8_Current_Mesh_Renderer()
+{
+	return DX8MeshRendererState_perEngine.get().renderer;
+}
+
+#define _RegisteredMeshList (DX8MeshRendererState_perEngine.get().registeredMeshList)
+#define texture_category_delete_list (DX8MeshRendererState_perEngine.get().textureCategoryDeleteList)
+#define fvf_category_container_delete_list (DX8MeshRendererState_perEngine.get().fvfCategoryContainerDeleteList)
+#else
 static MultiListClass<MeshModelClass>			_RegisteredMeshList;
 static TextureCategoryList							texture_category_delete_list;
 static FVFCategoryList								fvf_category_container_delete_list;
@@ -82,6 +108,7 @@ static FVFCategoryList								fvf_category_container_delete_list;
 ** process exited without shutting the device down first.
 */
 DX8MeshRendererClass TheDX8MeshRenderer;
+#endif
 
 // helper data structure
 class PolyRemover : public MultiListObjectClass

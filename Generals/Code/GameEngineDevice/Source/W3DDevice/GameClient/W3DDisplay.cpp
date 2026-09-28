@@ -313,10 +313,12 @@ StatDumpClass TheStatDump("StatisticsDump.txt");
 ///////////////////////////////////////////////////////////////////////////////
 
 //=============================================================================
+#if !RTS_ENGINE_CONTEXT
 RTS3DScene *W3DDisplay::m_3DScene = nullptr;
 RTS2DScene *W3DDisplay::m_2DScene = nullptr;
 RTS3DInterfaceScene *W3DDisplay::m_3DInterfaceScene = nullptr;
 W3DAssetManager *W3DDisplay::m_assetManager = nullptr;
+#endif
 
 //=============================================================================
 	// note, can't use the ones from PerfTimer.h 'cuz they are currently
@@ -437,6 +439,9 @@ W3DDisplay::~W3DDisplay()
 		W3DShaderManager::shutdown();
 	m_assetManager->Free_Assets();
 	delete m_assetManager;
+	// GeneralsX @bugfix cemlyn007 28/09/2026 Null it: with RTS_ENGINE_CONTEXT it is this engine's context
+	// field, which the context's lifecycle checks expect null after the teardown (PLAN-023 Phase 3).
+	m_assetManager = nullptr;
 	if (!TheGlobalData->m_headless)
 		WW3D::Shutdown();
 	WWMath::Shutdown();

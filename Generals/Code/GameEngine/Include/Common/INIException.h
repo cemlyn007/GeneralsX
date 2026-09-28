@@ -60,5 +60,5 @@ public:
 	}
 
 private:
-	INIException& operator=(const INIException& other);	// not implemented (VC6 has no "= delete")
+	INIException& operator=(const INIException& other) FUNCTION_DELETE;
 };

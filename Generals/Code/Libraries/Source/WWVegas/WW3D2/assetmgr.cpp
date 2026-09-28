@@ -121,7 +121,9 @@
 /*
 ** Static member variable which keeps track of the single instanced asset manager
 */
+#if !RTS_ENGINE_CONTEXT
 WW3DAssetManager *		WW3DAssetManager::TheInstance = nullptr;
+#endif
 
 /*
 ** Static instance of the Null prototype.  This render object is special cased

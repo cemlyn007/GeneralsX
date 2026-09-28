@@ -102,6 +102,7 @@ set(GAMEENGINE_SRC
     Include/Common/Radar.h
     Include/Common/RAMFile.h
     Include/Common/RandomValue.h
+    Include/Common/RandomValueSeeds.h
 #    Include/Common/Recorder.h
 #    Include/Common/Registry.h
     Include/Common/ReplaySimulation.h
