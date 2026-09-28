@@ -60,6 +60,9 @@
 #include "GameLogic/ScriptEngine.h"
 #include "GameLogic/Weapon.h"
 
+// GeneralsX @bugfix cemlyn007 28/09/2026 strtok_r for the per-INI tokenizer (declared by WWLib where libc lacks it)
+#include "strtok_r.h"
+
 #if __cplusplus >= 201611L && !defined(__APPLE__)
 #define USE_STD_FROM_CHARS_PARSING 1
 #else
@@ -76,8 +79,6 @@
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // PRIVATE DATA ///////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-
-static Xfer *s_xfer = nullptr;
 
 //-------------------------------------------------------------------------------------------------
 /** This is the table of data types we can have in INI files.  To add a new data type
@@ -184,6 +185,8 @@ INI::INI()
 	m_lineNum						= 0;
 	m_buffer[0]					= 0;
 	m_endOfFile					= FALSE;
+	m_tokenSavePtr			= nullptr;
+	m_xfer							= nullptr;
 #ifdef DEBUG_CRASHING
 	m_curBlockStart[0]	= 0;
 #endif
@@ -348,7 +351,8 @@ void INI::unPrepFile()
 	m_loadType = INI_LOAD_INVALID;
 	m_lineNum = 0;
 	m_endOfFile = FALSE;
-	s_xfer = nullptr;
+	m_tokenSavePtr = nullptr;
+	m_xfer = nullptr;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -402,7 +406,7 @@ UnsignedInt INI::load( AsciiString filename, INILoadType loadType, Xfer *pXfer )
 	
 	setFPMode(); // so we have consistent Real values for GameLogic -MDC
 
-	s_xfer = pXfer;
+	m_xfer = pXfer;
 	fprintf(stderr, "[INI] load - calling prepFile('%s') START\n", filename.str());
 	fflush(stderr);
 	prepFile(filename, loadType);
@@ -429,7 +433,8 @@ UnsignedInt INI::load( AsciiString filename, INILoadType loadType, Xfer *pXfer )
 			AsciiString currentLine = m_buffer;
 
 			// the first word is the type of data we're processing
-			const char *token = strtok( m_buffer, getSeps() );
+			// GeneralsX @bugfix cemlyn007 28/09/2026 strtok_r with this INI's save pointer instead of libc's shared one
+			const char *token = strtok_r( m_buffer, getSeps(), &m_tokenSavePtr );
 			if( token )
 			{
 				INIBlockParse parse = findBlockParse(token);
@@ -557,10 +562,10 @@ void INI::readLine()
 		}
 	}
 
-	if (s_xfer)
+	if (m_xfer)
 	{
-		s_xfer->xferUser( m_buffer, sizeof( char ) * strlen( m_buffer ) );
-		//DEBUG_LOG(("Xfer val is now 0x%8.8X in %s, line %s", ((XferCRC *)s_xfer)->getCRC(), m_filename.str(), m_buffer));
+		m_xfer->xferUser( m_buffer, sizeof( char ) * strlen( m_buffer ) );
+		//DEBUG_LOG(("Xfer val is now 0x%8.8X in %s, line %s", ((XferCRC *)m_xfer)->getCRC(), m_filename.str(), m_buffer));
 	}
 }
 
@@ -854,7 +859,8 @@ AsciiString INI::getNextAsciiString()
 		}
 		else
 		{
-			static char buff[INI_MAX_CHARS_PER_LINE];
+			// GeneralsX @bugfix cemlyn007 28/09/2026 Local, not static: the buffer is only used within this call
+			char buff[INI_MAX_CHARS_PER_LINE];
 			buff[0] = 0;
 			if (strlen(token) > 1)
 			{
@@ -1565,7 +1571,8 @@ void INI::initFromINIMulti( void *what, const MultiIniFieldParse& parseTableList
 		readLine();
 
 		// check for end token
-		const char* field = strtok( m_buffer, INI::getSeps() );
+		// GeneralsX @bugfix cemlyn007 28/09/2026 strtok_r with this INI's save pointer instead of libc's shared one
+		const char* field = strtok_r( m_buffer, INI::getSeps(), &m_tokenSavePtr );
 		if( field )
 		{
 
@@ -1634,18 +1641,18 @@ void INI::initFromINIMulti( void *what, const MultiIniFieldParse& parseTableList
 }
 
 //-------------------------------------------------------------------------------------------------
-/*static*/ const char* INI::getNextToken(const char* seps)
+const char* INI::getNextToken(const char* seps)
 {
-	const char *token = ::strtok(nullptr, seps);
+	const char *token = strtok_r(nullptr, seps, &m_tokenSavePtr);
 	if (!token)
 		throw INI_INVALID_DATA;
 	return token;
 }
 
 //-------------------------------------------------------------------------------------------------
-/*static*/ const char* INI::getNextTokenOrNull(const char* seps)
+const char* INI::getNextTokenOrNull(const char* seps)
 {
-	const char *token = ::strtok(nullptr, seps);
+	const char *token = strtok_r(nullptr, seps, &m_tokenSavePtr);
 	return token;
 }
 
