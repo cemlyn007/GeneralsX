@@ -223,10 +223,13 @@ protected:
 	std::list<PlayingAudio *> m_stoppedAudio;
 
 	void *m_binkHandle;
-	// GeneralsX @bugfix cemlyn007 28/09/2026 TRUE once openDevice has initialised the engine and
-	// its groups, so closeDevice never uninitialises what was never initialised (-noaudio, a failed
-	// open, or the device-free MiniAudioManagerDummy).
-	Bool m_deviceOpen;
+	// GeneralsX @bugfix cemlyn007 28/09/2026 One flag per openDevice stage, so closeDevice
+	// uninitialises exactly what was initialised (-noaudio, a partly failed open, or the
+	// device-free MiniAudioManagerDummy). m_engineInitialized also covers the four sound groups.
+	Bool m_resourceManagerInitialized;
+	Bool m_logInitialized;
+	Bool m_contextInitialized;
+	Bool m_engineInitialized;
 
 #if defined(_DEBUG) || defined(_INTERNAL)
 	typedef std::set<AsciiString> SetAsciiString;
@@ -241,8 +244,11 @@ protected:
 // It loads the audio INI data like the real manager, but never initialises a MiniAudio
 // context, engine or device, so it starts no audio threads. Audio requests are dropped on
 // every update, so nothing is ever playing. getFileLengthMS is inherited unchanged (it only
-// decodes the file), so script timings that read audio lengths match the real backend.
-// Keep in step with OpenALAudioManagerDummy (OpenALAudioManager.h).
+// decodes the file through a standalone ma_decoder), so script timings that read audio lengths
+// match the real MiniAudio backend. Every other inherited method that touches MiniAudio state
+// (the engine, its groups or the device list) is overridden here or is only reached with a
+// playing sound, which never exists. Keep in step with OpenALAudioManagerDummy
+// (OpenALAudioManager.h); PLAN-023 notes the one known difference (getFileLengthMS).
 class MiniAudioManagerDummy : public MiniAudioManager
 {
 public:
@@ -257,6 +263,8 @@ public:
 	virtual void pauseAudio(AudioAffect which) override {}
 	virtual void resumeAudio(AudioAffect which) override {}
 	virtual void pauseAmbient(Bool shouldPause) override {}
+
+	virtual Bool isMusicPlaying(void) const override { return FALSE; }
 
 	virtual void selectProvider(UnsignedInt providerNdx) override {}
 	virtual void unselectProvider(void) override {}

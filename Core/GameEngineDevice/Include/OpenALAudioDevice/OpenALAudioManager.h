@@ -253,8 +253,12 @@ protected:
 // It loads the audio INI data like the real manager, but never opens an ALC device or
 // context, so it starts no OpenAL threads and makes no AL call (the current ALC context is
 // process-wide, so an AL call here could reach another engine's context). Audio requests
-// are dropped on every update, so nothing is ever playing. getFileLengthMS is inherited
-// unchanged, so script timings that read audio lengths match the real backend.
+// are dropped on every update, so nothing is ever playing. getFileLengthMS and
+// audioDebugDisplay are overridden so that no path reaches AL or the buffer cache, whatever
+// the build options: getFileLengthMS always reports 0, which is what the real OpenAL manager
+// reports in builds without SAGE_USE_FFMPEG (the current builds). MiniAudioManagerDummy
+// reports the decoded length instead, a pre-existing OpenAL/MiniAudio difference recorded in
+// PLAN-023.
 // Keep in step with MiniAudioManagerDummy (MiniAudioManager.h).
 class OpenALAudioManagerDummy : public OpenALAudioManager
 {
@@ -270,6 +274,11 @@ public:
 	virtual void pauseAudio(AudioAffect which) override {}
 	virtual void resumeAudio(AudioAffect which) override {}
 	virtual void pauseAmbient(Bool shouldPause) override {}
+
+#if defined(_DEBUG) || defined(_INTERNAL)
+	virtual void audioDebugDisplay(DebugDisplayInterface *dd, void *, FILE *fp = NULL) override {}
+#endif
+	virtual Real getFileLengthMS(AsciiString strToLoad) const override { return 0.0f; }
 
 	virtual void selectProvider(UnsignedInt providerNdx) override {}
 	virtual void unselectProvider(void) override {}

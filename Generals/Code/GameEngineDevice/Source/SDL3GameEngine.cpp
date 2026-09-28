@@ -580,8 +580,9 @@ AudioManager *SDL3GameEngine::createAudioManager(Bool dummy)
 	fprintf(stderr, "INFO: SDL3GameEngine::createAudioManager()\n");
 
 	// GeneralsX @feature cemlyn007 28/09/2026 Honour dummy (headless) and -noaudio with a
-	// device-free manager, as Win32GameEngine does (PLAN-023 Phase 0).
-	const Bool deviceFree = dummy || !TheGlobalData->m_audioOn;
+	// device-free manager, as Win32GameEngine does (PLAN-023 Phase 0). m_headlessAudio lets an
+	// embedding host keep real audio in headless mode (as in Zero Hour).
+	const Bool deviceFree = (dummy && !TheGlobalData->m_headlessAudio) || !TheGlobalData->m_audioOn;
 
 #ifdef SAGE_USE_MINIAUDIO
 	if (deviceFree) {

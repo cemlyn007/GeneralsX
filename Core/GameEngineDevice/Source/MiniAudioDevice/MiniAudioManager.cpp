@@ -90,7 +90,10 @@ MiniAudioManager::MiniAudioManager() :
 	m_selectedSpeakerType(0),
 	m_lastSelectedPlaybackDevice(PROVIDER_ERROR),
 	m_binkHandle(NULL),
-	m_deviceOpen(FALSE),
+	m_resourceManagerInitialized(FALSE),
+	m_logInitialized(FALSE),
+	m_contextInitialized(FALSE),
+	m_engineInitialized(FALSE),
 	m_pref3DProvider(AsciiString::TheEmptyString),
 	m_prefSpeaker(AsciiString::TheEmptyString)
 {
@@ -748,6 +751,10 @@ AsciiString MiniAudioManager::prevMusicTrack(void)
 //-------------------------------------------------------------------------------------------------
 Bool MiniAudioManager::isMusicPlaying(void) const
 {
+	// GeneralsX @bugfix cemlyn007 28/09/2026 The music group exists only once the engine initialised.
+	if (!m_engineInitialized) {
+		return FALSE;
+	}
 	return ma_sound_group_is_playing(&m_musicGroup) == MA_TRUE;
 }
 
@@ -796,19 +803,25 @@ void MiniAudioManager::openDevice(void)
 
 	resourceManagerConfig = ma_resource_manager_config_init();
 	resourceManagerConfig.pVFS = (ma_vfs *)&vfs;
+	// GeneralsX @bugfix cemlyn007 28/09/2026 Record each stage as it initialises, and on a failure
+	// release the stages already initialised via closeDevice. A failure after the resource manager
+	// started would otherwise leave its job thread running against a manager that is later deleted.
 	result = ma_resource_manager_init(&resourceManagerConfig, &m_resourceManager);
 	if (result != MA_SUCCESS) {
 		DEBUG_LOG(("MiniAudio: Failed to initialize resource manager: %d\n", result));
 		setOn(false, AudioAffect_All);
 		return;
 	}
+	m_resourceManagerInitialized = TRUE;
 
 	result = ma_log_init(NULL, &m_log);
 	if (result != MA_SUCCESS) {
 		DEBUG_LOG(("MiniAudio: Failed to initialize log: %d\n", result));
+		closeDevice();
 		setOn(false, AudioAffect_All);
 		return;
 	}
+	m_logInitialized = TRUE;
 
 	auto on_log = [](void *pUserData, ma_uint32 logLevel, const char *message) {
 		DEBUG_LOG(("miniaudio [%s]: %s", ma_log_level_to_string(logLevel), message));
@@ -821,14 +834,17 @@ void MiniAudioManager::openDevice(void)
 	result = ma_context_init(NULL, 0, &contextConfig, &m_context);
 	if (result != MA_SUCCESS) {
 		DEBUG_LOG(("MiniAudio: Failed to initialize context: %d\n", result));
+		closeDevice();
 		setOn(false, AudioAffect_All);
 		return;
 	}
+	m_contextInitialized = TRUE;
 
 	result = ma_context_get_devices(&m_context, &m_playbackDevices, &m_playbackDeviceCount, NULL, NULL);
 	if (result != MA_SUCCESS) {
 		DEBUG_LOG(("MiniAudio: Failed to enumerate devices: %d\n", result));
-		ma_context_uninit(&m_context);
+		m_playbackDeviceCount = 0;
+		closeDevice();
 		setOn(false, AudioAffect_All);
 		return;
 	}
@@ -839,6 +855,7 @@ void MiniAudioManager::openDevice(void)
 	result = ma_engine_init(&engineConfig, &m_engine);
 	if (result != MA_SUCCESS) {
 		DEBUG_LOG(("MiniAudio: Failed to initialize engine: %d\n", result));
+		closeDevice();
 		setOn(false, AudioAffect_All);
 		return;
 	}
@@ -848,7 +865,7 @@ void MiniAudioManager::openDevice(void)
 	ma_sound_group_init(&m_engine, 0, NULL, &m_sound3DGroup);
 	ma_sound_group_init(&m_engine, 0, NULL, &m_speechGroup);
 
-	m_deviceOpen = TRUE;
+	m_engineInitialized = TRUE;
 
 	fprintf(stderr, "AUDIO: MiniAudio backend loaded - version %s, device: %s, playback devices: %d\n",
 		ma_version_string(),
@@ -866,21 +883,31 @@ void MiniAudioManager::closeDevice(void)
 	// Stop all audio first to prevent use-after-free in audio callbacks
 	stopAllAudioImmediately();
 
-	// GeneralsX @bugfix cemlyn007 28/09/2026 Nothing to uninitialise unless openDevice completed.
-	// The destructor calls this too, so a second call is a no-op.
-	if (!m_deviceOpen) {
-		return;
+	// GeneralsX @bugfix cemlyn007 28/09/2026 Uninitialise only the stages openDevice initialised, in
+	// reverse order: -noaudio, a partly failed open and the device-free MiniAudioManagerDummy each
+	// leave some or all of them uninitialised. Clearing each flag makes a second call (the destructor
+	// calls this too) a no-op.
+	if (m_engineInitialized) {
+		m_engineInitialized = FALSE;
+		ma_sound_group_uninit(&m_speechGroup);
+		ma_sound_group_uninit(&m_sound3DGroup);
+		ma_sound_group_uninit(&m_soundGroup);
+		ma_sound_group_uninit(&m_musicGroup);
+		ma_engine_uninit(&m_engine);
 	}
-	m_deviceOpen = FALSE;
-
-	ma_sound_group_uninit(&m_speechGroup);
-	ma_sound_group_uninit(&m_sound3DGroup);
-	ma_sound_group_uninit(&m_soundGroup);
-	ma_sound_group_uninit(&m_musicGroup);
-	ma_engine_uninit(&m_engine);
-	ma_resource_manager_uninit(&m_resourceManager);
-	ma_context_uninit(&m_context);
-	ma_log_uninit(&m_log);
+	if (m_resourceManagerInitialized) {
+		m_resourceManagerInitialized = FALSE;
+		ma_resource_manager_uninit(&m_resourceManager);
+	}
+	if (m_contextInitialized) {
+		m_contextInitialized = FALSE;
+		m_playbackDeviceCount = 0;
+		ma_context_uninit(&m_context);
+	}
+	if (m_logInitialized) {
+		m_logInitialized = FALSE;
+		ma_log_uninit(&m_log);
+	}
 }
 
 //-------------------------------------------------------------------------------------------------

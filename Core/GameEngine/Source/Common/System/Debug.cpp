@@ -790,6 +790,11 @@ void ReleaseCrash(const char *reason)
 	char curbuf[ _MAX_PATH ];
 
 	if (TheGlobalData==nullptr) {
+		// GeneralsX @bugfix cemlyn007 28/09/2026 Embedded mode: there is no crash file to write, but
+		// the caller still must not carry on, so hand the error to the host (see FatalEngineError.h).
+		if (IsEngineEmbeddedMode()) {
+			throw FatalEngineError(reason ? reason : "");
+		}
 		return; // We are shutting down, and TheGlobalData has been freed.  jba. [4/15/2003]
 	}
 
@@ -916,6 +921,14 @@ void ReleaseCrashLocalized(const AsciiString& p, const AsciiString& m)
 	// Linux: Output to stderr (game will crash anyway after this)
 	fprintf(stderr, "FATAL ERROR: %s\n%s\n", prompt.str(), mesg.str());
 	#endif
+
+	// GeneralsX @bugfix cemlyn007 28/09/2026 Embedded mode: with no TheGlobalData there is no crash
+	// file path, so hand the error straight to the host (see FatalEngineError.h).
+	if (TheGlobalData == nullptr && IsEngineEmbeddedMode()) {
+		AsciiString reason;
+		reason.translate(mesg);
+		throw FatalEngineError(reason.str());
+	}
 
 	char prevbuf[ _MAX_PATH ];
 	char curbuf[ _MAX_PATH ];
