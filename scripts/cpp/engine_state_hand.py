@@ -34,6 +34,16 @@ NET = (
     "multiplayer network/online state: reached only from the LAN/online menus and networked games; a "
     "headless skirmish opens no network (PLAN-023 'Things checked'), and one networked engine per process"
 )
+# The GUI files a headless engine reaches too, so the `file:/GUI/` render-only blanket must not cover them:
+# InGameUI::init creates the ControlBar and runs ControlBar::init; GameLogic::startNewGame makes and inits a
+# load screen; GameLogic::clearGameData (GameLogicDispatch) calls HideDiplomacy, ResetDiplomacy and
+# ResetInGameChat; ScriptActions reach InGameUI::popupMessage; VictoryConditions calls
+# PopulateInGameDiplomacyPopup; and GameWindowManagerDummy is a GameWindowManager whose winGetWindowFromId hands
+# out a dummy window rather than null, so window pointers are real (per-engine) objects headless too.
+HEADLESS_GUI = (
+    "ControlBar/|LoadScreen\\.cpp|GameWindowManager\\.cpp|"
+    "GUICallbacks/(Diplomacy|InGameChat|InGamePopupMessage|ControlBarPopupDescription)\\.cpp"
+)
 W3D_RENDER = "W3D render path (device, shaders, draw lists): only the one rendering engine per process reaches it (PLAN-023 Phase 8)"
 LOADER = "stateless W3D prototype loader/persist factory, registered once at static initialisation"
 PER_ENGINE_STATIC = "cached per-engine pointer (template/image/button looked up once): PER_ENGINE_STATIC slot"
@@ -107,6 +117,17 @@ HAND = [
     (PER, 4, "TerrainRoadCollection::m_idCounter", "road type ID counter continued by every engine's Roads.ini parse: TheTerrainRoads member"),
     (PER, 4, "View::m_idNext", "view ID counter: per engine"),
     (PER, 4, "re:InGameUI::update\\(\\)::(lastMoney|lastIncome)|InGameUI::updateFloatingText\\(\\)::lastLogicFrameUpdate", "InGameUI::update runs headless too (GameClient::update): UI state, no simulation effect; InGameUI members"),
+    # GUI statics that a headless engine writes too (see HEADLESS_GUI): the control bar, diplomacy and chat
+    # code runs headless against GameWindowManagerDummy's dummy windows, so these point at one engine's
+    # objects or are cleared/deleted by another engine's teardown.
+    (PER, 4, "re:ControlBar::m_rank(Veteran|Elite|Heroic)Icon", "written by ControlBar::init (InGameUI::init, headless too) from this engine's TheMappedImageCollection: stale Image* after that engine dies; ControlBar members (" + PER_ENGINE_STATIC + ")"),
+    (PER, 4, "re:ObserverPlayer(Info|List)Window|buttonPlayer|winFlag|winGeneralPortrait|buttonIdleWorker|staticTextNumberOf(Units|Buildings|UnitsKilled|UnitsLost)|staticTextPlayerName", "ControlBar::initObserverControls (from ControlBar::init, headless too) stores this engine's (dummy) windows: ControlBar members"),
+    (PER, 4, "re:staticTextPlayer|staticTextSide|staticTextTeam|staticTextStatus|buttonMute|buttonUnMute|slotNumInRow", "Diplomacy/observer window pointers: HideDiplomacy (GameLogic::clearGameData, headless too) clears them and PopulateInGameDiplomacyPopup (VictoryConditions) writes through them, so one engine touches another's windows; a per-engine Diplomacy state (the ControlBarObserver/menu TUs of the same name follow)"),
+    (PER, 4, "re:theWindow|theLayout", "Diplomacy's layout and window (the only instance linked in; ControlBarPopupDescription's are unused): ResetDiplomacy (clearGameData, headless too) destroys the layout and clears the window, another engine's included; per-engine Diplomacy state"),
+    (PER, 4, "theAnimateWindowManager", "ResetDiplomacy (clearGameData) and ControlBar::deleteBuildTooltipLayout (ScriptActions' disable-input, headless too) delete it: one engine deletes another's; per-engine Diplomacy state / ControlBar member"),
+    (PER, 4, "prevWindow", "tooltip button pointer, cleared by ControlBar::deleteBuildTooltipLayout (ScriptActions, headless too): ControlBar member"),
+    (PER, 4, "theBriefingList", "script briefing texts (UpdateDiplomacyBriefingText from InGameUI's popup/military captions, headless too; saved with the GameClient): InGameUI member"),
+    (PER, 4, "re:chatWindow|chatTextEntry|chatTypeStaticText|s_savedChat", "ResetInGameChat (GameLogic::clearGameData, headless too) destroys the chat window and clears these, another engine's included: per-engine chat state"),
     (PER, 4, "re:ParticleSystem::(computePointOnUnitSphere|computeParticleVelocity|computeParticlePosition|generateParticleInfo)\\(.*\\)::\\w+", "threads only: particle scratch returned by pointer, consumed at once"),
     # ---------------------------------------------------------------------------------------------------
     # Process-global on purpose.
@@ -195,7 +216,18 @@ HAND = [
     (RENDER, "", "re:WW3D::(IsSortingEnabled|PixelCenter[XY]|RenderBackend|IsInitted|IsRendering|IsCapturing|IsScreenUVBiased|AreDecalsEnabled|DecalRejectionDistance|AreStaticSortListsEnabled|MungeSortOnLoad|OverbrightModifyOnLoad|Movie|PauseRecord|RecordNextFrame|UserStat[0-2]|DefaultNativeScreenSize|DefaultStaticSortLists|CurrentStaticSortLists|DefaultDebugMaterial|DefaultDebugShader|LightmapDebugShader|PrelitMode|ExposePrelit|SnapshotActivated|ThumbnailEnabled|MeshDrawMode|NPatchesGapFillingMode|NPatchesLevel|IsTexturingEnabled|IsColoringEnabled|LastFrameMemoryAllocations|LastFrameMemoryFrees|TextureFilter|AnisotropyLevel|Lite)|_TextureReduction|_TextureMinDim|_LargeTextureExtraReductionEnabled|DAZZLE_INI_FILENAME", "WW3D render setting or render-loop state: only WW3D::Init, the render loop and the options code (render mode) write it; a headless engine only reads the defaults"),
     (RENDER, "", "re:LocationHash|DuplicateLocationHash|SideHash", "MeshModelClass::Init_For_NPatch_Rendering scratch (needs the render device's caps)"),
     (RENDER, "", "re:TheSupplyAndTechImageLocations", "skirmish menu map-preview markers (T3 listed it for Phase 4; only the menu reads it): " + UI),
-    (RENDER, "", "file:/GUI/", UI),
+    (GLOBAL, "", "re:ControlBar::(updateBuildQueueDisabledImages|populateBuildQueue)\\(.*\\)::idsInitialized", "guards the fill of that function's cached NameKey array (process-wide by PLAN-023 Decision 2)"),
+    (CONST, "", "commandWindowsInitialized", "never written (nothing but its definition names it)"),
+    (CONST, "", "WindowLayoutCurrentVersion", "never written"),
+    (CONST, "", "re:(guard variable for )?GameWindowManager::assignDefaultGadgetLook\\(.*\\)::\\w+", "set on the first call to a fixed colour (winMakeColor of constants), the same in every engine"),
+    (RENDER, "", "ControlBar::m_containData", "written only by the context UI (evaluateContextUI, from ControlBar::update, which returns at once headless) and button clicks: " + UI),
+    (RENDER, "", "re:ControlBar::populateBuildQueue\\(.*\\)::cancel(Unit|Upgrade)Command", "cached CommandButton*, but populateBuildQueue runs only from evaluateContextUI (ControlBar::update returns at once headless): " + UI),
+    (RENDER, "", "re:ControlBar::(showBuildTooltipLayout|populateBuildTooltipLayout)\\(.*\\)::\\w+", "tooltip on mouse hover over a command button (commandButtonTooltip): " + UI),
+    (RENDER, "", "re:radioButton(InGame|Buddies)|win(InGame|Buddies|Solo)", "written only by ShowDiplomacy (player input) and the online buddy overlay: " + UI),
+    (RENDER, "", "re:inGameChatType|ToggleInGameChat\\(bool\\)::justHid", "chat type and toggle, set only on player input (Show/ToggleInGameChat): " + UI),
+    (RENDER, "", "re:staticTextMessage|buttonOk|shouldPause", "InGamePopupMessageInit only: headless, InGameUI::popupMessage's layout has no init (GameWindowManagerDummy's winCreateFromScript returns no init name): " + UI),
+    (UNREVIEWED, "", "re:ShellGameLoadScreen::init\\(.*\\)::firstLoad|ChallengeLoadScreen::activatePieces\\(.*\\)::textPos\\w+", "load-screen state: GameLogic::startNewGame makes and inits a load screen headless too (a shell game's or a challenge campaign's); not yet reviewed whether a headless engine's use of these can change the rendering engine's"),
+    (RENDER, "", "file:/GUI/(?!" + HEADLESS_GUI + ")", UI),
     (RENDER, "", "re:m_replayWindow|ScriptActions::m_messageWindow", "GameWindow pointer, null with GameWindowManagerDummy: " + UI),
     (RENDER, "", "re:scrollDir|prevCursor|Mouse::updateMouseData\\(\\)::busy", "mouse/scroll input: headless has MouseDummy and no input"),
     (RENDER, "", "re:W3DRadar::.*", "W3DRadar: headless has RadarDummy"),
