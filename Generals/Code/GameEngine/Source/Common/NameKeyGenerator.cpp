@@ -30,6 +30,8 @@
 
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
+#include "Common/FatalEngineError.h"	// GeneralsX @bugfix cemlyn007 28/09/2026 ReleaseCrashNoReturn
+
 // Public Data ////////////////////////////////////////////////////////////////////////////////////
 NameKeyGenerator *TheNameKeyGenerator = nullptr;  ///< name key gen. singleton
 
@@ -226,9 +228,14 @@ NameKeyType NameKeyGenerator::nameToLowercaseKey(const char *name)
 //-------------------------------------------------------------------------------------------------
 NameKeyType NameKeyGenerator::createNameKey(UnsignedInt hash, const AsciiString& name)
 {
+	// GeneralsX @feature cemlyn007 28/09/2026 Downwards once perturbForTesting asked for it. The keys
+	// handed out downwards would meet those handed out upwards (a duplicate key) or, reaching 0, turn
+	// back into upwards ones: a hard failure in every build. (perturbForTesting keeps
+	// NAMEKEY_PERTURB_RESERVE keys between the two, so only a test hook's misuse gets here.)
+	if (m_descendingID != 0 && m_descendingID <= m_nextID)
+		ReleaseCrashNoReturn("NameKey space exhausted: the keys handed out downwards (perturbForTesting) met "
+			"those handed out upwards");
 	Bucket *b = newInstance(Bucket);
-	// GeneralsX @feature cemlyn007 28/09/2026 Downwards once perturbForTesting asked for it
-	DEBUG_ASSERTCRASH(m_descendingID == 0 || m_descendingID >= m_nextID, ("NameKey space exhausted"));
 	b->m_key = (NameKeyType)(m_descendingID != 0 ? m_descendingID-- : m_nextID++);
 	b->m_nameString = name;
 	b->m_nextInSocket = m_sockets[hash];

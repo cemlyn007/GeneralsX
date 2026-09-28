@@ -62,6 +62,7 @@
 #include "Common/Debug.h"
 #include "Common/FatalEngineError.h"
 #include <atomic>
+#include <cstdlib>
 #include <exception>
 #include "Common/CRCDebug.h"
 #include "Common/UnicodeString.h"
@@ -923,6 +924,18 @@ void ReleaseCrash(const char *reason)
 #endif
 
 	_exit(1);
+}
+
+// GeneralsX @bugfix cemlyn007 28/09/2026 See FatalEngineError.h
+void ReleaseCrashNoReturn(const char *reason)
+{
+	ReleaseCrash(reason);
+	// ReleaseCrash returned: no TheGlobalData, and it did not throw.
+	fprintf(stderr, "GeneralsX: fatal engine error: %s\n", reason ? reason : "");
+	fflush(stderr);
+	if (IsEngineEmbeddedMode())
+		throw FatalEngineError(reason ? reason : "");
+	abort();
 }
 
 void ReleaseCrashLocalized(const AsciiString& p, const AsciiString& m)

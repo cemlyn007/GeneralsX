@@ -59,7 +59,7 @@ struct EngineSlotTable
 
 EngineContext::~EngineContext()
 {
-	DEBUG_ASSERTCRASH(this == &g_noEngine || countLiveSingletons() == 0,
+	DEBUG_ASSERTCRASH(this == &g_noEngine || (countLiveSingletons() == 0 && originalGlobalData == nullptr),
 		("EngineContext destroyed with %u live singletons: its engine was not shut down, or its shutdown left some",
 		(unsigned)countLiveSingletons()));
 	DEBUG_ASSERTCRASH(this == &g_noEngine || noEngineIsPristine(), ("g_noEngine was written: engine state leaked outside every Scope"));
@@ -105,15 +105,7 @@ void EngineContext::setSlot(std::size_t index, void* object, EngineSlotDestroyFn
 
 std::size_t EngineContext::countLiveSingletons() const
 {
-	std::size_t live = 0;
-#define RTS_ENGINE_SINGLETON(T, n) live += (n##_ != nullptr) ? 1 : 0;
-#define RTS_ENGINE_SINGLETON_STRUCT(T, n) live += (n##_ != nullptr) ? 1 : 0;
-#define RTS_ENGINE_SINGLETON_ZH(T, n) live += (n##_ != nullptr) ? 1 : 0;
-#include "Common/EngineSingletons.inl"
-#undef RTS_ENGINE_SINGLETON
-#undef RTS_ENGINE_SINGLETON_STRUCT
-#undef RTS_ENGINE_SINGLETON_ZH
-	return live;
+	return forEachLiveSingleton([](const char*, void*) {}, nullptr);
 }
 
 std::size_t EngineContext::forEachLiveSingleton(void (*visit)(const char* name, void* user), void* user) const
@@ -132,7 +124,8 @@ std::size_t EngineContext::forEachLiveSingleton(void (*visit)(const char* name, 
 
 bool noEngineIsPristine()
 {
-	return g_noEngine.countLiveSingletons() == 0 && !g_noEngine.engineTearingDown && !g_noEngine.nameKeysFrozen;
+	return g_noEngine.countLiveSingletons() == 0 && !g_noEngine.engineTearingDown && !g_noEngine.nameKeysFrozen
+		&& g_noEngine.originalGlobalData == nullptr;
 }
 
 } // namespace rts

@@ -126,6 +126,10 @@ struct RTS_ENGINE_CONTEXT_API EngineContext
 	// must intern no new NameKey then (NameKeyGenerator::PrimingLatch, PLAN-023 Decision 2).
 	bool nameKeysFrozen = false;
 
+	// GlobalData::m_theOriginal, this engine's GlobalData with no overrides (Zero Hour; see GlobalData.h).
+	// GlobalData nulls it when that instance is deleted.
+	::GlobalData* originalGlobalData = nullptr;
+
 	// Later phases add hot per-engine state here as direct fields (the RNG seeds, the pathfinder pool,
 	// the polygon triggers, ...: PLAN-023 Phases 2-3), since a field costs one load where a slot costs a
 	// lookup.

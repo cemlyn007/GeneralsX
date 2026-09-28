@@ -73,3 +73,11 @@ FATAL_ENGINE_ERROR_API bool IsEngineEmbeddedMode();
 //   teardown clears it first, SetEngineTearingDown(false), before anything that can raise a fatal error.
 FATAL_ENGINE_ERROR_API void SetEngineTearingDown(bool tearingDown);
 FATAL_ENGINE_ERROR_API bool IsEngineTearingDown();
+
+// GeneralsX @bugfix cemlyn007 28/09/2026 A fatal error that never returns (PLAN-023 Phase 1). ReleaseCrash
+// returns when there is no TheGlobalData and it does not throw (not embedded, the teardown window, another
+// exception propagating, or outside every engine context: see above), and upstream callers carry on after
+// it then. A caller that must not carry on in any case calls this instead: ReleaseCrash, and if that
+// returns, FatalEngineError in embedded mode (which ends the process through std::terminate if a
+// destructor is running) or abort() otherwise, with the reason on stderr.
+[[noreturn]] FATAL_ENGINE_ERROR_API void ReleaseCrashNoReturn(const char *reason);

@@ -221,6 +221,31 @@ GameEngine *CreateGameEngine(void)
 	return engine;
 }
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @bugfix cemlyn007 28/09/2026 The process-default engine context main() runs its engine in
+// (PLAN-023 Phase 1). It is destroyed only once the engine has been shut down (GameMain returned):
+// on an early return or an exception out of GameMain the engine's singletons are still set, and
+// ~EngineContext's debug checks would fire on them. There the context is leaked instead, as a host
+// leaks a faulted engine's, and the process exits anyway.
+namespace
+{
+struct ProcessEngineContext
+{
+	rts::EngineContext* context = new rts::EngineContext;
+	bool engineShutDown = false;
+
+	ProcessEngineContext() = default;
+	ProcessEngineContext(const ProcessEngineContext&) = delete;
+	ProcessEngineContext& operator=(const ProcessEngineContext&) = delete;
+	~ProcessEngineContext()
+	{
+		if (engineShutDown)
+			delete context;
+	}
+};
+}
+#endif
+
 /**
  * main
  *
@@ -244,9 +269,9 @@ int main(int argc, char* argv[])
 	// GeneralsX @feature cemlyn007 28/09/2026 The game runs one engine, in a process-default engine context
 	// entered for the whole of main() (PLAN-023 Phase 1). Everything below, including the command-line parse
 	// that creates TheWritableGlobalData, sets that context's singletons. Static destructors run after main()
-	// has left it, and see no engine.
-	rts::EngineContext processEngineContext;
-	rts::Scope processEngineScope(&processEngineContext);
+	// has left it, and see no engine. The scope is left before the context is destroyed (or leaked).
+	ProcessEngineContext processEngineContext;
+	rts::Scope processEngineScope(processEngineContext.context);
 #endif
 
 	fprintf(stderr, "=================================================\n");
@@ -356,6 +381,10 @@ int main(int argc, char* argv[])
 
 		// Call cross-platform game entry point
 		exitcode = GameMain();
+#if RTS_ENGINE_CONTEXT
+		// GameMain deleted TheGameEngine, which shut every subsystem down
+		processEngineContext.engineShutDown = true;
+#endif
 
 		fprintf(stderr, "INFO: GameMain() returned with code %d\n", exitcode);
 

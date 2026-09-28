@@ -142,19 +142,25 @@ public:
 	// loaded (the science and upgrade keys are what orders carry): a new name there means different
 	// data, which is a fatal error. If the priming engine fails partway, the generator holds a
 	// partial prefix that a retry would extend differently, so the process is poisoned: every later
-	// engine fails in GameEngine::init, and the host has to restart the process.
+	// engine fails in GameEngine::init, and the host has to restart the process. So is it if a later
+	// engine's init fails partway: that leaves process-wide state half built, and ~GameEngine cannot
+	// tear a partly initialised engine down, so the host must leak it (never delete it).
+	//
+	// Every refusal here is a fatal error that never returns (ReleaseCrashNoReturn): FatalEngineError
+	// in embedded mode.
 	enum PrimingState
 	{
 		PRIMING_NOT_STARTED,	///< no engine has started GameEngine::init in this process
 		PRIMING_IN_PROGRESS,	///< the priming engine is inside GameEngine::init
 		PRIMED,								///< the priming engine completed GameEngine::init
-		PRIMING_FAILED,				///< the priming engine failed: no engine can boot in this process
+		PRIMING_FAILED,				///< an engine's GameEngine::init failed partway: no engine can boot in this process
 	};
 	static PrimingState getPrimingState();
 
-	// Held by GameEngine::init for its whole run. The constructor makes the generator if this is the
-	// priming engine (or fails if another engine is priming, or priming failed); complete() at the
-	// end of a successful init; destroyed without complete(), a priming engine poisons the process.
+	// Held by GameEngine::init for its whole run, inside the engine's context. The constructor makes
+	// the generator if this is the priming engine (or fails if another engine is priming, or the process
+	// is poisoned, or no engine context is current); complete() at the end of a successful init;
+	// destroyed without complete(), it poisons the process.
 	class PrimingLatch
 	{
 	public:

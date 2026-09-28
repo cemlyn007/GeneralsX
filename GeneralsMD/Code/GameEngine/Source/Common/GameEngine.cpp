@@ -975,14 +975,21 @@ void GameEngine::init()
 		RELEASE_CRASH(("Uncaught Exception during initialization."));
 	}
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @bugfix cemlyn007 28/09/2026 The try block stopped partway and a catch above returned (the
+	// ErrorCode one swallows every code but ERROR_INVALID_D3D; RELEASE_CRASH returns with no TheGlobalData).
+	// Upstream carries on with a partly initialised engine; with several engines in a process that must be
+	// a clear failure instead. The latch, left incomplete, then poisons the process (see PrimingLatch).
+	if (!initBodyCompleted)
+		ReleaseCrashNoReturn("GameEngine::init stopped partway (an error its catch blocks swallowed)");
+#endif
+
 	resetSubsystems();
 
 	HideControlBar();
 
 #if RTS_ENGINE_CONTEXT
-	// Left incomplete, the latch poisons the process when it goes out of scope (a priming engine)
-	if (initBodyCompleted)
-		primingLatch.complete();
+	primingLatch.complete();
 #endif
 }
 

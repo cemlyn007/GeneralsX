@@ -30,6 +30,8 @@
 
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
+#include "Common/FatalEngineError.h"	// GeneralsX @bugfix cemlyn007 28/09/2026 ReleaseCrashNoReturn
+
 // Public Data ////////////////////////////////////////////////////////////////////////////////////
 NameKeyGenerator *TheNameKeyGenerator = nullptr;  ///< name key gen. singleton
 
@@ -240,7 +242,8 @@ NameKeyType NameKeyGenerator::createNameKey(UnsignedInt hash, const AsciiString&
 		AsciiString reason;
 		reason.format("NameKey '%s' is new to this process while a later engine boots: its data differs from the "
 			"first engine's, so the name keys it shares with it (sciences, upgrades) cannot be trusted", name.str());
-		ReleaseCrash(reason.str());
+		// Never returns: the name must not be interned (ReleaseCrash alone returns with no TheGlobalData)
+		ReleaseCrashNoReturn(reason.str());
 	}
 
 	std::lock_guard<std::mutex> lock(m_insertMutex);
@@ -253,9 +256,14 @@ NameKeyType NameKeyGenerator::createNameKey(UnsignedInt hash, const AsciiString&
 	}
 #endif
 
+	// GeneralsX @feature cemlyn007 28/09/2026 Downwards once perturbForTesting asked for it. The keys
+	// handed out downwards would meet those handed out upwards (a duplicate key) or, reaching 0, turn
+	// back into upwards ones: a hard failure in every build. (perturbForTesting keeps
+	// NAMEKEY_PERTURB_RESERVE keys between the two, so only a test hook's misuse gets here.)
+	if (m_descendingID != 0 && m_descendingID <= m_nextID)
+		ReleaseCrashNoReturn("NameKey space exhausted: the keys handed out downwards (perturbForTesting) met "
+			"those handed out upwards");
 	Bucket *b = newInstance(Bucket);
-	// GeneralsX @feature cemlyn007 28/09/2026 Downwards once perturbForTesting asked for it
-	DEBUG_ASSERTCRASH(m_descendingID == 0 || m_descendingID >= m_nextID, ("NameKey space exhausted"));
 	b->m_key = (NameKeyType)(m_descendingID != 0 ? m_descendingID-- : m_nextID++);
 	b->m_nameString = name;
 	b->m_nextInSocket = m_sockets[hash];
@@ -335,6 +343,8 @@ namespace
 {
 std::mutex thePrimingMutex;
 NameKeyGenerator::PrimingState thePrimingState = NameKeyGenerator::PRIMING_NOT_STARTED;
+// Why the process is poisoned (PRIMING_FAILED): a string literal.
+const char* thePrimingFailure = nullptr;
 }
 
 NameKeyGenerator::PrimingState NameKeyGenerator::getPrimingState()
@@ -345,6 +355,11 @@ NameKeyGenerator::PrimingState NameKeyGenerator::getPrimingState()
 
 NameKeyGenerator::PrimingLatch::PrimingLatch() : m_priming(FALSE), m_completed(FALSE)
 {
+	// Engine state (nameKeysFrozen, the singletons init sets) is per engine context; g_noEngine must
+	// stay pristine.
+	if (rts::ctx() == &rts::g_noEngine)
+		ReleaseCrashNoReturn("GameEngine::init was called outside every engine context: enter one (rts::Scope) first");
+
 	const char* refusal = nullptr;
 	{
 		std::lock_guard<std::mutex> lock(thePrimingMutex);
@@ -368,13 +383,14 @@ NameKeyGenerator::PrimingLatch::PrimingLatch() : m_priming(FALSE), m_completed(F
 			case PRIMED:
 				break;
 			case PRIMING_FAILED:
-				refusal = "the first engine in this process failed during GameEngine::init, so the shared "
-					"NameKey generator is partly primed and no engine can boot in this process; restart it";
+				refusal = thePrimingFailure;
 				break;
 		}
 	}
+	// Never returns: ReleaseCrash alone returns when there is no TheGlobalData (a host that called init
+	// before its startup parse, say), and init must not run on then.
 	if (refusal != nullptr)
-		ReleaseCrash(refusal);
+		ReleaseCrashNoReturn(refusal);
 	if (!m_priming)
 		rts::ctx()->nameKeysFrozen = true;
 }
@@ -382,10 +398,21 @@ NameKeyGenerator::PrimingLatch::PrimingLatch() : m_priming(FALSE), m_completed(F
 NameKeyGenerator::PrimingLatch::~PrimingLatch()
 {
 	rts::ctx()->nameKeysFrozen = false;
-	if (m_priming && !m_completed)
+	// GeneralsX @bugfix cemlyn007 28/09/2026 Any engine's init that stopped partway poisons the process,
+	// not only the priming engine's (whose generator would be partly primed). A later engine's leaves
+	// process-wide state behind too (GameEngine's own statics, the water and weather settings, the
+	// subsystems' statics until PLAN-023 Phases 2-4), and ~GameEngine cannot tear a partly initialised
+	// engine down (it dereferences subsystems init never made), so the host must leak that engine, and
+	// the next init must refuse clearly rather than trip over what it left.
+	if (!m_completed)
 	{
 		std::lock_guard<std::mutex> lock(thePrimingMutex);
 		thePrimingState = PRIMING_FAILED;
+		thePrimingFailure = m_priming
+			? "the first engine in this process failed during GameEngine::init, so the shared NameKey generator "
+				"is partly primed and no engine can boot in this process; restart it"
+			: "an engine failed partway through GameEngine::init in this process, leaving process-wide state "
+				"half built, so no engine can boot in this process; restart it";
 	}
 }
 
