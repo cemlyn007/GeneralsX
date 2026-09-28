@@ -142,10 +142,20 @@ public:
 	virtual void preloadTextureAssets( AsciiString texture ) override;	///< preload texture asset
 
 	/// @todo Need a scene abstraction
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 28/09/2026 The scenes and the asset manager are per engine (EngineContext
+	// fields): a headless engine builds them too, and one engine's teardown reset another's scenes after
+	// they were freed (PLAN-023 Phase 3). The qualified uses are unchanged.
+	static constexpr rts::ContextField<RTS3DScene*, &rts::EngineContext::w3dDisplay3DScene> m_3DScene{};
+	static constexpr rts::ContextField<RTS2DScene*, &rts::EngineContext::w3dDisplay2DScene> m_2DScene{};
+	static constexpr rts::ContextField<RTS3DInterfaceScene*, &rts::EngineContext::w3dDisplay3DInterfaceScene> m_3DInterfaceScene{};
+	static constexpr rts::ContextField<W3DAssetManager*, &rts::EngineContext::w3dDisplayAssetManager> m_assetManager{};
+#else
 	static RTS3DScene *m_3DScene;							///< our 3d scene representation
 	static RTS2DScene *m_2DScene;							///< our 2d scene representation
 	static RTS3DInterfaceScene *m_3DInterfaceScene;	///< our 3d interface scene that draws last (for 3d mouse cursor, etc)
 	static W3DAssetManager *m_assetManager;		///< W3D asset manager
+#endif
 
 	void drawFPSStats();								///< draw the fps on the screen
 	virtual Real getAverageFPS() override;						///< return the average FPS.

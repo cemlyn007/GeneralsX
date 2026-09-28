@@ -48,8 +48,27 @@ float _FastAsinTable[ARC_TABLE_SIZE];
 float _FastSinTable[SIN_TABLE_SIZE];
 float _FastInvSinTable[SIN_TABLE_SIZE];
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 28/09/2026 Init and Shutdown are counted: every engine calls them, and one
+// engine's Shutdown freed the lookup tables another still used. The first Init builds the tables (the same
+// values every time) and the last Shutdown frees them (PLAN-023 Phase 3). Each engine holds at most one
+// count (EngineContext::wwMathInitialized), so an unpaired Shutdown cannot free another engine's tables.
+#include <mutex>
+static std::mutex WWMathInitMutex;
+static int WWMathInitCount = 0;
+#endif
+
 void		WWMath::Init()
 {
+#if RTS_ENGINE_CONTEXT
+	std::lock_guard<std::mutex> lock(WWMathInitMutex);
+	rts::EngineContext* context = rts::ctx();
+	if (context->wwMathInitialized)
+		return;
+	context->wwMathInitialized = true;
+	if (WWMathInitCount++ > 0)
+		return;
+#endif
 	LookupTableMgrClass::Init();
 
 	int a=0;
@@ -73,6 +92,15 @@ void		WWMath::Init()
 
 void		WWMath::Shutdown()
 {
+#if RTS_ENGINE_CONTEXT
+	std::lock_guard<std::mutex> lock(WWMathInitMutex);
+	rts::EngineContext* context = rts::ctx();
+	if (!context->wwMathInitialized)
+		return;
+	context->wwMathInitialized = false;
+	if (--WWMathInitCount > 0)
+		return;
+#endif
 	LookupTableMgrClass::Shutdown();
 }
 

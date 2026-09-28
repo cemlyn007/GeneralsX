@@ -487,9 +487,51 @@ W3DFileSystem *TheW3DFileSystem = nullptr;
 /** Constructor.  Creating an instance of this class overrides the default
 W3D file factory.  */
 //-------------------------------------------------------------------------------------------------
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 28/09/2026 One permanent, process-wide W3D file factory that forwards to
+// the current engine's W3DFileSystem (PLAN-023 Phase 3). Each engine's W3DFileSystem used to install itself
+// in _TheFileFactory and null it on destruction, so a second engine's teardown left the first reading
+// through null. With no W3DFileSystem in the current engine it reads through the default factory, as
+// _TheFileFactory does before the first W3DFileSystem is made. It reads the current engine's W3DFileSystem,
+// so a thread that loads files must run in its engine's context: the texture loader thread enters each
+// task's engine (TextureLoadTaskClass::Get_Engine_Context). The factory is immortal (made on first use and
+// never destroyed) since _TheFileFactory keeps pointing at it until the process exits, past static
+// destruction.
+namespace
+{
+class EngineW3DFileFactoryClass : public FileFactoryClass
+{
+public:
+	virtual FileClass * Get_File( char const *filename ) override
+	{
+		if (TheW3DFileSystem != nullptr)
+			return TheW3DFileSystem->Get_File(filename);
+		return _TheSimpleFileFactory->Get_File(filename);
+	}
+	virtual void Return_File( FileClass *file ) override
+	{
+		if (TheW3DFileSystem != nullptr)
+			TheW3DFileSystem->Return_File(file);
+		else
+			_TheSimpleFileFactory->Return_File(file);
+	}
+};
+
+FileFactoryClass *engineW3DFileFactory()
+{
+	static EngineW3DFileFactoryClass *const factory = new EngineW3DFileFactoryClass;
+	return factory;
+}
+}
+#endif
+
 W3DFileSystem::W3DFileSystem()
 {
+#if RTS_ENGINE_CONTEXT
+	_TheFileFactory = engineW3DFileFactory();
+#else
 	_TheFileFactory = this; // override the w3d file factory.
+#endif
 
 #if RTS_ZEROHOUR && PRIORITIZE_TEXTURES_BY_SIZE
 	reprioritizeTexturesBySize();
@@ -502,7 +544,9 @@ after W3D is shutdown.  */
 //-------------------------------------------------------------------------------------------------
 W3DFileSystem::~W3DFileSystem()
 {
+#if !RTS_ENGINE_CONTEXT
 	_TheFileFactory = nullptr; // remove the w3d file factory.
+#endif
 }
 
 //-------------------------------------------------------------------------------------------------

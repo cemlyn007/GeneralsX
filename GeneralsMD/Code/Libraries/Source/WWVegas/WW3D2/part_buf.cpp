@@ -75,7 +75,14 @@ float ParticleBufferClass::LODMaxScreenSizes[17] = {
 	NO_MAX_SCREEN_SIZE
 };
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 28/09/2026 Per engine: the particle buffers' generator, so one engine's particles do
+// not advance another's sequence (PLAN-023 Phase 3).
+static rts::PerEngineStatic<Random4Class> rand_gen_perEngine;
+#define rand_gen (rand_gen_perEngine.get())
+#else
 static Random4Class rand_gen;
+#endif
 const float oo_intmax = 1.0f / (float)INT_MAX;
 
 // Default Line Emitter Properties

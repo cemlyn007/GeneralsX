@@ -74,10 +74,10 @@ PROCESS_GLOBAL = {
     "TheGameSpyMutex": "GameSpy thread mutex object",
     "TheLobbyQueuedUTMs": "GameSpy lobby menu queue (menu state; one UI engine per process)",
     # Not pointers: objects and values that later phases classify (the Phase 1 nm classification).
-    "TheDX8MeshRenderer": "W3D mesh renderer object (PLAN-023 Phase 3)",
-    "TheW3DFrameLengthInMsec": "W3D frame timing value (PLAN-023 Phase 3)",
-    "TheWaterTransparency": "OVERRIDE<> INI object (PLAN-023 Phase 3)",
-    "TheWeatherSetting": "OVERRIDE<> INI object (PLAN-023 Phase 3)",
+    "TheDX8MeshRenderer": "W3D mesh renderer object of the build without the context; with it, a PER_ENGINE_STATIC (PLAN-023 Phase 3)",
+    "TheW3DFrameLengthInMsec": "W3D frame timing value: every engine writes the same constant (GameClient::init sets MSEC_PER_LOGICFRAME_REAL); the unsynchronised write matters only with threads",
+    "TheWaterTransparency": "OVERRIDE<> INI object of the build without the context; with it, a PER_ENGINE_STATIC (PLAN-023 Phase 3)",
+    "TheWeatherSetting": "OVERRIDE<> INI object of the build without the context; with it, a PER_ENGINE_STATIC (PLAN-023 Phase 3)",
     "TheSupplyAndTechImageLocations": "skirmish-menu object (PLAN-023 Phase 4)",
     "TheThingTemplateBeingParsedName": "INI parse scratch string (PLAN-023 Phase 4)",
     "TheSkateDistOverride": "INI parse scratch value (PLAN-023 Phase 4)",
@@ -91,9 +91,16 @@ PROCESS_GLOBAL = {
 CONSTANT_TABLE_RE = re.compile(r"(Names|FieldParse|FieldParseTable|LookupList)$")
 
 
+# A PER_ENGINE_STATIC's static (`TheXxx_perEngine`, rts::PerEngineStatic<T>): it holds only the slot index,
+# written once at static initialisation; the object lives in each engine's EngineContext.
+PER_ENGINE_STATIC_RE = re.compile(r"_perEngine$")
+
+
 def process_global_reason(name):
     if name in PROCESS_GLOBAL:
         return PROCESS_GLOBAL[name]
+    if PER_ENGINE_STATIC_RE.search(name):
+        return "PER_ENGINE_STATIC slot index; the object is per engine"
     if CONSTANT_TABLE_RE.search(name):
         return "constant table"
     return None

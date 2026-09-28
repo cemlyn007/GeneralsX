@@ -164,10 +164,12 @@ const char* DAZZLE_INI_FILENAME="DAZZLE.INI";
 **
 ***********************************************************************************/
 
+#if !RTS_ENGINE_CONTEXT
 float														WW3D::LogicFrameTimeMs = 1000.0f / WWSyncPerSecond; // initialized to something to avoid division by zero on first use
 float															WW3D::FractionalSyncMs = 0.0f;
 unsigned int											WW3D::SyncTime = 0;
 unsigned int											WW3D::PreviousSyncTime = 0;
+#endif
 bool														WW3D::IsSortingEnabled = true;
 
 float														WW3D::PixelCenterX = 0.0f;
@@ -193,7 +195,9 @@ FrameGrabClass *										WW3D::Movie = nullptr;
 bool														WW3D::PauseRecord;
 bool														WW3D::RecordNextFrame;
 
+#if !RTS_ENGINE_CONTEXT
 int														WW3D::FrameCount = 0;
+#endif
 long														WW3D::UserStat0 = 0;
 long														WW3D::UserStat1 = 0;
 long														WW3D::UserStat2 = 0;

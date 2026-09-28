@@ -67,6 +67,74 @@ bool DX8TextureCategoryClass::m_gForceMultiply = false; // Forces opaque materia
 static DynamicVectorClass<Vector3>				_TempVertexBuffer;
 static DynamicVectorClass<Vector3>				_TempNormalBuffer;
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 28/09/2026 Per engine: the mesh renderer and the lists it tears down, one
+// object (PLAN-023 Phase 3). The renderer is the last member, so it is destroyed first and still finds the
+// lists alive, as with the file statics below.
+namespace
+{
+struct DX8MeshRendererState;
+
+// The state whose destructor is running: its slot is already cleared then (EngineContext::destroySlots),
+// so the renderer's teardown reaches its lists, and TheDX8MeshRenderer, through this instead.
+thread_local DX8MeshRendererState* DX8MeshRendererState_destroying = nullptr;
+
+// Marks its state as the one being destroyed from the start of ~DX8MeshRendererState's body until its
+// last member is destroyed: as the first member it is destroyed last, after the renderer and the lists,
+// whose destructors may reach the state through DX8_Current_Mesh_Renderer_State.
+class DX8MeshRendererStateDestroyingMark
+{
+public:
+	DX8MeshRendererStateDestroyingMark() = default;
+	DX8MeshRendererStateDestroyingMark(const DX8MeshRendererStateDestroyingMark&) = delete;
+	DX8MeshRendererStateDestroyingMark& operator=(const DX8MeshRendererStateDestroyingMark&) = delete;
+	void enter(DX8MeshRendererState* state)
+	{
+		m_previous = DX8MeshRendererState_destroying;
+		m_entered = true;
+		DX8MeshRendererState_destroying = state;
+	}
+	~DX8MeshRendererStateDestroyingMark()
+	{
+		if (m_entered)
+			DX8MeshRendererState_destroying = m_previous;
+	}
+
+private:
+	DX8MeshRendererState* m_previous = nullptr;
+	bool m_entered = false;
+};
+
+struct DX8MeshRendererState
+{
+	~DX8MeshRendererState();
+
+	DX8MeshRendererStateDestroyingMark destroyingMark; // first: destroyed last
+	MultiListClass<MeshModelClass>	registeredMeshList;
+	TextureCategoryList					textureCategoryDeleteList;
+	FVFCategoryList						fvfCategoryContainerDeleteList;
+	DX8MeshRendererClass					renderer;
+};
+
+rts::PerEngineStatic<DX8MeshRendererState> DX8MeshRendererState_perEngine;
+
+DX8MeshRendererState& DX8_Current_Mesh_Renderer_State()
+{
+	if (DX8MeshRendererState_destroying != nullptr)
+		return *DX8MeshRendererState_destroying;
+	return DX8MeshRendererState_perEngine.get();
+}
+}
+
+DX8MeshRendererClass & DX8_Current_Mesh_Renderer()
+{
+	return DX8_Current_Mesh_Renderer_State().renderer;
+}
+
+#define _RegisteredMeshList (DX8_Current_Mesh_Renderer_State().registeredMeshList)
+#define texture_category_delete_list (DX8_Current_Mesh_Renderer_State().textureCategoryDeleteList)
+#define fvf_category_container_delete_list (DX8_Current_Mesh_Renderer_State().fvfCategoryContainerDeleteList)
+#else
 static MultiListClass<MeshModelClass>			_RegisteredMeshList;
 static TextureCategoryList							texture_category_delete_list;
 static FVFCategoryList								fvf_category_container_delete_list;
@@ -82,6 +150,7 @@ static FVFCategoryList								fvf_category_container_delete_list;
 ** process exited without shutting the device down first.
 */
 DX8MeshRendererClass TheDX8MeshRenderer;
+#endif
 
 // helper data structure
 class PolyRemover : public MultiListObjectClass
@@ -2293,6 +2362,20 @@ void DX8MeshRendererClass::Invalidate( bool shutdown)
 
 	texture_category_container_lists_rigid.Delete_All();
 }
+
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @bugfix cemlyn007 28/09/2026 Release what Shutdown() would have when the engine goes
+// (PLAN-023 Phase 3). Shutdown() runs only from the device teardown, which headless never reaches, so
+// without this every engine leaked the category containers and pending-delete lists its renderer made. The
+// engine is still alive here (its ~GameEngine destroys its slots), unlike the static destruction that
+// ~DX8MeshRendererClass avoids. After a Shutdown() there is nothing left, so this does nothing.
+DX8MeshRendererState::~DX8MeshRendererState()
+{
+	destroyingMark.enter(this); // until the last member is destroyed
+	renderer.Invalidate(true);
+	renderer.Clear_Pending_Delete_Lists();
+}
+#endif
 
 
 

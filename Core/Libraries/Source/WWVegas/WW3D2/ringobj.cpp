@@ -96,7 +96,14 @@
 #include "visrasterizer.h"
 
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 28/09/2026 Built once per process, under std::call_once: the LOD meshes come from
+// constants, the same for every engine, and several engines may be the first (PLAN-023 Phase 3).
+#include <mutex>
+static std::once_flag Ring_Array_Once;
+#else
 static bool Ring_Array_Valid = false;
+#endif
 
 
 /**
@@ -367,7 +374,11 @@ RingRenderObjClass & RingRenderObjClass::operator = (const RingRenderObjClass & 
 void RingRenderObjClass::Generate_Shared_Mesh_Arrays ()
 {
 	// Generate shared Mesh Arrays
+#if RTS_ENGINE_CONTEXT
+	std::call_once(Ring_Array_Once, []() {
+#else
 	if (!Ring_Array_Valid) {
+#endif
 
 		float size = RING_LOWEST_LOD;
 		float step = (RING_HIGHEST_LOD - RING_LOWEST_LOD);
@@ -383,8 +394,12 @@ void RingRenderObjClass::Generate_Shared_Mesh_Arrays ()
 			size+=step;
 		}
 
+#if RTS_ENGINE_CONTEXT
+	});
+#else
 		Ring_Array_Valid = true;
 	}
+#endif
 }
 
 

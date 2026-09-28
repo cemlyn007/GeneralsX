@@ -24,7 +24,9 @@
 
 #include "Common/EngineContext.h"
 
+#include <algorithm>
 #include <atomic>
+#include <cstdio>
 #include <vector>
 
 namespace rts
@@ -57,11 +59,42 @@ struct EngineSlotTable
 	std::vector<Owned> inCreationOrder;
 };
 
+#ifdef DEBUG_CRASHING
+namespace
+{
+// Appends each live field's name to a bounded, comma-separated list (for the ~EngineContext assert).
+struct LiveFieldNames
+{
+	char text[512] = "";
+	std::size_t length = 0;
+};
+
+void appendLiveFieldName(const char* name, void* user)
+{
+	LiveFieldNames& names = *static_cast<LiveFieldNames*>(user);
+	const std::size_t room = sizeof(names.text) - names.length;
+	if (room <= 1)
+		return;
+	const int written = std::snprintf(names.text + names.length, room, "%s%s", names.length == 0 ? "" : ", ", name);
+	if (written > 0)
+		names.length += std::min<std::size_t>((std::size_t)written, room - 1);
+}
+}
+#endif
+
 EngineContext::~EngineContext()
 {
-	DEBUG_ASSERTCRASH(this == &g_noEngine || (countLiveSingletons() == 0 && originalGlobalData == nullptr),
-		("EngineContext destroyed with %u live singletons: its engine was not shut down, or its shutdown left some",
-		(unsigned)countLiveSingletons()));
+#ifdef DEBUG_CRASHING
+	if (this != &g_noEngine && (countLiveSingletons() != 0 || originalGlobalData != nullptr || wwMathInitialized))
+	{
+		LiveFieldNames names;
+		const std::size_t live = forEachLiveSingleton(&appendLiveFieldName, &names);
+		DEBUG_CRASH(("EngineContext destroyed before its engine was shut down, or its shutdown left state: "
+			"%u live singleton/pointer fields (%s), originalGlobalData %s, wwMathInitialized %s",
+			(unsigned)live, live != 0 ? names.text : "none", originalGlobalData != nullptr ? "set" : "null",
+			wwMathInitialized ? "true" : "false"));
+	}
+#endif
 	DEBUG_ASSERTCRASH(this == &g_noEngine || noEngineIsPristine(), ("g_noEngine was written: engine state leaked outside every Scope"));
 
 	destroySlots();
@@ -129,13 +162,26 @@ std::size_t EngineContext::forEachLiveSingleton(void (*visit)(const char* name, 
 #undef RTS_ENGINE_SINGLETON
 #undef RTS_ENGINE_SINGLETON_STRUCT
 #undef RTS_ENGINE_SINGLETON_ZH
+	// The direct pointer fields, which the engine's teardown frees and nulls just as it does the singletons.
+#define RTS_ENGINE_CONTEXT_POINTER(n) if (n != nullptr) { ++live; visit(#n, user); }
+	RTS_ENGINE_CONTEXT_POINTER(pathfindCellInfoArray)
+	RTS_ENGINE_CONTEXT_POINTER(pathfindCellInfoFirstFree)
+	RTS_ENGINE_CONTEXT_POINTER(polygonTriggerList)
+	RTS_ENGINE_CONTEXT_POINTER(mapObjectList)
+	RTS_ENGINE_CONTEXT_POINTER(partitionContactList)
+	RTS_ENGINE_CONTEXT_POINTER(w3dDisplay3DScene)
+	RTS_ENGINE_CONTEXT_POINTER(w3dDisplay2DScene)
+	RTS_ENGINE_CONTEXT_POINTER(w3dDisplay3DInterfaceScene)
+	RTS_ENGINE_CONTEXT_POINTER(w3dDisplayAssetManager)
+	RTS_ENGINE_CONTEXT_POINTER(ww3dAssetManager)
+#undef RTS_ENGINE_CONTEXT_POINTER
 	return live;
 }
 
 bool noEngineIsPristine()
 {
 	return g_noEngine.countLiveSingletons() == 0 && !g_noEngine.engineTearingDown && !g_noEngine.nameKeysFrozen
-		&& g_noEngine.originalGlobalData == nullptr && !g_noEngine.hasSlotObjects();
+		&& g_noEngine.originalGlobalData == nullptr && !g_noEngine.wwMathInitialized && !g_noEngine.hasSlotObjects();
 }
 
 } // namespace rts

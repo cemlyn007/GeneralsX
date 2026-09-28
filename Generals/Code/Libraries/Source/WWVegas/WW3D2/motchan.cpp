@@ -75,7 +75,14 @@ static float filtertable[FILTER_TABLE_SIZE] = {
 	10000000.0f,
 
 };
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 28/09/2026 Built once per process, under std::call_once: the table comes from
+// constants, the same for every engine, and several engines may be the first (PLAN-023 Phase 3).
+#include <mutex>
+static std::once_flag table_once;
+#else
 static bool table_valid = false;
+#endif
 
 
 /***********************************************************************************************
@@ -836,7 +843,11 @@ AdaptiveDeltaMotionChannelClass::AdaptiveDeltaMotionChannelClass() :
 	Scale(0.0f)
 {
 
+#if RTS_ENGINE_CONTEXT
+	std::call_once(table_once, []() {
+#else
 	if (false == table_valid) {
+#endif
 		// Create Filter Table, used in delta compression
 
 		for (int i=0; i<FILTER_TABLE_GEN_SIZE; i++)
@@ -849,9 +860,13 @@ AdaptiveDeltaMotionChannelClass::AdaptiveDeltaMotionChannelClass() :
 			filtertable[i + FILTER_TABLE_GEN_START] = 1.0f - WWMath::Sin( DEG_TO_RAD(90.0f * ratio));
 		}
 
+#if RTS_ENGINE_CONTEXT
+	});
+#else
 		table_valid = true;
 
 	}
+#endif
 
 }
 

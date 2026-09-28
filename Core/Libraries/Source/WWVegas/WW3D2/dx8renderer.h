@@ -349,4 +349,12 @@ protected:
 
 };
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 28/09/2026 One mesh renderer (and its pending-delete and registered-mesh
+// lists) per engine: every map load and mesh destruction changes them, headless too (PLAN-023 Phase 3).
+// The uses are unchanged.
+DX8MeshRendererClass & DX8_Current_Mesh_Renderer();
+#define TheDX8MeshRenderer (DX8_Current_Mesh_Renderer())
+#else
 extern DX8MeshRendererClass TheDX8MeshRenderer;
+#endif

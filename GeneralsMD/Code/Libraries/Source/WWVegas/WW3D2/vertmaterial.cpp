@@ -48,7 +48,14 @@
 #include "dx8wrapper.h"
 
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 28/09/2026 Per engine: the vertex material ID counter (from 1), so an engine numbers
+// its materials as it does alone (PLAN-023 Phase 3).
+static rts::PerEngineStatic<unsigned int> unique_perEngine([](unsigned int& value) { value = 1; });
+#define unique (unique_perEngine.get())
+#else
 static unsigned int unique=1;
+#endif
 
 VertexMaterialClass* VertexMaterialClass::Presets[VertexMaterialClass::PRESET_COUNT];
 
