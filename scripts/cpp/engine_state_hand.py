@@ -4,7 +4,9 @@
 # engine_state_symbols.py's rules. A per-engine entry carries the PLAN-023 phase that fixes it (2, 3 or 4)
 # and a one-line fix note; every other entry says why it is what it is. The matcher is the exact demangled
 # key (compiler `.N` suffixes stripped), `re:` + a regular expression that must match the whole key, or
-# `file:` + a regular expression searched for in the source column (path:line).
+# `file:` + a regular expression searched for in every definition site of the source column (path:line;
+# all sites must match). A `file:` pattern is a blanket: keep it to files that only a rendering, UI or
+# networked engine reaches, since `check` makes every new symbol it classifies an error until reviewed.
 #
 # "Headless" below means an rlgenerals engine: GlobalData::m_headless without m_headlessRender. Such an
 # engine still runs GameClient::update (so the message translators, InGameUI::update and the drawables),
@@ -72,7 +74,8 @@ HAND = [
     (PER, 3, "re:W3DDisplay::m_(3DScene|2DScene|3DInterfaceScene|assetManager)", "W3DDisplay class static (94 references): PerEnginePtr<T> proxy"),
     (PER, 3, "WW3DAssetManager::TheInstance", "the asset manager (bones and meshes headless): change only Get_Instance/Delete_This"),
     (PER, 3, "TheDX8MeshRenderer", "mutated on every map load (Free_Assets_With_Exclusion_List) and mesh destruction: per engine (T3: not a T* field)"),
-    (PER, 3, "re:_RegisteredMeshList|texture_category_delete_list|fvf_category_container_delete_list|_TempVertexBuffer|_TempNormalBuffer", "TheDX8MeshRenderer's file-static lists: per engine with it"),
+    (PER, 3, "re:_RegisteredMeshList|texture_category_delete_list|fvf_category_container_delete_list", "TheDX8MeshRenderer's file-static lists: per engine with it"),
+    (PER, 3, "re:_TempVertexBuffer|_TempNormalBuffer", "threads only: one pair per TU (dx8renderer.cpp's skinned-mesh deform scratch, cleared by TheDX8MeshRenderer's teardown; mesh.cpp's ray-cast/decal skin scratch; decalmsh.cpp's decal scratch; meshmdl.cpp's unused pair), each resized, filled and consumed within one call"),
     (PER, 3, "WorldHeightMap::m_alphaTiles", "built lazily from the first map's tiles: build once and make immutable, or a member"),
     (PER, 3, "re:s_buffer|s_blendBuffer", "threads only: WorldHeightMap tile scratch, filled and consumed in one call"),
     (PER, 3, "re:filtertable|table_valid", "motchan's lazily built filter table (animation decompression, headless too): std::call_once"),
@@ -91,6 +94,7 @@ HAND = [
     (PER, 3, "re:W3DAssetManager::Create_Render_Obj\\(.*\\)::warning_count|WW3DAssetManager::Create_Render_Obj\\(.*\\)::warning_count", "missing-asset warning limiter: harmless shared, per engine with the asset manager"),
     (PER, 3, "_PlaneEQArray", "threads only: MeshGeometryClass plane-equation scratch (ray casts), filled and consumed in one call"),
     (PER, 3, "re:CollisionContext|IntersectContext", "threads only: WWMath AAB-tree collision scratch, filled and consumed in one call"),
+    (PER, 3, "InheritedWorldSpaceEmitterVel", "threads only: set by ParticleEmitterClass::Emit and read by Initialize_Particle within the same call"),
     (PER, 3, "CameraShakerSystem", "W3D camera shake system; W3DView only, but the object is created at static init: per engine with the view"),
     # ---------------------------------------------------------------------------------------------------
     # PLAN-023 Phase 4: caches and remaining statics.
@@ -133,7 +137,10 @@ HAND = [
     (GLOBAL, "", "re:s_thread|s_done|s_hasUpdate|s_latestTag", "update checker (menus), one per process"),
     (GLOBAL, "", "re:thread_id_map(_mutex)?|next_thread_id", "pthread-to-Win32 thread id map (CompatLib), process-wide by nature"),
     (GLOBAL, "", "re:GameSpyColor|theLobbyFilter|isThreadHosting|NET_CRC_INTERVAL|MIN_LOGIC_FRAMES|MAX_FRAMES_AHEAD|MIN_RUNAHEAD|FRAME_DATA_LENGTH|FRAMES_TO_KEEP|commandsReadyDebugSpewage", NET),
-    (GLOBAL, "", "file:/GameNetwork/", NET),
+    # Not the whole of GameNetwork/: GameInfo.cpp (skirmish setup), LANGameInfo.cpp, GameMessageParser.cpp and
+    # NetworkUtil.cpp are reached without a network, so their statics are classified by name.
+    (GLOBAL, "", "file:/GameNetwork/(GameSpy/|GeneralsOnline/|WOLBrowser/|GameSpy\\w*\\.cpp|LANAPI\\w*\\.cpp|NAT\\.cpp|FirewallHelper\\.cpp|Connection(Manager)?\\.cpp|DisconnectManager\\.cpp|Network\\.cpp|GUIUtil\\.cpp|Transport\\.cpp|udp\\.cpp|FileTransfer\\.cpp|DownloadManager\\.cpp|IPEnumeration\\.cpp|NetPacket\\w*\\.cpp|NetCommand\\w*\\.cpp|NetMessageStream\\.cpp|FrameData\\w*\\.cpp|FrameMetrics\\.cpp|User\\.cpp)", NET),
+    (GLOBAL, "", "s_commandID", "network command ID counter (NetworkUtil GenerateNextCommandID): only networked games' NetCommandMsgs take IDs; " + NET),
     (GLOBAL, "", "file:/WWDownload/", "patch/map downloader (menus only), one per process"),
     (GLOBAL, "", "re:(Unicode|Ascii)StringToQuotedPrintable\\(.*\\)::dest|QuotedPrintableTo(Unicode|Ascii)String\\(.*\\)::dest", "only the LAN/online lobby code calls these: " + NET),
     (GLOBAL, "", "re:Return_Buffer|Temp_Buffer", "password encryption for the online login menu: " + NET),
@@ -197,7 +204,26 @@ HAND = [
     (RENDER, "", "re:SmudgeSet::m_freeSmudgeList", "heat-haze smudges, drawn only"),
     (RENDER, "", "file:/W3DDevice/GameClient/(Shadow|Water)/", W3D_RENDER),
     (RENDER, "", "file:W3DShaderManager\\.cpp|W3DMouse\\.cpp|W3DScene\\.cpp|W3DShroud\\.cpp|W3DStatusCircle\\.cpp|W3DTreeBuffer\\.cpp|FlatHeightMap\\.cpp|HeightMap\\.cpp|BaseHeightMap\\.cpp|W3DGhostObject\\.cpp|Win32Mouse\\.cpp", W3D_RENDER),
-    (RENDER, "", "file:WW3D2/(dx8wrapper|dx8indexbuffer|dx8vertexbuffer|dx8caps|dx8texman|dx8webbrowser|sortingrenderer|shader|render2d|font3d|missingtexture|dazzle|pointgr|segline|linegrp|texture|textureloader|texturefilter|texturethumbnail|texproject|boxrobj|scene|formconv|decalmsh|visrasterizer|metalmap|lightenvironment|vertmaterial|part_buf|meshmatdesc|mesh|meshmdl|meshgeometry|shattersystem|predlod|matpass|dynamesh|rendobj|part_emt|ww3d|dx8renderer)\\.cpp", W3D_RENDER),
+    # Only device-only WW3D2 files: mesh, meshmdl, meshgeometry, rendobj, texture, ww3d, dx8renderer,
+    # part_emt and part_buf are reached by a headless engine too (models, bones, emitters, asset loading),
+    # so their statics are classified by name below or above.
+    (RENDER, "", "file:WW3D2/(dx8wrapper|dx8indexbuffer|dx8vertexbuffer|dx8caps|dx8texman|dx8webbrowser|sortingrenderer|shader|render2d|font3d|missingtexture|dazzle|pointgr|segline|linegrp|textureloader|texturefilter|texturethumbnail|texproject|boxrobj|scene|formconv|decalmsh|visrasterizer|metalmap|lightenvironment|vertmaterial|meshmatdesc|shattersystem|predlod|matpass|dynamesh)\\.cpp", W3D_RENDER),
+    (RENDER, "", "_Hwnd", "the render window handle (dx8wrapper.cpp's and ww3d.cpp's, one per TU)"),
+    (RENDER, "", "_LineRenderer", "segline.cpp's and streak.cpp's line renderers (draw only)"),
+    (RENDER, "", "detailAlphaShader", "tree/bib/bridge/road buffer shaders, one per TU: " + W3D_RENDER),
+    (RENDER, "", "parent", "a menu's parent window, one per menu TU (in-game popup, lobby, score screen, map select, ...): " + UI),
+    (GLOBAL, "", "pingImages", "the online lobby's and WOL game setup's ping images: " + NET),
+    (RENDER, "", "WW3D::Make_Screen_Shot(char const*, float, WW3D::ScreenShotFormatEnum)::frame_number", "screenshot file counter (render mode)"),
+    (RENDER, "", "temp_apt", "MeshClass::Create_Decal scratch: no game code creates W3D decals (Create_Decal's callers are all inside WW3D2's decal system)"),
+    (RENDER, "", "re:_TempTransformedVertexBuffer|_TempClipFlagBuffer", "MeshModelClass::Shadow_Render scratch (the clip-flag buffer is unused)"),
+    (RENDER, "", "re:ParticleBufferClass::Render_Line\\(RenderInfoClass&\\)::tmp_(points|diffuse|id)", "ParticleBufferClass::Render_Line scratch: draw only"),
+    (DEBUG, "", "statistics_requested", "DX8 mesh-renderer statistics request (debug display)"),
+    (DEBUG, "", "ParticleBufferClass::TotalActiveCount", "particle-buffer statistics counter; its getter Get_Total_Active_Count has no caller"),
+    (DEBUG, "", "RenderObjPersistFactoryClass::Load(ChunkLoadClass&) const::count", "warning limiters (two in the function)"),
+    (CONST, "", "DX8TextureCategoryClass::m_gForceMultiply", "never written: SetForceMultiply has no caller"),
+    (CONST, "", "MeshClass::Legacy_Meshes_Fogged", "never written"),
+    (CONST, "", "ParticleBufferClass::LODMaxScreenSizes", "never written: Set_LOD_Max_Screen_Size has no caller"),
+    (CONST, "", "re:ParticleEmitterClass::(DebugDisable|DefaultRemoveOnComplete)", "never written: Disable_All_Emitters / Set_Default_Remove_On_Complete have no caller"),
     (RENDER, "", "re:Quads|SortingQuads", W3D_RENDER),
     (RENDER, "", "Vector3Randomizer::Randomizer", "RNG of the W3D particle emitters' randomizers (render objects)"),
     (RENDER, "", "listboxLobbyGamesLarge", UI),

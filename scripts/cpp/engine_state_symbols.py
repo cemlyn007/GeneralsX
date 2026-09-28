@@ -25,9 +25,12 @@
 # Usage (from the GeneralsX root, or with --root):
 #   engine_state_symbols.py snapshot LIB.so   rewrite the TSV from the library's symbols
 #   engine_state_symbols.py check LIB.so      exit 1 if the library has a symbol the TSV lacks that no rule
-#                                             or hand entry classifies (an unreviewed new symbol), or with
-#                                             --strict if the TSV is stale in any way (a new or vanished
-#                                             symbol, or a class that changed)
+#                                             or hand entry classifies (an unreviewed new symbol) or that
+#                                             only a blanket `file:` pattern classifies, a listed symbol
+#                                             whose class or phase changed (to `unreviewed` included), or a
+#                                             listed name with a new instance (more TUs define it); with
+#                                             --strict also if the TSV is stale in any way (a new symbol a
+#                                             rule classifies, a vanished symbol, a moved definition)
 #   engine_state_symbols.py report [LIB.so]   print the per-engine work list grouped by phase, the counts
 #                                             per class and the unreviewed symbols (from the TSV, or from
 #                                             the library when given)
@@ -86,6 +89,7 @@ class Symbol:
         self.scope = ""
         self.source = "?"
         self.decl = ""
+        self.decls = []
         self.library = ""
         self.cls = ""
         self.phase = ""
@@ -299,6 +303,28 @@ class SourceIndex:
 
     def find(self, parsed):
         """(file:line, declaration text, whether the line is indented) of the definition, or ('?', '', False)."""
+        for _branch, source, decl, indented in self.definitions(parsed):
+            return source, decl, indented
+        return "?", "", False
+
+    def find_all(self, parsed):
+        """Every definition site (file:line, declaration text), one per file, found the way `find` finds the first: the TUs of
+        a name that several translation units each define (a file static, a function-local static of a
+        same-named function)."""
+        sites, files, first_branch = [], set(), None
+        for branch, source, decl, _indented in self.definitions(parsed):
+            if first_branch is None:
+                first_branch = branch
+            if branch != first_branch:
+                break
+            rel = source.split(":")[0]
+            if rel not in files:
+                files.add(rel)
+                sites.append((source, decl))
+        return sites
+
+    def definitions(self, parsed):
+        """(branch, file:line, declaration text, indented) of each candidate definition, best first."""
         var_re = re.compile(rf"\b{re.escape(parsed.var)}\b")
         if parsed.scope in ("function", "guard") and parsed.func:
             func = re.escape(parsed.func)
@@ -308,21 +334,23 @@ class SourceIndex:
                 else rf"\b{func}\s*\("
             )
             # Defined out of line, then (inline in the class body) anywhere after the function's name.
-            for owner_re in (owner, re.compile(rf"\b{func}\s*\(")):
+            for branch, owner_re in (("owner", owner), ("inline", re.compile(rf"\b{func}\s*\("))):
                 for rel in self.candidates(parsed.var, parsed.func, parsed.cls):
                     fm = owner_re.search(self.files[rel])
                     if not fm:
                         continue
                     for ls, line, a, _b in self.lines_with(rel, var_re, fm.start()):
                         if re.search(r"\bstatic\b", line[:a]):
-                            return self.where_is(rel, ls, line)
+                            yield (branch, *self.where_is(rel, ls, line))
+                            break
             # Made by a macro (MAKE_STANDARD_MODULE_MACRO's getModuleNameKey, ...): the class's header.
             if parsed.cls:
                 cls_re = re.compile(rf"^\s*(?:class|struct)\s+(?:\w+\s+)?{re.escape(parsed.cls)}\b[^;]*$", re.M)
                 for rel in self.candidates(parsed.cls):
                     m = cls_re.search(self.files[rel])
                     if m:
-                        return f"{rel}:{self.line_of(rel, m.start())}", "(defined by a macro in the class)", False
+                        yield "macro", f"{rel}:{self.line_of(rel, m.start())}", "(defined by a macro in the class)", False
+                        break
         if parsed.scope in ("class", "guard") and parsed.cls and not parsed.func:
             qual = re.compile(rf"\b{re.escape(parsed.cls)}\s*::\s*{re.escape(parsed.var)}\b")
             for rel in self.candidates(parsed.var, parsed.cls):
@@ -330,14 +358,17 @@ class SourceIndex:
                     continue
                 for ls, line, a, b in self.lines_with(rel, qual):
                     if DEF_PREFIX_RE.fullmatch(line[:a]) and DEF_SUFFIX_RE.match(line[b:]):
-                        return self.where_is(rel, ls, line)
+                        yield ("qualified", *self.where_is(rel, ls, line))
+                        break
             # A static data member defined in the class body (inline or constexpr).
             for rel in self.candidates(parsed.var, parsed.cls):
                 for ls, line, a, _b in self.lines_with(rel, var_re):
                     if re.search(r"\bstatic\b", line[:a]) and "(" not in line[:a]:
-                        return self.where_is(rel, ls, line)
+                        yield ("in-class", *self.where_is(rel, ls, line))
+                        break
         if parsed.scope in ("namespace", "class", "guard") and not parsed.func:
-            best = None
+            # Every file's first definition, ranked: a file-scope definition in a source file first.
+            found = []
             for rel in self.candidates(parsed.var):
                 is_source = rel.endswith((".cpp", ".c", ".cc"))
                 for ls, line, a, b in self.lines_with(rel, var_re):
@@ -349,15 +380,11 @@ class SourceIndex:
                         text = self.files[rel]
                         if not re.search(r"^\s*namespace\b", text[:ls], re.M):
                             continue
-                    rank = (indented, not is_source)
-                    if best is None or rank < best[0]:
-                        best = (rank, ls, line, rel)
+                    found.append(((indented, not is_source), ls, line, rel))
                     break
-                if best is not None and best[0] == (False, False):
-                    break
-            if best:
-                return self.where_is(best[3], best[1], best[2])
-        return "?", "", False
+            found.sort(key=lambda f: f[0])  # stable: candidates order within a rank
+            for rank, ls, line, rel in found:
+                yield (f"plain{rank}", *self.where_is(rel, ls, line))
 
 
 # What comes before the name in a definition: a type (and qualifiers), no keyword that makes it a
@@ -370,6 +397,14 @@ DEF_PREFIX_RE = re.compile(
     r"|[A-Z_][A-Z_0-9]*\(.*\)\s*)"  # a declaring macro (DECLARE_DEFINITION_FACTORY(...) name;)
 )
 DEF_SUFFIX_RE = re.compile(r"\s*(?:\[[^\]]*\]\s*)*(?:=|;|\{|\(|,|$)")
+
+
+SITE_SEP = ";"
+
+
+def source_files(source):
+    """The files of a source column (`a.cpp:1;b.cpp:2` -> {'a.cpp', 'b.cpp'}), without line numbers."""
+    return {site.split(":")[0] if not site.startswith("third-party:") else site for site in source.split(SITE_SEP)}
 
 
 def resolve_sources(root, symbols, third_party):
@@ -390,6 +425,13 @@ def resolve_sources(root, symbols, third_party):
         if library and (source == "?" or not at_file_scope or p.scope == "class" or sym.count == 1 and p.scope != "namespace"):
             sym.library = library
             source = f"third-party:{library}"
+        elif sym.count > 1:
+            # Several instances (TU-local statics of one name): record every definition site, so that the
+            # list shows each TU the one classification covers and a new TU's static is a visible change.
+            sites = index.find_all(p)
+            if len(sites) > 1:
+                source = SITE_SEP.join(site for site, _decl in sites)
+                sym.decls = [re.sub(r"\s+", " ", d)[:160] for _site, d in sites]
         sym.source = source
         sym.decl = re.sub(r"\s+", " ", decl)[:160]
         sym.parsed = p
@@ -405,7 +447,9 @@ PER, GLOBAL, CONST, DEBUG, RENDER, UNREVIEWED = CLASSES
 class Hand:
     """A hand classification from engine_state_hand.py: (class, phase, matcher, note). The matcher is the
     exact key, `re:` + a regular expression (fullmatch on the key) or `file:` + a regular expression
-    (search on the source column)."""
+    (searched for in every definition site of the source column; all of them must match). A `file:` match
+    is a blanket one, recorded as `by` = `file`: `check` fails on a new symbol it classifies, so every
+    static a sync adds to such a file is looked at once (and recorded by `snapshot`)."""
 
     def __init__(self, entry):
         self.cls, phase, matcher, self.note = entry
@@ -426,7 +470,7 @@ class Hand:
             return sym.key == self.name
         if self.regex is not None:
             return bool(self.regex.fullmatch(sym.key))
-        return bool(self.file.search(sym.source))
+        return all(self.file.search(site) for site in sym.source.split(SITE_SEP))
 
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -464,6 +508,12 @@ def rule_read_only(sym):
     return None
 
 
+def declarations(sym):
+    """The declaration of every definition site: a rule that reads the declaration must hold for all of
+    the TUs one key covers, not only the first."""
+    return sym.decls or [sym.decl]
+
+
 NAMEKEY_DECL_RE = re.compile(r"\b(NameKeyType|StaticNameKey)\b")
 
 
@@ -471,14 +521,16 @@ def rule_namekey(sym):
     p = sym.parsed
     if sym.key.startswith("TheKey_") or (p.var == "nk" and p.func == "getModuleNameKey"):
         return GLOBAL, "", "cached NameKeyType: process-wide by PLAN-023 Decision 2 (shared immortal generator)"
-    if NAMEKEY_DECL_RE.search(sym.decl.split("=")[0]):
+    if all(NAMEKEY_DECL_RE.search(d.split("=")[0]) for d in declarations(sym)):
         return GLOBAL, "", "cached NameKeyType (a name or window ID key): process-wide by PLAN-023 Decision 2"
     return None
 
 
 def rule_field_parse(sym):
     p = sym.parsed
-    if p.var in ("dataFieldParse", "myFieldParse", "commonFieldParse") or re.search(r"\bFieldParse\b", sym.decl.split("=")[0]):
+    if p.var in ("dataFieldParse", "myFieldParse", "commonFieldParse") or all(
+        re.search(r"\bFieldParse\b", d.split("=")[0]) for d in declarations(sym)
+    ):
         return CONST, "", "INI FieldParse table: built once, never written"
     return None
 
@@ -489,10 +541,11 @@ CONST_DECL_RE = re.compile(r"^(?:/\*static\*/\s*)?(?:static\s+)?(?:inline\s+)?(?
 def rule_const_object(sym):
     """A const object (dynamically initialised, so it lands in .data/.bss): never written after its
     initialisation. A pointer to const without `* const` is not one."""
-    decl = sym.decl.split("=")[0]
-    if CONST_DECL_RE.match(decl) or re.search(r"\*\s*const\s+\w+\s*(\[|$)", decl):
-        return CONST, "", "const object: initialised once, never written"
-    return None
+    for d in declarations(sym):
+        decl = d.split("=")[0]
+        if not (CONST_DECL_RE.match(decl) or re.search(r"\*\s*const\s+\w+\s*(\[|$)", decl)):
+            return None
+    return CONST, "", "const object: initialised once, never written"
 
 
 RULES = [
@@ -519,7 +572,8 @@ def classify(sym, symbols):
             return
     for hand in HAND:
         if hand.matches(sym):
-            sym.cls, sym.phase, sym.note, sym.by = hand.cls, hand.phase, hand.note, "hand"
+            sym.cls, sym.phase, sym.note = hand.cls, hand.phase, hand.note
+            sym.by = "file" if hand.file is not None else "hand"
             hand.used += 1
             return
     for name, rule in RULES:
@@ -540,8 +594,9 @@ TSV_HEADER = (
     "# list (scripts/cpp/engine_state_hand.py) or the rules, not this file. Columns: symbol (demangled, compiler\n"
     "# `.N` suffixes stripped); scope (namespace, class, function = function-local static, guard = its guard\n"
     "# variable); binding (local, global, unique = STB_GNU_UNIQUE); section; count (instances: TUs can each\n"
-    "# have one); bytes; source (path:line of the definition, found by searching the sources, `third-party:<lib>`\n"
-    "# for a vcpkg library, `?` if not found); class; phase (per-engine only); note; by (hand, rule:<name>,\n"
+    "# have one); bytes; source (path:line of the definition, found by searching the sources, every TU's site\n"
+    "# joined by `;` when several TUs define the name, `third-party:<lib>` for a vcpkg library, `?` if not\n"
+    "# found); class; phase (per-engine only); note; by (hand, file = a hand `file:` pattern, rule:<name>,\n"
     "# guard, none).\n"
 )
 
@@ -630,6 +685,36 @@ def cmd_snapshot(args):
     return 0
 
 
+def compare(key, sym, row):
+    """(errors, stale) for a symbol the list records. Errors in every mode: a class or phase that changed
+    (including to `unreviewed`: a hand entry deleted, or a hand regex or `file:` pattern that stopped
+    matching after an upstream rename or move), a blanket `file:` match replacing a reviewed one, and a new
+    instance of an already listed name (a count or a set of defining files that grew: a new TU's static of
+    the same name would otherwise inherit the existing classification unseen). Stale only: fewer instances,
+    and definitions that moved."""
+    errors, stale = [], []
+    if row["class"] != sym.cls or row["phase"] != sym.phase:
+        errors.append(f"class changed: {key}: {row['class']} {row['phase']} -> {sym.cls} {sym.phase} (by {sym.by})")
+    elif sym.by == "file" and row["by"] != "file":
+        errors.append(f"now classified only by a file pattern (was {row['by']}): {key} ({sym.source})")
+    try:
+        recorded_count = int(row["count"])
+    except (KeyError, ValueError):
+        recorded_count = 0
+    new_files = source_files(sym.source) - source_files(row.get("source", ""))
+    if sym.count > recorded_count or (recorded_count > 1 or sym.count > 1) and new_files and row.get("source") != "?":
+        errors.append(
+            f"new instance of a listed name: {key}: {recorded_count} -> {sym.count} instances"
+            + (f", new definition in {', '.join(sorted(new_files))}" if new_files else "")
+            + " (the listed classification would cover it unseen)"
+        )
+    elif sym.count < recorded_count:
+        stale.append(f"fewer instances: {key}: {recorded_count} -> {sym.count}")
+    elif row.get("source") != sym.source:
+        stale.append(f"definition moved: {key}: {row.get('source')} -> {sym.source}")
+    return errors, stale
+
+
 def cmd_check(args):
     symbols = load_library(args.root, args.lib, args.vcpkg_lib)
     recorded = read_tsv(os.path.join(args.root, TSV))
@@ -639,10 +724,14 @@ def cmd_check(args):
         if row is None:
             if sym.cls == UNREVIEWED:
                 errors.append(f"new symbol, not classified: {key} ({sym.source})")
+            elif sym.by == "file":
+                errors.append(f"new symbol, classified {sym.cls} only by a file pattern (review it): {key} ({sym.source})")
             else:
                 stale.append(f"new symbol, classified {sym.cls} by {sym.by}: {key} ({sym.source})")
-        elif row["class"] != sym.cls or row["phase"] != sym.phase:
-            stale.append(f"class changed: {key}: {row['class']} {row['phase']} -> {sym.cls} {sym.phase}")
+        else:
+            e, st = compare(key, sym, row)
+            errors += e
+            stale += st
     for key in sorted(set(recorded) - set(symbols)):
         stale.append(f"gone from the library: {key}")
     for line in errors:
@@ -694,7 +783,7 @@ def main():
     sub = parser.add_subparsers(dest="mode", required=True)
     p = sub.add_parser("snapshot", help="rewrite the TSV from the library")
     p.add_argument("lib")
-    p = sub.add_parser("check", help="fail on an unclassified new symbol")
+    p = sub.add_parser("check", help="fail on an unclassified new symbol, a changed class or a new instance")
     p.add_argument("lib")
     p.add_argument("--strict", action="store_true", help="also fail if the TSV is stale in any way")
     p = sub.add_parser("report", help="print the per-engine work list by phase and the unreviewed symbols")
