@@ -59,6 +59,7 @@
 
 #include "WWMath/plane.h"
 #include "WWMath/tri.h"
+#include "Common/FatalEngineError.h"
 
 
 // GLOBALS ////////////////////////////////////////////////////////////////////////////////////////
@@ -1241,6 +1242,8 @@ Bool TerrainLogic::loadMap( AsciiString filename, Bool query )
 			}
 		}
 		theInputStream.close();
+	} catch (const FatalEngineError&) { // GeneralsX @bugfix cemlyn007 28/09/2026 Let an embedded-mode fatal error reach the host.
+		throw;
 	} catch (...) {
 		// Eat the error - legacy files are not valid chunk format (and don't have waypoint info.)
 		DEBUG_LOG(("Unable to read waypoint info."));

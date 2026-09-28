@@ -65,6 +65,7 @@
 #include "GameLogic/SidesList.h"
 #include "GameLogic/TerrainLogic.h"
 #include "Lib/PathUtil.h"
+#include "Common/FatalEngineError.h"
 
 
 // PUBLIC DATA ////////////////////////////////////////////////////////////////////////////////////
@@ -591,6 +592,8 @@ SaveResult GameState::saveGame( AsciiString filename, UnicodeString desc,
 	XferSave xferSave;
 	try {
 		xferSave.open( filepath );
+	} catch (const FatalEngineError&) { // GeneralsX @bugfix cemlyn007 28/09/2026 Let an embedded-mode fatal error reach the host.
+		throw;
 	} catch(...) {
 		DEBUG_LOG(( "Error opening file '%s'", filepath.str() ));
 		return SaveResult( SC_UNABLE_TO_OPEN_FILE, filename );
@@ -617,6 +620,11 @@ SaveResult GameState::saveGame( AsciiString filename, UnicodeString desc,
 		// save file
 		xferSaveData( &xferSave, which );
 
+	}
+	// GeneralsX @bugfix cemlyn007 28/09/2026 Let an embedded-mode fatal error reach the host.
+	catch (const FatalEngineError&)
+	{
+		throw;
 	}
 	catch( ... )
 	{
@@ -703,6 +711,11 @@ SaveCode GameState::loadGame( AvailableGameInfo gameInfo )
 		xferSaveData( &xferLoad, SNAPSHOT_SAVELOAD );
 
 	}
+	// GeneralsX @bugfix cemlyn007 28/09/2026 Let an embedded-mode fatal error reach the host.
+	catch (const FatalEngineError&)
+	{
+		throw;
+	}
 	catch( ... )
 	{
 		error = TRUE;
@@ -718,6 +731,11 @@ SaveCode GameState::loadGame( AvailableGameInfo gameInfo )
 	{
 		// do the post-process from a save game load
 		gameStatePostProcessLoad();
+	}
+	// GeneralsX @bugfix cemlyn007 28/09/2026 Let an embedded-mode fatal error reach the host.
+	catch (const FatalEngineError&)
+	{
+		throw;
 	}
 	catch (...)
 	{
@@ -806,6 +824,11 @@ void GameState::loadQueuedSaveGame()
 	try
 	{
 		getSaveGameInfoFromFile( gameInfo.filename, &gameInfo.saveGameInfo );
+	}
+	// GeneralsX @bugfix cemlyn007 28/09/2026 Let an embedded-mode fatal error reach the host.
+	catch (const FatalEngineError&)
+	{
+		throw;
 	}
 	catch( ... )
 	{
@@ -1038,6 +1061,11 @@ Bool GameState::doesSaveGameExist( AsciiString filename )
 		xfer.open( filepath );
 
 	}
+	// GeneralsX @bugfix cemlyn007 28/09/2026 Let an embedded-mode fatal error reach the host.
+	catch (const FatalEngineError&)
+	{
+		throw;
+	}
 	catch( ... )
 	{
 		// unable to open file, it must not be here
@@ -1226,6 +1254,8 @@ static void addGameToAvailableList( AsciiString filename, void *userData )
 		}
 
 	}
+	} catch (const FatalEngineError&) { // GeneralsX @bugfix cemlyn007 28/09/2026 Let an embedded-mode fatal error reach the host.
+		throw;
 	} catch(...) {
 		// ignore invalid save entries
 	}

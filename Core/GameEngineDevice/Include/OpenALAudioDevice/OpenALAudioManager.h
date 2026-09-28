@@ -277,6 +277,8 @@ public:
 	virtual void setHardwareAccelerated(Bool accel) override { AudioManager::setHardwareAccelerated(accel); }
 	virtual void setSpeakerSurround(Bool surround) override { AudioManager::setSpeakerSurround(surround); }
 
+	virtual void *getHandleForBink(void) override;
+
 	virtual void friend_forcePlayAudioEventRTS(const AudioEventRTS *eventToPlay) override {}
 	virtual void processRequestList(void) override { removeAllAudioRequests(); }
 

@@ -942,6 +942,11 @@ void GameEngine::execute()
 					else
 						RELEASE_CRASH(("Uncaught Exception in GameEngine::update"));
 				}
+				// GeneralsX @bugfix cemlyn007 28/09/2026 Let an embedded-mode fatal error reach the host.
+				catch (const FatalEngineError&)
+				{
+					throw;
+				}
 				catch (...)
 				{
 					// try to save info off

@@ -3106,6 +3106,18 @@ void* OpenALAudioManager::getHandleForBink(void)
 }
 
 //-------------------------------------------------------------------------------------------------
+// GeneralsX @bugfix cemlyn007 28/09/2026 A video's audio stream with no AL behind it: the dummy
+// has no context, so a real stream's AL calls would fail (and bufferData's alGetError loop would
+// spin forever) or reach another engine's context. The video plays silently.
+void *OpenALAudioManagerDummy::getHandleForBink(void)
+{
+	if (!m_binkAudio) {
+		m_binkAudio = NEW OpenALAudioStream(OpenALAudioStream::DeviceFree());
+	}
+	return m_binkAudio;
+}
+
+//-------------------------------------------------------------------------------------------------
 void OpenALAudioManager::releaseHandleForBink(void)
 {
 	if (m_binkAudio) {

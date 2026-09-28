@@ -24,8 +24,15 @@ OpenALAudioStream::OpenALAudioStream()
     DEBUG_LOG(("OpenALAudioStream created: %i\n", m_source));
 }
 
+OpenALAudioStream::OpenALAudioStream(DeviceFree)
+    : m_hasSource(false)
+{
+}
+
 OpenALAudioStream::~OpenALAudioStream()
 {
+    if (!m_hasSource)
+        return;
     DEBUG_LOG(("OpenALAudioStream freed: %i\n", m_source));
     // Unbind the buffers first
     alSourceStop(m_source);
@@ -37,6 +44,8 @@ OpenALAudioStream::~OpenALAudioStream()
 
 bool OpenALAudioStream::bufferData(uint8_t *data, size_t data_size, ALenum format, int samplerate)
 {
+    if (!m_hasSource)
+        return false;
     DEBUG_LOG(("Buffering %zu bytes of data (samplerate: %i, format: %i)\n", data_size, samplerate, format));
     ALint num_queued;
     alGetSourcei(m_source, AL_BUFFERS_QUEUED, &num_queued);
@@ -74,6 +83,8 @@ bool OpenALAudioStream::bufferData(uint8_t *data, size_t data_size, ALenum forma
 
 void OpenALAudioStream::update()
 {
+    if (!m_hasSource)
+        return;
     ALint sourceState;
     alGetSourcei(m_source, AL_SOURCE_STATE, &sourceState);
 
@@ -130,6 +141,8 @@ void OpenALAudioStream::update()
 
 void OpenALAudioStream::reset()
 {
+    if (!m_hasSource)
+        return;
     DEBUG_LOG(("Resetting stream\n"));
     // alSourceStop() marks all queued buffers as processed so they can be
     // unqueued. alSourceRewind() transitions to AL_INITIAL but does NOT move
@@ -149,6 +162,8 @@ void OpenALAudioStream::reset()
 
 bool OpenALAudioStream::isPlaying()
 {
+    if (!m_hasSource)
+        return false;
     ALint state;
     alGetSourcei(m_source, AL_SOURCE_STATE, &state);
     return state == AL_PLAYING;
