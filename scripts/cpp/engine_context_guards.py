@@ -75,7 +75,7 @@ PROCESS_GLOBAL = {
     "TheLobbyQueuedUTMs": "GameSpy lobby menu queue (menu state; one UI engine per process)",
     # Not pointers: objects and values that later phases classify (the Phase 1 nm classification).
     "TheDX8MeshRenderer": "W3D mesh renderer object of the build without the context; with it, a PER_ENGINE_STATIC (PLAN-023 Phase 3)",
-    "TheW3DFrameLengthInMsec": "W3D frame timing value, never written: the same for every engine",
+    "TheW3DFrameLengthInMsec": "W3D frame timing value: every engine writes the same constant (GameClient::init sets MSEC_PER_LOGICFRAME_REAL); the unsynchronised write matters only with threads",
     "TheWaterTransparency": "OVERRIDE<> INI object of the build without the context; with it, a PER_ENGINE_STATIC (PLAN-023 Phase 3)",
     "TheWeatherSetting": "OVERRIDE<> INI object of the build without the context; with it, a PER_ENGINE_STATIC (PLAN-023 Phase 3)",
     "TheSupplyAndTechImageLocations": "skirmish-menu object (PLAN-023 Phase 4)",

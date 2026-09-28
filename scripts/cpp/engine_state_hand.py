@@ -77,12 +77,13 @@ HAND = [
     # and its three lists, the particle buffers' rand_gen and the mesh/material/texture/decal ID counters are
     # PER_ENGINE_STATICs; WorldHeightMap::m_alphaTiles is a member (so gone from the library, the slot
     # indexes rule:per-engine-static). What is left here is process-wide by design.
-    (GLOBAL, "", "_TheFileFactory", "with RTS_ENGINE_CONTEXT, always the one permanent W3D file factory (W3DFileSystem.cpp) that forwards to the current engine's W3DFileSystem (PLAN-023 Phase 3); every W3DFileSystem stores the same pointer and none nulls it"),
+    (GLOBAL, "", "_TheFileFactory", "with RTS_ENGINE_CONTEXT, always the one permanent W3D file factory (W3DFileSystem.cpp, immortal) that forwards to the current engine's W3DFileSystem (PLAN-023 Phase 3); every W3DFileSystem stores the same pointer and none nulls it"),
+    (GLOBAL, "", "re:(guard variable for )?\\(anonymous namespace\\)::engineW3DFileFactory\\(\\)::factory", "the one permanent W3D file factory _TheFileFactory points at (PLAN-023 Phase 3): made on first use under the static-init guard and never destroyed, the same object for every engine"),
     (GLOBAL, "", "_TheSimpleFileFactory", "never reassigned by the engine (only the tools do): always the process-global default factory"),
     (GLOBAL, "", "filtertable", "motchan's filter table: built once per process under std::call_once from constants (PLAN-023 Phase 3)"),
     (GLOBAL, "", "re:(Sphere|Ring)MeshArray|(Sphere|Ring)LODCosts", "sphere/ring LOD meshes: built once per process under std::call_once from constants (PLAN-023 Phase 3); only the one rendering engine's draw re-sets their alpha/scale, right before it draws them"),
     (GLOBAL, "", "re:_Fast(Acos|Asin|Sin|InvSin)Table", "WWMath::Init tables: built by the first of the counted WWMath::Init calls (PLAN-023 Phase 3), the same values every time"),
-    (GLOBAL, "", "TheW3DFrameLengthInMsec", "never written: the upstream tunable keeps its initial value, the same for every engine"),
+    (GLOBAL, "", "TheW3DFrameLengthInMsec", "every engine writes the same constant: GameClient::init calls W3DGameClient::setFrameRate(MSEC_PER_LOGICFRAME_REAL), its initial value; the unsynchronised write matters only with threads"),
     (GLOBAL, "", "re:W3DAssetManager::Create_Render_Obj\\(.*\\)::warning_count|WW3DAssetManager::Create_Render_Obj\\(.*\\)::warning_count", "missing-asset log limiter: bounds a log message count, and no engine state depends on it"),
     (PER, 3, "AssetStatusClass::Instance", "threads only: the missing-asset report, written by every engine and read by none (the WWDEBUG destructor writes it out at exit); concurrent engines need a lock"),
     (PER, 3, "re:_TempVertexBuffer|_TempNormalBuffer", "threads only: one pair per TU (dx8renderer.cpp's skinned-mesh deform scratch, cleared by TheDX8MeshRenderer's teardown; mesh.cpp's ray-cast/decal skin scratch; decalmsh.cpp's decal scratch; meshmdl.cpp's unused pair), each resized, filled and consumed within one call"),
