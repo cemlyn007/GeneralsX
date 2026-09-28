@@ -418,7 +418,11 @@ W3D file factory.  */
 // the current engine's W3DFileSystem (PLAN-023 Phase 3). Each engine's W3DFileSystem used to install itself
 // in _TheFileFactory and null it on destruction, so a second engine's teardown left the first reading
 // through null. With no W3DFileSystem in the current engine it reads through the default factory, as
-// _TheFileFactory does before the first W3DFileSystem is made.
+// _TheFileFactory does before the first W3DFileSystem is made. It reads the current engine's W3DFileSystem,
+// so a thread that loads files must run in its engine's context: the texture loader thread enters each
+// task's engine (TextureLoadTaskClass::Get_Engine_Context). The factory is immortal (made on first use and
+// never destroyed) since _TheFileFactory keeps pointing at it until the process exits, past static
+// destruction.
 namespace
 {
 class EngineW3DFileFactoryClass : public FileFactoryClass
@@ -439,14 +443,18 @@ public:
 	}
 };
 
-EngineW3DFileFactoryClass theEngineW3DFileFactory;
+FileFactoryClass *engineW3DFileFactory()
+{
+	static EngineW3DFileFactoryClass *const factory = new EngineW3DFileFactoryClass;
+	return factory;
+}
 }
 #endif
 
 W3DFileSystem::W3DFileSystem()
 {
 #if RTS_ENGINE_CONTEXT
-	_TheFileFactory = &theEngineW3DFileFactory;
+	_TheFileFactory = engineW3DFileFactory();
 #else
 	_TheFileFactory = this; // override the w3d file factory.
 #endif

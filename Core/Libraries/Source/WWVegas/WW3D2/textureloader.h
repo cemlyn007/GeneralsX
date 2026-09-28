@@ -237,6 +237,14 @@ class TextureLoadTaskClass : public TextureLoadTaskListNodeClass
 		void						Finish_Load					();
 		void						Apply_Missing_Texture	();
 
+#if RTS_ENGINE_CONTEXT
+		// GeneralsX @feature cemlyn007 28/09/2026 The engine that queued this task for the background loader,
+		// which the loader thread enters while it loads the task (PLAN-023 Phase 3): the W3D file factory
+		// reads the current engine's file system, and one process-wide loader thread serves every engine.
+		void						Set_Engine_Context		(::rts::EngineContext* context) { QueuedEngineContext = context; }
+		::rts::EngineContext*	Get_Engine_Context		() const { return QueuedEngineContext; }
+#endif
+
 	protected:
 		virtual bool			Begin_Compressed_Load	();
 		virtual bool			Begin_Uncompressed_Load	();
@@ -265,6 +273,9 @@ class TextureLoadTaskClass : public TextureLoadTaskListNodeClass
 		TaskType					Type;
 		PriorityType			Priority;
 		StateType				State;
+#if RTS_ENGINE_CONTEXT
+		::rts::EngineContext*	QueuedEngineContext = nullptr;
+#endif
 };
 
 class CubeTextureLoadTaskClass : public TextureLoadTaskClass

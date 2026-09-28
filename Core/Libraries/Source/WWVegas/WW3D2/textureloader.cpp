@@ -971,6 +971,9 @@ void TextureLoader::Begin_Load_And_Queue(TextureLoadTaskClass *task)
 		// without actually listing the reasons. I suspect
 		// it has something to do with visually important textures,
 		// like those in the foreground, starting their load last.
+#if RTS_ENGINE_CONTEXT
+		task->Set_Engine_Context(::rts::ctx()); // GeneralsX @feature cemlyn007 28/09/2026 entered by the loader thread
+#endif
 		_BackgroundQueue.Push_Front(task);
 	} else {
 		// unable to load.
@@ -1028,6 +1031,11 @@ void LoaderThreadClass::Thread_Function()
 				WWASSERT(task->Get_State() == TextureLoadTaskClass::STATE_LOAD_BEGUN);
 
 				// load mip map levels and return to foreground queue for final step.
+#if RTS_ENGINE_CONTEXT
+				// GeneralsX @feature cemlyn007 28/09/2026 Load in the engine that queued the task, not the one
+				// that started this thread: it reads that engine's W3DFileSystem (PLAN-023 Phase 3).
+				::rts::Scope engineScope(task->Get_Engine_Context());
+#endif
 				task->Load();
 				_ForegroundQueue.Push_Back(task);
 			}
