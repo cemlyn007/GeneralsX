@@ -98,8 +98,11 @@ struct EngineSlotTable;
 struct RTS_ENGINE_CONTEXT_API EngineContext
 {
 	EngineContext() = default;
-	// Destroys the slot objects in the reverse order of their creation. It does not touch the singletons:
-	// the engine's own shutdown deletes those, inside a Scope for this context.
+	// Destroys the slot objects in the reverse order of their creation, inside a Scope for this context.
+	// It does not touch the singletons: the engine's own shutdown deletes and nulls those, inside a
+	// Scope for this context, before the context is destroyed. Debug builds assert that it did (every
+	// singleton null) and that nothing wrote g_noEngine. A context whose engine faulted is never
+	// destroyed: its state is corrupt.
 	~EngineContext();
 
 	EngineContext(const EngineContext&) = delete;
@@ -119,6 +122,10 @@ struct RTS_ENGINE_CONTEXT_API EngineContext
 	// FatalEngineError.h).
 	bool engineTearingDown = false;
 
+	// Set while this engine boots from names another engine primed, until its upgrades are loaded: it
+	// must intern no new NameKey then (NameKeyGenerator::PrimingLatch, PLAN-023 Decision 2).
+	bool nameKeysFrozen = false;
+
 	// Later phases add hot per-engine state here as direct fields (the RNG seeds, the pathfinder pool,
 	// the polygon triggers, ...: PLAN-023 Phases 2-3), since a field costs one load where a slot costs a
 	// lookup.
@@ -130,6 +137,9 @@ struct RTS_ENGINE_CONTEXT_API EngineContext
 
 	// The number of singleton fields that are not null (for the lifecycle checks).
 	std::size_t countLiveSingletons() const;
+	// Calls `visit` with the name (`TheXxx`) of every singleton field that is not null, in list order,
+	// and returns how many there were.
+	std::size_t forEachLiveSingleton(void (*visit)(const char* name, void* user), void* user) const;
 
 private:
 	EngineSlotTable* m_slots = nullptr;

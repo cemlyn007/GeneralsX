@@ -18,6 +18,10 @@
 
 #include "PreRTS.h"
 
+#if RTS_ENGINE_CONTEXT
+#include <mutex>
+#endif
+
 // GeneralsX @bugfix BenderAI 24/02/2026 Phase 5 - malloc.h not on macOS
 #ifdef __APPLE__
 #include <stdlib.h>
@@ -115,11 +119,24 @@ void MemoryPoolFactory::debugSetInitFillerIndex(Int index)
 // GLOBAL FUNCTIONS
 //-----------------------------------------------------------------------------
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 28/09/2026 The memory manager is process-wide and every engine in the
+// process uses it, so initMemoryManager/shutdownMemoryManager are refcounted: only the last shutdown
+// destroys it (PLAN-023 Phase 1).
+static std::mutex theMemoryManagerUsersMutex;
+static Int theMemoryManagerUsers = 0;
+#endif
+
 /**
 	Initialize the memory manager, and create TheMemoryPoolFactory and TheDynamicMemoryAllocator.
 */
 void initMemoryManager()
 {
+#if RTS_ENGINE_CONTEXT
+	std::lock_guard<std::mutex> users(theMemoryManagerUsersMutex);
+	if (theMemoryManagerUsers++ > 0)
+		return;
+#endif
 	if (TheMemoryPoolFactory == nullptr && TheDynamicMemoryAllocator == nullptr)
 	{
 		TheMemoryPoolFactory = new (malloc(sizeof(MemoryPoolFactory))) MemoryPoolFactory;
@@ -149,6 +166,11 @@ Bool isMemoryManagerOfficiallyInited()
 */
 void shutdownMemoryManager()
 {
+#if RTS_ENGINE_CONTEXT
+	std::lock_guard<std::mutex> users(theMemoryManagerUsersMutex);
+	if (theMemoryManagerUsers == 0 || --theMemoryManagerUsers > 0)
+		return;
+#endif
 	if (TheDynamicMemoryAllocator != nullptr)
 	{
 		TheDynamicMemoryAllocator->~DynamicMemoryAllocator();

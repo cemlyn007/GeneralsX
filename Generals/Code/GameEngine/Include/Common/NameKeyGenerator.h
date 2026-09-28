@@ -106,6 +106,11 @@ public:
 	// Get a string out of the INI. Store it into a NameKeyType
 	static void parseStringAsNameKeyType( INI *ini, void *instance, void *store, const void* userData );
 
+	// GeneralsX @feature cemlyn007 28/09/2026 Test hook for PLAN-023 Decision 2's perturbation gate:
+	// interns `junkNames` names no data uses, then skips `skippedIds` ids, so every key interned
+	// afterwards differs from an unperturbed run. The simulation must not notice. Never call it in play.
+	void perturbForTesting(Int junkNames, Int skippedIds);
+
 #if RETAIL_COMPATIBLE_CRC
 #if RTS_ZEROHOUR
 	void syncNameKeyID();

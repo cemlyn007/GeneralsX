@@ -59,8 +59,16 @@ struct EngineSlotTable
 
 EngineContext::~EngineContext()
 {
+	DEBUG_ASSERTCRASH(this == &g_noEngine || countLiveSingletons() == 0,
+		("EngineContext destroyed with %u live singletons: its engine was not shut down, or its shutdown left some",
+		(unsigned)countLiveSingletons()));
+	DEBUG_ASSERTCRASH(this == &g_noEngine || noEngineIsPristine(), ("g_noEngine was written: engine state leaked outside every Scope"));
+
 	if (m_slots == nullptr)
 		return;
+
+	// A slot object's destructor may read engine state, which must be this engine's.
+	Scope scope(this);
 
 	// A slot object's destructor may read another slot (or create one), so destroy them newest first and
 	// clear each before its destructor runs.
@@ -108,9 +116,23 @@ std::size_t EngineContext::countLiveSingletons() const
 	return live;
 }
 
+std::size_t EngineContext::forEachLiveSingleton(void (*visit)(const char* name, void* user), void* user) const
+{
+	std::size_t live = 0;
+	// Three separate definitions: forwarding one macro to another would macro-expand the name.
+#define RTS_ENGINE_SINGLETON(T, n) if (n##_ != nullptr) { ++live; visit(#n, user); }
+#define RTS_ENGINE_SINGLETON_STRUCT(T, n) if (n##_ != nullptr) { ++live; visit(#n, user); }
+#define RTS_ENGINE_SINGLETON_ZH(T, n) if (n##_ != nullptr) { ++live; visit(#n, user); }
+#include "Common/EngineSingletons.inl"
+#undef RTS_ENGINE_SINGLETON
+#undef RTS_ENGINE_SINGLETON_STRUCT
+#undef RTS_ENGINE_SINGLETON_ZH
+	return live;
+}
+
 bool noEngineIsPristine()
 {
-	return g_noEngine.countLiveSingletons() == 0 && !g_noEngine.engineTearingDown;
+	return g_noEngine.countLiveSingletons() == 0 && !g_noEngine.engineTearingDown && !g_noEngine.nameKeysFrozen;
 }
 
 } // namespace rts

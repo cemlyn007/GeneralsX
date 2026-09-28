@@ -765,8 +765,25 @@ static std::atomic<bool> theEngineEmbeddedMode(false);
 
 FatalEngineError::~FatalEngineError() = default;
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @bugfix cemlyn007 28/09/2026 Set once the process has started to exit (see IsEngineTearingDown)
+static std::atomic<bool> theProcessExiting(false);
+
+static void markProcessExiting()
+{
+	theProcessExiting.store(true);
+}
+#endif
+
 void SetEngineEmbeddedMode(bool embedded)
 {
+#if RTS_ENGINE_CONTEXT
+	// Registered when a host first embeds the engine, so it runs before the destructors of the statics
+	// constructed until then (atexit handlers and static destructors run in reverse order).
+	static std::atomic<bool> exitHandlerRegistered(false);
+	if (embedded && !exitHandlerRegistered.exchange(true))
+		atexit(&markProcessExiting);
+#endif
 	theEngineEmbeddedMode.store(embedded);
 }
 
@@ -779,6 +796,7 @@ bool IsEngineEmbeddedMode()
 #if RTS_ENGINE_CONTEXT
 void SetEngineTearingDown(bool tearingDown)
 {
+	// g_noEngine stays pristine: no engine is being torn down there.
 	rts::EngineContext* context = rts::ctx();
 	if (context != &rts::g_noEngine)
 		context->engineTearingDown = tearingDown;
@@ -786,8 +804,13 @@ void SetEngineTearingDown(bool tearingDown)
 
 bool IsEngineTearingDown()
 {
+	// GeneralsX @bugfix cemlyn007 28/09/2026 Outside every engine a fatal error reaches the host (it
+	// throws) until the process starts to exit; from then on it is a static destructor or an exit
+	// handler, where a throw would end the process through std::terminate.
 	const rts::EngineContext* context = rts::ctx();
-	return context == &rts::g_noEngine || context->engineTearingDown;
+	if (context == &rts::g_noEngine)
+		return theProcessExiting.load();
+	return context->engineTearingDown;
 }
 #else
 static bool theEngineTearingDown = false;

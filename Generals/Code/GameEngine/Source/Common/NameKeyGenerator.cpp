@@ -256,6 +256,20 @@ NameKeyType NameKeyGenerator::createNameKey(UnsignedInt hash, const AsciiString&
 }
 
 //-------------------------------------------------------------------------------------------------
+// GeneralsX @feature cemlyn007 28/09/2026 PLAN-023 Decision 2's perturbation gate (see the header)
+void NameKeyGenerator::perturbForTesting(Int junkNames, Int skippedIds)
+{
+	for (Int i = 0; i < junkNames; ++i)
+	{
+		AsciiString junk;
+		junk.format("GeneralsXNameKeyPerturbation%d_%u", i, m_nextID);
+		nameToKey(junk);
+	}
+	if (skippedIds > 0)
+		m_nextID += (UnsignedInt)skippedIds;
+}
+
+//-------------------------------------------------------------------------------------------------
 // Get a string out of the INI. Store it into a NameKeyType
 //-------------------------------------------------------------------------------------------------
 void NameKeyGenerator::parseStringAsNameKeyType( INI *ini, void *instance, void *store, const void* userData )
