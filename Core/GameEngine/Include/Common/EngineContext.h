@@ -54,6 +54,7 @@
 #endif
 
 #include <cstddef>
+#include <cstdint>
 #include <functional>
 #include <type_traits>
 #include <utility>
@@ -82,6 +83,8 @@
 #undef RTS_ENGINE_SINGLETON
 #undef RTS_ENGINE_SINGLETON_STRUCT
 #undef RTS_ENGINE_SINGLETON_ZH
+// The types of the direct per-engine fields below.
+class PathfindCellInfo;
 
 namespace rts
 {
@@ -130,9 +133,19 @@ struct RTS_ENGINE_CONTEXT_API EngineContext
 	// GlobalData nulls it when that instance is deleted.
 	::GlobalData* originalGlobalData = nullptr;
 
-	// Later phases add hot per-engine state here as direct fields (the RNG seeds, the pathfinder pool,
-	// the polygon triggers, ...: PLAN-023 Phases 2-3), since a field costs one load where a slot costs a
-	// lookup.
+	// Hot per-engine state lives here as direct fields, since a field costs one load where a slot costs a
+	// lookup (PLAN-023 Phases 2-3).
+
+	// RandomValue.cpp's seeds (theGameAudioSeed, ...), with their upstream initial values.
+	std::uint32_t gameAudioSeed[6] = {0xf22d0e56U, 0x883126e9U, 0xc624dd2fU, 0x702c49cU, 0x9e353f7dU, 0x6fdf3b64U};
+	std::uint32_t gameClientSeed[6] = {0xf22d0e56U, 0x883126e9U, 0xc624dd2fU, 0x702c49cU, 0x9e353f7dU, 0x6fdf3b64U};
+	std::uint32_t gameLogicSeed[6] = {0xf22d0e56U, 0x883126e9U, 0xc624dd2fU, 0x702c49cU, 0x9e353f7dU, 0x6fdf3b64U};
+	std::uint32_t gameLogicBaseSeed = 0;
+
+	// PathfindCellInfo::s_infoArray/s_firstFree: the pathfinder's cell-info pool and its free list
+	// (AIPathfind.cpp), made and freed by this engine's Pathfinder.
+	::PathfindCellInfo* pathfindCellInfoArray = nullptr;
+	::PathfindCellInfo* pathfindCellInfoFirstFree = nullptr;
 
 	// Per-engine slot objects, by allocateEngineSlotIndex() index; null until set.
 	void* getSlot(std::size_t index) const;
@@ -183,6 +196,55 @@ public:
 
 private:
 	EngineContext* m_previous;
+};
+
+// GeneralsX @feature cemlyn007 28/09/2026 PER_ENGINE_STATIC (PLAN-023 Phases 2-4)
+// One object per engine in place of a file, class or function-local static: the object lives in a slot of
+// the current EngineContext, made on first use in that context (value-initialised, then passed to
+// `initialize` if one is given) and destroyed with it, newest first. The static itself only holds the slot
+// index, so it is process-wide and written once, at static initialisation. A TU-local (or header) `#define`
+// of the old name to `(name_perEngine.get())` keeps the uses unchanged. An access costs a slot lookup (a
+// call), so hot state belongs in direct EngineContext fields instead. It must not be used outside every
+// Scope (g_noEngine owns no slots).
+template <typename T>
+class PerEngineStatic
+{
+public:
+	PerEngineStatic() : m_index(allocateEngineSlotIndex()), m_initialize(nullptr) {}
+	explicit PerEngineStatic(void (*initialize)(T& object)) : m_index(allocateEngineSlotIndex()), m_initialize(initialize) {}
+
+	PerEngineStatic(const PerEngineStatic&) = delete;
+	PerEngineStatic& operator=(const PerEngineStatic&) = delete;
+
+	T& get() const
+	{
+		EngineContext* context = ctx();
+		void* object = context->getSlot(m_index);
+		if (object == nullptr)
+		{
+			Holder* holder = new Holder();
+			if (m_initialize != nullptr)
+				m_initialize(holder->value);
+			context->setSlot(m_index, holder, &destroy);
+			object = holder;
+		}
+		return static_cast<Holder*>(object)->value;
+	}
+
+private:
+	// A struct, so that T may be an array.
+	struct Holder
+	{
+		T value{};
+	};
+
+	static void destroy(void* object)
+	{
+		delete static_cast<Holder*>(object);
+	}
+
+	std::size_t m_index;
+	void (*m_initialize)(T& object);
 };
 
 // A callable that runs `function` inside a Scope for the context that was current when it was made. For

@@ -331,9 +331,15 @@ GameEngine::~GameEngine()
 	TheGameInfo = nullptr;
 
 	// GeneralsX @bugfix cemlyn007 28/09/2026 GameEngine::init parses Water.ini and Weather.ini into these
-	// process-wide settings, and only the render device's W3DWater (and the snow manager) free them. Left
-	// set, the next engine's parse finds them and throws INI_INVALID_DATA (PLAN-023 Phase 3 makes them
-	// per engine; until then they are freed with the engine that parsed them).
+	// settings (per engine: Water.h, Snow.h), and only the render device's W3DWater (and the snow manager)
+	// free them. The engine that parsed them owns them, so it frees them here, headless too; and the
+	// time-of-day water settings' strings go back to the memory manager with the engine rather than with its
+	// context.
+	for (Int i = 0; i < TIME_OF_DAY_COUNT; ++i)
+	{
+		WaterSettings[i].m_skyTextureFile.clear();
+		WaterSettings[i].m_waterTextureFile.clear();
+	}
 	if (TheWaterTransparency != nullptr)
 	{
 		deleteInstance((WaterTransparencySetting*)TheWaterTransparency.getNonOverloadedPointer());
