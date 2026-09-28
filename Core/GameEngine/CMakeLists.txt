@@ -37,6 +37,7 @@ set(GAMEENGINE_SRC
 #    Include/Common/encrypt.h
 #    Include/Common/Energy.h
     Include/Common/Errors.h
+    Include/Common/FatalEngineError.h
     Include/Common/file.h
     Include/Common/FileSystem.h
     Include/Common/FramePacer.h

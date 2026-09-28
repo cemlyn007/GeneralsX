@@ -68,6 +68,7 @@
 #include "Common/Xfer.h"
 #include "Common/XferCRC.h"
 #include "Common/GameLOD.h"
+#include "Common/FatalEngineError.h"
 #include "Common/Registry.h"
 #include "Common/GameCommon.h"	// FOR THE ALLOW_DEBUG_CHEATS_IN_RELEASE #define
 
@@ -889,6 +890,12 @@ void GameEngine::init()
 		else
 			RELEASE_CRASH(("Uncaught Exception during initialization."));
 
+	}
+	// GeneralsX @feature cemlyn007 28/09/2026 Embedded mode: a fatal error raised inside init
+	// reaches the host with its own message, instead of being replaced by the generic one below.
+	catch (const FatalEngineError&)
+	{
+		throw;
 	}
 	catch (...)
 	{

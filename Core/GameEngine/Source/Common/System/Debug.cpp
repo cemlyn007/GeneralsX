@@ -60,6 +60,8 @@
 #endif
 #include "Common/CommandLine.h"
 #include "Common/Debug.h"
+#include "Common/FatalEngineError.h"
+#include <atomic>
 #include "Common/CRCDebug.h"
 #include "Common/UnicodeString.h"
 #include "GameClient/ClientInstance.h"
@@ -757,6 +759,21 @@ static void TriggerMiniDump()
 }
 
 
+// GeneralsX @feature cemlyn007 28/09/2026 Embedded mode (see FatalEngineError.h)
+static std::atomic<bool> theEngineEmbeddedMode(false);
+
+FatalEngineError::~FatalEngineError() = default;
+
+void SetEngineEmbeddedMode(bool embedded)
+{
+	theEngineEmbeddedMode.store(embedded);
+}
+
+bool IsEngineEmbeddedMode()
+{
+	return theEngineEmbeddedMode.load();
+}
+
 void ReleaseCrash(const char *reason)
 {
 	/// do additional reporting on the crash, if possible
@@ -809,6 +826,12 @@ void ReleaseCrash(const char *reason)
 		fflush(theReleaseCrashLogFile);
 		fclose(theReleaseCrashLogFile);
 		theReleaseCrashLogFile = nullptr;
+	}
+
+	// GeneralsX @feature cemlyn007 28/09/2026 Embedded mode: hand the error to the host instead of
+	// showing a message box and exiting the process.
+	if (IsEngineEmbeddedMode()) {
+		throw FatalEngineError(reason ? reason : "");
 	}
 
 	if (!DX8Wrapper_IsWindowed) {
@@ -930,6 +953,14 @@ void ReleaseCrashLocalized(const AsciiString& p, const AsciiString& m)
 		fflush(theReleaseCrashLogFile);
 		fclose(theReleaseCrashLogFile);
 		theReleaseCrashLogFile = nullptr;
+	}
+
+	// GeneralsX @feature cemlyn007 28/09/2026 Embedded mode: hand the error to the host instead of
+	// exiting the process (see FatalEngineError.h).
+	if (IsEngineEmbeddedMode()) {
+		AsciiString reason;
+		reason.translate(mesg);
+		throw FatalEngineError(reason.str());
 	}
 
 	_exit(1);
