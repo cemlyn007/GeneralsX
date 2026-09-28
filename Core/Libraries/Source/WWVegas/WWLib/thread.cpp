@@ -53,6 +53,12 @@ ThreadClass::~ThreadClass()
 void __cdecl ThreadClass::Internal_Thread_Function(void* params)
 {
 	ThreadClass* tc=reinterpret_cast<ThreadClass*>(params);
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 28/09/2026 Run in the context of the engine that started the thread. Set
+	// directly rather than with an rts::Scope: MSVC rejects __try below in a function with objects to
+	// unwind (C2712), and the thread has no previous context to restore.
+	::rts::t_engine = tc->engine_context != nullptr ? tc->engine_context : &::rts::g_noEngine;
+#endif
 	tc->running=true;
 	// GeneralsX @bugfix BenderAI 24/02/2026 Phase 5 - pthread_t is a pointer on macOS; use int wrapper
 #ifdef _WIN32
@@ -99,6 +105,9 @@ void ThreadClass::Execute()
 		// assert(0);
 		return;
 	#else
+#if RTS_ENGINE_CONTEXT
+		engine_context = ::rts::ctx(); // GeneralsX @feature cemlyn007 28/09/2026 carried into the thread
+#endif
 		handle=_beginthread(&Internal_Thread_Function,0,this);
 		SetThreadPriority((HANDLE)handle,THREAD_PRIORITY_NORMAL+thread_priority);
 		WWDEBUG_SAY(("ThreadClass::Execute: Started thread %s, thread ID is %X", ThreadName, handle));

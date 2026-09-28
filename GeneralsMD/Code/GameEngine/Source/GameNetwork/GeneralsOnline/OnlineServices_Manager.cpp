@@ -16,6 +16,7 @@
 #include <thread>
 #include <curl/curl.h>
 #include "GameNetwork/GeneralsOnline/NGMP_json.h"
+#include "Common/EngineContext.h" // GeneralsX @feature cemlyn007 28/09/2026 rts::withCurrentEngine
 
 using json = nlohmann::json;
 
@@ -387,7 +388,7 @@ void NGMP_OnlineServicesManager::requestLobbyListAsync() {
         m_lobbyThread.join();
     }
 
-    m_lobbyThread = std::thread([this]() {
+    m_lobbyThread = std::thread(::rts::withCurrentEngine([this]() {
         CURL* curl = curl_easy_init();
         if (!curl) {
             m_lobbyRequestInFlight = false;
@@ -500,11 +501,11 @@ void NGMP_OnlineServicesManager::requestLobbyListAsync() {
         }
 
     m_lobbyRequestInFlight = false;
-    });
+    }));
 }
 
 void NGMP_OnlineServicesManager::createLobbyAsync(const std::string& name, const std::string& mapName, const std::string& mapPath, bool isOfficial, int maxPlayers, bool vanillaTeamsOnly, bool trackStats, uint32_t startingCash, bool isPassworded, const std::string& password, bool allowObservers) {
-    std::thread([this, name, mapName, mapPath, isOfficial, maxPlayers, vanillaTeamsOnly, trackStats, startingCash, isPassworded, password, allowObservers]() {
+    std::thread(::rts::withCurrentEngine([this, name, mapName, mapPath, isOfficial, maxPlayers, vanillaTeamsOnly, trackStats, startingCash, isPassworded, password, allowObservers]() {
         CURL* curl = curl_easy_init();
         if (!curl) return;
 
@@ -601,11 +602,11 @@ void NGMP_OnlineServicesManager::createLobbyAsync(const std::string& name, const
             ev.type = NGMPEvent::EVENT_LOBBY_CREATE_FAILED;
             postEvent(ev);
         }
-    }).detach();
+    })).detach();
 }
 
 void NGMP_OnlineServicesManager::joinLobbyAsync(int64_t lobbyId, const std::string& password) {
-    std::thread([this, lobbyId, password]() {
+    std::thread(::rts::withCurrentEngine([this, lobbyId, password]() {
         CURL* curl = curl_easy_init();
         if (!curl) return;
 
@@ -688,14 +689,14 @@ void NGMP_OnlineServicesManager::joinLobbyAsync(int64_t lobbyId, const std::stri
             ev.type = NGMPEvent::EVENT_LOBBY_JOIN_FAILED;
             postEvent(ev);
         }
-    }).detach();
+    })).detach();
 }
 
 void NGMP_OnlineServicesManager::requestLobbyDetailsAsync(int64_t lobbyId) {
     int64_t targetId = (lobbyId >= 0) ? lobbyId : m_currentLobbyId;
     if (targetId < 0) return;
 
-    std::thread([this, targetId]() {
+    std::thread(::rts::withCurrentEngine([this, targetId]() {
         CURL* curl = curl_easy_init();
         if (!curl) return;
 
@@ -869,13 +870,13 @@ void NGMP_OnlineServicesManager::requestLobbyDetailsAsync(int64_t lobbyId) {
                 postEvent(leftEv);
             }
         }
-    }).detach();
+    })).detach();
 }
 
 static void sendLobbyPostUpdate(const std::string& authToken, int64_t lobbyId, const json& payload) {
     if (lobbyId < 0 || authToken.empty()) return;
 
-    std::thread([authToken, lobbyId, payload]() {
+    std::thread(::rts::withCurrentEngine([authToken, lobbyId, payload]() {
         CURL* curl = curl_easy_init();
         if (!curl) return;
 
@@ -907,7 +908,7 @@ static void sendLobbyPostUpdate(const std::string& authToken, int64_t lobbyId, c
                 payload.value("field", -1), res, httpCode, response.text.c_str());
             fflush(stderr);
         }
-    }).detach();
+    })).detach();
 }
 
 void NGMP_OnlineServicesManager::updateLobbyMap(const std::string& mapName, const std::string& mapPath, bool isOfficial, int maxPlayers) {
@@ -1042,7 +1043,7 @@ void NGMP_OnlineServicesManager::updateLobbyLeave(int64_t lobbyId) {
     int64_t targetId = (lobbyId >= 0) ? lobbyId : m_currentLobbyId;
     if (targetId < 0 || m_authToken.empty()) return;
 
-    std::thread([this, targetId]() {
+    std::thread(::rts::withCurrentEngine([this, targetId]() {
         CURL* curl = curl_easy_init();
         if (!curl) return;
 
@@ -1074,7 +1075,7 @@ void NGMP_OnlineServicesManager::updateLobbyLeave(int64_t lobbyId) {
 
         m_currentLobbyId = -1;
         m_isLobbyOwner = false;
-    }).detach();
+    })).detach();
 }
 
 void NGMP_OnlineServicesManager::requestPlaylistsAsync() {
@@ -1094,7 +1095,7 @@ void NGMP_OnlineServicesManager::requestPlaylistsAsync() {
         m_playlistsThread.join();
     }
 
-    m_playlistsThread = std::thread([this]() {
+    m_playlistsThread = std::thread(::rts::withCurrentEngine([this]() {
         CURL* curl = curl_easy_init();
         if (!curl) {
             m_playlistsRequestInFlight = false;
@@ -1209,11 +1210,11 @@ void NGMP_OnlineServicesManager::requestPlaylistsAsync() {
         }
 
         m_playlistsRequestInFlight = false;
-    });
+    }));
 }
 
 void NGMP_OnlineServicesManager::startMatchmakingAsync(uint16_t playlistID, const std::vector<int>& selectedMapIndexes) {
-    std::thread([this, playlistID, selectedMapIndexes]() {
+    std::thread(::rts::withCurrentEngine([this, playlistID, selectedMapIndexes]() {
         CURL* curl = curl_easy_init();
         if (!curl) return;
 
@@ -1255,11 +1256,11 @@ void NGMP_OnlineServicesManager::startMatchmakingAsync(uint16_t playlistID, cons
             fprintf(stderr, "[NGMP] Failed to start matchmaking (curl=%d, http=%ld)\n", res, httpCode);
             fflush(stderr);
         }
-    }).detach();
+    })).detach();
 }
 
 void NGMP_OnlineServicesManager::cancelMatchmakingAsync() {
-    std::thread([this]() {
+    std::thread(::rts::withCurrentEngine([this]() {
         CURL* curl = curl_easy_init();
         if (!curl) return;
 
@@ -1291,11 +1292,11 @@ void NGMP_OnlineServicesManager::cancelMatchmakingAsync() {
             fprintf(stderr, "[NGMP] Failed to cancel matchmaking (curl=%d, http=%ld)\n", res, httpCode);
             fflush(stderr);
         }
-    }).detach();
+    })).detach();
 }
 
 void NGMP_OnlineServicesManager::widenMatchmakingAsync() {
-    std::thread([this]() {
+    std::thread(::rts::withCurrentEngine([this]() {
         CURL* curl = curl_easy_init();
         if (!curl) return;
 
@@ -1328,7 +1329,7 @@ void NGMP_OnlineServicesManager::widenMatchmakingAsync() {
             fprintf(stderr, "[NGMP] Failed to widen matchmaking search (curl=%d, http=%ld)\n", res, httpCode);
             fflush(stderr);
         }
-    }).detach();
+    })).detach();
 }
 
 bool NGMP_OnlineServicesManager::hasGlobalStats() const {

@@ -26,9 +26,16 @@
 //   RTS_ENGINE_SINGLETON(Class, TheName)         -- `Class* TheName`, Class declared with `class`
 //   RTS_ENGINE_SINGLETON_STRUCT(Struct, TheName) -- the same for a type declared with `struct`
 //
-// Every file that includes this one defines both macros. Only plain #if/#endif lines may appear
-// between entries (they are copied into the generated macro header), and entries that exist in
-// one game only go under #if RTS_ZEROHOUR, because Core compiles into both games.
+//   RTS_ENGINE_SINGLETON_ZH(Class, TheName)      -- a singleton that exists in Zero Hour only
+//
+// Every file that includes this one defines all three macros (RTS_ENGINE_SINGLETON_ZH cannot default
+// to RTS_ENGINE_SINGLETON: forwarding would macro-expand TheName where the macro header is in scope).
+// The list has no preprocessor conditionals (the script rejects them), so rts::EngineContext has the
+// same fields in every translation unit, whatever game or library it is compiled for. That matters
+// because Common/EngineContext.h is force-included into Core libraries built without RTS_ZEROHOUR as
+// well as into both games, and differing layouts would be an ODR violation that reads the wrong
+// field. A Zero Hour-only entry is therefore a field in both games; only its `TheXxx` macro is under
+// #if RTS_ZEROHOUR (in the generated macro header), because Core compiles into both games.
 //
 // After editing this list, run
 //   python3 scripts/cpp/engine_context_guards.py guard
@@ -94,9 +101,7 @@ RTS_ENGINE_SINGLETON(WeaponStore, TheWeaponStore)
 // GameClient: display, input, UI and client-side stores
 RTS_ENGINE_SINGLETON(Anim2DCollection, TheAnim2DCollection)
 RTS_ENGINE_SINGLETON(CampaignManager, TheCampaignManager)
-#if RTS_ZEROHOUR
-RTS_ENGINE_SINGLETON(SkirmishGameInfo, TheChallengeGameInfo)
-#endif
+RTS_ENGINE_SINGLETON_ZH(SkirmishGameInfo, TheChallengeGameInfo)
 RTS_ENGINE_SINGLETON(ChallengeGenerals, TheChallengeGenerals)
 RTS_ENGINE_SINGLETON(ControlBar, TheControlBar)
 RTS_ENGINE_SINGLETON(CreditsManager, TheCredits)
@@ -153,9 +158,7 @@ RTS_ENGINE_SINGLETON(LANAPI, TheLAN)
 RTS_ENGINE_SINGLETON(LANGameInfo, TheLANGameInfo)
 RTS_ENGINE_SINGLETON(NAT, TheNAT)
 RTS_ENGINE_SINGLETON(NetworkInterface, TheNetwork)
-#if RTS_ZEROHOUR
-RTS_ENGINE_SINGLETON(NGMPGame, TheNGMPGame)
-#endif
+RTS_ENGINE_SINGLETON_ZH(NGMPGame, TheNGMPGame)
 RTS_ENGINE_SINGLETON(PingerInterface, ThePinger)
 
 // GameEngineDevice: W3D objects that register themselves as singletons

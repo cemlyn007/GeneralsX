@@ -27,16 +27,22 @@
 //
 // The build force-includes this header into every engine translation unit (and a host must include it,
 // or force-include it, into every TU that touches an engine header). With RTS_ENGINE_CONTEXT off (the
-// default, upstream-shaped build) it is empty.
+// default, upstream-shaped build) it only declares rts::withCurrentEngine, which then returns its argument.
 //
 // Rules:
 // - A host owns one EngineContext per engine and enters it with an rts::Scope around every call into that
 //   engine (boot, update, shutdown and every read of engine state). Scopes nest and restore the previous
 //   context, and they are per call, not per thread, so an engine is not tied to the thread that made it.
 // - Outside any Scope the current context is rts::g_noEngine, whose singletons are all null. Code that
-//   runs with no engine (static initialisation, threads the engine did not start, static destructors
+//   runs with no engine (static initialisation, threads started outside every Scope, static destructors
 //   after the host has left its Scope) therefore sees "no engine", never another engine's state. Nothing
 //   may assign a singleton there: that would leak into every thread and every later engine.
+// - The current context is per thread, so a thread the engine starts carries its creator's context
+//   explicitly: WWLib's ThreadClass captures it in Execute(), and every other thread function that reads
+//   engine state is wrapped in rts::withCurrentEngine(...) where the thread is created (std::thread).
+//   Such a thread must end before its engine's EngineContext is destroyed, just as it must not outlive
+//   the singletons it reads. A new thread start that reads engine state needs the same wrapper; without
+//   it the thread sees g_noEngine and its first singleton access dereferences null.
 // - Process-global state (the critical sections, the memory manager, the NameKey generator, TheVersion,
 //   debug globals, constant tables) stays in ordinary globals; see EngineSingletons.inl.
 #pragma once
@@ -48,6 +54,9 @@
 #endif
 
 #include <cstddef>
+#include <functional>
+#include <type_traits>
+#include <utility>
 
 // initial-exec TLS: one 8-byte pointer in the static TLS block, read with a single %fs-relative load and no
 // __tls_get_addr call. ELF only; Mach-O has only the TLV model, and Windows its own implicit TLS.
@@ -68,9 +77,11 @@
 // The singletons' types, forward-declared at global scope.
 #define RTS_ENGINE_SINGLETON(T, n) class T;
 #define RTS_ENGINE_SINGLETON_STRUCT(T, n) struct T;
+#define RTS_ENGINE_SINGLETON_ZH(T, n) class T;
 #include "EngineSingletons.inl"
 #undef RTS_ENGINE_SINGLETON
 #undef RTS_ENGINE_SINGLETON_STRUCT
+#undef RTS_ENGINE_SINGLETON_ZH
 
 namespace rts
 {
@@ -97,9 +108,11 @@ struct RTS_ENGINE_CONTEXT_API EngineContext
 	// Every per-engine singleton: `TheXxx_`, reached through the `TheXxx` macro.
 #define RTS_ENGINE_SINGLETON(T, n) ::T* n##_ = nullptr;
 #define RTS_ENGINE_SINGLETON_STRUCT(T, n) ::T* n##_ = nullptr;
+#define RTS_ENGINE_SINGLETON_ZH(T, n) ::T* n##_ = nullptr;
 #include "EngineSingletons.inl"
 #undef RTS_ENGINE_SINGLETON
 #undef RTS_ENGINE_SINGLETON_STRUCT
+#undef RTS_ENGINE_SINGLETON_ZH
 
 	// Set while this engine is being torn down (GameEngine's destructor onwards), cleared when a
 	// GameEngine is constructed in it. Fatal errors raised in that window do not throw (see
@@ -158,9 +171,54 @@ private:
 	EngineContext* m_previous;
 };
 
+// A callable that runs `function` inside a Scope for the context that was current when it was made. For
+// thread functions: see withCurrentEngine.
+template <typename Function>
+class BoundToEngine
+{
+public:
+	BoundToEngine(EngineContext* context, Function function) : m_context(context), m_function(std::move(function)) {}
+
+	template <typename... Args>
+	decltype(auto) operator()(Args&&... args)
+	{
+		Scope scope(m_context);
+		return std::invoke(m_function, std::forward<Args>(args)...);
+	}
+
+private:
+	EngineContext* m_context;
+	Function m_function;
+};
+
+// Wraps a thread function so that it runs in the engine context current where the thread is created:
+// `std::thread(rts::withCurrentEngine([this]() { ... }))`. A function rather than a macro, because some
+// of the wrapped lambdas hold preprocessor directives.
+template <typename Function>
+BoundToEngine<std::decay_t<Function>> withCurrentEngine(Function&& function)
+{
+	return BoundToEngine<std::decay_t<Function>>(ctx(), std::forward<Function>(function));
+}
+
 } // namespace rts
 
 // `#define TheXxx (::rts::ctx()->TheXxx_)` for every entry, generated from EngineSingletons.inl.
 #include "EngineSingletonMacros.h"
+
+#else // !(__cplusplus && RTS_ENGINE_CONTEXT)
+
+#if defined(__cplusplus)
+#include <utility>
+
+namespace rts
+{
+// Off: the thread function itself, forwarded unchanged (see the RTS_ENGINE_CONTEXT version above).
+template <typename Function>
+constexpr Function&& withCurrentEngine(Function&& function) noexcept
+{
+	return std::forward<Function>(function);
+}
+} // namespace rts
+#endif
 
 #endif // __cplusplus && RTS_ENGINE_CONTEXT

@@ -9,6 +9,7 @@
 #include <cinttypes>
 #include <thread>
 #include <curl/curl.h>
+#include "Common/EngineContext.h" // GeneralsX @feature cemlyn007 28/09/2026 rts::withCurrentEngine
 
 using json = nlohmann::json;
 
@@ -105,7 +106,7 @@ void NGMP_OnlineServices_StatsInterface::CommitMyOutcome(ScoreKeeper* pScoreKeep
 	std::string authToken = NGMP_OnlineServicesManager::getInstance().getAuthToken();
 	uint32_t tokenVersion = NGMP_OnlineServicesManager::getInstance().getAuthTokenVersion();
 
-	std::thread([url, payloadStr, authToken, tokenVersion]() {
+	std::thread(::rts::withCurrentEngine([url, payloadStr, authToken, tokenVersion]() {
 		CURL* curl = curl_easy_init();
 		if (!curl) {
 			fprintf(stderr, "[NGMP] CommitMyOutcome: failed to initialize curl\n");
@@ -179,5 +180,5 @@ void NGMP_OnlineServices_StatsInterface::CommitMyOutcome(ScoreKeeper* pScoreKeep
 		}
 		fflush(stderr);
 		NGMP_OnlineServicesManager::getInstance().postEvent(ev);
-	}).detach();
+	})).detach();
 }

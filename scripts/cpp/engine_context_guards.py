@@ -103,14 +103,15 @@ EXTERN_RE = re.compile(r'^\s*extern\s+(?!"C")[^()=;]*?\b(The[A-Z]\w*)\s*(?:\[[^\
 DEFINITION_RE = re.compile(
     r"^(?:/\*extern\*/\s*)?(?:class\s+|struct\s+)?[A-Za-z_][\w:<>]*\s*\*\s*(The[A-Z]\w*)\s*(?:=\s*[^;]*)?;"
 )
-ENTRY_RE = re.compile(r"^\s*RTS_ENGINE_SINGLETON(?:_STRUCT)?\(\s*([\w:]+)\s*,\s*(\w+)\s*\)\s*$")
+ENTRY_RE = re.compile(r"^\s*RTS_ENGINE_SINGLETON(_STRUCT|_ZH)?\(\s*([\w:]+)\s*,\s*(\w+)\s*\)\s*$")
+
 PREPROCESSOR_RE = re.compile(r"^\s*#\s*(if|ifdef|ifndef|elif|else|endif)\b")
 IF_RE = re.compile(r"^\s*#\s*if(?:def|ndef)?\b")
 ENDIF_RE = re.compile(r"^\s*#\s*endif\b")
 
 
 def read_singleton_list(root):
-    """The listed names, and the list's lines that go into the macro header (entries and #if lines)."""
+    """The listed names, and the list's entries for the macro header (plain or Zero Hour only)."""
     names = []
     lines = []
     with open(os.path.join(root, SINGLETON_LIST), encoding="latin-1") as f:
@@ -118,10 +119,14 @@ def read_singleton_list(root):
             line = raw.rstrip("\r\n")
             entry = ENTRY_RE.match(line)
             if entry:
-                names.append(entry.group(2))
-                lines.append(("entry", entry.group(2)))
+                names.append(entry.group(3))
+                lines.append(("entry_zh" if entry.group(1) == "_ZH" else "entry", entry.group(3)))
             elif PREPROCESSOR_RE.match(line):
-                lines.append(("pp", line.strip()))
+                # A conditional would give rts::EngineContext a different layout per game or library.
+                sys.exit(
+                    f"{SINGLETON_LIST}: `{line.strip()}`: no conditionals in the list; a Zero Hour-only "
+                    "singleton is RTS_ENGINE_SINGLETON_ZH (a field in both games, see the list's header)"
+                )
     if len(set(names)) != len(names):
         dupes = sorted({n for n in names if names.count(n) > 1})
         sys.exit(f"{SINGLETON_LIST}: duplicate entries: {', '.join(dupes)}")
@@ -137,10 +142,11 @@ def render_macro_header(lines):
         "",
     ]
     for kind, value in lines:
-        if kind == "pp":
-            out.append(value)
+        define = f"#define {value} (::rts::ctx()->{value}_)"
+        if kind == "entry_zh":
+            out.extend(["#if RTS_ZEROHOUR", define, "#endif"])
         else:
-            out.append(f"#define {value} (::rts::ctx()->{value}_)")
+            out.append(define)
     return "\n".join(out) + "\n"
 
 

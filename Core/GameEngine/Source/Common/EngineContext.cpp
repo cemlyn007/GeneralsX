@@ -100,9 +100,11 @@ std::size_t EngineContext::countLiveSingletons() const
 	std::size_t live = 0;
 #define RTS_ENGINE_SINGLETON(T, n) live += (n##_ != nullptr) ? 1 : 0;
 #define RTS_ENGINE_SINGLETON_STRUCT(T, n) live += (n##_ != nullptr) ? 1 : 0;
+#define RTS_ENGINE_SINGLETON_ZH(T, n) live += (n##_ != nullptr) ? 1 : 0;
 #include "Common/EngineSingletons.inl"
 #undef RTS_ENGINE_SINGLETON
 #undef RTS_ENGINE_SINGLETON_STRUCT
+#undef RTS_ENGINE_SINGLETON_ZH
 	return live;
 }
 
