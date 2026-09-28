@@ -269,8 +269,13 @@ BaseHeightMapRenderObjClass::BaseHeightMapRenderObjClass()
 	m_depthFade.Z = 0.0f;
 	m_useDepthFade = false;
 	m_disableTextures = false;
-	// PLAN-023: the constructor no longer registers itself as TheTerrainRenderObject
-	// (that wrote whichever engine's context was current); its owner does.
+#if !RTS_ENGINE_CONTEXT
+	TheTerrainRenderObject = this;
+#else
+	// GeneralsX @bugfix cemlyn007 28/09/2026 No self-registration as TheTerrainRenderObject: that wrote
+	// whichever engine's context was current. Its owners register it (W3DTerrainVisual::init and
+	// adjustTerrainLOD; PLAN-023 Phase 3).
+#endif
 
 	m_treeBuffer = nullptr;
 	m_propBuffer = nullptr;
@@ -359,13 +364,19 @@ void BaseHeightMapRenderObjClass::adjustTerrainLOD(Int adj)
 		newROBJ = TheHeightMap;
 		if (newROBJ==nullptr) {
 			newROBJ = NEW_REF( HeightMapRenderObjClass, () );
-			TheTerrainRenderObject = newROBJ;	// PLAN-023: was the constructor's self-registration
+#if RTS_ENGINE_CONTEXT
+			// GeneralsX @bugfix cemlyn007 28/09/2026 Where the constructor registered itself (PLAN-023 Phase 3)
+			TheTerrainRenderObject = newROBJ;
+#endif
 		}
 	}	else {
 		newROBJ = TheFlatHeightMap;
 		if (newROBJ==nullptr) {
 			newROBJ = NEW_REF( FlatHeightMapRenderObjClass, () );
-			TheTerrainRenderObject = newROBJ;	// PLAN-023: was the constructor's self-registration
+#if RTS_ENGINE_CONTEXT
+			// GeneralsX @bugfix cemlyn007 28/09/2026 Where the constructor registered itself (PLAN-023 Phase 3)
+			TheTerrainRenderObject = newROBJ;
+#endif
 		}
 	}
 
