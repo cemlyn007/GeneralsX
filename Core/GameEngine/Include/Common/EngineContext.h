@@ -241,15 +241,26 @@ RTS_ENGINE_CONTEXT_API bool noEngineIsPristine();
 // thread's floating-point environment (with the x87 control word) and its locale, saved by a Scope that enters
 // an engine. Opaque here, so that this force-included header pulls in neither <cfenv> nor <locale.h>;
 // EngineContext.cpp checks that fenv_t and locale_t fit.
+// GeneralsX @bugfix cemlyn007 28/09/2026 Only what the Scope changes is saved and restored. On x86-64 (not Windows) that
+// is the x87 control word and MXCSR, and nothing at all for a thread already in the engine's mode; elsewhere the
+// whole fenv_t. Only LC_NUMERIC is switched (to "C"), and only when the thread's differs from it, so that the
+// engine sees the thread's other categories (LC_CTYPE for towlower, iswspace, mbstowcs) as it does without the
+// engine context.
 struct ThreadInvariants
 {
 	alignas(8) unsigned char floatingPointEnvironment[32];
+	// The thread's locale to restore, and the one made for this Scope (freed on exit); both null when the Scope
+	// left the thread's locale alone.
 	void* locale;
+	void* engineLocale;
+	unsigned int mxcsr;
 	unsigned short x87ControlWord;
+	// Whether the fields above hold the thread's floating-point state to restore.
+	bool floatingPointSaved;
 };
 
-// Saves the calling thread's invariants into `saved`, then sets the engine's: setFPMode()'s rounding and
-// precision, and the "C" locale (made once per process) for this thread.
+// Saves the calling thread's invariants into `saved` where they differ from the engine's, then sets the engine's:
+// setFPMode()'s rounding and precision, and LC_NUMERIC "C" over the thread's own locale.
 RTS_ENGINE_CONTEXT_API void enterEngineThreadInvariants(ThreadInvariants& saved) noexcept;
 // Restores what enterEngineThreadInvariants saved.
 RTS_ENGINE_CONTEXT_API void leaveEngineThreadInvariants(const ThreadInvariants& saved) noexcept;
@@ -258,8 +269,9 @@ RTS_ENGINE_CONTEXT_API void leaveEngineThreadInvariants(const ThreadInvariants& 
 // A null context means g_noEngine.
 //
 // GeneralsX @feature cemlyn007 28/09/2026 A Scope that switches the thread to a different engine also sets the
-// engine's per-thread invariants (PLAN-023 Phase 5b): the floating-point mode setFPMode() sets and the "C"
-// locale, which the engine's boot, INI and load-screen paths set only on the thread that ran them. An engine
+// engine's per-thread invariants (PLAN-023 Phase 5b): the floating-point mode setFPMode() sets, which the engine's
+// boot, INI and load-screen paths set only on the thread that ran them, and a "C" LC_NUMERIC for its number
+// parsing and formatting. An engine
 // may be stepped on another thread than it booted on, or on one whose mode the host changed, and must still
 // run as it would alone. The thread's own mode and locale come back when the Scope ends. A nested Scope on
 // the engine already current, and a Scope for g_noEngine, do nothing more than before, so the cost is paid
