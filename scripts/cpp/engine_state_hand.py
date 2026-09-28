@@ -56,15 +56,14 @@ HAND = [
     # PLAN-023 Phase 2: simulation statics.
     # Done (PLAN-023 Phase 2 PR): the pathfinder pool, the polygon triggers, the map objects and world dict,
     # the four RNG seeds, TheContactList and getClosestObjects' theIterFlag, the script and sides parse
-    # scratch, ScriptList::m_curId, s_failedMapLookups, s_transportStatuses, the build plan, the eight
-    # AIDecisionObserver statics, the recorder's startTime and REPLAY_CRC_INTERVAL are EngineContext fields or
-    # PER_ENGINE_STATICs now (so gone from the library; their slot indexes are rule:per-engine-static), as are
-    # Phase 3's TheWaterTransparency, TheWeatherSetting, WaterSettings[], rand4 and CameraShakerSystem.
+    # scratch, ScriptList::m_curId, s_failedMapLookups, MapUtil's map-parse scratch, s_transportStatuses,
+    # the build plan, the eight AIDecisionObserver statics, the recorder's startTime and REPLAY_CRC_INTERVAL
+    # are EngineContext fields or PER_ENGINE_STATICs now (so gone from the library; their slot indexes are
+    # rule:per-engine-static), as are Phase 3's TheWaterTransparency, TheWeatherSetting, WaterSettings[], rand4
+    # and CameraShakerSystem.
     # thread_local (per thread by design, so process-global here): both checkfortransitionsnum, inCRCGen and
-    # PathNode::computeDirectionVector()'s dir. The two XferLoad buffers are locals now (so gone). MapUtil's
-    # parse scratch is left.
+    # PathNode::computeDirectionVector()'s dir. The two XferLoad buffers are locals now (so gone).
     (GLOBAL, "", "re:State::friend_check(For|ForSleep)Transitions\\(StateReturnType\\)::checkfortransitionsnum", "thread_local call-depth counter (PLAN-023 Phase 2): per thread by design"),
-    (PER, 2, "re:m_width|m_height|m_borderSize|m_boundaries|m_data|worldDict|m_waypoints|m_supplyPositions|m_techPositions|m_mapDX|m_mapDY", "threads only: MapUtil map-parse scratch that loadMap() fills and MapCache::addMap consumes within one call (every field is rewritten by the next parse); a stack-local parser object before threads"),
     (GLOBAL, "", "TerrainLogic::m_gridWaterHandle", "an address-only sentinel (the grid water's WaterHandle is compared by address and never written), the same for every engine"),
     (GLOBAL, "", "inCRCGen", "thread_local, set only while this thread runs GameLogic::getCRC (PLAN-023 Phase 2): per thread by design"),
     (GLOBAL, "", "re:PathNode::computeDirectionVector\\(\\)::dir", "thread_local returned-by-pointer scratch, consumed at once (PLAN-023 Phase 2): per thread by design"),

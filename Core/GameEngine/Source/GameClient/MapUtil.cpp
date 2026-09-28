@@ -111,20 +111,43 @@ static Bool hasValidMapLeafLayout(const AsciiString& filepathLower, const AsciiS
 	return filepathLower.endsWithNoCase(endingStrBackslash.str()) || filepathLower.endsWithNoCase(endingStrSlash.str());
 }
 
-static Int m_width = 0;						///< Height map width.
-static Int m_height = 0;					///< Height map height (y size of array).
-static Int m_borderSize = 0;			///< Non-playable border area.
-static std::vector<ICoord2D> m_boundaries;	///< All the boundaries we use for the map
-static Int m_dataSize = 0;				///< size of m_data.
-static UnsignedByte *m_data = nullptr;	///< array of z(height) values in the height map.
-static Dict worldDict = 0;
+// GeneralsX @feature cemlyn007 28/09/2026 The map-parse scratch that loadMap() fills and MapCache::addMap
+// reads is one object per engine (PLAN-023 Phase 2), so engines never see each other's half-parsed map.
+// The fields and their carry-over between parses are upstream's; only their home changed.
+struct MapParseScratch
+{
+	Int m_width;						///< Height map width.
+	Int m_height;						///< Height map height (y size of array).
+	Int m_borderSize;				///< Non-playable border area.
+	std::vector<ICoord2D> m_boundaries;	///< All the boundaries we use for the map
+	Int m_dataSize;					///< size of m_data.
+	UnsignedByte *m_data;		///< array of z(height) values in the height map.
+	Dict worldDict;
 
-static WaypointMap *m_waypoints = nullptr;
-static Coord3DList	m_supplyPositions;
-static Coord3DList	m_techPositions;
+	WaypointMap *m_waypoints;
+	Coord3DList	m_supplyPositions;
+	Coord3DList	m_techPositions;
 
-static Int m_mapDX = 0;
-static Int m_mapDY = 0;
+	Int m_mapDX;
+	Int m_mapDY;
+
+	MapParseScratch() : m_width(0), m_height(0), m_borderSize(0), m_dataSize(0), m_data(nullptr), worldDict(0),
+		m_waypoints(nullptr), m_mapDX(0), m_mapDY(0) {}
+};
+
+#if RTS_ENGINE_CONTEXT
+static rts::PerEngineStatic<MapParseScratch> s_mapParseScratch_perEngine;
+static MapParseScratch& mapParseScratch()
+{
+	return s_mapParseScratch_perEngine.get();
+}
+#else
+static MapParseScratch s_mapParseScratch;
+static MapParseScratch& mapParseScratch()
+{
+	return s_mapParseScratch;
+}
+#endif
 
 static UnsignedInt calcCRC( AsciiString fname )
 {
@@ -153,6 +176,7 @@ static UnsignedInt calcCRC( AsciiString fname )
 
 static Bool ParseObjectDataChunk(DataChunkInput &file, DataChunkInfo *info, void *userData)
 {
+	MapParseScratch& scratch = mapParseScratch();
 	Bool readDict = info->version >= K_OBJECTS_VERSION_2;
 
 	Coord3D loc;
@@ -185,15 +209,15 @@ static Bool ParseObjectDataChunk(DataChunkInput &file, DataChunkInfo *info, void
 		pThisOne->setIsWaypoint();
 
 		// grab useful info
-		(*m_waypoints)[pThisOne->getWaypointName()] = loc;
+		(*scratch.m_waypoints)[pThisOne->getWaypointName()] = loc;
 	}
 	else if (pThisOne->getThingTemplate() && pThisOne->getThingTemplate()->isKindOf(KINDOF_TECH_BUILDING))
 	{
-		m_techPositions.push_back(loc);
+		scratch.m_techPositions.push_back(loc);
 	}
 	else if (pThisOne->getThingTemplate() && pThisOne->getThingTemplate()->isKindOf(KINDOF_SUPPLY_SOURCE_ON_PREVIEW))
 	{
-		m_supplyPositions.push_back(loc);
+		scratch.m_supplyPositions.push_back(loc);
 	}
 
 	deleteInstance(pThisOne);
@@ -209,48 +233,50 @@ static Bool ParseObjectsDataChunk(DataChunkInput &file, DataChunkInfo *info, voi
 
 static Bool ParseWorldDictDataChunk(DataChunkInput &file, DataChunkInfo *info, void *userData)
 {
-	worldDict = file.readDict();
+	MapParseScratch& scratch = mapParseScratch();
+	scratch.worldDict = file.readDict();
 	return true;
 }
 
 static Bool ParseSizeOnly(DataChunkInput &file, DataChunkInfo *info, void *userData)
 {
-	m_width = file.readInt();
-	m_height = file.readInt();
+	MapParseScratch& scratch = mapParseScratch();
+	scratch.m_width = file.readInt();
+	scratch.m_height = file.readInt();
 	if (info->version >= K_HEIGHT_MAP_VERSION_3) {
-		m_borderSize = file.readInt();
+		scratch.m_borderSize = file.readInt();
 	} else {
-		m_borderSize = 0;
+		scratch.m_borderSize = 0;
 	}
 
 	if (info->version >= K_HEIGHT_MAP_VERSION_4) {
 		Int numBorders = file.readInt();
-		m_boundaries.resize(numBorders);
+		scratch.m_boundaries.resize(numBorders);
 		for (int i = 0; i < numBorders; ++i) {
-			m_boundaries[i].x = file.readInt();
-			m_boundaries[i].y = file.readInt();
+			scratch.m_boundaries[i].x = file.readInt();
+			scratch.m_boundaries[i].y = file.readInt();
 		}
 	}
 	return true;
 
-	m_dataSize = file.readInt();
-	m_data = NEW UnsignedByte[m_dataSize];	// pool[]ify
-	if (m_dataSize <= 0 || (m_dataSize != (m_width*m_height))) {
+	scratch.m_dataSize = file.readInt();
+	scratch.m_data = NEW UnsignedByte[scratch.m_dataSize];	// pool[]ify
+	if (scratch.m_dataSize <= 0 || (scratch.m_dataSize != (scratch.m_width*scratch.m_height))) {
 		throw ERROR_CORRUPT_FILE_FORMAT	;
 	}
-	file.readArrayOfBytes((char *)m_data, m_dataSize);
+	file.readArrayOfBytes((char *)scratch.m_data, scratch.m_dataSize);
 	// Resize me.
 	if (info->version == K_HEIGHT_MAP_VERSION_1) {
-		Int newWidth = (m_width+1)/2;
-		Int newHeight = (m_height+1)/2;
+		Int newWidth = (scratch.m_width+1)/2;
+		Int newHeight = (scratch.m_height+1)/2;
 		Int i, j;
 		for (i=0; i<newHeight; i++) {
 			for (j=0; j<newWidth; j++) {
-				m_data[i*newWidth+j] = m_data[2*i*m_width+2*j];
+				scratch.m_data[i*newWidth+j] = scratch.m_data[2*i*scratch.m_width+2*j];
 			}
 		}
-		m_width = newWidth;
-		m_height = newHeight;
+		scratch.m_width = newWidth;
+		scratch.m_height = newHeight;
 	}
 	return true;
 }
@@ -262,6 +288,7 @@ static Bool ParseSizeOnlyInChunk(DataChunkInput &file, DataChunkInfo *info, void
 
 static Bool loadMap( AsciiString filename )
 {
+	MapParseScratch& scratch = mapParseScratch();
 	CachedFileInputStream fileStrm;
 
 	if( !fileStrm.open(filename) )
@@ -273,7 +300,7 @@ static Bool loadMap( AsciiString filename )
 
 	DataChunkInput file( pStrm );
 
-	m_waypoints = NEW WaypointMap;
+	scratch.m_waypoints = NEW WaypointMap;
 
 	file.registerParser( "HeightMapData", AsciiString::TheEmptyString, ParseSizeOnlyInChunk );
 	file.registerParser( "WorldInfo", AsciiString::TheEmptyString, ParseWorldDictDataChunk );
@@ -282,34 +309,36 @@ static Bool loadMap( AsciiString filename )
 		throw(ERROR_CORRUPT_FILE_FORMAT);
 	}
 
-	m_mapDX = m_width  - 2*m_borderSize;
-	m_mapDY = m_height - 2*m_borderSize;
+	scratch.m_mapDX = scratch.m_width  - 2*scratch.m_borderSize;
+	scratch.m_mapDY = scratch.m_height - 2*scratch.m_borderSize;
 
 	return TRUE;
 }
 
 static void resetMap()
 {
-	delete[] m_data;
-	m_data = nullptr;
+	MapParseScratch& scratch = mapParseScratch();
+	delete[] scratch.m_data;
+	scratch.m_data = nullptr;
 
-	delete m_waypoints;
-	m_waypoints = nullptr;
+	delete scratch.m_waypoints;
+	scratch.m_waypoints = nullptr;
 
-	m_techPositions.clear();
-	m_supplyPositions.clear();
+	scratch.m_techPositions.clear();
+	scratch.m_supplyPositions.clear();
 }
 
 static void getExtent( Region3D *extent )
 {
+	MapParseScratch& scratch = mapParseScratch();
 	extent->lo.x = 0.0f;
 
 	extent->lo.y = 0.0f;
 
 	// Note - m_mapDX & Y are the number of height map grids wide, so we have to
 	// multiply by the grid width.
-	extent->hi.x = m_mapDX*MAP_XY_FACTOR;
-	extent->hi.y = m_mapDY*MAP_XY_FACTOR;
+	extent->hi.x = scratch.m_mapDX*MAP_XY_FACTOR;
+	extent->hi.y = scratch.m_mapDY*MAP_XY_FACTOR;
 
 	extent->lo.z = 0;
 	extent->hi.z = 0;
@@ -319,7 +348,8 @@ static void getExtent( Region3D *extent )
 
 void WaypointMap::update()
 {
-	if (!m_waypoints)
+	MapParseScratch& scratch = mapParseScratch();
+	if (!scratch.m_waypoints)
 	{
 		m_numStartSpots = 1;
 		return;
@@ -330,8 +360,8 @@ void WaypointMap::update()
 	AsciiString startingCamName = TheNameKeyGenerator->keyToName(TheKey_InitialCameraPosition);
 	WaypointMap::const_iterator it;
 
-	it = m_waypoints->find(startingCamName);
-	if (it != m_waypoints->end())
+	it = scratch.m_waypoints->find(startingCamName);
+	if (it != scratch.m_waypoints->end())
 	{
 		(*this)[startingCamName] = it->second;
 	}
@@ -340,8 +370,8 @@ void WaypointMap::update()
 	for (Int i=0; i<MAX_SLOTS; ++i)
 	{
 		startingCamName.format("Player_%d_Start", i+1); // start pos waypoints are 1-based
-		it = m_waypoints->find(startingCamName);
-		if (it != m_waypoints->end())
+		it = scratch.m_waypoints->find(startingCamName);
+		if (it != scratch.m_waypoints->end())
 		{
 			(*this)[startingCamName] = it->second;
 			++m_numStartSpots;
@@ -710,12 +740,13 @@ Bool MapCache::addMap(
 	md.m_isMultiplayer = (md.m_numPlayers >= 2);
 	md.m_timestamp.m_highTimeStamp = fileInfo.timestampHigh;
 	md.m_timestamp.m_lowTimeStamp = fileInfo.timestampLow;
-	md.m_supplyPositions = m_supplyPositions;
-	md.m_techPositions = m_techPositions;
+	MapParseScratch& scratch = mapParseScratch();
+	md.m_supplyPositions = scratch.m_supplyPositions;
+	md.m_techPositions = scratch.m_techPositions;
 	md.m_CRC = calcCRC(fname);
 
 	Bool exists = false;
-	AsciiString nameLookupTag = worldDict.getAsciiString(TheKey_mapName, &exists);
+	AsciiString nameLookupTag = scratch.worldDict.getAsciiString(TheKey_mapName, &exists);
 	md.m_nameLookupTag = nameLookupTag;
 
 	if (!exists || nameLookupTag.isEmpty())
