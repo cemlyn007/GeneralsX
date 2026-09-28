@@ -170,6 +170,7 @@ stbi_write_tga_with_rle	namespace	global	.data	1	4	?	process-global		stb_image_w
 stbiw__encode_png_line(unsigned char*, int, int, int, int, int, int, signed char*)::firstmap	function	local	.data	1	20	?	constant		table/constant in header-only third-party code	hand
 stbiw__encode_png_line(unsigned char*, int, int, int, int, int, int, signed char*)::mapping	function	local	.data	1	20	?	constant		table/constant in header-only third-party code	hand
 std::_Sp_make_shared_tag::_S_ti()::__tag	function	unique	.rodata	1	16	?	process-global		libstdc++ template static instantiated into the library (library state, not engine state)	rule:libstdc++
+std::__detail::__from_chars_alnum_to_val_table<false>::value	class	unique	.rodata	1	256	?	process-global		libstdc++ template static instantiated into the library (library state, not engine state)	rule:libstdc++
 std::__detail::__waiter_pool_base::_S_for(void const*)::__w	function	unique	.bss	1	2048	?	process-global		libstdc++ template static instantiated into the library (library state, not engine state)	rule:libstdc++
 std::__unicode::__v16_0_0::__escape_edges	class	unique	.rodata	1	5892	?	process-global		libstdc++ template static instantiated into the library (library state, not engine state)	rule:libstdc++
 std::__unicode::__v16_0_0::__gcb_edges	class	unique	.rodata	1	6868	?	process-global		libstdc++ template static instantiated into the library (library state, not engine state)	rule:libstdc++
@@ -187,7 +188,6 @@ guard variable for BeaconClientUpdate::getModuleNameKey() const::nk	guard	unique
 SwayClientUpdate::getModuleNameKey() const::nk	function	unique	.bss	1	4	Core/GameEngine/Include/GameClient/Module/SwayClientUpdate.h:41	process-global		cached NameKeyType: process-wide by PLAN-023 Decision 2 (shared immortal generator)	rule:namekey
 guard variable for SwayClientUpdate::getModuleNameKey() const::nk	guard	unique	.bss	1	8	Core/GameEngine/Include/GameClient/Module/SwayClientUpdate.h:41	process-global		guard variable of that static: cached NameKeyType: process-wide by PLAN-023 Decision 2 (shared immortal generator)	guard
 PathfindCell::~PathfindCell()::warn	function	local	.data	1	1	Core/GameEngine/Include/GameLogic/AIPathfind.h:274	debug-only		warn-once flag	hand
-std::__detail::__from_chars_alnum_to_val_table<false>::value	class	unique	.rodata	1	256	Core/GameEngine/Source/Common/AddonCompat.cpp:28	process-global		libstdc++ template static instantiated into the library (library state, not engine state)	rule:libstdc++
 paramsForStartup	namespace	local	.data	1	112	Core/GameEngine/Source/Common/CommandLine.cpp:1179	constant		command-line parameter table (names and handlers)	hand
 paramsForEngineInit	namespace	local	.data	1	272	Core/GameEngine/Source/Common/CommandLine.cpp:1208	constant		command-line parameter table (names and handlers)	hand
 TheDebugIgnoreSyncErrors	namespace	global	.bss	1	1	Core/GameEngine/Source/Common/CommandLine.cpp:47	debug-only		debug	hand
@@ -202,7 +202,6 @@ ReplaySimulation::s_isRunning	class	global	.bss	1	1	Core/GameEngine/Source/Commo
 ReplaySimulation::s_replayIndex	class	global	.bss	1	4	Core/GameEngine/Source/Common/ReplaySimulation.cpp:42	process-global		the game executable's multi-replay simulation driver (-simReplay); an embedded engine never runs it	hand
 ReplaySimulation::s_replayCount	class	global	.bss	1	4	Core/GameEngine/Source/Common/ReplaySimulation.cpp:43	process-global		the game executable's multi-replay simulation driver (-simReplay); an embedded engine never runs it	hand
 AsciiString::TheEmptyString	class	global	.bss	1	8	Core/GameEngine/Source/Common/System/AsciiString.cpp:53	constant		const object: initialised once, never written	rule:const
-UnicodeString::TheEmptyString	class	global	.bss	1	8	Core/GameEngine/Source/Common/System/AsciiString.cpp:53	constant		const object: initialised once, never written	rule:const
 TheCurrentIgnoreCrashPtr	namespace	global	.bss	1	8	Core/GameEngine/Source/Common/System/Debug.cpp:137	debug-only		debug	hand
 theReleaseCrashLogFile	namespace	local	.bss	1	8	Core/GameEngine/Source/Common/System/Debug.cpp:737	process-global		embedding host's fatal-error mode / release-crash log (PLAN-023 Phase 5 moves the log to per-engine output paths)	hand
 theEngineEmbeddedMode	namespace	local	.bss	1	1	Core/GameEngine/Source/Common/System/Debug.cpp:765	process-global		embedding host's fatal-error mode / release-crash log (PLAN-023 Phase 5 moves the log to per-engine output paths)	hand
@@ -222,6 +221,7 @@ Radar::tryUnderAttackEvent(Object const*)::underAttackSound	function	local	.bss	
 guard variable for Radar::tryUnderAttackEvent(Object const*)::underAttackSound	guard	local	.bss	1	8	Core/GameEngine/Source/Common/System/Radar.cpp:1115	per-engine	4	guard variable of that static: static AudioEventRTS: make it a local (PLAN-023 Phase 4; also removes a lock-taking exit destructor)	guard
 Radar::tryInfiltrationEvent(Object const*)::infiltrationWarningSound	function	local	.bss	1	128	Core/GameEngine/Source/Common/System/Radar.cpp:1159	per-engine	4	static AudioEventRTS: make it a local (PLAN-023 Phase 4; also removes a lock-taking exit destructor)	hand
 guard variable for Radar::tryInfiltrationEvent(Object const*)::infiltrationWarningSound	guard	local	.bss	1	8	Core/GameEngine/Source/Common/System/Radar.cpp:1159	per-engine	4	guard variable of that static: static AudioEventRTS: make it a local (PLAN-023 Phase 4; also removes a lock-taking exit destructor)	guard
+UnicodeString::TheEmptyString	class	global	.bss	1	8	Core/GameEngine/Source/Common/System/UnicodeString.cpp:53	constant		const object: initialised once, never written	rule:const
 UnicodeString::format_va(wchar_t const*, __va_list_tag*)::s_utf8_locale	function	local	.bss	1	8	Core/GameEngine/Source/Common/System/UnicodeString.cpp:582	process-global		a UTF-8 locale handle, created once	hand
 guard variable for UnicodeString::format_va(wchar_t const*, __va_list_tag*)::s_utf8_locale	guard	local	.bss	1	8	Core/GameEngine/Source/Common/System/UnicodeString.cpp:582	process-global		guard variable of that static: a UTF-8 locale handle, created once	guard
 XferLoad::xferAsciiString(AsciiString*)::buffer	function	local	.bss	1	1024	Core/GameEngine/Source/Common/System/XferLoad.cpp:206	per-engine	2	threads only (a load runs to completion on one thread): local or member buffer; matters once save/load is used	hand

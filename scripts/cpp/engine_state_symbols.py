@@ -283,6 +283,19 @@ class SourceIndex:
         # Definitions live in source files; headers only for inline functions and class-body statics.
         return sorted(found, key=lambda p: (not p.endswith((".cpp", ".c", ".cc")), p))
 
+    def class_bodies(self, rel, cls):
+        """(start, end) offsets of the body of every definition of class `cls` in `rel`, braces matched (comments
+        and string literals are not skipped, which a class body's braces rarely need)."""
+        text = self.files[rel]
+        head = re.compile(rf"\b(?:class|struct)\s+(?:\w+\s+)*?{re.escape(cls)}\b[^;{{}}()]*\{{")
+        for m in head.finditer(text):
+            depth, i = 1, m.end()
+            while depth and i < len(text):
+                c = text[i]
+                depth += (c == "{") - (c == "}")
+                i += 1
+            yield m.end(), i
+
     def line_of(self, rel, pos):
         return self.files[rel].count("\n", 0, pos) + 1
 
@@ -357,26 +370,40 @@ class SourceIndex:
                 if not rel.endswith((".cpp", ".c", ".cc")):
                     continue
                 for ls, line, a, b in self.lines_with(rel, qual):
-                    if DEF_PREFIX_RE.fullmatch(line[:a]) and DEF_SUFFIX_RE.match(line[b:]):
+                    if is_def_prefix(line[:a]) and DEF_SUFFIX_RE.match(line[b:]):
                         yield ("qualified", *self.where_is(rel, ls, line))
                         break
-            # A static data member defined in the class body (inline or constexpr).
+            # A static data member defined in the class body (inline or constexpr): only inside that class's
+            # own body, so that another class's member of the same name is never taken for it.
             for rel in self.candidates(parsed.var, parsed.cls):
-                for ls, line, a, _b in self.lines_with(rel, var_re):
-                    if re.search(r"\bstatic\b", line[:a]) and "(" not in line[:a]:
-                        yield ("in-class", *self.where_is(rel, ls, line))
+                for body_start, body_end in self.class_bodies(rel, parsed.cls):
+                    site = None
+                    for ls, line, a, _b in self.lines_with(rel, var_re, body_start):
+                        if ls + a >= body_end:
+                            break
+                        prefix = strip_block_comments(line[:a])
+                        if re.search(r"\bstatic\b", prefix) and "(" not in prefix:
+                            site = self.where_is(rel, ls, line)
+                            break
+                    if site:
+                        yield ("in-class", *site)
                         break
         if parsed.scope in ("namespace", "class", "guard") and not parsed.func:
             # Every file's first definition, ranked: a file-scope definition in a source file first.
+            # A qualified name found by neither branch above is a namespace member: only a definition after
+            # that namespace opens counts (not another scope's variable of the same name).
+            ns_re = re.compile(rf"^\s*namespace\s+(?:\w+\s*::\s*)*{re.escape(parsed.cls)}\b", re.M) if parsed.cls else None
             found = []
             for rel in self.candidates(parsed.var):
                 is_source = rel.endswith((".cpp", ".c", ".cc"))
                 for ls, line, a, b in self.lines_with(rel, var_re):
-                    if not (DEF_PREFIX_RE.fullmatch(line[:a]) and DEF_SUFFIX_RE.match(line[b:])):
+                    if not (is_def_prefix(line[:a]) and DEF_SUFFIX_RE.match(line[b:])):
+                        continue
+                    if ns_re and not ns_re.search(self.files[rel], 0, ls):
                         continue
                     indented = line[:1] in (" ", "\t")
                     # Indented: a local variable unless it is a static or inside a namespace block.
-                    if indented and not re.search(r"\bstatic\b", line[:a]):
+                    if indented and not re.search(r"\bstatic\b", strip_block_comments(line[:a])):
                         text = self.files[rel]
                         if not re.search(r"^\s*namespace\b", text[:ls], re.M):
                             continue
@@ -397,6 +424,16 @@ DEF_PREFIX_RE = re.compile(
     r"|[A-Z_][A-Z_0-9]*\(.*\)\s*)"  # a declaring macro (DECLARE_DEFINITION_FACTORY(...) name;)
 )
 DEF_SUFFIX_RE = re.compile(r"\s*(?:\[[^\]]*\]\s*)*(?:=|;|\{|\(|,|$)")
+
+
+def strip_block_comments(text):
+    """`text` with each complete `/* ... */` replaced by a space (`/*static*/ const T C::x;` is a definition). An
+    unterminated `/*` stays, so a line that opens a comment is still no definition."""
+    return re.sub(r"/\*.*?\*/", " ", text)
+
+
+def is_def_prefix(prefix):
+    return DEF_PREFIX_RE.fullmatch(strip_block_comments(prefix)) is not None
 
 
 SITE_SEP = ";"
