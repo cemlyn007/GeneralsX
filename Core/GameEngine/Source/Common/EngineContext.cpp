@@ -59,7 +59,7 @@ struct EngineSlotTable
 
 EngineContext::~EngineContext()
 {
-	DEBUG_ASSERTCRASH(this == &g_noEngine || (countLiveSingletons() == 0 && originalGlobalData == nullptr),
+	DEBUG_ASSERTCRASH(this == &g_noEngine || (countLiveSingletons() == 0 && originalGlobalData == nullptr && !wwMathInitialized),
 		("EngineContext destroyed with %u live singletons: its engine was not shut down, or its shutdown left some",
 		(unsigned)countLiveSingletons()));
 	DEBUG_ASSERTCRASH(this == &g_noEngine || noEngineIsPristine(), ("g_noEngine was written: engine state leaked outside every Scope"));
@@ -148,7 +148,7 @@ std::size_t EngineContext::forEachLiveSingleton(void (*visit)(const char* name, 
 bool noEngineIsPristine()
 {
 	return g_noEngine.countLiveSingletons() == 0 && !g_noEngine.engineTearingDown && !g_noEngine.nameKeysFrozen
-		&& g_noEngine.originalGlobalData == nullptr && !g_noEngine.hasSlotObjects();
+		&& g_noEngine.originalGlobalData == nullptr && !g_noEngine.wwMathInitialized && !g_noEngine.hasSlotObjects();
 }
 
 } // namespace rts

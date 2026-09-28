@@ -195,6 +195,11 @@ struct RTS_ENGINE_CONTEXT_API EngineContext
 	unsigned int ww3dPreviousSyncTime = 0;
 	int ww3dFrameCount = 0;
 
+	// Whether this engine holds one of WWMath's Init counts (wwmath.cpp): set by its first WWMath::Init and
+	// cleared by its first WWMath::Shutdown after that, so an engine that calls Shutdown twice (W3DDisplay's
+	// failed init, then its destructor) releases only its own count, never another live engine's.
+	bool wwMathInitialized = false;
+
 	// Per-engine slot objects, by allocateEngineSlotIndex() index; null until set.
 	void* getSlot(std::size_t index) const;
 	// Stores a slot object that this context owns and destroys with `destroy`. The index must not be set.
