@@ -271,6 +271,29 @@ const Int MAX_ENABLED_MODULES								= 16;
 // ------------------------------------------------------------------------------------------------
 // ------------------------------------------------------------------------------------------------
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 28/09/2026 Per engine: every Drawable constructor (headless too) caches this
+// engine's images and 2D animation templates here, so another engine's would dangle once that engine is
+// gone (PLAN-023 Phase 4). The class statics stay declared; these macros stand in for them in this file.
+struct DrawableStaticImages
+{
+	Bool inited;
+	const Image* veterancyImage[LEVEL_COUNT];
+	const Image* fullAmmo;
+	const Image* emptyAmmo;
+	const Image* fullContainer;
+	const Image* emptyContainer;
+	Anim2DTemplate** animationTemplates;
+};
+static rts::PerEngineStatic<DrawableStaticImages> s_drawableStaticImages_perEngine;
+#define s_staticImagesInited (s_drawableStaticImages_perEngine.get().inited)
+#define s_veterancyImage (s_drawableStaticImages_perEngine.get().veterancyImage)
+#define s_fullAmmo (s_drawableStaticImages_perEngine.get().fullAmmo)
+#define s_emptyAmmo (s_drawableStaticImages_perEngine.get().emptyAmmo)
+#define s_fullContainer (s_drawableStaticImages_perEngine.get().fullContainer)
+#define s_emptyContainer (s_drawableStaticImages_perEngine.get().emptyContainer)
+#define s_animationTemplates (s_drawableStaticImages_perEngine.get().animationTemplates)
+#else
 /*static*/ Bool							Drawable::s_staticImagesInited = false;
 /*static*/ const Image*			Drawable::s_veterancyImage[LEVEL_COUNT]	= { nullptr };
 /*static*/ const Image*			Drawable::s_fullAmmo = nullptr;
@@ -278,6 +301,7 @@ const Int MAX_ENABLED_MODULES								= 16;
 /*static*/ const Image*			Drawable::s_fullContainer = nullptr;
 /*static*/ const Image*			Drawable::s_emptyContainer = nullptr;
 /*static*/ Anim2DTemplate**	Drawable::s_animationTemplates = nullptr;
+#endif
 #ifdef DIRTY_CONDITION_FLAGS
 /*static*/ Int							Drawable::s_modelLockCount = 0;
 #endif

@@ -947,7 +947,19 @@ protected:
 	  GameWindow *control;
 		ObjectID objectID;
 	};
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 28/09/2026 Per engine: every engine's ControlBar constructor (headless too,
+	// InGameUI::init) clears it (resetContainData), so shared, a headless engine's boot would clear the rendering
+	// engine's inventory buttons (PLAN-023 Phase 4). ControlBarCommand.cpp and ControlBarCommandProcessing.cpp
+	// stand m_containData in for its entries.
+	struct ContainData
+	{
+		ContainEntry entries[ MAX_COMMANDS_PER_SET ];
+	};
+	static rts::PerEngineStatic<ContainData> s_containData_perEngine;
+#else
 	static ContainEntry m_containData[ MAX_COMMANDS_PER_SET ];  ///< inventory buttons integrated into the regular command set for buildings/transports
+#endif
 
 	struct QueueEntry
 	{
@@ -1022,9 +1034,22 @@ private:
 	GameWindowTransitionsHandler *m_transitionHandler;
 	const Image *m_genArrow;
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 28/09/2026 Per engine: ControlBar::init (headless too) caches this engine's
+	// rank images, which would dangle in another engine once this one is gone (PLAN-023 Phase 4).
+	// ControlBar.cpp and ControlBarCommand.cpp stand m_rank*Icon in for its fields.
+	struct RankIcons
+	{
+		const Image *veteran;
+		const Image *elite;
+		const Image *heroic;
+	};
+	static rts::PerEngineStatic<RankIcons> s_rankIcons_perEngine;
+#else
 	static const Image *m_rankVeteranIcon;
 	static const Image *m_rankEliteIcon;
 	static const Image *m_rankHeroicIcon;
+#endif
 
 	const Image *m_generalButtonEnable;
 	const Image *m_generalButtonHighlight;

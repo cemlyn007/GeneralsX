@@ -291,6 +291,35 @@ public:
 		return static_cast<Holder*>(object)->value;
 	}
 
+	// GeneralsX @feature cemlyn007 28/09/2026 As get(), but the object is made with `initialize(object)`, which
+	// may capture (PLAN-023 Phase 4): for a function-local static whose initialiser reads the function's
+	// locals, `static const X* x = find(info.name);` becomes
+	// `static rts::PerEngineStatic<const X*> x_perEngine;` and
+	// `const X* x = x_perEngine.get([&](const X*& value) { value = find(info.name); });`, so each engine
+	// runs the initialiser once, on its first call, as a solo run does.
+	template <typename Initialize>
+	T& get(Initialize&& initialize) const
+	{
+		EngineContext* context = ctx();
+		void* object = context->getSlot(m_index);
+		if (object == nullptr)
+		{
+			Holder* holder = new Holder();
+			try
+			{
+				initialize(holder->value);
+			}
+			catch (...)
+			{
+				delete holder;
+				throw;
+			}
+			context->setSlot(m_index, holder, &destroy);
+			object = holder;
+		}
+		return static_cast<Holder*>(object)->value;
+	}
+
 private:
 	// A struct, so that T may be an array.
 	struct Holder
