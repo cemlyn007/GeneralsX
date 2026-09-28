@@ -89,9 +89,27 @@
 
 
 #define MAX_PATH_SUBJECTS 64
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 28/09/2026 Per engine: the build plan being recorded belongs to this
+// engine's command stream (PLAN-023 Phase 2).
+namespace
+{
+struct BuildPlanPerEngine
+{
+	Bool buildPlan;
+	Object *planSubject[ MAX_PATH_SUBJECTS ];
+	int planSubjectCount;
+};
+rts::PerEngineStatic<BuildPlanPerEngine> s_buildPlanPerEngine;
+}
+#define theBuildPlan (s_buildPlanPerEngine.get().buildPlan)
+#define thePlanSubject (s_buildPlanPerEngine.get().planSubject)
+#define thePlanSubjectCount (s_buildPlanPerEngine.get().planSubjectCount)
+#else
 static Bool theBuildPlan = false;
 static Object *thePlanSubject[ MAX_PATH_SUBJECTS ];
 static int thePlanSubjectCount = 0;
+#endif
 //static WindowLayout *background = nullptr;
 
 // ------------------------------------------------------------------------------------------------

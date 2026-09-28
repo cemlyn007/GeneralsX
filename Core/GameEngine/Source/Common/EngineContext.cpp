@@ -64,6 +64,11 @@ EngineContext::~EngineContext()
 		(unsigned)countLiveSingletons()));
 	DEBUG_ASSERTCRASH(this == &g_noEngine || noEngineIsPristine(), ("g_noEngine was written: engine state leaked outside every Scope"));
 
+	destroySlots();
+}
+
+void EngineContext::destroySlots()
+{
 	if (m_slots == nullptr)
 		return;
 
@@ -103,6 +108,11 @@ void EngineContext::setSlot(std::size_t index, void* object, EngineSlotDestroyFn
 	m_slots->inCreationOrder.push_back(EngineSlotTable::Owned{index, object, destroy});
 }
 
+bool EngineContext::hasSlotObjects() const
+{
+	return m_slots != nullptr && !m_slots->inCreationOrder.empty();
+}
+
 std::size_t EngineContext::countLiveSingletons() const
 {
 	return forEachLiveSingleton([](const char*, void*) {}, nullptr);
@@ -125,7 +135,7 @@ std::size_t EngineContext::forEachLiveSingleton(void (*visit)(const char* name, 
 bool noEngineIsPristine()
 {
 	return g_noEngine.countLiveSingletons() == 0 && !g_noEngine.engineTearingDown && !g_noEngine.nameKeysFrozen
-		&& g_noEngine.originalGlobalData == nullptr;
+		&& g_noEngine.originalGlobalData == nullptr && !g_noEngine.hasSlotObjects();
 }
 
 } // namespace rts

@@ -69,8 +69,29 @@
 
 
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 28/09/2026 Per engine (PLAN-023 Phase 2): the map-parse scratch that
+// ScriptList::ParseScriptsDataChunk fills and getReadScripts hands over, and the xfer recovery objects
+// (still leaked, as upstream leaks them, but one per engine).
+namespace
+{
+struct ScriptsPerEngine
+{
+	ScriptList *readLists[MAX_PLAYER_COUNT];
+	Int numInReadList;
+	Script *mtScript;
+	ScriptGroup *mtGroup;
+};
+rts::PerEngineStatic<ScriptsPerEngine> s_scriptsPerEngine;
+}
+#define s_readLists (s_scriptsPerEngine.get().readLists)
+#define s_numInReadList (s_scriptsPerEngine.get().numInReadList)
+#define s_mtScript (s_scriptsPerEngine.get().mtScript)
+#define s_mtGroup (s_scriptsPerEngine.get().mtGroup)
+#else
 static Script *s_mtScript = nullptr;
 static ScriptGroup *s_mtGroup = nullptr;
+#endif
 
 //
 // These strings must be in the same order as they are in their definitions
@@ -166,10 +187,12 @@ enum { AT_END = 0x00FFFFFF };
 // ******************************** class  ScriptList *********************************************
 //-------------------------------------------------------------------------------------------------
 // Statics ///////////////////////////////////////////////////////////////////////////////////////
+#if !RTS_ENGINE_CONTEXT
 ScriptList *ScriptList::s_readLists[MAX_PLAYER_COUNT] = {0};
 Int					ScriptList::s_numInReadList = 0;
 
 Int ScriptList::m_curId = 0;
+#endif
 
 /**
  ScriptList::updateDefaults -  checks for empty script lists, and adds some default stuff

@@ -102,7 +102,11 @@ SnowManager::~SnowManager()
 	TheWeatherSetting=nullptr;
 }
 
+#if RTS_ENGINE_CONTEXT
+rts::PerEngineStatic<OVERRIDE<WeatherSetting> > TheWeatherSetting_perEngine;
+#else
 OVERRIDE<WeatherSetting> TheWeatherSetting = nullptr;
+#endif
 
 // PRIVATE DATA ///////////////////////////////////////////////////////////////////////////////////
 const FieldParse WeatherSetting::m_weatherSettingFieldParseTable[] =

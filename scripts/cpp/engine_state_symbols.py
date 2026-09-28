@@ -603,7 +603,20 @@ def rule_const_object(sym):
     return CONST, "", "const object: initialised once, never written"
 
 
+PER_ENGINE_STATIC_DECL_RE = re.compile(r"\brts::PerEngineStatic\s*<")
+
+
+def rule_per_engine_static(sym):
+    """A PER_ENGINE_STATIC (rts::PerEngineStatic<T>, EngineContext.h): the static holds only a slot index,
+    allocated once at static initialisation; the object it stands for lives in each engine's context. It
+    is checked before the hand list, since what it is does not depend on the file it is in."""
+    if all(PER_ENGINE_STATIC_DECL_RE.search(d.split("=")[0]) for d in declarations(sym)):
+        return GLOBAL, "", "PER_ENGINE_STATIC slot index, written once at static initialisation; the object lives in each engine's EngineContext"
+    return None
+
+
 RULES = [
+    ("per-engine-static", rule_per_engine_static),
     ("toolchain", rule_toolchain),
     ("libstdc++", rule_libstdcxx),
     ("third-party", rule_third_party),
@@ -634,6 +647,11 @@ def classify(sym, symbols):
             sym.note = f"guard variable of that static: {target.note}" if target.note else "guard variable of that static"
             sym.by = "guard"
             return
+    result = rule_per_engine_static(sym)
+    if result:
+        sym.cls, sym.phase, sym.note = result
+        sym.by = "rule:per-engine-static"
+        return
     for hand in HAND:
         if hand.matches(sym):
             sym.cls, sym.phase, sym.note = hand.cls, hand.phase, hand.note

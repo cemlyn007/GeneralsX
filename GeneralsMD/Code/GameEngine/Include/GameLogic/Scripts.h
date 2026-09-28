@@ -1094,10 +1094,17 @@ protected:
 
 	ScriptGroup		*m_firstGroup;
 	Script				*m_firstScript;
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 28/09/2026 Per engine: the script ID counter (an EngineContext field)
+	// and the map-parse scratch (s_readLists, s_numInReadList: Scripts.cpp), which another engine's map
+	// load would otherwise continue or swap (PLAN-023 Phase 2).
+	static constexpr rts::ContextField<Int, &rts::EngineContext::scriptListCurId> m_curId{};
+#else
 	static Int		m_curId;
 
 	static ScriptList *s_readLists[MAX_PLAYER_COUNT];
 	static Int				s_numInReadList;
+#endif
 
 public:
 	ScriptList();

@@ -54,6 +54,7 @@
 #endif
 
 #include <cstddef>
+#include <cstdint>
 #include <functional>
 #include <type_traits>
 #include <utility>
@@ -82,6 +83,11 @@
 #undef RTS_ENGINE_SINGLETON
 #undef RTS_ENGINE_SINGLETON_STRUCT
 #undef RTS_ENGINE_SINGLETON_ZH
+// The types of the direct per-engine fields below.
+class PathfindCellInfo;
+class PolygonTrigger;
+class MapObject;
+class PartitionContactList;
 
 namespace rts
 {
@@ -130,14 +136,48 @@ struct RTS_ENGINE_CONTEXT_API EngineContext
 	// GlobalData nulls it when that instance is deleted.
 	::GlobalData* originalGlobalData = nullptr;
 
-	// Later phases add hot per-engine state here as direct fields (the RNG seeds, the pathfinder pool,
-	// the polygon triggers, ...: PLAN-023 Phases 2-3), since a field costs one load where a slot costs a
-	// lookup.
+	// Hot per-engine state lives here as direct fields, since a field costs one load where a slot costs a
+	// lookup (PLAN-023 Phases 2-3).
+
+	// RandomValue.cpp's seeds (theGameAudioSeed, ...), with their upstream initial values.
+	std::uint32_t gameAudioSeed[6] = {0xf22d0e56U, 0x883126e9U, 0xc624dd2fU, 0x702c49cU, 0x9e353f7dU, 0x6fdf3b64U};
+	std::uint32_t gameClientSeed[6] = {0xf22d0e56U, 0x883126e9U, 0xc624dd2fU, 0x702c49cU, 0x9e353f7dU, 0x6fdf3b64U};
+	std::uint32_t gameLogicSeed[6] = {0xf22d0e56U, 0x883126e9U, 0xc624dd2fU, 0x702c49cU, 0x9e353f7dU, 0x6fdf3b64U};
+	std::uint32_t gameLogicBaseSeed = 0;
+
+	// PathfindCellInfo::s_infoArray/s_firstFree: the pathfinder's cell-info pool and its free list
+	// (AIPathfind.cpp), made and freed by this engine's Pathfinder.
+	::PathfindCellInfo* pathfindCellInfoArray = nullptr;
+	::PathfindCellInfo* pathfindCellInfoFirstFree = nullptr;
+
+	// PolygonTrigger::ThePolygonTriggerListPtr/s_currentID: the map's trigger areas, walked on every
+	// object's cell change, and the next trigger ID.
+	::PolygonTrigger* polygonTriggerList = nullptr;
+	std::int32_t polygonTriggerCurrentID = 1;
+
+	// MapObject::TheMapObjectListPtr: the map objects of the last map this engine read.
+	::MapObject* mapObjectList = nullptr;
+
+	// PartitionManager.cpp's TheContactList (the contact list of the partition update in progress) and
+	// getClosestObjects()'s iteration stamp (nonzero).
+	::PartitionContactList* partitionContactList = nullptr;
+	std::int32_t partitionIterFlag = 1;
+
+	// ScriptList::m_curId: the last script ID handed out.
+	std::int32_t scriptListCurId = 0;
+
+	// REPLAY_CRC_INTERVAL (Recorder.cpp): the logic CRC interval of a solo game or replay.
+	std::int32_t replayCrcInterval = 100;
 
 	// Per-engine slot objects, by allocateEngineSlotIndex() index; null until set.
 	void* getSlot(std::size_t index) const;
 	// Stores a slot object that this context owns and destroys with `destroy`. The index must not be set.
 	void setSlot(std::size_t index, void* object, EngineSlotDestroyFn destroy);
+	// Destroys every slot object now, newest first, inside a Scope for this context (the engine's teardown
+	// calls it; the destructor does it for any made since). A later get() makes a fresh object.
+	void destroySlots();
+	// Whether this context holds any slot object (for the lifecycle checks: g_noEngine must hold none).
+	bool hasSlotObjects() const;
 
 	// The number of singleton fields that are not null (for the lifecycle checks).
 	std::size_t countLiveSingletons() const;
@@ -161,7 +201,8 @@ inline EngineContext* ctx() noexcept
 	return t_engine;
 }
 
-// True when g_noEngine still has every singleton null (nothing assigned one outside a Scope).
+// True when g_noEngine still has every singleton null and no slot object (nothing assigned one, or used a
+// PerEngineStatic, outside a Scope).
 RTS_ENGINE_CONTEXT_API bool noEngineIsPristine();
 
 // Makes `context` the current context for its lifetime, then restores the previous one. Scopes nest.
@@ -183,6 +224,87 @@ public:
 
 private:
 	EngineContext* m_previous;
+};
+
+// GeneralsX @feature cemlyn007 28/09/2026 PER_ENGINE_STATIC (PLAN-023 Phases 2-4)
+// One object per engine in place of a file, class or function-local static: the object lives in a slot of
+// the current EngineContext, made on first use in that context (value-initialised, then passed to
+// `initialize` if one is given) and destroyed with it, newest first. The static itself only holds the slot
+// index, so it is process-wide and written once, at static initialisation. A TU-local (or header) `#define`
+// of the old name to `(name_perEngine.get())` keeps the uses unchanged. An access costs a slot lookup (a
+// call), so hot state belongs in direct EngineContext fields instead. It must not be used outside every
+// Scope (g_noEngine owns no slots).
+template <typename T>
+class PerEngineStatic
+{
+public:
+	PerEngineStatic() : m_index(allocateEngineSlotIndex()), m_initialize(nullptr) {}
+	explicit PerEngineStatic(void (*initialize)(T& object)) : m_index(allocateEngineSlotIndex()), m_initialize(initialize) {}
+
+	PerEngineStatic(const PerEngineStatic&) = delete;
+	PerEngineStatic& operator=(const PerEngineStatic&) = delete;
+
+	T& get() const
+	{
+		EngineContext* context = ctx();
+		void* object = context->getSlot(m_index);
+		if (object == nullptr)
+		{
+			Holder* holder = new Holder();
+			if (m_initialize != nullptr)
+				m_initialize(holder->value);
+			context->setSlot(m_index, holder, &destroy);
+			object = holder;
+		}
+		return static_cast<Holder*>(object)->value;
+	}
+
+private:
+	// A struct, so that T may be an array.
+	struct Holder
+	{
+		T value{};
+	};
+
+	static void destroy(void* object)
+	{
+		delete static_cast<Holder*>(object);
+	}
+
+	std::size_t m_index;
+	void (*m_initialize)(T& object);
+};
+
+// GeneralsX @feature cemlyn007 28/09/2026 A stand-in for a class's static data member whose value is a
+// direct EngineContext field (PLAN-023 Phase 2), for statics that are also used qualified
+// (`MapObject::TheMapObjectListPtr`), where a macro cannot stand in: declare it as
+// `static constexpr rts::ContextField<T, &rts::EngineContext::field> name{};` and the upstream reads,
+// assignments, `->` and comparisons compile unchanged. Taking its address gives the stand-in's, not the
+// field's, so a static whose address is taken needs a macro instead.
+template <typename T, T EngineContext::*Field>
+struct ContextField
+{
+	operator T&() const noexcept
+	{
+		return ctx()->*Field;
+	}
+	T operator->() const noexcept
+	{
+		return ctx()->*Field;
+	}
+	const ContextField& operator=(T value) const noexcept
+	{
+		ctx()->*Field = value;
+		return *this;
+	}
+	T& operator++() const noexcept
+	{
+		return ++(ctx()->*Field);
+	}
+	T operator++(int) const noexcept
+	{
+		return (ctx()->*Field)++;
+	}
 };
 
 // A callable that runs `function` inside a Scope for the context that was current when it was made. For

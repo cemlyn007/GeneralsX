@@ -85,8 +85,16 @@ protected:
 	Bool				m_shouldRender;
 	Bool				m_selected;
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 28/09/2026 The trigger list and its ID counter are per engine
+	// (EngineContext fields; s_currentID in PolygonTrigger.cpp): every map load clears the list and every
+	// object's cell change walks it, so a process-wide one was another engine's, freed under it (PLAN-023
+	// Phase 2). TerrainLogic still frees it (deleteTriggers).
+#define ThePolygonTriggerListPtr (::rts::ctx()->polygonTriggerList)
+#else
 	static PolygonTrigger* ThePolygonTriggerListPtr;
 	static Int s_currentID; ///< Current id for new triggers.
+#endif
 
 protected:
 	void reallocate();

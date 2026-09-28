@@ -331,9 +331,8 @@ GameEngine::~GameEngine()
 	TheGameInfo = nullptr;
 
 	// GeneralsX @bugfix cemlyn007 28/09/2026 GameEngine::init parses Water.ini and Weather.ini into these
-	// process-wide settings, and only the render device's W3DWater (and the snow manager) free them. Left
-	// set, the next engine's parse finds them and throws INI_INVALID_DATA (PLAN-023 Phase 3 makes them
-	// per engine; until then they are freed with the engine that parsed them).
+	// settings (per engine: Water.h, Snow.h), and only the render device's W3DWater (and the snow manager)
+	// free them. The engine that parsed them owns them, so it frees them here, headless too.
 	if (TheWaterTransparency != nullptr)
 	{
 		deleteInstance((WaterTransparencySetting*)TheWaterTransparency.getNonOverloadedPointer());
@@ -367,6 +366,14 @@ GameEngine::~GameEngine()
 	TheGameLODManager = nullptr;
 
 	Drawable::killStaticImages();
+
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 28/09/2026 The engine's PER_ENGINE_STATIC objects (map-parse scratch, the
+	// world dict, the water settings, ...) are engine state: free them with the engine, while the memory
+	// manager their strings and pools use is certainly still up, rather than with the context, which a
+	// host may destroy after its last memory-manager reference is gone (PLAN-023 Phase 2).
+	rts::ctx()->destroySlots();
+#endif
 
 // TheSuperHackers @build fighter19 11/02/2026 COM termination (Windows-only)
 #ifdef _WIN32

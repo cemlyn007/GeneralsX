@@ -211,8 +211,10 @@ public:
 	static void releaseACellInfo(PathfindCellInfo *theInfo);
 
 protected:
+#if !RTS_ENGINE_CONTEXT
 	static PathfindCellInfo *s_infoArray;
 	static PathfindCellInfo *s_firstFree;							///<
+#endif
 
 
 	PathfindCellInfo *m_nextOpen, *m_prevOpen;						///< for A* "open" list, shared by closed list

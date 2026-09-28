@@ -54,32 +54,19 @@ AUDIO_SCRATCH = "static AudioEventRTS: make it a local (PLAN-023 Phase 4; also r
 HAND = [
     # ---------------------------------------------------------------------------------------------------
     # PLAN-023 Phase 2: simulation statics.
-    (PER, 2, "PathfindCellInfo::s_infoArray", "blocker at creation: a second Pathfinder frees the first's pool; make it a Pathfinder member (TheAI->pathfinder())"),
-    (PER, 2, "PathfindCellInfo::s_firstFree", "the pool's free list, with s_infoArray: Pathfinder member"),
-    (PER, 2, "PolygonTrigger::ThePolygonTriggerListPtr", "blocker: cleared on every map load, walked on every cell change; per-engine list owned by TerrainLogic"),
-    (PER, 2, "PolygonTrigger::s_currentID", "trigger ID counter, with the list: TerrainLogic member"),
-    (PER, 2, "MapObject::TheMapObjectListPtr", "blocker for resets: rebuilt on every map load; EngineContext field"),
-    (PER, 2, "MapObject::TheWorldDict", "the map's world dict (weather, ...), with the map-object list: EngineContext field"),
-    (PER, 2, "re:theGame(Logic|Client|Audio)Seed|theGameLogicBaseSeed", "blocker: one engine's InitRandom reseeds every engine; EngineContext fields (only RandomValue.cpp changes)"),
-    (PER, 2, "TheContactList", "partition-manager scratch list, set and consumed per update: PartitionManager member"),
-    (PER, 2, "re:PartitionManager::getClosestObjects\\(.*\\)::theIterFlag", "iteration stamp; safe on one thread (every call takes a fresh value), a PartitionManager member before threads (not thread_local)"),
-    (PER, 2, "re:State::friend_check(For|ForSleep)Transitions\\(StateReturnType\\)::checkfortransitionsnum", "threads only: a call-depth counter, correct on one thread; thread_local later (PLAN-023 delivery scope)"),
-    (PER, 2, "ScriptList::s_readLists", "map-parse scratch: concurrent map loads swap scripts; per-parse context or SidesList member"),
-    (PER, 2, "ScriptList::s_numInReadList", "map-parse scratch, with s_readLists"),
-    (PER, 2, "ScriptList::m_curId", "script ID counter carried from one engine's map load into the next: reset per load or ScriptEngine member"),
-    (PER, 2, "static_readPlayerNames", "SidesList parse scratch (player names read from the map): SidesList member"),
-    (PER, 2, "re:s_mt(Script|Group)", "xfer recovery scratch shared by concurrent loads: make locals"),
-    (PER, 2, "re:m_width|m_height|m_borderSize|m_boundaries|m_data|worldDict|m_waypoints|m_supplyPositions|m_techPositions|m_mapDX|m_mapDY", "MapUtil map-parse scratch filled by loadMap() on every MapCache miss: a stack-local parser object"),
-    (PER, 2, "s_failedMapLookups", "MapUtil negative-lookup cache: MapCache member (or one read-only MapCache per process)"),
-    (PER, 2, "re:XferLoad::xfer(Ascii|Unicode)String\\(.*\\)::buffer", "threads only (a load runs to completion on one thread): local or member buffer; matters once save/load is used"),
-    (PER, 2, "s_transportStatuses", "ScriptConditions transport-status cache: ScriptConditions member"),
-    (PER, 2, "re:theBuildPlan|thePlanSubjectCount|thePlanSubject", "GameLogicDispatch build-plan state: GameLogic members, reset in clearGameData"),
-    (PER, 2, "re:\\(anonymous namespace\\)::s_(observer|userData|scopeActive|origin|script|depth|muted|seq)", "AIDecisionObserver hook state (rlgenerals' decisions recorder): per GameLogic / EngineContext field"),
-    (PER, 2, "startTime", "Recorder start time: Recorder member"),
-    (PER, 2, "REPLAY_CRC_INTERVAL", "written by -ReplayCRCInterval and by replay playback (Recorder.cpp): Recorder/GameLogic member"),
-    (PER, 2, "TerrainLogic::m_gridWaterHandle", "the grid-water handle every TerrainLogic hands out: TerrainLogic member"),
-    (PER, 2, "inCRCGen", "threads only: set only while GameLogic::getCRC runs; GameLogic member before threads"),
-    (PER, 2, "re:PathNode::computeDirectionVector\\(\\)::dir", "threads only: returned-by-pointer scratch, consumed at once; local/member before threads"),
+    # Done (PLAN-023 Phase 2 PR): the pathfinder pool, the polygon triggers, the map objects and world dict,
+    # the four RNG seeds, TheContactList and getClosestObjects' theIterFlag, the script and sides parse
+    # scratch, ScriptList::m_curId, s_failedMapLookups, MapUtil's map-parse scratch, s_transportStatuses,
+    # the build plan, the eight AIDecisionObserver statics, the recorder's startTime and REPLAY_CRC_INTERVAL
+    # are EngineContext fields or PER_ENGINE_STATICs now (so gone from the library; their slot indexes are
+    # rule:per-engine-static), as are Phase 3's TheWaterTransparency, TheWeatherSetting, WaterSettings[], rand4
+    # and CameraShakerSystem.
+    # thread_local (per thread by design, so process-global here): both checkfortransitionsnum, inCRCGen and
+    # PathNode::computeDirectionVector()'s dir. The two XferLoad buffers are locals now (so gone).
+    (GLOBAL, "", "re:State::friend_check(For|ForSleep)Transitions\\(StateReturnType\\)::checkfortransitionsnum", "thread_local call-depth counter (PLAN-023 Phase 2): per thread by design"),
+    (GLOBAL, "", "TerrainLogic::m_gridWaterHandle", "an address-only sentinel (the grid water's WaterHandle is compared by address and never written), the same for every engine"),
+    (GLOBAL, "", "inCRCGen", "thread_local, set only while this thread runs GameLogic::getCRC (PLAN-023 Phase 2): per thread by design"),
+    (GLOBAL, "", "re:PathNode::computeDirectionVector\\(\\)::dir", "thread_local returned-by-pointer scratch, consumed at once (PLAN-023 Phase 2): per thread by design"),
     (PER, 4, "re:BuildAssistant::buildTiledLocations\\(.*\\)::tileInfo", "threads only: returned-by-pointer scratch, consumed at once"),
     # ---------------------------------------------------------------------------------------------------
     # PLAN-023 Phase 3: device-layer state a headless engine uses.
@@ -96,10 +83,7 @@ HAND = [
     (PER, 3, "re:_Fast(Acos|Asin|Sin|InvSin)Table", "WWMath::Init tables: refcount WWMath::Init/Shutdown (same values every time)"),
     (PER, 3, "re:MeshDebugIdCount|unique|unused_texture_id|DecalSystemClass::DecalIDGenerator", "W3D mesh/material/texture/decal ID counter: per engine (IDs continue from the previous engine)"),
     (PER, 3, "rand_gen", "ParticleBufferClass's Random4Class: per engine"),
-    (PER, 3, "rand4", "the texture mapper's Random4Class (random UV mappers): per engine"),
     (PER, 3, "re:WW3D::(SyncTime|PreviousSyncTime|FractionalSyncMs|LogicFrameTimeMs|FrameCount)", "WW3D timing statics that drive animation time (bones headless too): per engine"),
-    (PER, 3, "re:TheWaterTransparency|TheWeatherSetting", "OVERRIDE<> INI objects (Water.ini/Weather.ini): per engine, freed outside W3DWater (T3: freed by ~GameEngine for now)"),
-    (PER, 3, "WaterSettings", "Water.ini time-of-day settings, rewritten by every engine's parse: per engine with TheWaterTransparency"),
     (PER, 3, "TheW3DFrameLengthInMsec", "W3D frame timing value (T3: not a T* field): per engine"),
     (PER, 3, "_TheFileFactory", "WW file factory the W3D loaders read through: one permanent process-wide factory dispatching to the current engine's TheFileSystem"),
     (PER, 3, "_TheSimpleFileFactory", "with _TheFileFactory"),
@@ -107,7 +91,6 @@ HAND = [
     (PER, 3, "_PlaneEQArray", "threads only: MeshGeometryClass plane-equation scratch (ray casts), filled and consumed in one call"),
     (PER, 3, "re:CollisionContext|IntersectContext", "threads only: WWMath AAB-tree collision scratch, filled and consumed in one call"),
     (PER, 3, "InheritedWorldSpaceEmitterVel", "threads only: set by ParticleEmitterClass::Emit and read by Initialize_Particle within the same call"),
-    (PER, 3, "CameraShakerSystem", "W3D camera shake system; W3DView only, but the object is created at static init: per engine with the view"),
     # ---------------------------------------------------------------------------------------------------
     # PLAN-023 Phase 4: caches and remaining statics.
     (PER, 4, "re:ActiveBody::updateBodyParticleSystems\\(\\)::\\w+Template", PER_ENGINE_STATIC),

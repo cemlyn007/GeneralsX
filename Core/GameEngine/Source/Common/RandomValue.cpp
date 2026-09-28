@@ -46,6 +46,15 @@
 
 static const Real theMultFactor = 1.0f / static_cast<float>(UINT_MAX);
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 28/09/2026 The seeds are per engine (EngineContext fields, which start at
+// the initial values below): process-wide ones let one engine's InitRandom reseed every other engine
+// (PLAN-023 Phase 2).
+#define theGameAudioSeed (::rts::ctx()->gameAudioSeed)
+#define theGameClientSeed (::rts::ctx()->gameClientSeed)
+#define theGameLogicSeed (::rts::ctx()->gameLogicSeed)
+#define theGameLogicBaseSeed (::rts::ctx()->gameLogicBaseSeed)
+#else
 // Initial seed values.
 static UnsignedInt theGameAudioSeed[6] =
 {
@@ -63,6 +72,7 @@ static UnsignedInt theGameLogicSeed[6] =
 };
 
 static UnsignedInt theGameLogicBaseSeed = 0;
+#endif
 
 UnsignedInt GetGameLogicRandomSeed()
 {

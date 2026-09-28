@@ -194,7 +194,9 @@ void PathNode::append( PathNode *newNode )
  */
 const Coord3D *PathNode::computeDirectionVector()
 {
-	static Coord3D dir;
+	// GeneralsX @feature cemlyn007 28/09/2026 thread_local: returned-by-pointer scratch the caller consumes at once, on its own
+	// thread (PLAN-023 Phase 2).
+	static thread_local Coord3D dir;
 
 	if (m_next == nullptr)
 	{
@@ -1073,8 +1075,15 @@ Real Path::computeFlightDistToGoal( const Coord3D *pos, Coord3D& goalPos )
 }
 //-----------------------------------------------------------------------------------
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 28/09/2026 The cell-info pool is per engine (EngineContext fields, hot): a
+// second engine's Pathfinder freed and reused the first's process-wide pool (PLAN-023 Phase 2).
+#define s_infoArray (::rts::ctx()->pathfindCellInfoArray)
+#define s_firstFree (::rts::ctx()->pathfindCellInfoFirstFree)
+#else
 PathfindCellInfo *PathfindCellInfo::s_infoArray = nullptr;
 PathfindCellInfo *PathfindCellInfo::s_firstFree = nullptr;
+#endif
 
 #if RETAIL_COMPATIBLE_PATHFINDING
 // TheSuperHackers @info This variable is here so the code will run down the retail compatible path till a failure mode is hit

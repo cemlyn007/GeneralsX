@@ -31,6 +31,31 @@
 
 namespace
 {
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 28/09/2026 Per engine (PLAN-023 Phase 2): each engine has its own
+	// observer (setAIDecisionObserver acts on the current engine) and its own scope, depth and sequence
+	// state, all value-initialised like the statics below (AI_DECISION_REFLEX is 0).
+	struct ObserverPerEngine
+	{
+		AIDecisionObserverFn observer;
+		void *userData;
+		Bool scopeActive;
+		AIDecisionOrigin origin;
+		const char *script;
+		UnsignedByte depth;
+		Int muted;
+		UnsignedInt seq;
+	};
+	rts::PerEngineStatic<ObserverPerEngine> s_observerPerEngine;
+#define s_observer (s_observerPerEngine.get().observer)
+#define s_userData (s_observerPerEngine.get().userData)
+#define s_scopeActive (s_observerPerEngine.get().scopeActive)
+#define s_origin (s_observerPerEngine.get().origin)
+#define s_script (s_observerPerEngine.get().script)
+#define s_depth (s_observerPerEngine.get().depth)
+#define s_muted (s_observerPerEngine.get().muted)
+#define s_seq (s_observerPerEngine.get().seq)
+#else
 	AIDecisionObserverFn s_observer = nullptr;
 	void *s_userData = nullptr;
 
@@ -41,6 +66,7 @@ namespace
 	UnsignedByte s_depth = 0;
 	Int s_muted = 0;
 	UnsignedInt s_seq = 0;
+#endif
 
 	AIDecision makeDecision(AIDecisionKind kind, const Object *actor)
 	{

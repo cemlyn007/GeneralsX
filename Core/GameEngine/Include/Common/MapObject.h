@@ -107,8 +107,17 @@ class MapObject : public MemoryPoolObject
 	Int										m_runtimeFlags;
 
 public:
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 28/09/2026 The map's object list and world dict are per engine (the
+	// list an EngineContext field, the dict a PER_ENGINE_STATIC): every map load rebuilds them, so
+	// process-wide ones were rebuilt under another engine (PLAN-023 Phase 2). The uses are unchanged.
+	static constexpr rts::ContextField<MapObject*, &rts::EngineContext::mapObjectList> TheMapObjectListPtr{};
+	static rts::PerEngineStatic<Dict> TheWorldDict_perEngine;
+#define TheWorldDict (TheWorldDict_perEngine.get())
+#else
 	static MapObject *TheMapObjectListPtr;
 	static Dict TheWorldDict;
+#endif
 
 public:
 	MapObject(Coord3D loc, AsciiString name, Real angle, Int flags, const Dict* props,
