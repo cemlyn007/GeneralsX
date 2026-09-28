@@ -427,6 +427,10 @@ void GameEngine::init()
 	// generator, alone; a later engine may intern no new name until its upgrades are loaded; a failed
 	// priming poisons the process (PLAN-023 Decision 2). Released as failed unless init() completes.
 	NameKeyGenerator::PrimingLatch primingLatch;
+	// GeneralsX @bugfix cemlyn007 28/09/2026 Whether the try block below ran to its end: the catch
+	// (ErrorCode) below swallows every code but ERROR_INVALID_D3D, and a priming engine that stopped
+	// partway must not mark the generator primed
+	Bool initBodyCompleted = FALSE;
 #endif
 	try {
 		//create an INI object to use for loading stuff
@@ -941,6 +945,9 @@ void GameEngine::init()
 			}
 		}
 
+#if RTS_ENGINE_CONTEXT
+		initBodyCompleted = TRUE;
+#endif
 	}
 	catch (ErrorCode ec)
 	{
@@ -973,7 +980,9 @@ void GameEngine::init()
 	HideControlBar();
 
 #if RTS_ENGINE_CONTEXT
-	primingLatch.complete();
+	// Left incomplete, the latch poisons the process when it goes out of scope (a priming engine)
+	if (initBodyCompleted)
+		primingLatch.complete();
 #endif
 }
 

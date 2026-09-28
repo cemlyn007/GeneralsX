@@ -325,7 +325,11 @@ NameKeyGenerator::PrimingLatch::PrimingLatch() : m_priming(FALSE), m_completed(F
 		switch (thePrimingState)
 		{
 			case PRIMING_NOT_STARTED:
-				// The generator never leaves the process: its keys outlive every engine.
+				// The generator never leaves the process: its keys outlive every engine. Its memory (and
+				// its buckets') comes from the refcounted memory manager, so the generator holds a
+				// reference of its own, never released: the last engine's shutdownMemoryManager must not
+				// free the pools under it.
+				initMemoryManager();
 				TheNameKeyGenerator = new NameKeyGenerator;
 				TheNameKeyGenerator->init();
 				thePrimingState = PRIMING_IN_PROGRESS;
