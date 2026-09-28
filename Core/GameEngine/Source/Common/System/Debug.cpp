@@ -805,6 +805,10 @@ bool IsEngineTearingDown()
 }
 #endif
 
+// GeneralsX @bugfix cemlyn007 28/09/2026 Whether this thread is inside ReleaseCrashNoReturn, which
+// reports a ReleaseCrash that returned itself (see throwWithoutGlobalData).
+static thread_local bool theInReleaseCrashNoReturn = false;
+
 // Embedded mode with no TheGlobalData: throw, unless that would end the process through std::terminate
 // (the engine is being torn down, or another exception is already propagating).
 static bool throwWithoutGlobalData(const char *reason)
@@ -820,8 +824,10 @@ static bool throwWithoutGlobalData(const char *reason)
 	// upstream does once TheGlobalData is gone, but says so on stderr rather than swallow the error.
 	if (rts::ctx() == &rts::g_noEngine)
 	{
-		fprintf(stderr, "GeneralsX: fatal engine error outside every engine context, not raised%s%s\n",
-			reason ? ": " : "", reason ? reason : "");
+		// ReleaseCrashNoReturn reports it itself, and raises it after all in embedded mode.
+		if (!theInReleaseCrashNoReturn)
+			fprintf(stderr, "GeneralsX: fatal engine error outside every engine context, not raised%s%s\n",
+				reason ? ": " : "", reason ? reason : "");
 		return false;
 	}
 #endif
@@ -929,11 +935,21 @@ void ReleaseCrash(const char *reason)
 // GeneralsX @bugfix cemlyn007 28/09/2026 See FatalEngineError.h
 void ReleaseCrashNoReturn(const char *reason)
 {
-	ReleaseCrash(reason);
+	struct InNoReturn
+	{
+		InNoReturn() { theInReleaseCrashNoReturn = true; }
+		~InNoReturn() { theInReleaseCrashNoReturn = false; }
+	};
+	{
+		InNoReturn inNoReturn;
+		ReleaseCrash(reason);
+	}
 	// ReleaseCrash returned: no TheGlobalData, and it did not throw.
-	fprintf(stderr, "GeneralsX: fatal engine error: %s\n", reason ? reason : "");
+	const bool raise = IsEngineEmbeddedMode();
+	fprintf(stderr, "GeneralsX: fatal engine error, %s: %s\n", raise ? "raised" : "aborting",
+		reason ? reason : "");
 	fflush(stderr);
-	if (IsEngineEmbeddedMode())
+	if (raise)
 		throw FatalEngineError(reason ? reason : "");
 	abort();
 }

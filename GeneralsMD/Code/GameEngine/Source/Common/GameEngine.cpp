@@ -980,7 +980,10 @@ void GameEngine::init()
 	// ErrorCode one swallows every code but ERROR_INVALID_D3D; RELEASE_CRASH returns with no TheGlobalData).
 	// Upstream carries on with a partly initialised engine; with several engines in a process that must be
 	// a clear failure instead. The latch, left incomplete, then poisons the process (see PrimingLatch).
-	if (!initBodyCompleted)
+	// GeneralsX @bugfix cemlyn007 28/09/2026 Embedded hosts only: the game executable (one engine, not
+	// embedded) keeps upstream's behaviour and carries on, its latch left incomplete (it boots no other
+	// engine, so the poisoned process state is never consulted).
+	if (!initBodyCompleted && IsEngineEmbeddedMode())
 		ReleaseCrashNoReturn("GameEngine::init stopped partway (an error its catch blocks swallowed)");
 #endif
 
@@ -989,7 +992,8 @@ void GameEngine::init()
 	HideControlBar();
 
 #if RTS_ENGINE_CONTEXT
-	primingLatch.complete();
+	if (initBodyCompleted)
+		primingLatch.complete();
 #endif
 }
 

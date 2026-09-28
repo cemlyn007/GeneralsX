@@ -80,4 +80,8 @@ FATAL_ENGINE_ERROR_API bool IsEngineTearingDown();
 // it then. A caller that must not carry on in any case calls this instead: ReleaseCrash, and if that
 // returns, FatalEngineError in embedded mode (which ends the process through std::terminate if a
 // destructor is running) or abort() otherwise, with the reason on stderr.
+//
+// Never call it from a destructor (or anything a destructor calls, an exit handler included): in
+// embedded mode it throws even where ReleaseCrash would not, and a throw out of a destructor ends the
+// process through std::terminate. Such callers keep ReleaseCrash, which returns there.
 [[noreturn]] FATAL_ENGINE_ERROR_API void ReleaseCrashNoReturn(const char *reason);
