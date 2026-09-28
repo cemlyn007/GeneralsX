@@ -60,12 +60,14 @@ HAND = [
     # AIDecisionObserver statics, the recorder's startTime and REPLAY_CRC_INTERVAL are EngineContext fields or
     # PER_ENGINE_STATICs now (so gone from the library; their slot indexes are rule:per-engine-static), as are
     # Phase 3's TheWaterTransparency, TheWeatherSetting, WaterSettings[], rand4 and CameraShakerSystem.
-    (PER, 2, "re:State::friend_check(For|ForSleep)Transitions\\(StateReturnType\\)::checkfortransitionsnum", "threads only: a call-depth counter, correct on one thread; thread_local later (PLAN-023 delivery scope)"),
+    # thread_local (per thread by design, so process-global here): both checkfortransitionsnum, inCRCGen and
+    # PathNode::computeDirectionVector()'s dir. The two XferLoad buffers are locals now (so gone). MapUtil's
+    # parse scratch is left.
+    (GLOBAL, "", "re:State::friend_check(For|ForSleep)Transitions\\(StateReturnType\\)::checkfortransitionsnum", "thread_local call-depth counter (PLAN-023 Phase 2): per thread by design"),
     (PER, 2, "re:m_width|m_height|m_borderSize|m_boundaries|m_data|worldDict|m_waypoints|m_supplyPositions|m_techPositions|m_mapDX|m_mapDY", "threads only: MapUtil map-parse scratch that loadMap() fills and MapCache::addMap consumes within one call (every field is rewritten by the next parse); a stack-local parser object before threads"),
-    (PER, 2, "re:XferLoad::xfer(Ascii|Unicode)String\\(.*\\)::buffer", "threads only (a load runs to completion on one thread): local or member buffer; matters once save/load is used"),
     (GLOBAL, "", "TerrainLogic::m_gridWaterHandle", "an address-only sentinel (the grid water's WaterHandle is compared by address and never written), the same for every engine"),
-    (PER, 2, "inCRCGen", "threads only: set only while GameLogic::getCRC runs; GameLogic member before threads"),
-    (PER, 2, "re:PathNode::computeDirectionVector\\(\\)::dir", "threads only: returned-by-pointer scratch, consumed at once; local/member before threads"),
+    (GLOBAL, "", "inCRCGen", "thread_local, set only while this thread runs GameLogic::getCRC (PLAN-023 Phase 2): per thread by design"),
+    (GLOBAL, "", "re:PathNode::computeDirectionVector\\(\\)::dir", "thread_local returned-by-pointer scratch, consumed at once (PLAN-023 Phase 2): per thread by design"),
     (PER, 4, "re:BuildAssistant::buildTiledLocations\\(.*\\)::tileInfo", "threads only: returned-by-pointer scratch, consumed at once"),
     # ---------------------------------------------------------------------------------------------------
     # PLAN-023 Phase 3: device-layer state a headless engine uses.

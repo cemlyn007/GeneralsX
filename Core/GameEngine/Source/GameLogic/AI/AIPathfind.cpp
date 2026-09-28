@@ -194,7 +194,9 @@ void PathNode::append( PathNode *newNode )
  */
 const Coord3D *PathNode::computeDirectionVector()
 {
-	static Coord3D dir;
+	// GeneralsX @feature cemlyn007 28/09/2026 thread_local: returned-by-pointer scratch the caller consumes at once, on its own
+	// thread (PLAN-023 Phase 2).
+	static thread_local Coord3D dir;
 
 	if (m_next == nullptr)
 	{
