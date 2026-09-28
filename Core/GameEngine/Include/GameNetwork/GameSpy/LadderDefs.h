@@ -80,4 +80,6 @@ private:
 	LadderInfoList m_standardLadders;
 };
 
+#if !RTS_ENGINE_CONTEXT
 extern LadderList *TheLadderList;
+#endif

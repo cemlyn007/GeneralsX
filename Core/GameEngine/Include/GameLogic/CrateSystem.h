@@ -109,4 +109,6 @@ private:
 
 };
 
+#if !RTS_ENGINE_CONTEXT
 extern CrateSystem *TheCrateSystem;
+#endif

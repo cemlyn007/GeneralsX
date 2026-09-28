@@ -34,7 +34,9 @@
 #include "GameLogic/GhostObject.h"
 #include "GameLogic/Object.h"
 
+#if !RTS_ENGINE_CONTEXT
 GhostObjectManager *TheGhostObjectManager = nullptr;
+#endif
 
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------

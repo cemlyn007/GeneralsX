@@ -211,5 +211,7 @@ protected:
 	UnsignedInt m_nextFrame;												///< The Frame that the next message is to be executed on.  This can be -1.
 };
 
+#if !RTS_ENGINE_CONTEXT
 extern RecorderClass *TheRecorder;
+#endif
 RecorderClass *createRecorder();

@@ -240,6 +240,15 @@ int main(int argc, char* argv[])
 	__argc = argc;
 	__argv = argv;
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 28/09/2026 The game runs one engine, in a process-default engine context
+	// entered for the whole of main() (PLAN-023 Phase 1). Everything below, including the command-line parse
+	// that creates TheWritableGlobalData, sets that context's singletons. Static destructors run after main()
+	// has left it, and see no engine.
+	rts::EngineContext processEngineContext;
+	rts::Scope processEngineScope(&processEngineContext);
+#endif
+
 	fprintf(stderr, "=================================================\n");
 	fprintf(stderr, " Command & Conquer Generals: Zero Hour (Linux)\n");
 	fprintf(stderr, " SDL3 + DXVK Build\n");

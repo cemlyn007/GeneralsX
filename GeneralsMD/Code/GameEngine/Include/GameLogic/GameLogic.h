@@ -536,4 +536,6 @@ inline Object* GameLogic::findObjectByID( ObjectID id )
 
 
 // the singleton
+#if !RTS_ENGINE_CONTEXT
 extern GameLogic *TheGameLogic;
+#endif

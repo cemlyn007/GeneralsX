@@ -77,7 +77,9 @@
 #endif
 
 // PUBLIC DATA ////////////////////////////////////////////////////////////////////////////////////
+#if !RTS_ENGINE_CONTEXT
 GlobalData* TheWritableGlobalData = nullptr;				///< The global data singleton
+#endif
 
 //-------------------------------------------------------------------------------------------------
 GlobalData* GlobalData::m_theOriginal = nullptr;

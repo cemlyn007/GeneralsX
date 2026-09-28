@@ -48,7 +48,9 @@
 #include "GameNetwork/LANAPICallbacks.h"
 #include "GameNetwork/networkutil.h"
 
+#if !RTS_ENGINE_CONTEXT
 LANAPI *TheLAN = nullptr;
+#endif
 extern Bool LANbuttonPushed;
 
 

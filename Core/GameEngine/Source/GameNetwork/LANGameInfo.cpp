@@ -45,7 +45,9 @@
 
 // Singleton ------------------------------------------
 
+#if !RTS_ENGINE_CONTEXT
 LANGameInfo *TheLANGameInfo = nullptr;
+#endif
 
 // LANGameSlot ----------------------------------------
 

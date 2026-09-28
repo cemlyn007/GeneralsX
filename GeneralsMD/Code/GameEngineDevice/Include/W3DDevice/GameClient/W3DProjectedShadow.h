@@ -97,7 +97,9 @@ class W3DProjectedShadowManager	: public ProjectedShadowManager
 		Int m_drawStartY;
 };
 
+#if !RTS_ENGINE_CONTEXT
 extern W3DProjectedShadowManager *TheW3DProjectedShadowManager;
+#endif
 
 /** Object for maintaining and updating an object's shadow texture.
 */

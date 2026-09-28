@@ -187,4 +187,6 @@ protected:
 };
 
 // EXTERNAL ///////////////////////////////////////////////////////////////////////////////////////
+#if !RTS_ENGINE_CONTEXT
 extern SpecialPowerStore *TheSpecialPowerStore;
+#endif

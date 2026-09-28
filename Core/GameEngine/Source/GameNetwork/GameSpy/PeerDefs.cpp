@@ -47,8 +47,10 @@
 #include "GameLogic/GameLogic.h"
 
 
+#if !RTS_ENGINE_CONTEXT
 GameSpyInfoInterface *TheGameSpyInfo = nullptr;
 GameSpyStagingRoom *TheGameSpyGame = nullptr;
+#endif
 void deleteNotificationBox();
 
 bool AsciiComparator::operator()(AsciiString s1, AsciiString s2) const

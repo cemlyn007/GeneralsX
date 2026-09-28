@@ -28,6 +28,12 @@
 // The engine that threw is corrupt: the host must not call into it again, and should not destroy
 // it either (its destructors may run on inconsistent state). A fatal error raised while a
 // destructor is running still ends the process, through std::terminate.
+//
+// GeneralsX @bugfix cemlyn007 28/09/2026 The teardown window (PLAN-023 Phase 1). With no TheGlobalData
+// a fatal error has no crash file to write. Before the engine has made TheGlobalData (early boot) it
+// still throws, but once the engine is being torn down (TheGlobalData is freed by then) it returns, as
+// it did before embedded mode: a throw there would almost always escape a destructor and end the
+// process through std::terminate. It also returns while another exception is already propagating.
 
 #pragma once
 
@@ -52,3 +58,8 @@ public:
 // Process-wide. Set it before the first engine is initialised; off by default.
 FATAL_ENGINE_ERROR_API void SetEngineEmbeddedMode(bool embedded);
 FATAL_ENGINE_ERROR_API bool IsEngineEmbeddedMode();
+
+// Per engine (per engine context with RTS_ENGINE_CONTEXT): GameEngine's destructor sets it and its
+// constructor clears it. Outside every engine context it reads as set (nothing to hand an error to).
+FATAL_ENGINE_ERROR_API void SetEngineTearingDown(bool tearingDown);
+FATAL_ENGINE_ERROR_API bool IsEngineTearingDown();

@@ -54,7 +54,9 @@
 #define SUN_DISTANCE_FROM_GROUND	10000.0f	//distance of sun (our only light source).
 
 // Global Variables and Functions /////////////////////////////////////////////
+#if !RTS_ENGINE_CONTEXT
 W3DShadowManager *TheW3DShadowManager=nullptr;
+#endif
 const FrustumClass *shadowCameraFrustum;
 
 Vector3 LightPosWorld[ MAX_SHADOW_LIGHTS ] =

@@ -363,7 +363,9 @@ inline GameWinInputFunc GameWindowManager::getDefaultInput()  { return GameWinDe
 inline GameWinTooltipFunc GameWindowManager::getDefaultTooltip() { return GameWinDefaultTooltip; }
 
 // EXTERN /////////////////////////////////////////////////////////////////////////////////////////
+#if !RTS_ENGINE_CONTEXT
 extern GameWindowManager *TheWindowManager;			///< singleton extern definition
+#endif
 extern UnsignedInt WindowLayoutCurrentVersion;  ///< current version of our window layouts
 
 // this function lets us generically pass button selections to our parent, we may

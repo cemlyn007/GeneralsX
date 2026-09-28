@@ -54,7 +54,9 @@ public:
 	// Called by the script engine in postProcessLoad()
 	virtual void doEnableOrDisableObjectDifficultyBonuses(Bool enableBonuses) = 0;
 };
+#if !RTS_ENGINE_CONTEXT
 extern ScriptActionsInterface *TheScriptActions;   ///< singleton definition
+#endif
 
 
 //-----------------------------------------------------------------------------

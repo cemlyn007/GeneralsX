@@ -694,4 +694,6 @@ void PushButtonImageDrawThree(GameWindow *window, Int alpha );
 //-----------------------------------------------------------------------------
 // EXTERNALS //////////////////////////////////////////////////////////////////
 //-----------------------------------------------------------------------------
+#if !RTS_ENGINE_CONTEXT
 extern GameWindowTransitionsHandler *TheTransitionHandler;
+#endif

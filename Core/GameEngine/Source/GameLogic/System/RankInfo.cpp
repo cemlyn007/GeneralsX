@@ -33,7 +33,9 @@
 #include "Common/Player.h"
 #include "GameLogic/RankInfo.h"
 
+#if !RTS_ENGINE_CONTEXT
 RankInfoStore* TheRankInfoStore = nullptr;
+#endif
 
 
 //-----------------------------------------------------------------------------

@@ -152,4 +152,6 @@ protected:
 
 };
 
+#if !RTS_ENGINE_CONTEXT
 extern TerrainTracksRenderObjClassSystem *TheTerrainTracksRenderObjClassSystem; ///< singleton for track drawing system.
+#endif

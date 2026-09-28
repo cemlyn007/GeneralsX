@@ -38,7 +38,9 @@
 //#include "GameLogic/GameLogic.h"
 
 /// The Display singleton instance.
+#if !RTS_ENGINE_CONTEXT
 Display *TheDisplay = nullptr;
+#endif
 
 
 Display::Display()

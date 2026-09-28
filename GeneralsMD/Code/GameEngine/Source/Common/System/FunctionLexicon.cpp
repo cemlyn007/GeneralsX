@@ -378,7 +378,9 @@ static FunctionLexicon::TableEntry winLayoutShutdownTable[] =
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // PUBLIC DATA
 ///////////////////////////////////////////////////////////////////////////////////////////////////
+#if !RTS_ENGINE_CONTEXT
 FunctionLexicon *TheFunctionLexicon = nullptr;  ///< the function dictionary
+#endif
 
 //-------------------------------------------------------------------------------------------------
 /** Since we have a convenient table to organize our callbacks anyway,

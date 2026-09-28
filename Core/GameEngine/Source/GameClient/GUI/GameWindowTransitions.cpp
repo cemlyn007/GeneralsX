@@ -60,7 +60,9 @@
 //-----------------------------------------------------------------------------
 // DEFINES ////////////////////////////////////////////////////////////////////
 //-----------------------------------------------------------------------------
+#if !RTS_ENGINE_CONTEXT
 GameWindowTransitionsHandler *TheTransitionHandler = nullptr;
+#endif
 const FieldParse GameWindowTransitionsHandler::m_gameWindowTransitionsFieldParseTable[] =
 {
 

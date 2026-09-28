@@ -163,7 +163,9 @@ extern void externalAddTree(Coord3D location, Real scale, Real angle, AsciiStrin
 enum { OBJ_HASH_SIZE	= 8192 };
 
 /// The GameLogic singleton instance
+#if !RTS_ENGINE_CONTEXT
 GameLogic *TheGameLogic = nullptr;
+#endif
 
 static void findAndSelectCommandCenter(Object *obj, void* alreadyFound);
 

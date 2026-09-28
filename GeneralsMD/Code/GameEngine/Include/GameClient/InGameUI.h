@@ -981,4 +981,6 @@ protected:
 };
 
 // the singleton
+#if !RTS_ENGINE_CONTEXT
 extern InGameUI *TheInGameUI;
+#endif

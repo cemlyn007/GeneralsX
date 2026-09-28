@@ -169,7 +169,9 @@ protected:
 };
 
 
+#if !RTS_ENGINE_CONTEXT
 extern ArchiveFileSystem *TheArchiveFileSystem;
+#endif
 
 //----------------------------------------------------------------------------
 //           Inlining

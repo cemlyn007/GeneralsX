@@ -75,7 +75,9 @@
 //         Public Data
 //----------------------------------------------------------------------------
 
+#if !RTS_ENGINE_CONTEXT
 LocalFileSystem *TheLocalFileSystem = nullptr;
+#endif
 
 //----------------------------------------------------------------------------
 //         Private Prototypes

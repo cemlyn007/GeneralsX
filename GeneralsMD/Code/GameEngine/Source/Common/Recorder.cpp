@@ -293,7 +293,9 @@ void RecorderClass::cleanUpReplayFile()
 /**
  * The recorder object.
  */
+#if !RTS_ENGINE_CONTEXT
 RecorderClass *TheRecorder = nullptr;
+#endif
 
 /**
  * Constructor

@@ -52,4 +52,6 @@ protected:
 	static const char *const m_playerStatusControlNames[MAX_SLOTS];
 };
 
+#if !RTS_ENGINE_CONTEXT
 extern EstablishConnectionsMenu *TheEstablishConnectionsMenu;
+#endif

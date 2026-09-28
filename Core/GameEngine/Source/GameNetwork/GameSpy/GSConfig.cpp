@@ -39,7 +39,9 @@
 
 ///////////////////////////////////////////////////////////////////////////////////////
 
+#if !RTS_ENGINE_CONTEXT
 GameSpyConfigInterface *TheGameSpyConfig = nullptr;
+#endif
 
 class GameSpyConfig : public GameSpyConfigInterface
 {

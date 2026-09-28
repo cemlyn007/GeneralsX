@@ -201,7 +201,9 @@ Int SidesInfo::removeFromBuildList(BuildListInfo *pBuildList)
 }
 
 /* ********* SidesList class ****************************/
+#if !RTS_ENGINE_CONTEXT
 /*extern*/ SidesList *TheSidesList = nullptr;	 ///< singleton instance of SidesList
+#endif
 /**
  SidesList - Constructor.
 */

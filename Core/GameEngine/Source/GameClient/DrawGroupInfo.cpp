@@ -52,4 +52,6 @@ DrawGroupInfo::DrawGroupInfo()
 	m_usingPixelOffsetY = TRUE;
 }
 
+#if !RTS_ENGINE_CONTEXT
 DrawGroupInfo *TheDrawGroupInfo = nullptr;
+#endif

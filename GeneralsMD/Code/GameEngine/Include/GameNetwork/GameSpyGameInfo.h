@@ -83,7 +83,9 @@ public:
 	void gotGOACall();																			///< Mark the game info as having been queried
 };
 
+#if !RTS_ENGINE_CONTEXT
 extern GameSpyGameInfo *TheGameSpyGame;
+#endif
 
 void WOLDisplayGameOptions();
 void WOLDisplaySlotList();

@@ -118,7 +118,9 @@ static void updateTeamAndPlayerStuff( Object *obj, void *userData )
 #define REALLY_FAR	(100000 * MAP_XY_FACTOR)
 
 // GLOBALS ////////////////////////////////////////////////////////////////////////////////////////
+#if !RTS_ENGINE_CONTEXT
 ScriptActionsInterface *TheScriptActions = nullptr;
+#endif
 GameWindow *ScriptActions::m_messageWindow = nullptr;
 
 //-------------------------------------------------------------------------------------------------

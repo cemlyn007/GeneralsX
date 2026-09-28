@@ -62,6 +62,7 @@
 #include "Common/Debug.h"
 #include "Common/FatalEngineError.h"
 #include <atomic>
+#include <exception>
 #include "Common/CRCDebug.h"
 #include "Common/UnicodeString.h"
 #include "GameClient/ClientInstance.h"
@@ -774,6 +775,41 @@ bool IsEngineEmbeddedMode()
 	return theEngineEmbeddedMode.load();
 }
 
+// GeneralsX @bugfix cemlyn007 28/09/2026 The teardown window (see FatalEngineError.h)
+#if RTS_ENGINE_CONTEXT
+void SetEngineTearingDown(bool tearingDown)
+{
+	rts::EngineContext* context = rts::ctx();
+	if (context != &rts::g_noEngine)
+		context->engineTearingDown = tearingDown;
+}
+
+bool IsEngineTearingDown()
+{
+	const rts::EngineContext* context = rts::ctx();
+	return context == &rts::g_noEngine || context->engineTearingDown;
+}
+#else
+static bool theEngineTearingDown = false;
+
+void SetEngineTearingDown(bool tearingDown)
+{
+	theEngineTearingDown = tearingDown;
+}
+
+bool IsEngineTearingDown()
+{
+	return theEngineTearingDown;
+}
+#endif
+
+// Embedded mode with no TheGlobalData: throw, unless that would end the process through std::terminate
+// (the engine is being torn down, or another exception is already propagating).
+static bool throwWithoutGlobalData()
+{
+	return IsEngineEmbeddedMode() && !IsEngineTearingDown() && std::uncaught_exceptions() == 0;
+}
+
 void ReleaseCrash(const char *reason)
 {
 	/// do additional reporting on the crash, if possible
@@ -792,7 +828,8 @@ void ReleaseCrash(const char *reason)
 	if (TheGlobalData==nullptr) {
 		// GeneralsX @bugfix cemlyn007 28/09/2026 Embedded mode: there is no crash file to write, but
 		// the caller still must not carry on, so hand the error to the host (see FatalEngineError.h).
-		if (IsEngineEmbeddedMode()) {
+		// GeneralsX @bugfix cemlyn007 28/09/2026 Not in the teardown window, though.
+		if (throwWithoutGlobalData()) {
 			throw FatalEngineError(reason ? reason : "");
 		}
 		return; // We are shutting down, and TheGlobalData has been freed.  jba. [4/15/2003]
@@ -924,10 +961,15 @@ void ReleaseCrashLocalized(const AsciiString& p, const AsciiString& m)
 
 	// GeneralsX @bugfix cemlyn007 28/09/2026 Embedded mode: with no TheGlobalData there is no crash
 	// file path, so hand the error straight to the host (see FatalEngineError.h).
-	if (TheGlobalData == nullptr && IsEngineEmbeddedMode()) {
-		AsciiString reason;
-		reason.translate(mesg);
-		throw FatalEngineError(reason.str());
+	// GeneralsX @bugfix cemlyn007 28/09/2026 In the teardown window return instead, as ReleaseCrash does
+	// (the code below needs TheGlobalData).
+	if (TheGlobalData == nullptr) {
+		if (throwWithoutGlobalData()) {
+			AsciiString reason;
+			reason.translate(mesg);
+			throw FatalEngineError(reason.str());
+		}
+		return;
 	}
 
 	char prevbuf[ _MAX_PATH ];

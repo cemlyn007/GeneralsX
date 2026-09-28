@@ -31,7 +31,9 @@
 
 
 
+#if !RTS_ENGINE_CONTEXT
 LanguageFilter *TheLanguageFilter = nullptr;
+#endif
 
 LanguageFilter::LanguageFilter()
 {

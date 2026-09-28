@@ -251,7 +251,9 @@ private:
 };
 
 // EXTERNALS //////////////////////////////////////////////////////////////////////////////////////
+#if !RTS_ENGINE_CONTEXT
 extern GameState *TheGameState;
+#endif
 
 
 UnicodeString getUnicodeTimeBuffer(SYSTEMTIME timeVal);

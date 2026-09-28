@@ -117,4 +117,6 @@ protected:
 	Int m_smudgeCountLastFrame;	//number of total smudges in manager last frame.
 };
 
+#if !RTS_ENGINE_CONTEXT
 extern SmudgeManager *TheSmudgeManager;	///<singleton
+#endif

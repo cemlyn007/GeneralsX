@@ -135,7 +135,9 @@ static UnicodeString formatIncomeValue(UnsignedInt cashPerMin)
 
 //-------------------------------------------------------------------------------------------------
 /// The InGameUI singleton instance.
+#if !RTS_ENGINE_CONTEXT
 InGameUI *TheInGameUI = nullptr;
+#endif
 
 GameWindow *m_replayWindow = nullptr;
 

@@ -82,4 +82,6 @@ protected:
 	Bool m_isGameHalted;
 };
 
+#if !RTS_ENGINE_CONTEXT
 extern FramePacer* TheFramePacer;
+#endif

@@ -781,7 +781,9 @@ Bool MapCache::addMap(
 	return TRUE;
 }
 
+#if !RTS_ENGINE_CONTEXT
 MapCache *TheMapCache = nullptr;
+#endif
 
 // PUBLIC FUNCTIONS //////////////////////////////////////////////////////////////////////////////
 

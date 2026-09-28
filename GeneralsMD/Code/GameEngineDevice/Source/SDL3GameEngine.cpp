@@ -60,9 +60,11 @@
 #include <cstring>
 
 // Extern globals for input devices (set by GameClient)
+#if !RTS_ENGINE_CONTEXT
 extern Mouse *TheMouse;
 extern Keyboard *TheKeyboard;
 extern GameWindowManager *TheWindowManager;
+#endif
 
 namespace {
 

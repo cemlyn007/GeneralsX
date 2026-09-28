@@ -98,4 +98,6 @@ private:
 };
 
 Bool CanSelectDrawable( const Drawable *draw, Bool dragSelecting );
+#if !RTS_ENGINE_CONTEXT
 extern SelectionTranslator *TheSelectionTranslator;
+#endif

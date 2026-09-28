@@ -453,4 +453,6 @@ class MouseDummy : public Mouse
 
 
 // EXTERNALS //////////////////////////////////////////////////////////////////
+#if !RTS_ENGINE_CONTEXT
 extern Mouse *TheMouse;  ///< extern mouse singleton definition
+#endif

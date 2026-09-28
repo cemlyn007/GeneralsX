@@ -122,4 +122,6 @@ protected:
 };
 
 // EXTERN /////////////////////////////////////////////////////////////////////////////////////////
+#if !RTS_ENGINE_CONTEXT
 extern ModuleFactory *TheModuleFactory;  ///< singleton definition
+#endif

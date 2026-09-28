@@ -254,6 +254,9 @@ static void updateWindowTitle()
 //-------------------------------------------------------------------------------------------------
 GameEngine::GameEngine()
 {
+	// GeneralsX @bugfix cemlyn007 28/09/2026 A new engine is not being torn down (see FatalEngineError.h)
+	SetEngineTearingDown(false);
+
 	// initialize to non garbage values
 	m_logicTimeAccumulator = 0.0f;
 	m_quitting = FALSE;
@@ -267,6 +270,10 @@ GameEngine::GameEngine()
 //-------------------------------------------------------------------------------------------------
 GameEngine::~GameEngine()
 {
+	// GeneralsX @bugfix cemlyn007 28/09/2026 From here on a fatal error with no TheGlobalData does not
+	// throw (see FatalEngineError.h)
+	SetEngineTearingDown(true);
+
 	//extern std::vector<std::string>	preloadTextureNamesGlobalHack;
 	//preloadTextureNamesGlobalHack.clear();
 

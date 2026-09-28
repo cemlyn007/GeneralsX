@@ -165,4 +165,6 @@ private:
 
 };
 
+#if !RTS_ENGINE_CONTEXT
 extern SubsystemInterfaceList* TheSubsystemList;
+#endif

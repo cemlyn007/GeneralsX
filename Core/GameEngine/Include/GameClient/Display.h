@@ -229,7 +229,9 @@ protected:
 };
 
 // the singleton
+#if !RTS_ENGINE_CONTEXT
 extern Display *TheDisplay;
+#endif
 
 extern void StatDebugDisplay( DebugDisplayInterface *dd, void *, FILE *fp = nullptr );
 

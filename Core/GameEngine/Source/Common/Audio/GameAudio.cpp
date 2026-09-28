@@ -139,7 +139,9 @@ static const FieldParse audioSettingsFieldParseTable[] =
 };
 
 // Singleton TheAudio /////////////////////////////////////////////////////////////////////////////
+#if !RTS_ENGINE_CONTEXT
 AudioManager *TheAudio = nullptr;
+#endif
 
 const char *const AudioManager::MuteAudioReasonNames[] =
 {

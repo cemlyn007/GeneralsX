@@ -10,6 +10,8 @@ option(RTS_BUILD_OPTION_ASAN "Build code with Address Sanitizer." OFF)
 option(RTS_BUILD_OPTION_VC6_FULL_DEBUG "Build VC6 with full debug info." OFF)
 option(RTS_BUILD_OPTION_FFMPEG "Enable FFmpeg support" OFF)
 option(RTS_BUILD_OPTION_DEEP_CRC "Enable deep CRC snapshots on sync mismatch" ON)
+# GeneralsX @feature cemlyn007 28/09/2026 Per-engine singletons for several engines in one process (PLAN-023)
+option(RTS_ENGINE_CONTEXT "Resolve the engine singletons through a current rts::EngineContext (embedding hosts)" OFF)
 
 # Linux/SDL3 and OpenAL options (Phase 1 Linux port)
 option(SAGE_USE_SDL3 "Use SDL3 for windowing/input (Linux/macOS)" OFF)
@@ -157,6 +159,45 @@ if(RTS_BUILD_OPTION_DEEP_CRC)
     target_compile_definitions(core_config INTERFACE DEEP_CRC_TO_MEMORY=1)
     message(STATUS "Deep CRC logging on sync mismatch enabled")
 endif()
+
+# GeneralsX @feature cemlyn007 28/09/2026 RTS_ENGINE_CONTEXT (PLAN-023 Decision 1, Phase 1)
+# ON: every singleton in Core/GameEngine/Include/Common/EngineSingletons.inl is a field of rts::EngineContext
+# and `TheXxx` is a macro over the current context, so a host can run several engines in one process. The
+# context header is force-included into every C++ translation unit that links core_config, ahead of the
+# precompiled header. OFF (the default) builds exactly the upstream-shaped code: the header is not included,
+# and the `#if !RTS_ENGINE_CONTEXT` guards around the upstream singleton declarations keep them.
+#
+# Zero Hour only for now: the Generals base game's own singleton declarations are not guarded yet (PLAN-023's
+# Generals backport), and the tools (WorldBuilder, GUIEdit, MapCacheBuilder, W3DView, ...) assign singletons
+# outside any context, so an ON build leaves both out rather than entering a context in each tool.
+if(RTS_ENGINE_CONTEXT)
+    if(IS_VS6_BUILD)
+        message(FATAL_ERROR "RTS_ENGINE_CONTEXT requires C++20 and cannot be used with VC6")
+    endif()
+    if(RTS_BUILD_GENERALS)
+        message(STATUS "RTS_ENGINE_CONTEXT: not building Generals (its singletons are not guarded yet); Zero Hour only")
+        set(RTS_BUILD_GENERALS OFF)
+    endif()
+    foreach(_rts_tools_option
+            RTS_BUILD_ZEROHOUR_TOOLS RTS_BUILD_ZEROHOUR_EXTRAS RTS_BUILD_GENERALS_TOOLS RTS_BUILD_GENERALS_EXTRAS
+            RTS_BUILD_CORE_TOOLS RTS_BUILD_CORE_EXTRAS)
+        if(${_rts_tools_option})
+            message(STATUS "RTS_ENGINE_CONTEXT: ${_rts_tools_option} off (the tools do not enter an engine context)")
+            set(${_rts_tools_option} OFF)
+        endif()
+    endforeach()
+    set(RTS_ENGINE_CONTEXT_HEADER "${CMAKE_CURRENT_LIST_DIR}/../Core/GameEngine/Include/Common/EngineContext.h")
+    cmake_path(NORMAL_PATH RTS_ENGINE_CONTEXT_HEADER)
+    target_compile_definitions(core_config INTERFACE RTS_ENGINE_CONTEXT=1)
+    if(MSVC)
+        target_compile_options(core_config INTERFACE "$<$<COMPILE_LANGUAGE:CXX>:/FI${RTS_ENGINE_CONTEXT_HEADER}>")
+    else()
+        # Joined `-include<file>` (GCC and Clang accept it), so the option is one argument.
+        target_compile_options(core_config INTERFACE "$<$<COMPILE_LANGUAGE:CXX,OBJCXX>:-include${RTS_ENGINE_CONTEXT_HEADER}>")
+    endif()
+    message(STATUS "RTS_ENGINE_CONTEXT: engine singletons resolve through rts::EngineContext")
+endif()
+add_feature_info(EngineContext RTS_ENGINE_CONTEXT "Per-engine singletons through rts::EngineContext (several engines per process)")
 
 # macOS MoltenVK detection (Phase 5)
 # GeneralsX @build BenderAI 24/02/2026 - Phase 5 macOS port
