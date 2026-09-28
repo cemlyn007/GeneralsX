@@ -6,7 +6,9 @@
 # key (compiler `.N` suffixes stripped), `re:` + a regular expression that must match the whole key, or
 # `file:` + a regular expression searched for in every definition site of the source column (path:line;
 # all sites must match). A `file:` pattern is a blanket: keep it to files that only a rendering, UI or
-# networked engine reaches, since `check` makes every new symbol it classifies an error until reviewed.
+# networked engine reaches. No entry here classifies a symbol the checked-in TSV lacks without review:
+# `check` (non-strict included) fails on every new symbol a hand entry matches, exact, `re:` or `file:`,
+# until `snapshot` records it (engine_state_symbols.py's SAFE_FOR_NEW).
 #
 # "Headless" below means an rlgenerals engine: GlobalData::m_headless without m_headlessRender. Such an
 # engine still runs GameClient::update (so the message translators, InGameUI::update and the drawables),

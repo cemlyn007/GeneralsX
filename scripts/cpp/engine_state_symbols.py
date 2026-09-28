@@ -24,13 +24,17 @@
 #
 # Usage (from the GeneralsX root, or with --root):
 #   engine_state_symbols.py snapshot LIB.so   rewrite the TSV from the library's symbols
-#   engine_state_symbols.py check LIB.so      exit 1 if the library has a symbol the TSV lacks that no rule
-#                                             or hand entry classifies (an unreviewed new symbol) or that
-#                                             only a blanket `file:` pattern classifies, a listed symbol
-#                                             whose class or phase changed (to `unreviewed` included), or a
-#                                             listed name with a new instance (more TUs define it); with
-#                                             --strict also if the TSV is stale in any way (a new symbol a
-#                                             rule classifies, a vanished symbol, a moved definition)
+#   engine_state_symbols.py check LIB.so      exit 1 if the library has a symbol the TSV lacks, unless a
+#                                             rule marked safe for new symbols classifies it (SAFE_FOR_NEW:
+#                                             the structural family rules, and the guard variable of a listed
+#                                             static); a hand entry, `re:` and `file:` ones included, never
+#                                             passes a new symbol, since its pattern was written for the
+#                                             symbols someone read, not for whatever a sync adds that
+#                                             happens to match. Also exit 1 on a listed symbol whose class or
+#                                             phase changed (to `unreviewed` included) or a listed name with
+#                                             a new instance (more TUs define it); with --strict also if the
+#                                             TSV is stale in any way (a new symbol a safe rule classifies, a
+#                                             vanished symbol, a moved definition)
 #   engine_state_symbols.py report [LIB.so]   print the per-engine work list grouped by phase, the counts
 #                                             per class and the unreviewed symbols (from the TSV, or from
 #                                             the library when given)
@@ -223,6 +227,26 @@ def split_scopes(name):
     return parts
 
 
+# A comment or a string/character literal, whichever starts first: `/*` inside a `//` comment or a string
+# opens nothing, and `//` inside a string or a block comment is no comment. An unterminated block comment
+# runs to the end of the file. (Raw strings and `'` digit separators are not recognised; a separator can only
+# mis-blank the rest of its own line.)
+LEXEME_RE = re.compile(r"//[^\n]*|/\*.*?(?:\*/|\Z)|\"(?:\\.|[^\"\\\n])*\"|'(?:\\.|[^'\\\n])*'", re.S)
+
+
+def _blank(m):
+    text = m.group(0)
+    if text[0] in "\"'":
+        return text[0] + re.sub(r"[^\n]", " ", text[1:-1]) + text[-1] if len(text) > 1 else text
+    return re.sub(r"[^\n]", " ", text)
+
+
+def code_only(text):
+    """`text` with every comment and the contents of every string and character literal replaced by spaces
+    (newlines kept, so offsets and line numbers are unchanged): what the definition search looks at."""
+    return LEXEME_RE.sub(_blank, text)
+
+
 def bare(part):
     """The identifier of a scope part: `f(int) const` -> `f`, `A<int>` -> `A`, `{lambda()#1}` -> ''."""
     m = re.match(r"\s*(?:\w+\s+)*?(~?[A-Za-z_]\w*|operator\S+)", part)
@@ -271,7 +295,8 @@ class SourceIndex:
                     rel = os.path.join(rel_dir, fn)
                     with open(os.path.join(root, rel), encoding="latin-1") as f:
                         text = f.read()
-                    self.files[rel] = text
+                    # Searched with comments and literals blanked out (offsets and lines unchanged).
+                    self.files[rel] = code_only(text)
                     for word in set(re.findall(r"[A-Za-z_]\w*", text)) & wanted:
                         self.where[word].add(rel)
 
@@ -284,8 +309,8 @@ class SourceIndex:
         return sorted(found, key=lambda p: (not p.endswith((".cpp", ".c", ".cc")), p))
 
     def class_bodies(self, rel, cls):
-        """(start, end) offsets of the body of every definition of class `cls` in `rel`, braces matched (comments
-        and string literals are not skipped, which a class body's braces rarely need)."""
+        """(start, end) offsets of the body of every definition of class `cls` in `rel`, braces matched (outside
+        comments and literals, which `code_only` has blanked)."""
         text = self.files[rel]
         head = re.compile(rf"\b(?:class|struct)\s+(?:\w+\s+)*?{re.escape(cls)}\b[^;{{}}()]*\{{")
         for m in head.finditer(text):
@@ -300,15 +325,14 @@ class SourceIndex:
         return self.files[rel].count("\n", 0, pos) + 1
 
     def lines_with(self, rel, word_re, start=0):
-        """(line start offset, line text, match offset within the line) of every match of `word_re`."""
+        """(line start offset, line text, match start and end within the line) of every match of `word_re` in
+        code: the text is `code_only`, so a match in a comment or a literal is never seen, and the line comes
+        back with its comments and literals blanked too."""
         text = self.files[rel]
         for m in word_re.finditer(text, start):
             ls = text.rfind("\n", 0, m.start()) + 1
             le = text.find("\n", m.end())
             line = text[ls : le if le >= 0 else len(text)]
-            # Not in a comment: after `//` on the line, or inside a `/* */` block.
-            if "//" in line[: m.start() - ls] or text.rfind("/*", 0, m.start()) > text.rfind("*/", 0, m.start()):
-                continue
             yield ls, line, m.start() - ls, m.end() - ls
 
     def where_is(self, rel, offset, line):
@@ -358,7 +382,7 @@ class SourceIndex:
                             break
             # Made by a macro (MAKE_STANDARD_MODULE_MACRO's getModuleNameKey, ...): the class's header.
             if parsed.cls:
-                cls_re = re.compile(rf"^\s*(?:class|struct)\s+(?:\w+\s+)?{re.escape(parsed.cls)}\b[^;]*$", re.M)
+                cls_re = re.compile(rf"^[ \t]*(?:class|struct)\s+(?:\w+\s+)?{re.escape(parsed.cls)}\b[^;]*$", re.M)
                 for rel in self.candidates(parsed.cls):
                     m = cls_re.search(self.files[rel])
                     if m:
@@ -381,7 +405,7 @@ class SourceIndex:
                     for ls, line, a, _b in self.lines_with(rel, var_re, body_start):
                         if ls + a >= body_end:
                             break
-                        prefix = strip_block_comments(line[:a])
+                        prefix = line[:a]
                         if re.search(r"\bstatic\b", prefix) and "(" not in prefix:
                             site = self.where_is(rel, ls, line)
                             break
@@ -403,7 +427,7 @@ class SourceIndex:
                         continue
                     indented = line[:1] in (" ", "\t")
                     # Indented: a local variable unless it is a static or inside a namespace block.
-                    if indented and not re.search(r"\bstatic\b", strip_block_comments(line[:a])):
+                    if indented and not re.search(r"\bstatic\b", line[:a]):
                         text = self.files[rel]
                         if not re.search(r"^\s*namespace\b", text[:ls], re.M):
                             continue
@@ -426,14 +450,8 @@ DEF_PREFIX_RE = re.compile(
 DEF_SUFFIX_RE = re.compile(r"\s*(?:\[[^\]]*\]\s*)*(?:=|;|\{|\(|,|$)")
 
 
-def strip_block_comments(text):
-    """`text` with each complete `/* ... */` replaced by a space (`/*static*/ const T C::x;` is a definition). An
-    unterminated `/*` stays, so a line that opens a comment is still no definition."""
-    return re.sub(r"/\*.*?\*/", " ", text)
-
-
 def is_def_prefix(prefix):
-    return DEF_PREFIX_RE.fullmatch(strip_block_comments(prefix)) is not None
+    return DEF_PREFIX_RE.fullmatch(prefix) is not None
 
 
 SITE_SEP = ";"
@@ -485,8 +503,8 @@ class Hand:
     """A hand classification from engine_state_hand.py: (class, phase, matcher, note). The matcher is the
     exact key, `re:` + a regular expression (fullmatch on the key) or `file:` + a regular expression
     (searched for in every definition site of the source column; all of them must match). A `file:` match
-    is a blanket one, recorded as `by` = `file`: `check` fails on a new symbol it classifies, so every
-    static a sync adds to such a file is looked at once (and recorded by `snapshot`)."""
+    is a blanket one, recorded as `by` = `file`. `check` fails on a new symbol any hand entry classifies
+    (see SAFE_FOR_NEW), so every static a sync adds is looked at once (and recorded by `snapshot`)."""
 
     def __init__(self, entry):
         self.cls, phase, matcher, self.note = entry
@@ -572,7 +590,7 @@ def rule_field_parse(sym):
     return None
 
 
-CONST_DECL_RE = re.compile(r"^(?:/\*static\*/\s*)?(?:static\s+)?(?:inline\s+)?(?:const\s+static|const)\b(?!\s*(?:char|unsigned\s+char|wchar_t|WideChar|Char|void|\w+)\s*\*\s*(?!const))")
+CONST_DECL_RE = re.compile(r"^(?:static\s+)?(?:inline\s+)?(?:const\s+static|const)\b(?!\s*(?:char|unsigned\s+char|wchar_t|WideChar|Char|void|\w+)\s*\*\s*(?!const))")
 
 
 def rule_const_object(sym):
@@ -594,6 +612,15 @@ RULES = [
     ("fieldparse", rule_field_parse),
     ("const", rule_const_object),
 ]
+
+# The `by` values that may classify a symbol the TSV lacks without failing a non-strict `check`: rules that
+# decide from what the symbol structurally is (its section, its declared type, its defining library, a
+# compiler or macro naming scheme), so they hold for any new member of the family. Hand entries are never
+# here, however they match: a `re:` or `file:` pattern names the symbols its author read, and a new symbol
+# that happens to match it (a new `static Int key_count` under `re:.*::key_\w+`) would otherwise inherit a
+# classification nobody gave it. A guard variable is safe when its static is listed (see `new_symbol_error`).
+# A rule added here must be as sound for an unseen symbol as these.
+SAFE_FOR_NEW = {f"rule:{name}" for name, _rule in RULES}
 
 
 def classify(sym, symbols):
@@ -752,6 +779,20 @@ def compare(key, sym, row):
     return errors, stale
 
 
+def new_symbol_error(sym, recorded):
+    """Why `check` fails on `sym`, a symbol the TSV lacks, or None when a safe rule classifies it."""
+    if sym.cls == UNREVIEWED:
+        return f"new symbol, not classified: {sym.key} ({sym.source})"
+    if sym.by in SAFE_FOR_NEW:
+        return None
+    if sym.by == "guard":
+        if sym.parsed.guarded in recorded:
+            return None
+        return f"new symbol, the guard variable of a new static (review the static): {sym.key} ({sym.source})"
+    how = "a blanket file pattern" if sym.by == "file" else "a hand entry"
+    return f"new symbol, classified {sym.cls} only by {how} written before it existed (review it): {sym.key} ({sym.source})"
+
+
 def cmd_check(args):
     symbols = load_library(args.root, args.lib, args.vcpkg_lib)
     recorded = read_tsv(os.path.join(args.root, TSV))
@@ -759,10 +800,9 @@ def cmd_check(args):
     for key, sym in sorted(symbols.items()):
         row = recorded.get(key)
         if row is None:
-            if sym.cls == UNREVIEWED:
-                errors.append(f"new symbol, not classified: {key} ({sym.source})")
-            elif sym.by == "file":
-                errors.append(f"new symbol, classified {sym.cls} only by a file pattern (review it): {key} ({sym.source})")
+            error = new_symbol_error(sym, recorded)
+            if error:
+                errors.append(error)
             else:
                 stale.append(f"new symbol, classified {sym.cls} by {sym.by}: {key} ({sym.source})")
         else:
@@ -782,7 +822,7 @@ def cmd_check(args):
         )
         return 1
     unreviewed = sum(1 for s in symbols.values() if s.cls == UNREVIEWED)
-    print(f"ok: {len(symbols)} symbols, none new and unclassified ({unreviewed} still unreviewed in the list)")
+    print(f"ok: {len(symbols)} symbols, none new but what a safe rule classifies ({unreviewed} still unreviewed in the list)")
     return 0
 
 
@@ -820,7 +860,7 @@ def main():
     sub = parser.add_subparsers(dest="mode", required=True)
     p = sub.add_parser("snapshot", help="rewrite the TSV from the library")
     p.add_argument("lib")
-    p = sub.add_parser("check", help="fail on an unclassified new symbol, a changed class or a new instance")
+    p = sub.add_parser("check", help="fail on a new symbol no safe rule classifies, a changed class or a new instance")
     p.add_argument("lib")
     p.add_argument("--strict", action="store_true", help="also fail if the TSV is stale in any way")
     p = sub.add_parser("report", help="print the per-engine work list by phase and the unreviewed symbols")
