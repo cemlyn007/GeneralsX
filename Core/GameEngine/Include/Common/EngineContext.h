@@ -176,6 +176,8 @@ struct RTS_ENGINE_CONTEXT_API EngineContext
 	// Destroys every slot object now, newest first, inside a Scope for this context (the engine's teardown
 	// calls it; the destructor does it for any made since). A later get() makes a fresh object.
 	void destroySlots();
+	// Whether this context holds any slot object (for the lifecycle checks: g_noEngine must hold none).
+	bool hasSlotObjects() const;
 
 	// The number of singleton fields that are not null (for the lifecycle checks).
 	std::size_t countLiveSingletons() const;
@@ -199,7 +201,8 @@ inline EngineContext* ctx() noexcept
 	return t_engine;
 }
 
-// True when g_noEngine still has every singleton null (nothing assigned one outside a Scope).
+// True when g_noEngine still has every singleton null and no slot object (nothing assigned one, or used a
+// PerEngineStatic, outside a Scope).
 RTS_ENGINE_CONTEXT_API bool noEngineIsPristine();
 
 // Makes `context` the current context for its lifetime, then restores the previous one. Scopes nest.
