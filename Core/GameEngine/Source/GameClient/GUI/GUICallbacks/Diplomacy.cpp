@@ -76,6 +76,41 @@ static NameKeyType winSoloID = NAMEKEY_INVALID;
 static GameWindow *winInGame = nullptr;
 static GameWindow *winBuddies = nullptr;
 static GameWindow *winSolo = nullptr;
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 28/09/2026 Per engine: GameLogic::clearGameData (headless too) resets this
+// engine's diplomacy popup (HideDiplomacy, ResetDiplomacy) and VictoryConditions populates it, so these
+// window pointers, the layout, its animation manager and the briefing texts are this engine's; shared,
+// one engine would destroy or write through another's windows (PLAN-023 Phase 4). The macros keep the
+// uses unchanged.
+struct DiplomacyState
+{
+	GameWindow *staticTextPlayer[MAX_SLOTS];
+	GameWindow *staticTextSide[MAX_SLOTS];
+	GameWindow *staticTextTeam[MAX_SLOTS];
+	GameWindow *staticTextStatus[MAX_SLOTS];
+	GameWindow *buttonMute[MAX_SLOTS];
+	GameWindow *buttonUnMute[MAX_SLOTS];
+	Int slotNumInRow[MAX_SLOTS];
+	WindowLayout *theLayout;
+	GameWindow *theWindow;
+	AnimateWindowManager *theAnimateWindowManager;
+	BriefingList theBriefingList;
+};
+static rts::PerEngineStatic<DiplomacyState> s_diplomacyState_perEngine;
+#define staticTextPlayer (s_diplomacyState_perEngine.get().staticTextPlayer)
+#define staticTextSide (s_diplomacyState_perEngine.get().staticTextSide)
+#define staticTextTeam (s_diplomacyState_perEngine.get().staticTextTeam)
+#define staticTextStatus (s_diplomacyState_perEngine.get().staticTextStatus)
+#define buttonMute (s_diplomacyState_perEngine.get().buttonMute)
+#define buttonUnMute (s_diplomacyState_perEngine.get().buttonUnMute)
+#define slotNumInRow (s_diplomacyState_perEngine.get().slotNumInRow)
+#define theLayout (s_diplomacyState_perEngine.get().theLayout)
+#define theWindow (s_diplomacyState_perEngine.get().theWindow)
+#define theAnimateWindowManager (s_diplomacyState_perEngine.get().theAnimateWindowManager)
+#define theBriefingList (s_diplomacyState_perEngine.get().theBriefingList)
+
+//-------------------------------------------------------------------------------------------------
+#else
 static GameWindow *staticTextPlayer[MAX_SLOTS] = {nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr};
 static GameWindow *staticTextSide[MAX_SLOTS] = {nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr};
 static GameWindow *staticTextTeam[MAX_SLOTS] = {nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr};
@@ -89,6 +124,7 @@ static Int slotNumInRow[MAX_SLOTS];
 static WindowLayout *theLayout = nullptr;
 static GameWindow *theWindow = nullptr;
 static AnimateWindowManager *theAnimateWindowManager = nullptr;
+#endif
 WindowMsgHandledType BuddyControlSystem( GameWindow *window, UnsignedInt msg,
 														 WindowMsgData mData1, WindowMsgData mData2);
 void InitBuddyControls(Int type);
@@ -153,7 +189,9 @@ static void updateFunc( WindowLayout *layout, void *param )
 
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
+#if !RTS_ENGINE_CONTEXT
 static BriefingList theBriefingList;
+#endif
 
 //-------------------------------------------------------------------------------------------------
 BriefingList* GetBriefingTextList()

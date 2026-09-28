@@ -96,10 +96,25 @@
 
 #include "GameNetwork/NetworkInterface.h"
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 28/09/2026 Per engine: ControlBar::deleteBuildTooltipLayout (ScriptActions'
+// input disabling, headless too) deletes this engine's tooltip animation manager and clears the tooltip
+// button, so shared, one engine would delete another's (PLAN-023 Phase 4). theLayout and theWindow are
+// unused here. The macros keep the uses unchanged.
+struct BuildTooltipState
+{
+	AnimateWindowManager *theAnimateWindowManager;
+	GameWindow *prevWindow;
+};
+static rts::PerEngineStatic<BuildTooltipState> s_buildTooltipState_perEngine;
+#define theAnimateWindowManager (s_buildTooltipState_perEngine.get().theAnimateWindowManager)
+#define prevWindow (s_buildTooltipState_perEngine.get().prevWindow)
+#else
 static WindowLayout *theLayout = nullptr;
 static GameWindow *theWindow = nullptr;
 static AnimateWindowManager *theAnimateWindowManager = nullptr;
 static GameWindow *prevWindow = nullptr;
+#endif
 static Bool useAnimation = FALSE;
 void ControlBarPopupDescriptionUpdateFunc( WindowLayout *layout, void *param )
 {

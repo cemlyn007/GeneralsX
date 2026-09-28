@@ -34,7 +34,15 @@
 #include "GameClient/GameClient.h"
 #include "GameClient/View.h"
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 28/09/2026 Per engine: the view ID counter, so each engine numbers its own
+// views from 1 as a solo run does (PLAN-023 Phase 4). The class static stays declared; the macro stands
+// in for it here.
+static rts::PerEngineStatic<UnsignedInt> s_viewIdNext_perEngine([](UnsignedInt& value) { value = 1; });
+#define m_idNext (s_viewIdNext_perEngine.get())
+#else
 UnsignedInt View::m_idNext = 1;
+#endif
 
 // the tactical view singleton
 #if !RTS_ENGINE_CONTEXT

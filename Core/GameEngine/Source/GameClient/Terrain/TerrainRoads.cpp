@@ -40,7 +40,14 @@ TerrainRoadCollection *TheTerrainRoads = nullptr;
 #endif
 
 // PRIVATE DATA ///////////////////////////////////////////////////////////////////////////////////
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 28/09/2026 Per engine: the road and bridge ID counter of this engine's
+// Roads.ini parse (PLAN-023 Phase 4). The class static stays declared; the macro stands in for it here.
+static rts::PerEngineStatic<UnsignedInt> s_terrainRoadIdCounter_perEngine;
+#define m_idCounter (s_terrainRoadIdCounter_perEngine.get())
+#else
 UnsignedInt TerrainRoadCollection::m_idCounter = 0;
+#endif
 
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------

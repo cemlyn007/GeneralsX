@@ -48,8 +48,6 @@ HEADLESS_GUI = (
 )
 W3D_RENDER = "W3D render path (device, shaders, draw lists): only the one rendering engine per process reaches it (PLAN-023 Phase 8)"
 LOADER = "stateless W3D prototype loader/persist factory, registered once at static initialisation"
-PER_ENGINE_STATIC = "cached per-engine pointer (template/image/button looked up once): PER_ENGINE_STATIC slot"
-AUDIO_SCRATCH = "static AudioEventRTS: make it a local (PLAN-023 Phase 4; also removes a lock-taking exit destructor)"
 
 HAND = [
     # ---------------------------------------------------------------------------------------------------
@@ -80,6 +78,8 @@ HAND = [
     (GLOBAL, "", "_TheFileFactory", "with RTS_ENGINE_CONTEXT, always the one permanent W3D file factory (W3DFileSystem.cpp, immortal) that forwards to the current engine's W3DFileSystem (PLAN-023 Phase 3); every W3DFileSystem stores the same pointer and none nulls it"),
     (GLOBAL, "", "re:(guard variable for )?\\(anonymous namespace\\)::engineW3DFileFactory\\(\\)::factory", "the one permanent W3D file factory _TheFileFactory points at (PLAN-023 Phase 3): made on first use under the static-init guard and never destroyed, the same object for every engine"),
     (GLOBAL, "", "_TheSimpleFileFactory", "never reassigned by the engine (only the tools do): always the process-global default factory"),
+    (GLOBAL, "", "re:table_once|Ring_Array_Once|Sphere_Array_Once", "std::once_flag of a table built once per process from constants (motchan's filter table, the ring/sphere LOD meshes; PLAN-023 Phase 3)"),
+    (GLOBAL, "", "re:WWMathInitMutex|WWMathInitCount", "the process-wide WWMath::Init/Shutdown count and its mutex (PLAN-023 Phase 3): the tables are built by the first Init and freed by the last Shutdown of any engine; each engine holds at most one count (EngineContext::wwMathInitialized)"),
     (GLOBAL, "", "filtertable", "motchan's filter table: built once per process under std::call_once from constants (PLAN-023 Phase 3)"),
     (GLOBAL, "", "re:(Sphere|Ring)MeshArray|(Sphere|Ring)LODCosts", "sphere/ring LOD meshes: built once per process under std::call_once from constants (PLAN-023 Phase 3); only the one rendering engine's draw re-sets their alpha/scale, right before it draws them"),
     (GLOBAL, "", "re:_Fast(Acos|Asin|Sin|InvSin)Table", "WWMath::Init tables: built by the first of the counted WWMath::Init calls (PLAN-023 Phase 3), the same values every time"),
@@ -93,26 +93,17 @@ HAND = [
     (PER, 3, "InheritedWorldSpaceEmitterVel", "threads only: set by ParticleEmitterClass::Emit and read by Initialize_Particle within the same call"),
     # ---------------------------------------------------------------------------------------------------
     # PLAN-023 Phase 4: caches and remaining statics.
-    (PER, 4, "re:ActiveBody::updateBodyParticleSystems\\(\\)::\\w+Template", PER_ENGINE_STATIC),
-    (PER, 4, "re:.*::(upgradeTemplate|supplyLinesTemplate|workerShoeTemplate|nationalismTemplate|fanaticismTemplate|muzzle|debrisTemplate|genericBridgeTemplate)", PER_ENGINE_STATIC),
-    (PER, 4, "re:WaveGuideUpdate::.*::(wave[123]|left|right|splash|waveSplash)", PER_ENGINE_STATIC),
-    (PER, 4, "re:.*::(structureAttackSound|underAttackSound|infiltrationWarningSound|rallyNotSet|rallyPointSet|placeBuilding|aSound|discoveredSound|neutralizedSound|leftGameSound|noCanDoSound|click)", AUDIO_SCRATCH),
-    (PER, 4, "re:Drawable::s_(staticImagesInited|veterancyImage|fullAmmo|emptyAmmo|fullContainer|emptyContainer|animationTemplates)", "written by every Drawable constructor (headless too), read only by drawIconUI: stale Image*/Anim2DTemplate* after the first engine dies; PER_ENGINE_STATIC"),
-    (PER, 4, "debrisModelNamesGlobalHack", "INI-parse output (ObjectCreationList) consumed by the client's preload: another engine's boot feeds this engine's preload; ObjectCreationListStore member"),
-    (PER, 4, "TerrainRoadCollection::m_idCounter", "road type ID counter continued by every engine's Roads.ini parse: TheTerrainRoads member"),
-    (PER, 4, "View::m_idNext", "view ID counter: per engine"),
-    (PER, 4, "re:InGameUI::update\\(\\)::(lastMoney|lastIncome)|InGameUI::updateFloatingText\\(\\)::lastLogicFrameUpdate", "InGameUI::update runs headless too (GameClient::update): UI state, no simulation effect; InGameUI members"),
-    # GUI statics that a headless engine writes too (see HEADLESS_GUI): the control bar, diplomacy and chat
-    # code runs headless against GameWindowManagerDummy's dummy windows, so these point at one engine's
-    # objects or are cleared/deleted by another engine's teardown.
-    (PER, 4, "re:ControlBar::m_rank(Veteran|Elite|Heroic)Icon", "written by ControlBar::init (InGameUI::init, headless too) from this engine's TheMappedImageCollection: stale Image* after that engine dies; ControlBar members (" + PER_ENGINE_STATIC + ")"),
-    (PER, 4, "re:ObserverPlayer(Info|List)Window|buttonPlayer|winFlag|winGeneralPortrait|buttonIdleWorker|staticTextNumberOf(Units|Buildings|UnitsKilled|UnitsLost)|staticTextPlayerName", "ControlBar::initObserverControls (from ControlBar::init, headless too) stores this engine's (dummy) windows: ControlBar members"),
-    (PER, 4, "re:staticTextPlayer|staticTextSide|staticTextTeam|staticTextStatus|buttonMute|buttonUnMute|slotNumInRow", "Diplomacy/observer window pointers: HideDiplomacy (GameLogic::clearGameData, headless too) clears them and PopulateInGameDiplomacyPopup (VictoryConditions) writes through them, so one engine touches another's windows; a per-engine Diplomacy state (the ControlBarObserver/menu TUs of the same name follow)"),
-    (PER, 4, "re:theWindow|theLayout", "Diplomacy's layout and window (the only instance linked in; ControlBarPopupDescription's are unused): ResetDiplomacy (clearGameData, headless too) destroys the layout and clears the window, another engine's included; per-engine Diplomacy state"),
-    (PER, 4, "theAnimateWindowManager", "ResetDiplomacy (clearGameData) and ControlBar::deleteBuildTooltipLayout (ScriptActions' disable-input, headless too) delete it: one engine deletes another's; per-engine Diplomacy state / ControlBar member"),
-    (PER, 4, "prevWindow", "tooltip button pointer, cleared by ControlBar::deleteBuildTooltipLayout (ScriptActions, headless too): ControlBar member"),
-    (PER, 4, "theBriefingList", "script briefing texts (UpdateDiplomacyBriefingText from InGameUI's popup/military captions, headless too; saved with the GameClient): InGameUI member"),
-    (PER, 4, "re:chatWindow|chatTextEntry|chatTypeStaticText|s_savedChat", "ResetInGameChat (GameLogic::clearGameData, headless too) destroys the chat window and clears these, another engine's included: per-engine chat state"),
+    # Done (PLAN-023 Phase 4 PR): every function-local cache of a per-engine pointer (the seven ActiveBody
+    # particle templates, the upgrade/thing template caches, muzzle, debrisTemplate, genericBridgeTemplate,
+    # the seven WaveGuideUpdate particle templates), the thirteen static AudioEventRTS (PER_ENGINE_STATICs,
+    # not locals: each keeps its event's sound rotation index, which a local would reset), Drawable's static
+    # images, ControlBar's rank icons, the observer, diplomacy, briefing, chat and build-tooltip GUI state a
+    # headless engine writes, debrisModelNamesGlobalHack, TerrainRoadCollection::m_idCounter, View::m_idNext,
+    # InGameUI's lastMoney/lastIncome/lastLogicFrameUpdate and ShellGameLoadScreen's firstLoad are
+    # PER_ENGINE_STATICs (so gone from the library; their slot indexes are rule:per-engine-static). The
+    # other TUs' statics of the same names (the WOL and download menus' staticTextPlayer/staticTextStatus)
+    # fall to the GUI blanket below. What is left here is threads only.
+    (RENDER, "", "re:staticTextPlayer|staticTextStatus", "with RTS_ENGINE_CONTEXT only the online menus' statics of these names are left (WOLGameSetupMenu.cpp's staticTextPlayer, DownloadMenu.cpp's staticTextStatus); the source column shows the first definition the search finds, the OFF-build one in ControlBarObserver.cpp or Diplomacy.cpp (those are PER_ENGINE_STATIC fields with the context on): " + UI),
     (PER, 4, "re:ParticleSystem::(computePointOnUnitSphere|computeParticleVelocity|computeParticlePosition|generateParticleInfo)\\(.*\\)::\\w+", "threads only: particle scratch returned by pointer, consumed at once"),
     # ---------------------------------------------------------------------------------------------------
     # Process-global on purpose.
@@ -137,7 +128,7 @@ HAND = [
     (GLOBAL, "", "re:rts::ClientInstance::\\w+", "the process's single-instance mutex"),
     (GLOBAL, "", "re:ReplaySimulation::s_\\w+", "the game executable's multi-replay simulation driver (-simReplay); an embedded engine never runs it"),
     (GLOBAL, "", "OurLanguage", "the installation's language, the same for every engine"),
-    (GLOBAL, "", "re:GetRegistryLanguage\\(\\)::(cached|val)", "the installation's language string, written once (Phase 4 string rule: call_once before threads)"),
+    (GLOBAL, "", "re:GetRegistryLanguage\\(\\)::(once|val)", "the installation's language string: with RTS_ENGINE_CONTEXT written exactly once, under std::call_once, and never mutated afterwards (PLAN-023 Phase 4's process-global string rule); every engine reads the same install"),
     (GLOBAL, "", "UnicodeString::format_va(wchar_t const*, __va_list_tag*)::s_utf8_locale", "a UTF-8 locale handle, created once"),
     (GLOBAL, "", "s_assetFallbackPath", "the install's asset fallback root, set once from the environment (PLAN-023 Phase 5 BootConfig)"),
     (GLOBAL, "", "re:s_thread|s_done|s_hasUpdate|s_latestTag", "update checker (menus), one per process"),
@@ -211,7 +202,7 @@ HAND = [
     (RENDER, "", "re:radioButton(InGame|Buddies)|win(InGame|Buddies|Solo)", "written only by ShowDiplomacy (player input) and the online buddy overlay: " + UI),
     (RENDER, "", "re:inGameChatType|ToggleInGameChat\\(bool\\)::justHid", "chat type and toggle, set only on player input (Show/ToggleInGameChat): " + UI),
     (RENDER, "", "re:staticTextMessage|buttonOk|shouldPause", "InGamePopupMessageInit only: headless, InGameUI::popupMessage's layout has no init (GameWindowManagerDummy's winCreateFromScript returns no init name): " + UI),
-    (UNREVIEWED, "", "re:ShellGameLoadScreen::init\\(.*\\)::firstLoad|ChallengeLoadScreen::activatePieces\\(.*\\)::textPos\\w+", "load-screen state: GameLogic::startNewGame makes and inits a load screen headless too (a shell game's or a challenge campaign's); not yet reviewed whether a headless engine's use of these can change the rendering engine's"),
+    (RENDER, "", "re:ChallengeLoadScreen::activatePieces\\(.*\\)::textPos\\w+", "Generals' Challenge load screen teletype positions: GameLogic::getLoadScreen makes a ChallengeLoadScreen only for a challenge campaign, which only the shell's Generals' Challenge menu starts (" + UI + "); they are also reset (FRAME_TELETYPE_START) and consumed within one ChallengeLoadScreen::init call"),
     (RENDER, "", "file:/GUI/(?!" + HEADLESS_GUI + ")", UI),
     (RENDER, "", "re:m_replayWindow|ScriptActions::m_messageWindow", "GameWindow pointer, null with GameWindowManagerDummy: " + UI),
     (RENDER, "", "re:scrollDir|prevCursor|Mouse::updateMouseData\\(\\)::busy", "mouse/scroll input: headless has MouseDummy and no input"),

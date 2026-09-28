@@ -60,6 +60,13 @@
 #include "GameClient/GadgetPushButton.h"
 
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 28/09/2026 This engine's rank images (PLAN-023 Phase 4; see ControlBar.h).
+#define m_rankVeteranIcon (s_rankIcons_perEngine.get().veteran)
+#define m_rankEliteIcon (s_rankIcons_perEngine.get().elite)
+#define m_rankHeroicIcon (s_rankIcons_perEngine.get().heroic)
+#endif
+
 // PRIVATE DATA ///////////////////////////////////////////////////////////////////////////////////
 static GameWindow *commandWindows[ MAX_COMMANDS_PER_SET ];
 Bool commandWindowsInitialized = FALSE;

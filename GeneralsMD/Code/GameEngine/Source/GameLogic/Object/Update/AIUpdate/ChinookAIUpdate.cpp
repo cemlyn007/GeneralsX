@@ -1730,7 +1730,13 @@ void ChinookAIUpdate::privateAttackPosition( const Coord3D *pos, Int maxShotsToF
 Int ChinookAIUpdate::getUpgradedSupplyBoost() const
 {
 	Player *player = getObject()->getControllingPlayer();
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 28/09/2026 Per engine: the cached template is this engine's (PLAN-023 Phase 4).
+	static rts::PerEngineStatic<const UpgradeTemplate *> supplyLinesTemplate_perEngine;
+	const UpgradeTemplate *supplyLinesTemplate = supplyLinesTemplate_perEngine.get([&](const UpgradeTemplate *&value) { value = TheUpgradeCenter->findUpgrade( "Upgrade_AmericaSupplyLines" ); });
+#else
 	static const UpgradeTemplate *supplyLinesTemplate = TheUpgradeCenter->findUpgrade( "Upgrade_AmericaSupplyLines" );
+#endif
 
 	if (player && supplyLinesTemplate && player->hasUpgradeComplete(supplyLinesTemplate))
 		return getChinookAIUpdateModuleData()->m_upgradedSupplyBoost;

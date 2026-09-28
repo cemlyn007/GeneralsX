@@ -192,7 +192,13 @@ void GarrisonContain::putObjectAtGarrisonPoint( Object *obj,
 	// create a drawable that has a gun barrel which will show there is an object at this
 	// garrison point ready to shoot
 	//
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 28/09/2026 Per engine: the cached template is this engine's (PLAN-023 Phase 4).
+	static rts::PerEngineStatic<const ThingTemplate *> muzzle_perEngine;
+	const ThingTemplate *muzzle = muzzle_perEngine.get([&](const ThingTemplate *&value) { value = TheThingFactory->findTemplate( "GarrisonGun" ); });
+#else
 	static const ThingTemplate *muzzle = TheThingFactory->findTemplate( "GarrisonGun" );
+#endif
 	DEBUG_ASSERTCRASH( muzzle, ("Warning, Object 'GarrisonGun' not found and is need for Garrison gun effects") );
 	if( muzzle && isEnclosingContainerFor( obj ) )// If we are showing the contained, we need no gun barrel drawable added
 	{

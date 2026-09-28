@@ -46,10 +46,28 @@
 #include "GameNetwork/GameInfo.h"
 #include "GameNetwork/NetworkInterface.h"
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 28/09/2026 Per engine: ResetInGameChat (GameLogic::clearGameData, headless too)
+// destroys this engine's chat window and clears these, so shared, one engine would destroy another's
+// (PLAN-023 Phase 4). The macros keep the uses unchanged.
+struct InGameChatState
+{
+	GameWindow *chatWindow;
+	GameWindow *chatTextEntry;
+	GameWindow *chatTypeStaticText;
+	UnicodeString savedChat;
+};
+static rts::PerEngineStatic<InGameChatState> s_inGameChatState_perEngine;
+#define chatWindow (s_inGameChatState_perEngine.get().chatWindow)
+#define chatTextEntry (s_inGameChatState_perEngine.get().chatTextEntry)
+#define chatTypeStaticText (s_inGameChatState_perEngine.get().chatTypeStaticText)
+#define s_savedChat (s_inGameChatState_perEngine.get().savedChat)
+#else
 static GameWindow *chatWindow = nullptr;
 static GameWindow *chatTextEntry = nullptr;
 static GameWindow *chatTypeStaticText = nullptr;
 static UnicodeString s_savedChat;
+#endif
 static InGameChatType inGameChatType;
 
 // ------------------------------------------------------------------------------------------------

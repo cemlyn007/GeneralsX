@@ -92,9 +92,17 @@
 ControlBar *TheControlBar = nullptr;
 #endif
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 28/09/2026 Per engine (PLAN-023 Phase 4; see ControlBar.h).
+rts::PerEngineStatic<ControlBar::RankIcons> ControlBar::s_rankIcons_perEngine;
+#define m_rankVeteranIcon (s_rankIcons_perEngine.get().veteran)
+#define m_rankEliteIcon (s_rankIcons_perEngine.get().elite)
+#define m_rankHeroicIcon (s_rankIcons_perEngine.get().heroic)
+#else
 const Image* ControlBar::m_rankVeteranIcon	= nullptr;
 const Image* ControlBar::m_rankEliteIcon		= nullptr;
 const Image* ControlBar::m_rankHeroicIcon		= nullptr;
+#endif
 
 // GeneralsX @bugfix Copilot 19/09/2026 Preserve full-resolution HUD card sizing.
 // Additional horizontal aspect fitting makes ultrawide thumbnails too small.

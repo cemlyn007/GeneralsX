@@ -77,6 +77,41 @@ static NameKeyType staticTextPlayerID[MAX_BUTTONS] = { NAMEKEY_INVALID,NAMEKEY_I
 																										NAMEKEY_INVALID,NAMEKEY_INVALID,
 																										NAMEKEY_INVALID,NAMEKEY_INVALID,
 																										NAMEKEY_INVALID,NAMEKEY_INVALID };
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 28/09/2026 Per engine: ControlBar::initObserverControls (from ControlBar::init,
+// headless too) stores this engine's (dummy) windows here, which another engine would otherwise use after
+// this one destroyed them (PLAN-023 Phase 4). The macros keep the uses unchanged.
+struct ObserverControls
+{
+	GameWindow *observerPlayerInfoWindow;
+	GameWindow *observerPlayerListWindow;
+	GameWindow *buttonPlayer[MAX_BUTTONS];
+	GameWindow *staticTextPlayer[MAX_BUTTONS];
+	GameWindow *winFlag;
+	GameWindow *winGeneralPortrait;
+	GameWindow *buttonIdleWorker;
+	GameWindow *staticTextNumberOfUnits;
+	GameWindow *staticTextNumberOfBuildings;
+	GameWindow *staticTextNumberOfUnitsKilled;
+	GameWindow *staticTextNumberOfUnitsLost;
+	GameWindow *staticTextPlayerName;
+};
+static rts::PerEngineStatic<ObserverControls> s_observerControls_perEngine;
+#define ObserverPlayerInfoWindow (s_observerControls_perEngine.get().observerPlayerInfoWindow)
+#define ObserverPlayerListWindow (s_observerControls_perEngine.get().observerPlayerListWindow)
+#define buttonPlayer (s_observerControls_perEngine.get().buttonPlayer)
+#define staticTextPlayer (s_observerControls_perEngine.get().staticTextPlayer)
+#define winFlag (s_observerControls_perEngine.get().winFlag)
+#define winGeneralPortrait (s_observerControls_perEngine.get().winGeneralPortrait)
+#define buttonIdleWorker (s_observerControls_perEngine.get().buttonIdleWorker)
+#define staticTextNumberOfUnits (s_observerControls_perEngine.get().staticTextNumberOfUnits)
+#define staticTextNumberOfBuildings (s_observerControls_perEngine.get().staticTextNumberOfBuildings)
+#define staticTextNumberOfUnitsKilled (s_observerControls_perEngine.get().staticTextNumberOfUnitsKilled)
+#define staticTextNumberOfUnitsLost (s_observerControls_perEngine.get().staticTextNumberOfUnitsLost)
+#define staticTextPlayerName (s_observerControls_perEngine.get().staticTextPlayerName)
+
+static NameKeyType buttonCancelID = NAMEKEY_INVALID;
+#else
 static GameWindow *ObserverPlayerInfoWindow = nullptr;
 static GameWindow *ObserverPlayerListWindow = nullptr;
 
@@ -95,6 +130,7 @@ static GameWindow *staticTextNumberOfBuildings = nullptr;
 static GameWindow *staticTextNumberOfUnitsKilled = nullptr;
 static GameWindow *staticTextNumberOfUnitsLost = nullptr;
 static GameWindow *staticTextPlayerName = nullptr;
+#endif
 
 static NameKeyType s_replayObserverNameKey = NAMEKEY_INVALID;
 
