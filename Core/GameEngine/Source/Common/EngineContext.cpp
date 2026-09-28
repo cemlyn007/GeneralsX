@@ -64,6 +64,11 @@ EngineContext::~EngineContext()
 		(unsigned)countLiveSingletons()));
 	DEBUG_ASSERTCRASH(this == &g_noEngine || noEngineIsPristine(), ("g_noEngine was written: engine state leaked outside every Scope"));
 
+	destroySlots();
+}
+
+void EngineContext::destroySlots()
+{
 	if (m_slots == nullptr)
 		return;
 

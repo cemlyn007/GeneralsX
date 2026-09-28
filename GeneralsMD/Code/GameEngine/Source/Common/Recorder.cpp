@@ -55,7 +55,9 @@
 constexpr const char s_genrep[] = "GENREP";
 constexpr const UnsignedInt replayBufferBytes = 8192;
 
+#if !RTS_ENGINE_CONTEXT
 Int REPLAY_CRC_INTERVAL = 100;
+#endif
 
 const char *replayExtention = ".rep";
 const char *lastReplayFileName = "00000000";	// a name the user is unlikely to ever type, but won't cause panic & confusion
@@ -70,7 +72,14 @@ typedef int32_t replay_time_t;
 // GeneralsX @bugfix GitHubCopilot 16/08/2026 Keep replay wide characters compatible with the retail UTF-16 layout on every platform.
 typedef uint16_t replay_wide_char_t;
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 28/09/2026 Per engine: the start time of this engine's recording
+// (PLAN-023 Phase 2). The macro ends before readReplayHeader, whose ReplayHeader has a field of this name.
+static rts::PerEngineStatic<time_t> startTime_perEngine;
+#define startTime (startTime_perEngine.get())
+#else
 static time_t startTime;
+#endif
 static const UnsignedInt startTimeOffset = 6;
 static const UnsignedInt endTimeOffset = startTimeOffset + sizeof(replay_time_t);
 static const UnsignedInt frameCountOffset = endTimeOffset + sizeof(replay_time_t);
@@ -219,6 +228,10 @@ void RecorderClass::logGameEnd()
 	}
 #endif
 }
+
+#if RTS_ENGINE_CONTEXT
+#undef startTime
+#endif
 
 void RecorderClass::cleanUpReplayFile()
 {

@@ -85,6 +85,9 @@
 #undef RTS_ENGINE_SINGLETON_ZH
 // The types of the direct per-engine fields below.
 class PathfindCellInfo;
+class PolygonTrigger;
+class MapObject;
+class PartitionContactList;
 
 namespace rts
 {
@@ -147,10 +150,32 @@ struct RTS_ENGINE_CONTEXT_API EngineContext
 	::PathfindCellInfo* pathfindCellInfoArray = nullptr;
 	::PathfindCellInfo* pathfindCellInfoFirstFree = nullptr;
 
+	// PolygonTrigger::ThePolygonTriggerListPtr/s_currentID: the map's trigger areas, walked on every
+	// object's cell change, and the next trigger ID.
+	::PolygonTrigger* polygonTriggerList = nullptr;
+	std::int32_t polygonTriggerCurrentID = 1;
+
+	// MapObject::TheMapObjectListPtr: the map objects of the last map this engine read.
+	::MapObject* mapObjectList = nullptr;
+
+	// PartitionManager.cpp's TheContactList (the contact list of the partition update in progress) and
+	// getClosestObjects()'s iteration stamp (nonzero).
+	::PartitionContactList* partitionContactList = nullptr;
+	std::int32_t partitionIterFlag = 1;
+
+	// ScriptList::m_curId: the last script ID handed out.
+	std::int32_t scriptListCurId = 0;
+
+	// REPLAY_CRC_INTERVAL (Recorder.cpp): the logic CRC interval of a solo game or replay.
+	std::int32_t replayCrcInterval = 100;
+
 	// Per-engine slot objects, by allocateEngineSlotIndex() index; null until set.
 	void* getSlot(std::size_t index) const;
 	// Stores a slot object that this context owns and destroys with `destroy`. The index must not be set.
 	void setSlot(std::size_t index, void* object, EngineSlotDestroyFn destroy);
+	// Destroys every slot object now, newest first, inside a Scope for this context (the engine's teardown
+	// calls it; the destructor does it for any made since). A later get() makes a fresh object.
+	void destroySlots();
 
 	// The number of singleton fields that are not null (for the lifecycle checks).
 	std::size_t countLiveSingletons() const;
@@ -245,6 +270,38 @@ private:
 
 	std::size_t m_index;
 	void (*m_initialize)(T& object);
+};
+
+// GeneralsX @feature cemlyn007 28/09/2026 A stand-in for a class's static data member whose value is a
+// direct EngineContext field (PLAN-023 Phase 2), for statics that are also used qualified
+// (`MapObject::TheMapObjectListPtr`), where a macro cannot stand in: declare it as
+// `static constexpr rts::ContextField<T, &rts::EngineContext::field> name{};` and the upstream reads,
+// assignments, `->` and comparisons compile unchanged. Taking its address gives the stand-in's, not the
+// field's, so a static whose address is taken needs a macro instead.
+template <typename T, T EngineContext::*Field>
+struct ContextField
+{
+	operator T&() const noexcept
+	{
+		return ctx()->*Field;
+	}
+	T operator->() const noexcept
+	{
+		return ctx()->*Field;
+	}
+	const ContextField& operator=(T value) const noexcept
+	{
+		ctx()->*Field = value;
+		return *this;
+	}
+	T& operator++() const noexcept
+	{
+		return ++(ctx()->*Field);
+	}
+	T operator++(int) const noexcept
+	{
+		return (ctx()->*Field)++;
+	}
 };
 
 // A callable that runs `function` inside a Scope for the context that was current when it was made. For

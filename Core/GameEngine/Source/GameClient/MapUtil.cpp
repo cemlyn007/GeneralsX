@@ -34,7 +34,14 @@
 
 #if !defined(_WIN32)
 #include <filesystem>
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 28/09/2026 The negative lookup cache is per engine, cleared with its
+// MapCache's update (PLAN-023 Phase 2).
+static rts::PerEngineStatic<std::set<std::string> > s_failedMapLookups_perEngine;
+#define s_failedMapLookups (s_failedMapLookups_perEngine.get())
+#else
 static std::set<std::string> s_failedMapLookups;
+#endif
 #endif
 
 #include "Common/crc.h"
