@@ -1584,13 +1584,23 @@ void OpenALAudioManager::closeDevice(void)
 	// GeneralsX @bugfix meerzulee 19/07/2026 FP env guard for audio entry point (see #215)
 	ScopedFPUGuard fpuGuard;
 	unselectProvider();
-	alcMakeContextCurrent(nullptr);
 
-	if (m_alcContext)
+	// GeneralsX @bugfix cemlyn007 28/09/2026 Only release the context this manager created.
+	// The current ALC context is process-wide: clearing it unconditionally cleared another
+	// engine's context in the same process, and made AL calls when no device was ever opened
+	// (-noaudio, or a device that failed to open). The handles are nulled so a second
+	// closeDevice (the destructor calls it too) is a no-op.
+	if (m_alcContext) {
+		if (alcGetCurrentContext() == m_alcContext)
+			alcMakeContextCurrent(nullptr);
 		alcDestroyContext(m_alcContext);
+		m_alcContext = nullptr;
+	}
 
-	if (m_alcDevice)
+	if (m_alcDevice) {
 		alcCloseDevice(m_alcDevice);
+		m_alcDevice = nullptr;
+	}
 }
 
 //-------------------------------------------------------------------------------------------------

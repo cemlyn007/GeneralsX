@@ -135,6 +135,12 @@ public:
 	// `!(m_headless && !m_headlessRender)`. Set by the RL embed (RlgBridge.cpp).
 	Bool m_headlessRender;
 
+	// GeneralsX @feature cemlyn007 28/09/2026 Audio in headless mode: when TRUE *together with*
+	// m_headless, SDL3GameEngine::createAudioManager still creates the real audio manager, which
+	// opens an audio device. Otherwise a headless engine gets the device-free audio manager, as
+	// with -noaudio. Set by an embedding host that wants sound from a headless engine (rlgenerals).
+	Bool m_headlessAudio;
+
 	// GeneralsX @feature BenderAI 21/04/2026 Opt-out toggle for the in-game update checker.
 	Bool m_checkForUpdates;
 

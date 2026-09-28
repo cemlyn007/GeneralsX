@@ -90,6 +90,7 @@ MiniAudioManager::MiniAudioManager() :
 	m_selectedSpeakerType(0),
 	m_lastSelectedPlaybackDevice(PROVIDER_ERROR),
 	m_binkHandle(NULL),
+	m_deviceOpen(FALSE),
 	m_pref3DProvider(AsciiString::TheEmptyString),
 	m_prefSpeaker(AsciiString::TheEmptyString)
 {
@@ -847,6 +848,8 @@ void MiniAudioManager::openDevice(void)
 	ma_sound_group_init(&m_engine, 0, NULL, &m_sound3DGroup);
 	ma_sound_group_init(&m_engine, 0, NULL, &m_speechGroup);
 
+	m_deviceOpen = TRUE;
+
 	fprintf(stderr, "AUDIO: MiniAudio backend loaded - version %s, device: %s, playback devices: %d\n",
 		ma_version_string(),
 		m_playbackDeviceCount > 0 ? m_playbackDevices[0].name : "default",
@@ -862,6 +865,13 @@ void MiniAudioManager::closeDevice(void)
 	ScopedFPUGuard fpuGuard;
 	// Stop all audio first to prevent use-after-free in audio callbacks
 	stopAllAudioImmediately();
+
+	// GeneralsX @bugfix cemlyn007 28/09/2026 Nothing to uninitialise unless openDevice completed.
+	// The destructor calls this too, so a second call is a no-op.
+	if (!m_deviceOpen) {
+		return;
+	}
+	m_deviceOpen = FALSE;
 
 	ma_sound_group_uninit(&m_speechGroup);
 	ma_sound_group_uninit(&m_sound3DGroup);
@@ -973,6 +983,17 @@ void *MiniAudioManager::getHandleForBink(void)
 		m_binkHandle = NEW MiniAudioStream;
 		// Give the stream access to the engine
 		static_cast<MiniAudioStream *>(m_binkHandle)->setEngine(&m_engine);
+	}
+	return m_binkHandle;
+}
+
+//-------------------------------------------------------------------------------------------------
+// GeneralsX @feature cemlyn007 28/09/2026 A video's audio stream with no engine: MiniAudioStream
+// never creates a sound without one, so the video plays silently and no device is opened.
+void *MiniAudioManagerDummy::getHandleForBink(void)
+{
+	if (!m_binkHandle) {
+		m_binkHandle = NEW MiniAudioStream;
 	}
 	return m_binkHandle;
 }

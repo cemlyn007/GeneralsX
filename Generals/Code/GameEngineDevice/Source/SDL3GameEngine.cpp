@@ -577,16 +577,28 @@ WebBrowser *SDL3GameEngine::createWebBrowser(void)
  */
 AudioManager *SDL3GameEngine::createAudioManager(Bool dummy)
 {
-	(void)dummy;
 	fprintf(stderr, "INFO: SDL3GameEngine::createAudioManager()\n");
 
+	// GeneralsX @feature cemlyn007 28/09/2026 Honour dummy (headless) and -noaudio with a
+	// device-free manager, as Win32GameEngine does (PLAN-023 Phase 0).
+	const Bool deviceFree = dummy || !TheGlobalData->m_audioOn;
+
 #ifdef SAGE_USE_MINIAUDIO
+	if (deviceFree) {
+		fprintf(stderr, "INFO: Creating device-free MiniAudio audio backend\n");
+		return NEW MiniAudioManagerDummy;
+	}
 	fprintf(stderr, "INFO: Creating MiniAudio audio backend\n");
 	return NEW MiniAudioManager;
 #elif defined(SAGE_USE_OPENAL)
+	if (deviceFree) {
+		fprintf(stderr, "INFO: Creating device-free OpenAL audio backend\n");
+		return NEW OpenALAudioManagerDummy;
+	}
 	fprintf(stderr, "INFO: Using OpenAL audio backend\n");
 	return NEW OpenALAudioManager;
 #else
+	(void)deviceFree;
 	fprintf(stderr, "INFO: No audio backend available - using AudioManagerDummy\n");
 	return NEW AudioManagerDummy;
 #endif

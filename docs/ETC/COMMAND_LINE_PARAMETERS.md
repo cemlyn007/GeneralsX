@@ -17,6 +17,7 @@ Common command line parameters for `GeneralsX` (Generals) and `GeneralsXZH` (Zer
 |-----------|-------------|---------|
 | `-noshellmap` | Disables the shell map (skip intro) | `./GeneralsXZH -noshellmap` |
 | `-quickstart` | Quick launch (skip movies + shell) | `./GeneralsXZH -quickstart` |
+| `-noaudio` | Turns all audio off and opens no audio device (device-free audio manager on Linux/macOS). Available in release builds. | `./GeneralsXZH -noaudio` |
 | `-debug` | Enable debug mode | `./GeneralsXZH -debug` |
 | `-logToCon` | Enables legacy debug-log console routing (`DEBUG_LOG`). **Debug builds only** (`ALLOW_DEBUG_UTILS` / `RTS_BUILD_OPTION_DEBUG=ON`); ignored in release builds. | `./GeneralsXZH -logToCon` |
 
@@ -32,7 +33,7 @@ Common command line parameters for `GeneralsX` (Generals) and `GeneralsXZH` (Zer
 |-----------|-------------|---------|
 | `-replay <file>` | Play a replay file | `./GeneralsXZH -replay match.rep` |
 | `-jobs <count>` | Number of parallel replay jobs | `./GeneralsXZH -jobs 4 -replay *.rep` |
-| `-headless` | Run without graphics (replay testing) | `./GeneralsXZH -headless -replay *.rep` |
+| `-headless` | Run without graphics or audio (replay testing). On Linux/macOS no audio device is opened. | `./GeneralsXZH -headless -replay *.rep` |
 
 ## Common Combinations
 

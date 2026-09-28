@@ -223,6 +223,10 @@ protected:
 	std::list<PlayingAudio *> m_stoppedAudio;
 
 	void *m_binkHandle;
+	// GeneralsX @bugfix cemlyn007 28/09/2026 TRUE once openDevice has initialised the engine and
+	// its groups, so closeDevice never uninitialises what was never initialised (-noaudio, a failed
+	// open, or the device-free MiniAudioManagerDummy).
+	Bool m_deviceOpen;
 
 #if defined(_DEBUG) || defined(_INTERNAL)
 	typedef std::set<AsciiString> SetAsciiString;
@@ -230,4 +234,41 @@ protected:
 	SetAsciiString m_allEventsLoaded;
 	void dumpAllAssetsUsed();
 #endif
+};
+
+// GeneralsX @feature cemlyn007 28/09/2026 Device-free MiniAudio audio manager (PLAN-023 Phase 0)
+// SDL3GameEngine::createAudioManager returns this for headless engines and for -noaudio.
+// It loads the audio INI data like the real manager, but never initialises a MiniAudio
+// context, engine or device, so it starts no audio threads. Audio requests are dropped on
+// every update, so nothing is ever playing. getFileLengthMS is inherited unchanged (it only
+// decodes the file), so script timings that read audio lengths match the real backend.
+// Keep in step with OpenALAudioManagerDummy (OpenALAudioManager.h).
+class MiniAudioManagerDummy : public MiniAudioManager
+{
+public:
+	virtual void init() override { AudioManager::init(); }
+	virtual void update() override { AudioManager::update(); removeAllAudioRequests(); }
+
+	virtual void openDevice(void) override {}
+	virtual void closeDevice(void) override {}
+	virtual void *getDevice(void) override { return nullptr; }
+
+	virtual void stopAudio(AudioAffect which) override {}
+	virtual void pauseAudio(AudioAffect which) override {}
+	virtual void resumeAudio(AudioAffect which) override {}
+	virtual void pauseAmbient(Bool shouldPause) override {}
+
+	virtual void selectProvider(UnsignedInt providerNdx) override {}
+	virtual void unselectProvider(void) override {}
+	virtual void setSpeakerType(UnsignedInt speakerType) override {}
+	virtual void setHardwareAccelerated(Bool accel) override { AudioManager::setHardwareAccelerated(accel); }
+	virtual void setSpeakerSurround(Bool surround) override { AudioManager::setSpeakerSurround(surround); }
+
+	virtual void *getHandleForBink(void) override;
+
+	virtual void friend_forcePlayAudioEventRTS(const AudioEventRTS *eventToPlay) override {}
+	virtual void processRequestList(void) override { removeAllAudioRequests(); }
+
+protected:
+	virtual void setDeviceListenerPosition(void) override {}
 };
