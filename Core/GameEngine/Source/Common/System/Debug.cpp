@@ -765,25 +765,8 @@ static std::atomic<bool> theEngineEmbeddedMode(false);
 
 FatalEngineError::~FatalEngineError() = default;
 
-#if RTS_ENGINE_CONTEXT
-// GeneralsX @bugfix cemlyn007 28/09/2026 Set once the process has started to exit (see IsEngineTearingDown)
-static std::atomic<bool> theProcessExiting(false);
-
-static void markProcessExiting()
-{
-	theProcessExiting.store(true);
-}
-#endif
-
 void SetEngineEmbeddedMode(bool embedded)
 {
-#if RTS_ENGINE_CONTEXT
-	// Registered when a host first embeds the engine, so it runs before the destructors of the statics
-	// constructed until then (atexit handlers and static destructors run in reverse order).
-	static std::atomic<bool> exitHandlerRegistered(false);
-	if (embedded && !exitHandlerRegistered.exchange(true))
-		atexit(&markProcessExiting);
-#endif
 	theEngineEmbeddedMode.store(embedded);
 }
 
@@ -804,13 +787,8 @@ void SetEngineTearingDown(bool tearingDown)
 
 bool IsEngineTearingDown()
 {
-	// GeneralsX @bugfix cemlyn007 28/09/2026 Outside every engine a fatal error reaches the host (it
-	// throws) until the process starts to exit; from then on it is a static destructor or an exit
-	// handler, where a throw would end the process through std::terminate.
-	const rts::EngineContext* context = rts::ctx();
-	if (context == &rts::g_noEngine)
-		return theProcessExiting.load();
-	return context->engineTearingDown;
+	// Outside every engine (rts::g_noEngine) no engine is being torn down: false.
+	return rts::ctx()->engineTearingDown;
 }
 #else
 static bool theEngineTearingDown = false;
@@ -828,9 +806,25 @@ bool IsEngineTearingDown()
 
 // Embedded mode with no TheGlobalData: throw, unless that would end the process through std::terminate
 // (the engine is being torn down, or another exception is already propagating).
-static bool throwWithoutGlobalData()
+static bool throwWithoutGlobalData(const char *reason)
 {
-	return IsEngineEmbeddedMode() && !IsEngineTearingDown() && std::uncaught_exceptions() == 0;
+	if (!IsEngineEmbeddedMode() || IsEngineTearingDown() || std::uncaught_exceptions() != 0)
+		return false;
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @bugfix cemlyn007 28/09/2026 Outside every engine context (rts::g_noEngine, where
+	// TheGlobalData is always null) the caller is either a host call that entered no engine or a static
+	// destructor or exit handler, and there is no telling which: a static built at any time (a
+	// function-local one first reached during play, say) is destroyed at exit, in no engine's scope.
+	// A throw out of a destructor ends the process through std::terminate, so it returns there, as
+	// upstream does once TheGlobalData is gone, but says so on stderr rather than swallow the error.
+	if (rts::ctx() == &rts::g_noEngine)
+	{
+		fprintf(stderr, "GeneralsX: fatal engine error outside every engine context, not raised%s%s\n",
+			reason ? ": " : "", reason ? reason : "");
+		return false;
+	}
+#endif
+	return true;
 }
 
 void ReleaseCrash(const char *reason)
@@ -852,7 +846,7 @@ void ReleaseCrash(const char *reason)
 		// GeneralsX @bugfix cemlyn007 28/09/2026 Embedded mode: there is no crash file to write, but
 		// the caller still must not carry on, so hand the error to the host (see FatalEngineError.h).
 		// GeneralsX @bugfix cemlyn007 28/09/2026 Not in the teardown window, though.
-		if (throwWithoutGlobalData()) {
+		if (throwWithoutGlobalData(reason)) {
 			throw FatalEngineError(reason ? reason : "");
 		}
 		return; // We are shutting down, and TheGlobalData has been freed.  jba. [4/15/2003]
@@ -987,7 +981,8 @@ void ReleaseCrashLocalized(const AsciiString& p, const AsciiString& m)
 	// GeneralsX @bugfix cemlyn007 28/09/2026 In the teardown window return instead, as ReleaseCrash does
 	// (the code below needs TheGlobalData).
 	if (TheGlobalData == nullptr) {
-		if (throwWithoutGlobalData()) {
+		// (The message is on stderr already.)
+		if (throwWithoutGlobalData(nullptr)) {
 			AsciiString reason;
 			reason.translate(mesg);
 			throw FatalEngineError(reason.str());

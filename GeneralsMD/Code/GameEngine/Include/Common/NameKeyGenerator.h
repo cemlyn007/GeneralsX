@@ -113,8 +113,14 @@ public:
 
 	// GeneralsX @feature cemlyn007 28/09/2026 Test hook for PLAN-023 Decision 2's perturbation gate:
 	// interns `junkNames` names no data uses, then skips `skippedIds` ids, so every key interned
-	// afterwards differs from an unperturbed run. The simulation must not notice. Never call it in play.
-	void perturbForTesting(Int junkNames, Int skippedIds);
+	// afterwards differs from an unperturbed run. With `descending`, the generator also switches, for
+	// good, to handing out every later key from the top of the key space downwards, so keys interned
+	// afterwards also come in the reverse of their interning order (with several engines sharing the
+	// generator, an engine finds keys another interned in that engine's order). The simulation must
+	// notice neither. Returns FALSE, changing nothing, if that would leave fewer than
+	// NAMEKEY_PERTURB_RESERVE keys free below NAMEKEY_MAX. Never call it in play.
+	Bool perturbForTesting(Int junkNames, Int skippedIds, Bool descending);
+	enum { NAMEKEY_PERTURB_RESERVE = 1 << 20 };
 
 #if RETAIL_COMPATIBLE_CRC
 #if RTS_ZEROHOUR
@@ -183,10 +189,12 @@ private:
 	// GeneralsX @feature cemlyn007 28/09/2026 Thread-safe with several engines (see PrimingLatch)
 	std::atomic<Bucket*>	m_sockets[SOCKET_COUNT];	///< Catalog of all Buckets already generated; a bucket is immutable once published
 	UnsignedInt		m_nextID;											///< Next available ID; guarded by m_insertMutex
+	UnsignedInt		m_descendingID;								///< Next ID handed out downwards, or 0 (perturbForTesting); guarded by m_insertMutex
 	std::mutex		m_insertMutex;								///< Held by every insert
 #else
 	Bucket*				m_sockets[SOCKET_COUNT];			///< Catalog of all Buckets already generated
 	UnsignedInt		m_nextID;											///< Next available ID
+	UnsignedInt		m_descendingID;								///< GeneralsX @feature cemlyn007 28/09/2026 Next ID handed out downwards, or 0 (perturbForTesting)
 #endif
 
 };

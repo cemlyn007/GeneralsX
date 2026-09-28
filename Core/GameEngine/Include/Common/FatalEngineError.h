@@ -64,9 +64,10 @@ FATAL_ENGINE_ERROR_API bool IsEngineEmbeddedMode();
 //
 // GeneralsX @bugfix cemlyn007 28/09/2026 It must not carry over into the next engine:
 // - With RTS_ENGINE_CONTEXT it is a field of the engine context, so a new engine (a new context) starts
-//   clear. Outside every engine context (rts::g_noEngine) it is never set, and reads as set only once
-//   the process has started to exit (exit handlers and static destructors, after the first
-//   SetEngineEmbeddedMode(true)): until then a fatal error there still reaches the host.
+//   clear. Outside every engine context (rts::g_noEngine) it is never set. A fatal error there with no
+//   TheGlobalData (always the case there) is not thrown, though, but reported on stderr: the caller may
+//   be a static destructor or an exit handler (noexcept, so a throw would end the process), which
+//   cannot be told apart from a host call that entered no engine.
 // - Without it there is one flag for the process, which stays set after ~GameEngine (the statics
 //   destroyed at exit still see no TheGlobalData). A host that brings up another engine after a
 //   teardown clears it first, SetEngineTearingDown(false), before anything that can raise a fatal error.

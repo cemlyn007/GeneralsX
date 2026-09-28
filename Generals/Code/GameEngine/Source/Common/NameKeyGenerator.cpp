@@ -38,6 +38,7 @@ NameKeyGenerator::NameKeyGenerator()
 {
 
 	m_nextID = (UnsignedInt)NAMEKEY_INVALID;  // uninitialized system
+	m_descendingID = 0;  // GeneralsX @feature cemlyn007 28/09/2026 upwards (perturbForTesting)
 
 	for (Int i = 0; i < SOCKET_COUNT; ++i)
 		m_sockets[i] = nullptr;
@@ -61,6 +62,7 @@ void NameKeyGenerator::init()
 	// start keys at the beginning again
 	freeSockets();
 	m_nextID = 1;
+	m_descendingID = 0;  // GeneralsX @feature cemlyn007 28/09/2026 upwards (perturbForTesting)
 
 }
 
@@ -69,6 +71,7 @@ void NameKeyGenerator::reset()
 {
 	freeSockets();
 	m_nextID = 1;
+	m_descendingID = 0;  // GeneralsX @feature cemlyn007 28/09/2026 upwards (perturbForTesting)
 
 }
 
@@ -224,7 +227,9 @@ NameKeyType NameKeyGenerator::nameToLowercaseKey(const char *name)
 NameKeyType NameKeyGenerator::createNameKey(UnsignedInt hash, const AsciiString& name)
 {
 	Bucket *b = newInstance(Bucket);
-	b->m_key = (NameKeyType)m_nextID++;
+	// GeneralsX @feature cemlyn007 28/09/2026 Downwards once perturbForTesting asked for it
+	DEBUG_ASSERTCRASH(m_descendingID == 0 || m_descendingID >= m_nextID, ("NameKey space exhausted"));
+	b->m_key = (NameKeyType)(m_descendingID != 0 ? m_descendingID-- : m_nextID++);
 	b->m_nameString = name;
 	b->m_nextInSocket = m_sockets[hash];
 	m_sockets[hash] = b;
@@ -257,16 +262,36 @@ NameKeyType NameKeyGenerator::createNameKey(UnsignedInt hash, const AsciiString&
 
 //-------------------------------------------------------------------------------------------------
 // GeneralsX @feature cemlyn007 28/09/2026 PLAN-023 Decision 2's perturbation gate (see the header)
-void NameKeyGenerator::perturbForTesting(Int junkNames, Int skippedIds)
+Bool NameKeyGenerator::perturbForTesting(Int junkNames, Int skippedIds, Bool descending)
 {
+	if (junkNames < 0 || skippedIds < 0)
+		return FALSE;
+	{
+		// Keys are handed out from m_nextID upwards, or from m_descendingID downwards to m_nextID.
+		const UnsignedInt top = m_descendingID != 0 ? m_descendingID : (UnsignedInt)NAMEKEY_MAX - 1;
+		const Int64 room = (Int64)top + 1 - (Int64)m_nextID;
+		if ((Int64)junkNames + (Int64)skippedIds + (Int64)NAMEKEY_PERTURB_RESERVE > room)
+			return FALSE;
+		if (descending && m_descendingID == 0)
+			m_descendingID = top;
+	}
+
+	static UnsignedInt calls = 0;
+	++calls;
 	for (Int i = 0; i < junkNames; ++i)
 	{
 		AsciiString junk;
-		junk.format("GeneralsXNameKeyPerturbation%d_%u", i, m_nextID);
+		junk.format("GeneralsXNameKeyPerturbation%u_%d", calls, i);
 		nameToKey(junk);
 	}
-	if (skippedIds > 0)
-		m_nextID += (UnsignedInt)skippedIds;
+
+	{
+		if (m_descendingID != 0)
+			m_descendingID -= (UnsignedInt)skippedIds;
+		else
+			m_nextID += (UnsignedInt)skippedIds;
+	}
+	return TRUE;
 }
 
 //-------------------------------------------------------------------------------------------------
