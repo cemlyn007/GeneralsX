@@ -947,7 +947,19 @@ protected:
 	  GameWindow *control;
 		ObjectID objectID;
 	};
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 28/09/2026 Per engine: every engine's ControlBar constructor (headless too,
+	// InGameUI::init) clears it (resetContainData), so shared, a headless engine's boot would clear the rendering
+	// engine's inventory buttons (PLAN-023 Phase 4). ControlBarCommand.cpp and ControlBarCommandProcessing.cpp
+	// stand m_containData in for its entries.
+	struct ContainData
+	{
+		ContainEntry entries[ MAX_COMMANDS_PER_SET ];
+	};
+	static rts::PerEngineStatic<ContainData> s_containData_perEngine;
+#else
 	static ContainEntry m_containData[ MAX_COMMANDS_PER_SET ];  ///< inventory buttons integrated into the regular command set for buildings/transports
+#endif
 
 	struct QueueEntry
 	{

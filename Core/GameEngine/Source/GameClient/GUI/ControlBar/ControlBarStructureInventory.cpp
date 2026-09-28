@@ -70,8 +70,14 @@ void ControlBar::populateButtonProc( Object *obj, void *userData )
 											info->source->getTemplate()->getName().str()) );
 
 	// put object in inventory data
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 28/09/2026 This engine's contain data (PLAN-023 Phase 4; see ControlBar.h).
+	s_containData_perEngine.get().entries[ info->buttonIndex ].control = info->inventoryButtons[ info->buttonIndex ];
+	s_containData_perEngine.get().entries[ info->buttonIndex ].objectID = obj->getID();
+#else
 	info->self->m_containData[ info->buttonIndex ].control = info->inventoryButtons[ info->buttonIndex ];
 	info->self->m_containData[ info->buttonIndex ].objectID = obj->getID();
+#endif
 
 	// set the UI button that will allow us to press it and cause the object to exit the container
 	const Image *image;
