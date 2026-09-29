@@ -44,7 +44,6 @@
 ///////////////////////////////////////////////////////////////////////////////
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
-#include "Common/CriticalSection.h"
 #include "WWLib/utf8.h"
 
 
@@ -121,9 +120,10 @@ static StringCaseInfo getStringCaseInfo(const char *str)
 // -----------------------------------------------------
 AsciiString::AsciiString(const AsciiString& stringSrc) : m_data(stringSrc.m_data)
 {
-	ScopedCriticalSection scopedCriticalSection(TheAsciiStringCriticalSection);
+	// GeneralsX @performance cemlyn007 29/09/2026 No global lock: stringSrc keeps its reference while we take
+	// ours, so the count cannot reach zero underneath us and a relaxed increment is enough.
 	if (m_data)
-		++m_data->m_refCount;
+		m_data->m_refCount.fetch_add(1, std::memory_order_relaxed);
 	validate();
 }
 
@@ -133,8 +133,8 @@ void AsciiString::validate() const
 {
 	if (!m_data)
 		return;
-	DEBUG_ASSERTCRASH(m_data->m_refCount > 0, ("m_refCount is zero"));
-	DEBUG_ASSERTCRASH(m_data->m_refCount < 32000, ("m_refCount is suspiciously large"));
+	DEBUG_ASSERTCRASH(m_data->m_refCount.load(std::memory_order_relaxed) > 0, ("m_refCount is zero"));
+	DEBUG_ASSERTCRASH(m_data->m_refCount.load(std::memory_order_relaxed) < 32000, ("m_refCount is suspiciously large"));
 	DEBUG_ASSERTCRASH(m_data->m_numCharsAllocated > 0, ("m_numCharsAllocated is zero"));
 //	DEBUG_ASSERTCRASH(m_data->m_numCharsAllocated < 1024, ("m_numCharsAllocated suspiciously large"));
 	DEBUG_ASSERTCRASH(strlen(m_data->peek())+1 <= m_data->m_numCharsAllocated,("str is too long (%d) for storage",strlen(m_data->peek())+1));
@@ -163,8 +163,13 @@ void AsciiString::ensureUniqueBufferOfSize(int numCharsNeeded, Bool preserveData
 
 	const int usableNumChars = numCharsNeeded - 1;
 
+	// GeneralsX @performance cemlyn007 29/09/2026 Copy-on-write safety without the global lock: a buffer is
+	// written in place only when this string holds the sole reference. Strings shared across engines on other
+	// threads (process-global statics, NameKeyGenerator names) keep the count at 2 or more, so they are never
+	// mutated in place while shared. The acquire load pairs with the acq_rel decrement in releaseBuffer(), so
+	// every read the last other holder made of this buffer happens before our in-place write.
 	if (m_data &&
-			m_data->m_refCount == 1 &&
+			m_data->m_refCount.load(std::memory_order_acquire) == 1 &&
 			m_data->m_numCharsAllocated >= numCharsNeeded)
 	{
 		// no buffer manhandling is needed (it's already large enough, and unique to us)
@@ -185,7 +190,7 @@ void AsciiString::ensureUniqueBufferOfSize(int numCharsNeeded, Bool preserveData
 	int minBytes = sizeof(AsciiStringData) + numCharsNeeded*sizeof(char);
 	int actualBytes = TheDynamicMemoryAllocator->getActualAllocationSize(minBytes);
 	AsciiStringData* newData = (AsciiStringData*)TheDynamicMemoryAllocator->allocateBytesDoNotZero(actualBytes, "STR_AsciiString::ensureUniqueBufferOfSize");
-	newData->m_refCount = 1;
+	newData->m_refCount.store(1, std::memory_order_relaxed);
 	newData->m_numCharsAllocated = (actualBytes - sizeof(AsciiStringData))/sizeof(char);
 #if defined(RTS_DEBUG)
 	newData->m_debugptr = newData->peek();	// just makes it easier to read in the debugger
@@ -217,12 +222,13 @@ void AsciiString::ensureUniqueBufferOfSize(int numCharsNeeded, Bool preserveData
 // -----------------------------------------------------
 void AsciiString::releaseBuffer()
 {
-	ScopedCriticalSection scopedCriticalSection(TheAsciiStringCriticalSection);
-
 	validate();
 	if (m_data)
 	{
-		if (--m_data->m_refCount == 0)
+		// GeneralsX @performance cemlyn007 29/09/2026 acq_rel decrement, freeing only on the 1 -> 0 transition:
+		// the release half publishes our reads of the buffer to whoever frees or reuses it, and the acquire
+		// half orders the free after every other holder's release.
+		if (m_data->m_refCount.fetch_sub(1, std::memory_order_acq_rel) == 1)
 		{
 			TheDynamicMemoryAllocator->freeBytes(m_data);
 		}
@@ -256,15 +262,17 @@ AsciiString::AsciiString(const char* s, int len) : m_data(nullptr)
 // -----------------------------------------------------
 void AsciiString::set(const AsciiString& stringSrc)
 {
-	ScopedCriticalSection scopedCriticalSection(TheAsciiStringCriticalSection);
-
 	validate();
 	if (&stringSrc != this)
 	{
+		// GeneralsX @performance cemlyn007 29/09/2026 No global lock: take the new reference (relaxed, as in the
+		// copy constructor) before dropping the old one, so a shared buffer's count never passes through a
+		// false 1 on the way.
+		AsciiStringData* newData = stringSrc.m_data;
+		if (newData)
+			newData->m_refCount.fetch_add(1, std::memory_order_relaxed);
 		releaseBuffer();
-		m_data = stringSrc.m_data;
-		if (m_data)
-			++m_data->m_refCount;
+		m_data = newData;
 	}
 	validate();
 }
