@@ -76,14 +76,15 @@ StringClass::Get_String (int length, bool is_temp)
 	//
 	//	Should we attempt to use a temp buffer for this string?
 	//
-	if (is_temp && length <= MAX_TEMP_LEN && ReservedMask!=ALL_TEMP_STRINGS_USED_MASK) {
+	// GeneralsX @bugfix cemlyn007 29/09/2026 Read ReservedMask only under m_Mutex (PLAN-023 Phase 5b, TSan)
+	// Upstream checked ReservedMask against ALL_TEMP_STRINGS_USED_MASK before taking the lock, an
+	// unsynchronised read of a word other threads write under it: a data race once engines run on
+	// several threads. The loop below already finds no free buffer when every one is in use.
+	if (is_temp && length <= MAX_TEMP_LEN) {
 
 		//
 		//	Make sure no one else is requesting a temp pointer
-		// at the same time we are. There is a slight possibility that another
-		// thread stole the last available buffer in between the if sentence and
-		// the mutex lock, but that is a feature by design and doesn't cause
-		// anything bad to happen.
+		// at the same time we are.
 		//
 		FastCriticalSectionClass::LockClass m(m_Mutex);
 
@@ -92,7 +93,7 @@ StringClass::Get_String (int length, bool is_temp)
 		//
 		// TODO: Don't loop, there are better ways
 		unsigned mask=1;
-		for (int index = 0; index < MAX_TEMP_STRING; index ++, mask<<=1) {
+		for (int index = 0; index < MAX_TEMP_STRING && ReservedMask != ALL_TEMP_STRINGS_USED_MASK; index ++, mask<<=1) {
 			unsigned mask=1<<index;
 			if (!(ReservedMask&mask)) {
 				ReservedMask|=mask;

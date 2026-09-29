@@ -199,7 +199,10 @@ HAND = [
     # ---------------------------------------------------------------------------------------------------
     # Debug only.
     (DEBUG, "", "re:TheDebugIgnoreSyncErrors|TheCurrentIgnoreCrashPtr|g_LastErrorDump", "debug"),
-    (DEBUG, "", "re:st_(LastCurrentFrame|CurrentFrame|CanAppCont|AppIsFast|DebugDLL|ParticleDLL|particleSystem|particleSystemNeedsStopping)", "ScriptEngine VTune/debug-DLL/particle-editor hooks (PLAN-023 Phase 4 names them)"),
+    # ScriptEngine's debugger-window and particle-editor hooks (st_CurrentFrame, st_DebugDLL, st_ParticleDLL,
+    # ...) were listed here as debug-only, but every ScriptEngine's constructor, init() and update() write
+    # them: they are a PER_ENGINE_STATIC now (PLAN-023 Phase 5b, found by the TSan build), so gone from the
+    # library; the slot index is rule:per-engine-static.
     (DEBUG, "", "re:_writeSingleParticleSystem\\(.*\\)::buff[1-4]|_reloadParticleSystemFromINI\\(.*\\)::linebuff|_getParticleSystemName\\(\\)::buff", "particle-editor writer/reader buffers (debug DLL)"),
     (DEBUG, "", "ScriptEngine::getTeamNamed(AsciiString const&)::warnCount", "debug-message limiter"),
     (DEBUG, "", "re:Object::setTriggerAreaFlagsForChangeInPosition\\(\\)::didWarn|PathfindCell::~PathfindCell\\(\\)::warn", "warn-once flag"),

@@ -258,7 +258,12 @@ StringClass::StringClass (bool hint_temporary)
 	:	m_Buffer (m_EmptyString)
 {
 	Get_String (MAX_TEMP_LEN, hint_temporary);
-	m_Buffer[0]	= m_NullChar;
+	// GeneralsX @bugfix cemlyn007 29/09/2026 Never write the shared empty string (PLAN-023 Phase 5b, TSan)
+	// A zero-length, non-temporary string is m_EmptyString, the process-wide m_NullChar: writing its
+	// terminator again from several engine threads at once is a data race, and it is already 0.
+	if (m_Buffer != m_EmptyString) {
+		m_Buffer[0]	= m_NullChar;
+	}
 }
 
 ///////////////////////////////////////////////////////////////////
@@ -269,7 +274,12 @@ StringClass::StringClass (int initial_len, bool hint_temporary)
 	:	m_Buffer (m_EmptyString)
 {
 	Get_String (initial_len, hint_temporary);
-	m_Buffer[0]	= m_NullChar;
+	// GeneralsX @bugfix cemlyn007 29/09/2026 Never write the shared empty string (PLAN-023 Phase 5b, TSan)
+	// A zero-length, non-temporary string is m_EmptyString, the process-wide m_NullChar: writing its
+	// terminator again from several engine threads at once is a data race, and it is already 0.
+	if (m_Buffer != m_EmptyString) {
+		m_Buffer[0]	= m_NullChar;
+	}
 }
 
 ///////////////////////////////////////////////////////////////////
