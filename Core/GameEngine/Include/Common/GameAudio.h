@@ -194,6 +194,14 @@ class AudioManager : public SubsystemInterface
 		///< NOTE NOTE NOTE !!DO NOT USE THIS IN FOR GAMELOGIC PURPOSES!! NOTE NOTE NOTE
 		virtual Bool isCurrentlyPlaying( AudioHandle handle );
 
+		// GeneralsX @performance cemlyn007 29/09/2026 Whether this manager can ever play a sound
+		// (PLAN-023 Phase 5b, perf2). The device-free managers (OpenALAudioManagerDummy,
+		// MiniAudioManagerDummy) answer FALSE: they drop every request, so nothing is ever playing.
+		// Client code may use it to skip work that only exists to (re)start sounds, such as
+		// Drawable::updateDrawable's per-frame restart of looping ambient sounds. Like
+		// isCurrentlyPlaying, DO NOT USE THIS FOR GAMELOGIC PURPOSES.
+		virtual Bool canPlaySounds() const { return TRUE; }
+
 		// Device Dependent open and close functions
 		virtual void openDevice() = 0;
 		virtual void closeDevice() = 0;
