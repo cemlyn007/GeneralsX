@@ -33,6 +33,7 @@
 
 #ifndef _WIN32
 #include <locale.h>
+#include <pthread.h>
 #if defined(__APPLE__)
 #include <xlocale.h>
 #endif
@@ -196,38 +197,157 @@ static_assert(sizeof(std::fenv_t) <= sizeof(ThreadInvariants::floatingPointEnvir
 static_assert(alignof(std::fenv_t) <= 8, "fenv_t is over-aligned for ThreadInvariants");
 #ifndef _WIN32
 static_assert(sizeof(locale_t) <= sizeof(void*), "locale_t does not fit ThreadInvariants");
+#endif
 
 namespace
 {
-std::once_flag theEngineLocaleOnce;
-locale_t theEngineLocale = (locale_t)0;
+#if defined(__x86_64__) && !defined(_WIN32)
+#define RTS_SCOPE_CONTROL_WORDS 1
+// GeneralsX @bugfix cemlyn007 28/09/2026 On x86-64 the engine's floating-point mode is two control words, the x87 one
+// and MXCSR, as setFPMode() leaves them. The same for every thread, so the first Scope learns them (after its
+// setFPMode()) and later ones load them directly: fnstcw/stmxcsr to save, fldcw/ldmxcsr to set and restore, in
+// place of fegetenv, setFPMode()'s fesetenv(FE_DFL_ENV) and friends, and fesetenv. A thread already in the mode
+// skips even that. Neither exception flags (masked, so they change no result) nor the empty x87 stack (empty at
+// every call) are part of the mode.
+constexpr unsigned int kMxcsrExceptionFlags = 0x3F;
+// (x87 control word << 32) | MXCSR less its exception flags, with bit 63 set once learnt.
+constexpr unsigned long long kFloatingPointModeKnown = 1ull << 63;
+std::atomic<unsigned long long> theEngineFloatingPointMode(0);
 
-// The "C" locale every engine runs in, made once per process and never freed (a thread may still use it at
-// exit).
-locale_t engineLocale() noexcept
+unsigned long long packFloatingPointMode(unsigned short controlWord, unsigned int mxcsr) noexcept
 {
-	std::call_once(theEngineLocaleOnce, []() { theEngineLocale = newlocale(LC_ALL_MASK, "C", (locale_t)0); });
-	return theEngineLocale;
+	return kFloatingPointModeKnown | (static_cast<unsigned long long>(controlWord) << 32) | (mxcsr & ~kMxcsrExceptionFlags);
 }
+#else
+#define RTS_SCOPE_CONTROL_WORDS 0
+#endif
+
+#ifndef _WIN32
+// GeneralsX @bugfix cemlyn007 29/09/2026 The engine's locale for this thread: the thread's own locale with LC_NUMERIC
+// "C", made from the locale the thread had when it first entered an engine (`source`, not owned) and kept, so
+// that every Scope switches to it with one uselocale, whatever the thread's LC_NUMERIC. Always a locale of the
+// thread's own, never the process's global one: with the GIL released, another thread's setlocale() cannot change
+// the engine's number parsing in the middle of a step. A thread on the global locale (LC_GLOBAL_LOCALE, as
+// Python's are) keeps the snapshot of it taken at its first entry; one that uselocale()s another locale of its
+// own gets a new engine locale made from that one at its next outermost entry. `users` counts the Scopes on this
+// thread that switched to it and have not yet left. Freed at thread exit (a pthread key's destructor; the main
+// thread's goes with the process).
+struct ThreadEngineLocale
+{
+	locale_t locale;
+	locale_t source;
+	unsigned int users;
+};
+constinit thread_local ThreadEngineLocale t_engineLocale = {(locale_t)0, (locale_t)0, 0};
+
+void freeThreadEngineLocale(void* locale) noexcept
+{
+	freelocale(static_cast<locale_t>(locale));
+	if (t_engineLocale.locale == static_cast<locale_t>(locale))
+		t_engineLocale = {(locale_t)0, (locale_t)0, 0};
+}
+
+struct ThreadEngineLocaleKey
+{
+	pthread_key_t key;
+	bool made;
+};
+
+const ThreadEngineLocaleKey& threadEngineLocaleKey() noexcept
+{
+	static const ThreadEngineLocaleKey key = []() noexcept {
+		ThreadEngineLocaleKey k{};
+		k.made = pthread_key_create(&k.key, freeThreadEngineLocale) == 0;
+		return k;
+	}();
+	return key;
+}
+
+// `from` with LC_NUMERIC "C" (a copy; `from` is left alone), or null if it cannot be made.
+locale_t makeEngineLocale(locale_t from) noexcept
+{
+	const locale_t base = duplocale(from);
+	if (base == (locale_t)0)
+		return (locale_t)0;
+	const locale_t engine = newlocale(LC_NUMERIC_MASK, "C", base);
+	if (engine == (locale_t)0)
+		freelocale(base);
+	return engine;
 }
 #endif
+}
 
 void enterEngineThreadInvariants(ThreadInvariants& saved) noexcept
 {
+	saved.floatingPointSaved = true;
+#if RTS_SCOPE_CONTROL_WORDS
+	__asm__ __volatile__("fnstcw %0" : "=m" (saved.x87ControlWord));
+	__asm__ __volatile__("stmxcsr %0" : "=m" (saved.mxcsr));
+	const unsigned long long mode = theEngineFloatingPointMode.load(std::memory_order_relaxed);
+	if (mode == packFloatingPointMode(saved.x87ControlWord, saved.mxcsr))
+	{
+		saved.floatingPointSaved = false;
+	}
+	else if (mode != 0)
+	{
+		unsigned short controlWord = static_cast<unsigned short>(mode >> 32);
+		unsigned int mxcsr = static_cast<unsigned int>(mode);
+		__asm__ __volatile__("fldcw %0" : : "m" (controlWord));
+		__asm__ __volatile__("ldmxcsr %0" : : "m" (mxcsr));
+	}
+	else
+	{
+		setFPMode();
+		unsigned short controlWord = 0;
+		unsigned int mxcsr = 0;
+		__asm__ __volatile__("fnstcw %0" : "=m" (controlWord));
+		__asm__ __volatile__("stmxcsr %0" : "=m" (mxcsr));
+		theEngineFloatingPointMode.store(packFloatingPointMode(controlWord, mxcsr), std::memory_order_relaxed);
+	}
+#else
 	std::fegetenv(reinterpret_cast<std::fenv_t*>(saved.floatingPointEnvironment));
-#if (defined(__i386__) || defined(__x86_64__)) && !defined(_WIN32)
-	// fesetenv need not restore the x87 precision bits that setFPMode clears, so the control word is saved too.
+#if defined(__i386__) && !defined(_WIN32)
+	// GeneralsX @bugfix cemlyn007 29/09/2026 glibc's i386 fesetenv does not restore the x87 precision bits that
+	// setFPMode() clears, so the control word is saved (and restored with fldcw) too.
 	__asm__ __volatile__("fnstcw %0" : "=m" (saved.x87ControlWord));
 #else
 	saved.x87ControlWord = 0;
 #endif
+	saved.mxcsr = 0;
 	setFPMode();
+#endif
+	saved.locale = nullptr;
+	saved.engineLocale = nullptr;
 #ifndef _WIN32
-	const locale_t locale = engineLocale();
-	saved.locale = locale != (locale_t)0 ? static_cast<void*>(uselocale(locale)) : nullptr;
+	ThreadEngineLocale& cache = t_engineLocale;
+	const locale_t current = uselocale((locale_t)0);
+	// Already the engine's (a Scope for another engine inside one): nothing to switch.
+	if (cache.locale != (locale_t)0 && current == cache.locale)
+		return;
+	if (cache.locale == (locale_t)0 || current != cache.source)
+	{
+		const locale_t engine = makeEngineLocale(current);
+		if (engine == (locale_t)0)
+			return;
+		const ThreadEngineLocaleKey& key = threadEngineLocaleKey();
+		if (cache.users != 0 || !key.made)
+		{
+			// The cached one is still in use further out on this thread (which has since switched to a locale of
+			// its own), or cannot be freed at thread exit: one for this Scope only, freed when it ends.
+			saved.engineLocale = static_cast<void*>(engine);
+			saved.locale = static_cast<void*>(uselocale(engine));
+			return;
+		}
+		if (cache.locale != (locale_t)0)
+			freelocale(cache.locale);
+		cache.locale = engine;
+		cache.source = current;
+		pthread_setspecific(key.key, static_cast<void*>(engine));
+	}
+	++cache.users;
+	saved.locale = static_cast<void*>(uselocale(cache.locale));
 #else
 	// Windows has no per-thread uselocale; the engine keeps the thread's locale there.
-	saved.locale = nullptr;
 #endif
 }
 
@@ -235,11 +355,24 @@ void leaveEngineThreadInvariants(const ThreadInvariants& saved) noexcept
 {
 #ifndef _WIN32
 	if (saved.locale != nullptr)
+	{
 		uselocale(static_cast<locale_t>(saved.locale));
+		if (saved.engineLocale != nullptr)
+			freelocale(static_cast<locale_t>(saved.engineLocale));
+		else
+			--t_engineLocale.users;
+	}
 #endif
-	std::fesetenv(reinterpret_cast<const std::fenv_t*>(saved.floatingPointEnvironment));
-#if (defined(__i386__) || defined(__x86_64__)) && !defined(_WIN32)
+	if (!saved.floatingPointSaved)
+		return;
+#if RTS_SCOPE_CONTROL_WORDS
 	__asm__ __volatile__("fldcw %0" : : "m" (saved.x87ControlWord));
+	__asm__ __volatile__("ldmxcsr %0" : : "m" (saved.mxcsr));
+#else
+	std::fesetenv(reinterpret_cast<const std::fenv_t*>(saved.floatingPointEnvironment));
+#if defined(__i386__) && !defined(_WIN32)
+	__asm__ __volatile__("fldcw %0" : : "m" (saved.x87ControlWord));
+#endif
 #endif
 }
 

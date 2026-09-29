@@ -405,9 +405,19 @@ void FunctionLexicon::loadTable( TableEntry *table,
 		// GeneralsX @feature cemlyn007 28/09/2026 Written only when it changes: the tables are process-wide and every
 		// engine's init interns the same names (PLAN-023 Decision 2), so only the first boot writes a key and later
 		// boots do not write while other engines look functions up on their threads (PLAN-023 Phase 5b).
+		// GeneralsX @bugfix cemlyn007 28/09/2026 With the engine context a key is written once: a later boot that
+		// finds a different one set (its names interned in another order) is refused rather than racing the engines
+		// already looking functions up (PLAN-023 Phase 5b).
 		const NameKeyType key = TheNameKeyGenerator->nameToKey( entry->name );
+#if RTS_ENGINE_CONTEXT
+		DEBUG_ASSERTCRASH( entry->key == NAMEKEY_INVALID || entry->key == key,
+			( "FunctionLexicon::loadTable - '%s' already has key %d, not %d", entry->name, entry->key, key ) );
+		if( entry->key == NAMEKEY_INVALID )
+			entry->key = key;
+#else
 		if( entry->key != key )
 			entry->key = key;
+#endif
 
 		// next table entry please
 		entry++;

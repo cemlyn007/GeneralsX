@@ -487,6 +487,16 @@ void StdLocalFileSystem::setAssetRootPath(const AsciiString& path)
 	std::filesystem::path assetRootPath(std::move(p));
 	if (s_assetFallbackPath == assetRootPath)
 		return;
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @bugfix cemlyn007 28/09/2026 Written once: a later boot naming another root is refused rather than
+	// changing the path under the engines already reading it (the host boots every engine on one install).
+	if (!s_assetFallbackPath.empty())
+	{
+		DEBUG_CRASH(("StdLocalFileSystem::setAssetRootPath - the asset fallback path is process-wide ('%s'): '%s' refused",
+			s_assetFallbackPath.string().c_str(), assetRootPath.string().c_str()));
+		return;
+	}
+#endif
 	s_assetFallbackPath = std::move(assetRootPath);
 	DEBUG_LOG(("StdLocalFileSystem::setAssetRootPath - asset fallback path set to '%s'", s_assetFallbackPath.string().c_str()));
 }
