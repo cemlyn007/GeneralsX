@@ -45,6 +45,7 @@
 
 #pragma once
 
+#include <atomic>
 #include <stdarg.h>
 #include "Lib/BaseType.h"
 #include "Common/Debug.h"
@@ -87,12 +88,20 @@ private:
 #if defined(RTS_DEBUG)
 		const char* m_debugptr;	// just makes it easier to read in the debugger
 #endif
-		unsigned short	m_refCount;						// reference count
+		// GeneralsX @performance cemlyn007 29/09/2026 Atomic reference count in place of the process-wide
+		// TheAsciiStringCriticalSection. Engines stepped on separate threads in one process share some strings
+		// (process-global statics, NameKeyGenerator names), and the global lock serialised every copy and
+		// release across them. The copy constructor and set() add a reference with a relaxed increment,
+		// releaseBuffer() drops one with an acq_rel decrement and frees on 1 -> 0, and every copy-on-write
+		// uniqueness test loads the count with acquire. Same size and layout as the plain unsigned short.
+		std::atomic<unsigned short>	m_refCount;		// reference count
 		unsigned short	m_numCharsAllocated;  // length of data allocated
 		// char m_stringdata[];
 
 		char* peek() { return (char*)(this+1); }
 	};
+	static_assert(sizeof(std::atomic<unsigned short>) == sizeof(unsigned short), "m_refCount must keep the plain unsigned short layout");
+	static_assert(std::atomic<unsigned short>::is_always_lock_free, "m_refCount must be lock-free");
 
 	#ifdef RTS_DEBUG
 	void validate() const;

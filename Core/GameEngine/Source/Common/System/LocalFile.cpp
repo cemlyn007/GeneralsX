@@ -47,6 +47,7 @@
 
 #include "PreRTS.h"
 
+#include <atomic>
 #include <fcntl.h>
 // GeneralsX @build BenderAI 12/02/2026 Windows-specific low-level file I/O
 #ifdef _WIN32
@@ -86,7 +87,11 @@
 //         Private Data
 //----------------------------------------------------------------------------
 
-static Int s_totalOpen = 0;
+// GeneralsX @bugfix cemlyn007 29/09/2026 Atomic: every engine's file opens and closes count here, on whichever
+// thread steps that engine. The process-wide AsciiString lock used to order these updates by accident; with the
+// atomic string reference count it no longer does, and ThreadSanitizer reported the race (PLAN-023 Phase 5b).
+// A diagnostic counter only, so relaxed ordering is enough.
+static std::atomic<Int> s_totalOpen{0};
 
 //----------------------------------------------------------------------------
 //         Public Data
@@ -268,8 +273,8 @@ Bool LocalFile::open( const Char *filename, Int access, size_t bufferSize )
 
 #endif
 
-	++s_totalOpen;
-///	DEBUG_LOG(("LocalFile::open %s (total %d)",filename,s_totalOpen));
+	s_totalOpen.fetch_add(1, std::memory_order_relaxed);
+///	DEBUG_LOG(("LocalFile::open %s (total %d)",filename,s_totalOpen.load(std::memory_order_relaxed)));
 	if ( m_access & APPEND )
 	{
 		if ( seek ( 0, END ) < 0 )
@@ -320,14 +325,14 @@ void LocalFile::closeFile()
 	{
 		fclose(m_file);
 		m_file = nullptr;
-		--s_totalOpen;
+		s_totalOpen.fetch_sub(1, std::memory_order_relaxed);
 	}
 #else
 	if( m_handle != -1 )
 	{
 		_close( m_handle );
 		m_handle = -1;
-		--s_totalOpen;
+		s_totalOpen.fetch_sub(1, std::memory_order_relaxed);
 	}
 #endif
 }
