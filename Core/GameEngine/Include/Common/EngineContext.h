@@ -243,14 +243,17 @@ RTS_ENGINE_CONTEXT_API bool noEngineIsPristine();
 // EngineContext.cpp checks that fenv_t and locale_t fit.
 // GeneralsX @bugfix cemlyn007 28/09/2026 Only what the Scope changes is saved and restored. On x86-64 (not Windows) that
 // is the x87 control word and MXCSR, and nothing at all for a thread already in the engine's mode; elsewhere the
-// whole fenv_t. Only LC_NUMERIC is switched (to "C"), and only when the thread's differs from it, so that the
-// engine sees the thread's other categories (LC_CTYPE for towlower, iswspace, mbstowcs) as it does without the
-// engine context.
+// whole fenv_t (with the x87 control word on i386). Only LC_NUMERIC is switched (to "C"), so that the engine sees
+// the thread's other categories (LC_CTYPE for towlower, iswspace, mbstowcs) as it does without the engine context.
+// GeneralsX @bugfix cemlyn007 29/09/2026 The locale is switched on every entry, to one cached per thread (the
+// thread's own locale, as at its first entry, with LC_NUMERIC "C"), never left as the process's global locale:
+// see enterEngineThreadInvariants. The host must still not call setlocale() while any engine steps (glibc's
+// locale functions are not safe against it).
 struct ThreadInvariants
 {
 	alignas(8) unsigned char floatingPointEnvironment[32];
-	// The thread's locale to restore, and the one made for this Scope (freed on exit); both null when the Scope
-	// left the thread's locale alone.
+	// The thread's locale to restore (null when the Scope left the thread's locale alone), and the one made for
+	// this Scope only (freed on exit; null when it used the thread's cached one).
 	void* locale;
 	void* engineLocale;
 	unsigned int mxcsr;

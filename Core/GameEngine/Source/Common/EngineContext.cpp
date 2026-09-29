@@ -32,8 +32,8 @@
 #include <vector>
 
 #ifndef _WIN32
-#include <langinfo.h>
 #include <locale.h>
+#include <pthread.h>
 #if defined(__APPLE__)
 #include <xlocale.h>
 #endif
@@ -223,13 +223,56 @@ unsigned long long packFloatingPointMode(unsigned short controlWord, unsigned in
 #endif
 
 #ifndef _WIN32
-// Whether the thread's LC_NUMERIC reads and writes numbers as "C" does: a '.' radix and no grouping, all that
-// category holds.
-bool numericIsC() noexcept
+// GeneralsX @bugfix cemlyn007 29/09/2026 The engine's locale for this thread: the thread's own locale with LC_NUMERIC
+// "C", made from the locale the thread had when it first entered an engine (`source`, not owned) and kept, so
+// that every Scope switches to it with one uselocale, whatever the thread's LC_NUMERIC. Always a locale of the
+// thread's own, never the process's global one: with the GIL released, another thread's setlocale() cannot change
+// the engine's number parsing in the middle of a step. A thread on the global locale (LC_GLOBAL_LOCALE, as
+// Python's are) keeps the snapshot of it taken at its first entry; one that uselocale()s another locale of its
+// own gets a new engine locale made from that one at its next outermost entry. `users` counts the Scopes on this
+// thread that switched to it and have not yet left. Freed at thread exit (a pthread key's destructor; the main
+// thread's goes with the process).
+struct ThreadEngineLocale
 {
-	const char* const radix = nl_langinfo(RADIXCHAR);
-	const char* const separator = nl_langinfo(THOUSEP);
-	return radix != nullptr && radix[0] == '.' && radix[1] == '\0' && (separator == nullptr || separator[0] == '\0');
+	locale_t locale;
+	locale_t source;
+	unsigned int users;
+};
+constinit thread_local ThreadEngineLocale t_engineLocale = {(locale_t)0, (locale_t)0, 0};
+
+void freeThreadEngineLocale(void* locale) noexcept
+{
+	freelocale(static_cast<locale_t>(locale));
+	if (t_engineLocale.locale == static_cast<locale_t>(locale))
+		t_engineLocale = {(locale_t)0, (locale_t)0, 0};
+}
+
+struct ThreadEngineLocaleKey
+{
+	pthread_key_t key;
+	bool made;
+};
+
+const ThreadEngineLocaleKey& threadEngineLocaleKey() noexcept
+{
+	static const ThreadEngineLocaleKey key = []() noexcept {
+		ThreadEngineLocaleKey k{};
+		k.made = pthread_key_create(&k.key, freeThreadEngineLocale) == 0;
+		return k;
+	}();
+	return key;
+}
+
+// `from` with LC_NUMERIC "C" (a copy; `from` is left alone), or null if it cannot be made.
+locale_t makeEngineLocale(locale_t from) noexcept
+{
+	const locale_t base = duplocale(from);
+	if (base == (locale_t)0)
+		return (locale_t)0;
+	const locale_t engine = newlocale(LC_NUMERIC_MASK, "C", base);
+	if (engine == (locale_t)0)
+		freelocale(base);
+	return engine;
 }
 #endif
 }
@@ -263,32 +306,46 @@ void enterEngineThreadInvariants(ThreadInvariants& saved) noexcept
 	}
 #else
 	std::fegetenv(reinterpret_cast<std::fenv_t*>(saved.floatingPointEnvironment));
+#if defined(__i386__) && !defined(_WIN32)
+	// GeneralsX @bugfix cemlyn007 29/09/2026 glibc's i386 fesetenv does not restore the x87 precision bits that
+	// setFPMode() clears, so the control word is saved (and restored with fldcw) too.
+	__asm__ __volatile__("fnstcw %0" : "=m" (saved.x87ControlWord));
+#else
 	saved.x87ControlWord = 0;
+#endif
 	saved.mxcsr = 0;
 	setFPMode();
 #endif
 	saved.locale = nullptr;
 	saved.engineLocale = nullptr;
 #ifndef _WIN32
-	// The thread's own locale with LC_NUMERIC "C", made only when its LC_NUMERIC differs (never in a host that
-	// leaves LC_NUMERIC alone, as Python does), and freed on exit.
-	if (!numericIsC())
+	ThreadEngineLocale& cache = t_engineLocale;
+	const locale_t current = uselocale((locale_t)0);
+	// Already the engine's (a Scope for another engine inside one): nothing to switch.
+	if (cache.locale != (locale_t)0 && current == cache.locale)
+		return;
+	if (cache.locale == (locale_t)0 || current != cache.source)
 	{
-		const locale_t base = duplocale(uselocale((locale_t)0));
-		if (base != (locale_t)0)
+		const locale_t engine = makeEngineLocale(current);
+		if (engine == (locale_t)0)
+			return;
+		const ThreadEngineLocaleKey& key = threadEngineLocaleKey();
+		if (cache.users != 0 || !key.made)
 		{
-			const locale_t engine = newlocale(LC_NUMERIC_MASK, "C", base);
-			if (engine != (locale_t)0)
-			{
-				saved.engineLocale = static_cast<void*>(engine);
-				saved.locale = static_cast<void*>(uselocale(engine));
-			}
-			else
-			{
-				freelocale(base);
-			}
+			// The cached one is still in use further out on this thread (which has since switched to a locale of
+			// its own), or cannot be freed at thread exit: one for this Scope only, freed when it ends.
+			saved.engineLocale = static_cast<void*>(engine);
+			saved.locale = static_cast<void*>(uselocale(engine));
+			return;
 		}
+		if (cache.locale != (locale_t)0)
+			freelocale(cache.locale);
+		cache.locale = engine;
+		cache.source = current;
+		pthread_setspecific(key.key, static_cast<void*>(engine));
 	}
+	++cache.users;
+	saved.locale = static_cast<void*>(uselocale(cache.locale));
 #else
 	// Windows has no per-thread uselocale; the engine keeps the thread's locale there.
 #endif
@@ -297,10 +354,13 @@ void enterEngineThreadInvariants(ThreadInvariants& saved) noexcept
 void leaveEngineThreadInvariants(const ThreadInvariants& saved) noexcept
 {
 #ifndef _WIN32
-	if (saved.engineLocale != nullptr)
+	if (saved.locale != nullptr)
 	{
 		uselocale(static_cast<locale_t>(saved.locale));
-		freelocale(static_cast<locale_t>(saved.engineLocale));
+		if (saved.engineLocale != nullptr)
+			freelocale(static_cast<locale_t>(saved.engineLocale));
+		else
+			--t_engineLocale.users;
 	}
 #endif
 	if (!saved.floatingPointSaved)
@@ -310,6 +370,9 @@ void leaveEngineThreadInvariants(const ThreadInvariants& saved) noexcept
 	__asm__ __volatile__("ldmxcsr %0" : : "m" (saved.mxcsr));
 #else
 	std::fesetenv(reinterpret_cast<const std::fenv_t*>(saved.floatingPointEnvironment));
+#if defined(__i386__) && !defined(_WIN32)
+	__asm__ __volatile__("fldcw %0" : : "m" (saved.x87ControlWord));
+#endif
 #endif
 }
 
