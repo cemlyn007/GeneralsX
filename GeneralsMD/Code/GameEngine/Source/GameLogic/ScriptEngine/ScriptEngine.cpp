@@ -60,14 +60,18 @@
 
 
 // These are for debugger window
+#if !RTS_ENGINE_CONTEXT
 static int st_LastCurrentFrame;
 static int st_CurrentFrame;
 static Bool st_CanAppCont;
 static Bool st_AppIsFast = false;
+#endif
 static void _appendMessage(const AsciiString& str, Bool isTrueMessage = true, Bool shouldPause = false);
 static void _adjustVariable(const AsciiString& str, Int value, Bool shouldPause = false);
 static void _updateFrameNumber();
+#if !RTS_ENGINE_CONTEXT
 static HMODULE st_DebugDLL;
+#endif
 // That's it for debugger window
 
 // These are for particle editor
@@ -93,9 +97,38 @@ static void _writeOutINI();
 extern void _writeSingleParticleSystem( File *out, ParticleSystemTemplate *particleTemplate );
 static void _reloadTextures();
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @bugfix cemlyn007 29/09/2026 The debugger-window and particle-editor hooks per engine (PLAN-023 Phase 5b, TSan)
+// Not debug-only: every ScriptEngine's constructor and init() write them (the DLL handles to nullptr on a
+// headless command line) and every update() counts st_CurrentFrame, so with engines on several threads a
+// later boot, or any other engine's frame, raced with a stepping engine's reads (ThreadSanitizer, rlgenerals'
+// threaded driver). Each engine's ScriptEngine now has its own, as a solo run does; the macros keep the uses
+// unchanged. OFF keeps the file statics.
+struct ScriptEngineDebugHooks
+{
+	int lastCurrentFrame;
+	int currentFrame;
+	Bool canAppCont;
+	Bool appIsFast;
+	HMODULE debugDLL;
+	HMODULE particleDLL;
+	ParticleSystem *particleSystem;
+	Bool particleSystemNeedsStopping; ///< Set along with particleSystem if the particle system has infinite life
+};
+static rts::PerEngineStatic<ScriptEngineDebugHooks> s_scriptEngineDebugHooks_perEngine;
+#define st_LastCurrentFrame (s_scriptEngineDebugHooks_perEngine.get().lastCurrentFrame)
+#define st_CurrentFrame (s_scriptEngineDebugHooks_perEngine.get().currentFrame)
+#define st_CanAppCont (s_scriptEngineDebugHooks_perEngine.get().canAppCont)
+#define st_AppIsFast (s_scriptEngineDebugHooks_perEngine.get().appIsFast)
+#define st_DebugDLL (s_scriptEngineDebugHooks_perEngine.get().debugDLL)
+#define st_ParticleDLL (s_scriptEngineDebugHooks_perEngine.get().particleDLL)
+#define st_particleSystem (s_scriptEngineDebugHooks_perEngine.get().particleSystem)
+#define st_particleSystemNeedsStopping (s_scriptEngineDebugHooks_perEngine.get().particleSystemNeedsStopping)
+#else
 static HMODULE st_ParticleDLL;
 ParticleSystem *st_particleSystem;
 Bool st_particleSystemNeedsStopping = FALSE; ///< Set along with st_particleSystem if the particle system has infinite life
+#endif
 #define ARBITRARY_BUFF_SIZE	128
 #define FORMAT_STRING "%.2f"
 #define FORMAT_STRING_LEADING_STRING		"%s%.2f"

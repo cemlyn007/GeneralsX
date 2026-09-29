@@ -642,6 +642,28 @@ PushButtonData * getNewPushButtonData()
 	return p;
 }
 
+// GeneralsX @bugfix cemlyn007 29/09/2026 The setters below keep their settings in the button's PushButtonData,
+// creating it on first use. A headless GameWindowDummy never gives its user data back (winGetUserData is nullptr,
+// since every window lookup there returns the same stand-in window), so each call made a new PushButtonData and
+// overwrote the last one: a leak every time the control bar set a portrait or an observer button (found by
+// LeakSanitizer, PLAN-023 Phase 5b). A window that does not keep its user data now gets none, and the setting is
+// dropped, as a dummy window's draw and reads already dropped it.
+static PushButtonData *getPushButtonDataToSet( GameWindow *g )
+{
+	PushButtonData *pData = (PushButtonData *)g->winGetUserData();
+	if( pData != nullptr )
+		return pData;
+	pData = getNewPushButtonData();
+	g->winSetUserData( pData );
+	if( g->winGetUserData() != pData )
+	{
+		g->winSetUserData( nullptr );
+		delete pData;
+		return nullptr;
+	}
+	return pData;
+}
+
 // GadgetButtonSetBorder ======================================================
 /** Set to draw the special borders in the game */
 //=============================================================================
@@ -650,14 +672,11 @@ void GadgetButtonSetBorder( GameWindow *g, Color color, Bool drawBorder = TRUE )
 	if( g == nullptr )
 		return;
 
-	PushButtonData *pData = (PushButtonData *)g->winGetUserData();
+	PushButtonData *pData = getPushButtonDataToSet(g);
 	if(!pData)
-	{
-		pData = getNewPushButtonData();
-	}
+		return;
 	pData->drawBorder = drawBorder;
 	pData->colorBorder = color;
-	g->winSetUserData(pData);
 }
 
 // GadgetButtonDrawClock ======================================================
@@ -669,15 +688,12 @@ void GadgetButtonDrawClock( GameWindow *g, Int percent, Color color )
 	if( g == nullptr )
 		return;
 
-	PushButtonData *pData = (PushButtonData *)g->winGetUserData();
+	PushButtonData *pData = getPushButtonDataToSet(g);
 	if(!pData)
-	{
-		pData = getNewPushButtonData();
-	}
+		return;
 	pData->drawClock = NORMAL_CLOCK;
 	pData->percentClock = percent;
 	pData->colorClock = color;
-	g->winSetUserData(pData);
 
 }
 
@@ -690,15 +706,12 @@ void GadgetButtonDrawInverseClock( GameWindow *g, Int percent, Color color )
 	if( g == nullptr )
 		return;
 
-	PushButtonData *pData = (PushButtonData *)g->winGetUserData();
+	PushButtonData *pData = getPushButtonDataToSet(g);
 	if(!pData)
-	{
-		pData = getNewPushButtonData();
-	}
+		return;
 	pData->drawClock = INVERSE_CLOCK;
 	pData->percentClock = percent;
 	pData->colorClock = color;
-	g->winSetUserData(pData);
 
 }
 
@@ -707,13 +720,10 @@ void GadgetButtonDrawOverlayImage( GameWindow *g, const Image *image )
 	if( g == nullptr )
 		return;
 
-	PushButtonData *pData = (PushButtonData *)g->winGetUserData();
+	PushButtonData *pData = getPushButtonDataToSet(g);
 	if(!pData)
-	{
-		pData = getNewPushButtonData();
-	}
+		return;
 	pData->overlayImage = image;
-	g->winSetUserData(pData);
 }
 
 
@@ -725,13 +735,10 @@ void GadgetButtonSetData(GameWindow *g, void *data)
 	if( g == nullptr )
 		return;
 
-	PushButtonData *pData = (PushButtonData *)g->winGetUserData();
+	PushButtonData *pData = getPushButtonDataToSet(g);
 	if(!pData)
-	{
-		pData = getNewPushButtonData();
-	}
+		return;
 	pData->userData = data;
-	g->winSetUserData(pData);
 }
 
 // GadgetButtonGetData ======================================================

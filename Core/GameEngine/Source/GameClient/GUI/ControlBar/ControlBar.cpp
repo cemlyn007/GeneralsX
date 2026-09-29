@@ -1068,7 +1068,9 @@ ControlBar::~ControlBar()
 
 	if (m_rightHUDCameoWindow && m_rightHUDCameoWindow->winGetUserData())
 	{
-		delete m_rightHUDCameoWindow->winGetUserData();
+		// GeneralsX @bugfix cemlyn007 29/09/2026 Delete the portrait's user data as the PushButtonData it is, not as
+		// void (undefined behaviour, and its altSound string was never destroyed).
+		delete (PushButtonData *)m_rightHUDCameoWindow->winGetUserData();
 		m_rightHUDCameoWindow->winSetUserData(nullptr);
 	}
 
