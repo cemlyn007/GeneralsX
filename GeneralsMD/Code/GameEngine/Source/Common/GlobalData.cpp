@@ -1280,11 +1280,20 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 	// GeneralsX @feature felipebraz 17/09/2026 Skirmish simulation tick rate configuration (#281)
 	TheWritableGlobalData->m_skirmishTickRate = optionPref.getSkirmishTickRate();
 
-	TheWritableGlobalData->m_antiAliasLevel = optionPref.getAntiAliasing();
-	TheWritableGlobalData->m_textureFilteringMode = optionPref.getTextureFilterMode();
-	TheWritableGlobalData->m_textureAnisotropyLevel = optionPref.getTextureAnisotropyLevel();
+	// GeneralsX @bugfix cemlyn007 30/09/2026 An off-screen render engine ignores the user's display options.
+	// Anti-aliasing, texture filtering, anisotropy and gamma change what the render device draws
+	// (W3DDisplay::init applies them to it), so with m_headlessRender they take the values an empty
+	// Options.ini gives: the host's observation images must not follow the user's settings, which may
+	// be the game's own file or shared with other processes. Headless and user interface boots are unchanged.
+	OptionPreferences displayPref(optionPref);
+	if (keepRenderSize)
+		displayPref.clear();
 
-	Int val=optionPref.getGammaValue();
+	TheWritableGlobalData->m_antiAliasLevel = displayPref.getAntiAliasing();
+	TheWritableGlobalData->m_textureFilteringMode = displayPref.getTextureFilterMode();
+	TheWritableGlobalData->m_textureAnisotropyLevel = displayPref.getTextureAnisotropyLevel();
+
+	Int val=displayPref.getGammaValue();
 	//generate a value between 0.6 and 2.0.
 	if (val < 50)
 	{	//darker gamma

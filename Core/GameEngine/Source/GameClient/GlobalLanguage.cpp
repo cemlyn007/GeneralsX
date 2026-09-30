@@ -193,8 +193,14 @@ void GlobalLanguage::init()
 	}
 
 	// override values with user preferences
-	OptionPreferences optionPref;
-	m_userResolutionFontSizeAdjustment = optionPref.getResolutionFontAdjustment();
+	// GeneralsX @bugfix cemlyn007 30/09/2026 An off-screen render engine ignores the user's font scale.
+	// The scale sizes the text its device draws (cinematic text, debug display), so with
+	// m_headlessRender it keeps the language's own adjustment, as with an empty Options.ini.
+	if (TheGlobalData == nullptr || !TheGlobalData->m_headlessRender)
+	{
+		OptionPreferences optionPref;
+		m_userResolutionFontSizeAdjustment = optionPref.getResolutionFontAdjustment();
+	}
 }
 
 void GlobalLanguage::reset()
