@@ -1218,6 +1218,15 @@ void GlobalData::reset()
 //-------------------------------------------------------------------------------------------------
 void GlobalData::parseGameDataDefinition( INI* ini )
 {
+	// GeneralsX @feature cemlyn007 30/09/2026 An off-screen render engine keeps the size its host set.
+	// With m_headlessRender, the host chose m_xResolution/m_yResolution before init (the size of
+	// its observation images), and neither GameData.ini nor the user's Options.ini Resolution,
+	// which the parse below applies and which may be shared with other processes or the game,
+	// may replace it: they are restored in memory at the end instead of pinned on disk.
+	const Bool keepRenderSize = TheWritableGlobalData != nullptr && TheWritableGlobalData->m_headlessRender;
+	const Int renderXResolution = keepRenderSize ? TheWritableGlobalData->m_xResolution : 0;
+	const Int renderYResolution = keepRenderSize ? TheWritableGlobalData->m_yResolution : 0;
+
 	if( TheWritableGlobalData && ini->getLoadType() != INI_LOAD_MULTIFILE)
 	{
 
@@ -1293,6 +1302,12 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 
 	TheWritableGlobalData->m_xResolution = xres;
 	TheWritableGlobalData->m_yResolution = yres;
+
+	if (keepRenderSize)
+	{
+		TheWritableGlobalData->m_xResolution = renderXResolution;
+		TheWritableGlobalData->m_yResolution = renderYResolution;
+	}
 }
 
 void GlobalData::parseCustomDefinition()
