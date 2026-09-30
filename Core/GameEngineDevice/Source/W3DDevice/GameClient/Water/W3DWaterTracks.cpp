@@ -625,6 +625,10 @@ WaterTracksRenderSystem::~WaterTracksRenderSystem()
 
 	m_vertexMaterialClass=nullptr;
 
+	// GeneralsX @bugfix cemlyn007 30/09/2026 Forget the singleton the constructor set: it was left dangling
+	// in the engine's context after a rendering engine's shutdown (PLAN-023 Phase 8, stage RR0a).
+	if (TheWaterTracksRenderSystem == this)
+		TheWaterTracksRenderSystem = nullptr;
 }
 
 //=============================================================================
