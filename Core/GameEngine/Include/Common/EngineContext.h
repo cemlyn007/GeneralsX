@@ -95,6 +95,7 @@ class RTS2DScene;
 class RTS3DInterfaceScene;
 class W3DAssetManager;
 class WW3DAssetManager;
+struct W3DRenderState;
 
 namespace rts
 {
@@ -207,13 +208,20 @@ struct RTS_ENGINE_CONTEXT_API EngineContext
 	// race the renderer's scene (PLAN-023 Phase 8, stage RR0a).
 	int drawableModelLockCount = 0;
 
-	// GeneralsX @bugfix cemlyn007 30/09/2026 Whether this engine created the process's render device
-	// (set by DX8Wrapper::Init, cleared by DX8Wrapper::Shutdown). DX8Wrapper's device state is still
-	// process-wide, so DX8Wrapper::Is_Initted, _Get_D3D_Device8 and Get_Current_Caps answer false/null
-	// for every other engine, as in a headless solo run: a headless engine beside the renderer must not
-	// reach its device or its caps (MissingTexture's lazy texture, the texture format choices; PLAN-023
-	// Phase 8, stage RR0a).
-	bool ownsRenderDevice = false;
+	// GeneralsX @feature cemlyn007 30/09/2026 This engine's DX8Wrapper state (WW3D2/w3drenderstate.h): its Direct3D
+	// interface and device, caps, render targets, cached states and statistics. DX8Wrapper::Init allocates it
+	// (Set_Display_Size_Provider, just before, too), DX8Wrapper::Shutdown frees it, and it is null for an engine
+	// that does not render. DX8Wrapper reads W3DRenderState::Defaults (no device, IsInitted false) while it is
+	// null, so a headless engine beside a renderer never reaches the renderer's device or caps and answers as in
+	// a headless solo run (this replaces RR0a's ownsRenderDevice flag). A direct field, not a slot: DX8Wrapper's
+	// inline state-cache setters are on the draw's hot path (PLAN-023 Phase 8, stage RR2a-1).
+	::W3DRenderState* w3dRender = nullptr;
+
+	// GeneralsX @feature cemlyn007 30/09/2026 DX8Wrapper_HeadlessRender and DX8Wrapper_PreserveFPU (dx8wrapper.h):
+	// the host's (and -preserveFPU's) switches for this engine's render device, set before its boot creates the
+	// device, so before w3dRender exists (PLAN-023 Phase 8, stage RR2a-1).
+	bool dx8HeadlessRender = false;
+	int dx8PreserveFPU = 0;
 
 	// Per-engine slot objects, by allocateEngineSlotIndex() index; null until set.
 	void* getSlot(std::size_t index) const;
@@ -439,6 +447,79 @@ struct ContextField
 	T& operator-=(const U& value) const noexcept
 	{
 		return ctx()->*Field -= value;
+	}
+};
+
+// GeneralsX @feature cemlyn007 30/09/2026 ContextField's indirect variant (PLAN-023 Phase 8, stage RR2a-1): state
+// that a direct EngineContext field points to (`S* EngineContext::*Pointer`, allocated only for some engines),
+// read through that pointer, or through `Defaults` (an S with every field at its default) while it is null.
+template <typename S, S* EngineContext::*Pointer, S& Defaults>
+inline S& indirectContext() noexcept
+{
+	S* const state = ctx()->*Pointer;
+	return state != nullptr ? *state : Defaults;
+}
+
+// A stand-in for a class's static data member that moved into such a struct (member `Field`), declared as
+// `static constexpr rts::IndirectContextField<S, &rts::EngineContext::p, S::Defaults, T, &S::name> name{};`.
+// Like ContextField: the upstream reads, assignments, `->` and comparisons compile unchanged, but `sizeof` and
+// `&` give the stand-in's size and address, not the field's (scripts/cpp/engine_context_standins.py fails on
+// those), so a name used that way, or with `.`, needs a reference-returning macro instead. An array field also
+// takes `[]` and decays to a pointer to its first element.
+template <typename S, S* EngineContext::*Pointer, S& Defaults, typename T, T S::*Field>
+struct IndirectContextField
+{
+	static T& get() noexcept
+	{
+		return indirectContext<S, Pointer, Defaults>().*Field;
+	}
+	operator T&() const noexcept
+	{
+		return get();
+	}
+	T operator->() const noexcept
+	{
+		return get();
+	}
+	const IndirectContextField& operator=(T value) const noexcept
+	{
+		get() = value;
+		return *this;
+	}
+	T& operator++() const noexcept
+	{
+		return ++get();
+	}
+	T operator++(int) const noexcept
+	{
+		return get()++;
+	}
+	template <typename U>
+	T& operator+=(const U& value) const noexcept
+	{
+		return get() += value;
+	}
+	template <typename U>
+	T& operator-=(const U& value) const noexcept
+	{
+		return get() -= value;
+	}
+};
+
+template <typename S, S* EngineContext::*Pointer, S& Defaults, typename E, std::size_t N, E (S::*Field)[N]>
+struct IndirectContextField<S, Pointer, Defaults, E[N], Field>
+{
+	static E (&get() noexcept)[N]
+	{
+		return indirectContext<S, Pointer, Defaults>().*Field;
+	}
+	operator E*() const noexcept
+	{
+		return get();
+	}
+	E& operator[](std::size_t index) const noexcept
+	{
+		return get()[index];
 	}
 };
 

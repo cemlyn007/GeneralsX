@@ -187,6 +187,8 @@ std::size_t EngineContext::forEachLiveSingleton(void (*visit)(const char* name, 
 	RTS_ENGINE_CONTEXT_POINTER(w3dDisplay3DInterfaceScene)
 	RTS_ENGINE_CONTEXT_POINTER(w3dDisplayAssetManager)
 	RTS_ENGINE_CONTEXT_POINTER(ww3dAssetManager)
+	// GeneralsX @feature cemlyn007 30/09/2026 Freed by DX8Wrapper::Shutdown (PLAN-023 Phase 8, stage RR2a-1).
+	RTS_ENGINE_CONTEXT_POINTER(w3dRender)
 #undef RTS_ENGINE_CONTEXT_POINTER
 	return live;
 }
