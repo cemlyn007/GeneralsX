@@ -150,6 +150,12 @@ extern bool _DX8SingleThreaded;
 // RL embed reads back (it never presents).
 extern bool DX8Wrapper_HeadlessRender;
 
+// GeneralsX @feature cemlyn007 30/09/2026 Called, when set, just before DX8Wrapper drops its last reference to a
+// render device (Release_Device) or to its Direct3D interface (Shutdown), with what it releases (PLAN-023 Phase 8,
+// stage RR1). An embedding host running several engines checks there that the release is serialised with its
+// other engines' device creation (rlgenerals asserts its process mutex is held). Set once, before any device.
+extern void (*DX8Wrapper_FinalReleaseHook)(const char* what);
+
 void DX8_Assert();
 void Log_DX8_ErrorCode(unsigned res);
 
