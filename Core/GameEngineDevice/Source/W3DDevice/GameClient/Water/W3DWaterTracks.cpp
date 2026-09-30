@@ -1092,7 +1092,8 @@ void WaterTracksRenderSystem::loadTracks()
 Will need to move this code to an external editor at some pont. */
 #include "GameClient/Display.h"
 
-extern HWND ApplicationHWnd;
+// GeneralsX @refactor cemlyn007 30/09/2026 The window handles (PLAN-023 Phase 8, stage RR2a-2).
+#include "Common/ApplicationWindow.h"
 
 //TODO: Fix editor so it actually draws the wave segment instead of line while editing
 //Could freeze all the water while editing?  Or keep setting elapsed time on current segment.

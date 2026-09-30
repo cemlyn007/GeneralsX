@@ -170,6 +170,26 @@ float															WW3D::FractionalSyncMs = 0.0f;
 unsigned int											WW3D::SyncTime = 0;
 unsigned int											WW3D::PreviousSyncTime = 0;
 #endif
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 30/09/2026 WW3D's statics are the current engine's WW3DState fields (ww3d.h; PLAN-023
+// Phase 8, stage RR2a-2), with the upstream initial values below.
+WW3DState WW3DState::Defaults;
+
+WW3DState::WW3DState()
+	: DefaultDebugShader(DEFAULT_DEBUG_SHADER_BITS),
+	  LightmapDebugShader(LIGHTMAP_DEBUG_SHADER_BITS),
+	  TextureFilter(TextureFilterClass::TextureFilterMode::TEXTURE_FILTER_BILINEAR),
+	  AnisotropyLevel(TextureFilterClass::AnisotropicFilterMode::TEXTURE_FILTER_ANISOTROPIC_2X)
+{
+}
+
+// The file statics, as the engine's fields.
+#define _Hwnd (reinterpret_cast<HWND&>(WW3D_State()._Hwnd))
+#define _TextureReduction (WW3D_State()._TextureReduction)
+#define _TextureMinDim (WW3D_State()._TextureMinDim)
+#define _LargeTextureExtraReductionEnabled (WW3D_State()._LargeTextureExtraReductionEnabled)
+static_assert(sizeof(HWND) == sizeof(void*), "WW3DState::_Hwnd holds an HWND");
+#else
 bool														WW3D::IsSortingEnabled = true;
 
 float														WW3D::PixelCenterX = 0.0f;
@@ -235,6 +255,7 @@ int														WW3D::TextureFilter = TextureFilterClass::TextureFilterMode::TE
 int														WW3D::AnisotropyLevel = TextureFilterClass::AnisotropicFilterMode::TEXTURE_FILTER_ANISOTROPIC_2X;
 
 bool														WW3D::Lite = false;
+#endif
 
 /**********************************************************************************
 **
@@ -273,6 +294,11 @@ void WW3D::Set_NPatches_Level(unsigned level)
  *=============================================================================================*/
 WW3DErrorType WW3D::Init(void *hwnd, char *defaultpal, bool lite)
 {
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 30/09/2026 This engine's render state (WW3D's and DX8Wrapper's), before the first
+	// write below; freed at the end of Shutdown (PLAN-023 Phase 8, stage RR2a-2).
+	DX8Wrapper::Create_Render_State();
+#endif
 	assert(IsInitted == false);
 	WWDEBUG_SAY(("WW3D::Init hwnd = %p",hwnd));
 	_Hwnd = (HWND)hwnd;
@@ -342,6 +368,13 @@ WW3DErrorType WW3D::Init(void *hwnd, char *defaultpal, bool lite)
  *=============================================================================================*/
 WW3DErrorType WW3D::Shutdown()
 {
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 30/09/2026 Nothing to shut down without a render state (PLAN-023 Phase 8, stage
+	// RR2a-2): an engine that never rendered, or a second Shutdown (W3DDisplay's failed init, then its destructor).
+	// The defaults are never written.
+	if (::rts::ctx()->ww3dState == nullptr)
+		return WW3D_ERROR_OK;
+#endif
 	assert(Lite || IsInitted == true);
 //	WWDEBUG_SAY(("WW3D::Shutdown"));
 
@@ -391,6 +424,11 @@ WW3DErrorType WW3D::Shutdown()
 	AnimatedSoundMgrClass::Shutdown ();
 
 	IsInitted = false;
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 30/09/2026 The engine's render state goes last, WW3D's own with DX8Wrapper's
+	// (PLAN-023 Phase 8, stage RR2a-2): a later Init starts fresh ones, as a fresh process did.
+	DX8Wrapper::Destroy_Render_State();
+#endif
 	return WW3D_ERROR_OK;
 }
 
@@ -1357,7 +1395,12 @@ void WW3D::Make_Screen_Shot( const char * filename_base , const float gamma, con
 			break;
 	}
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 30/09/2026 The engine's (PLAN-023 Phase 8, stage RR2a-2).
+	int& frame_number = WW3D_State().ScreenShotFrameNumber;
+#else
 	static int frame_number = 1;
+#endif
 
 	bool done = false;
 	while (!done) {

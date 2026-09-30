@@ -2,8 +2,9 @@
 # GeneralsX @feature cemlyn007 30/09/2026 The sizeof/& gate for EngineContext stand-ins (PLAN-023 Phase 8, stage RR2a-1)
 #
 # With RTS_ENGINE_CONTEXT, a class's static data member can become a stand-in for a per-engine field:
-# `static constexpr rts::ContextField<T, &rts::EngineContext::field> name{};` or its indirect variant,
-# `rts::IndirectContextField<...>` (Core/GameEngine/Include/Common/EngineContext.h). A stand-in is an empty
+# `static constexpr rts::ContextField<T, &rts::EngineContext::field> name{};`, its indirect variant,
+# `rts::IndirectContextField<...>`, or its accessor variant, `rts::AccessorContextField<...>` (RR2a-2: WW3D's names;
+# Core/GameEngine/Include/Common/EngineContext.h). A stand-in is an empty
 # object that converts to the field, so reads, assignments and comparisons compile unchanged, and so do
 # `sizeof(name)` and `&name`, which then give the stand-in's size and address, not the field's. This fails on
 # either use of any stand-in, so a name used that way is caught at review time (it needs a reference-returning
@@ -26,7 +27,7 @@ SOURCE_DIRS = ("Core", "Generals", "GeneralsMD")
 SOURCE_EXTENSIONS = (".h", ".hpp", ".inl", ".cpp", ".cc")
 
 STANDIN = re.compile(
-    r"static\s+constexpr\s+(?:::)?rts::(?:Indirect)?ContextField\s*<(?P<args>.*?)>\s*(?P<name>\w+)\s*\{\s*\}\s*;",
+    r"static\s+constexpr\s+(?:::)?rts::(?:Indirect|Accessor)?ContextField\s*<(?P<args>.*?)>\s*(?P<name>\w+)\s*\{\s*\}\s*;",
     re.S,
 )
 CLASS = re.compile(r"^\s*(?:class|struct)\s+(?:\w+\s+)*?(?P<name>\w+)\s*(?::[^;{]*)?\{", re.M)

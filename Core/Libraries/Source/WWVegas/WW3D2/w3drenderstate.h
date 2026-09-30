@@ -20,17 +20,19 @@
 //
 // DX8Wrapper's mutable statics (its Direct3D interface and device, the caps, the presentation parameters, the
 // render targets, the cached render and texture-stage states, transforms and lights, the pillarbox, the frame
-// statistics) and Debug_Statistics' counters, as one struct. With RTS_ENGINE_CONTEXT each rendering engine owns
-// one, rts::EngineContext::w3dRender: DX8Wrapper::Init (or Set_Display_Size_Provider, which W3DDisplay::init
-// calls just before it) allocates it, DX8Wrapper::Shutdown frees it, and it stays null for an engine that never
-// renders. Several engines can then each drive their own device, and a headless engine never reaches a
+// statistics), Debug_Statistics' counters and ShaderClass's device state (RR2a-2), as one struct. With
+// RTS_ENGINE_CONTEXT each rendering engine owns one, rts::EngineContext::w3dRender: WW3D::Init (or
+// Set_Display_Size_Provider, which W3DDisplay::init calls just before it, or DX8Wrapper::Init) allocates it, the end
+// of WW3D::Shutdown frees it (RR2a-2, with the engine's WW3DState: ww3d.h), and it stays null for an engine that
+// never renders. Several engines can then each drive their own device, and a headless engine never reaches a
 // renderer's device or caps.
 //
 // The upstream names are unchanged: inside DX8Wrapper (dx8wrapper.h and dx8wrapper.cpp) each is a macro for the
 // current engine's field (w3drenderstate_names.h), or, where the name is also a member of another class used
 // there (BitDepth, Textures), an rts::IndirectContextField stand-in. An engine with no render state reads
 // W3DRenderState::Defaults, every field at its upstream initial value (IsInitted false, no device, no caps),
-// which is what a headless engine read from the statics before.
+// which is what a headless engine read from the statics before. Nothing may write the defaults: the struct is page
+// aligned, so they fill whole pages of their own, which W3D_Protect_Render_Defaults makes read-only (RR2a-2).
 //
 // Part of dx8wrapper.h, which includes it once the types below are declared: include dx8wrapper.h, not this.
 #pragma once
@@ -102,7 +104,7 @@ struct DebugStatisticsState
 // The fields keep the statics' names and upstream initial values. It has no user-provided constructor, so
 // `new W3DRenderState()` zero-initialises it before the member initialisers and constructors run, exactly as a
 // static's storage was: a fresh engine starts where a fresh process started.
-struct RTS_ENGINE_CONTEXT_API W3DRenderState
+struct RTS_ENGINE_CONTEXT_API alignas(::rts::renderStateAlignment) W3DRenderState
 {
 	// dx8wrapper.cpp's DEFAULT_RESOLUTION_WIDTH, ... (checked there).
 	static constexpr int DefaultResolutionWidth = 640;
@@ -210,7 +212,22 @@ struct RTS_ENGINE_CONTEXT_API W3DRenderState
 
 	// statistics.cpp's.
 	DebugStatisticsState DebugStatistics;
+
+	// GeneralsX @feature cemlyn007 30/09/2026 ShaderClass's device state (shader.cpp; PLAN-023 Phase 8, stage
+	// RR2a-2): the shader last applied to this engine's device, whether it must be applied in full, and the cull
+	// mode (a D3DCULL).
+	bool ShaderDirty = true;
+	unsigned long CurrentShader;
+	unsigned long _PolygonCullMode = D3DCULL_CW;
 };
+
+// GeneralsX @feature cemlyn007 30/09/2026 Makes the pages of W3DRenderState::Defaults and WW3DState::Defaults
+// read-only (or writable again), so that a write to them, which would leak one engine's render state into every
+// engine without one, faults where it happens instead of passing unseen (PLAN-023 Phase 8, stage RR2a-2). An
+// embedding host calls it once, before any engine boots; the first call also registers an exit handler that makes
+// them writable again for their static destructors. Returns false where it cannot (a page size that does not divide
+// rts::renderStateAlignment, or no mprotect: Windows).
+RTS_ENGINE_CONTEXT_API bool W3D_Protect_Render_Defaults(bool readOnly);
 
 // The current engine's render state, or W3DRenderState::Defaults for an engine that has none.
 inline W3DRenderState& W3D_Render_State() noexcept
