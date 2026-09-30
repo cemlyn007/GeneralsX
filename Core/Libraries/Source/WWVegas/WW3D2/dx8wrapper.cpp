@@ -498,7 +498,11 @@ DX8_Stats	 DX8Wrapper::stats;
 // changed since last frame and reconfigures pillarbox accordingly.
 void DX8Wrapper::Pillarbox_Process_Resize()
 {
-	if (!D3DDevice) return;
+	// GeneralsX @bugfix cemlyn007 30/09/2026 Through the accessor, which is null for every engine but the one
+	// that owns the device: W3DDisplay::draw calls this first thing on headless engines too, which read the
+	// renderer's device (and could reset it) from their own threads (PLAN-023 Phase 8, stage RR0a; found by
+	// ThreadSanitizer).
+	if (!_Get_D3D_Device8()) return;
 
 	int physW = 0, physH = 0;
 	float density = 1.0f;
@@ -690,6 +694,10 @@ bool DX8Wrapper::Init(void * hwnd, bool lite)
 			return(false);
 		}
 		IsInitted = true;
+#if RTS_ENGINE_CONTEXT
+		// GeneralsX @bugfix cemlyn007 30/09/2026 This engine owns the render device (PLAN-023 Phase 8, stage RR0a).
+		::rts::ctx()->ownsRenderDevice = true;
+#endif
 
 		/*
 		** Enumerate the available devices
@@ -740,6 +748,9 @@ void DX8Wrapper::Shutdown()
 
 	DX8Caps::Shutdown();
 	IsInitted = false;		// 010803 srj
+#if RTS_ENGINE_CONTEXT
+	::rts::ctx()->ownsRenderDevice = false;
+#endif
 }
 
 void DX8Wrapper::Do_Onetime_Device_Dependent_Inits()

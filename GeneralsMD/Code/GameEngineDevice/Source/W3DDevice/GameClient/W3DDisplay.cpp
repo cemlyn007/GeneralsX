@@ -482,10 +482,16 @@ W3DDisplay::~W3DDisplay()
 	for (Int j=0; j<LightEnvironmentClass::MAX_LIGHTS; j++)
 		REF_PTR_RELEASE( m_myLight[j] );
 
-	PredictiveLODOptimizerClass::Free();
+	// GeneralsX @bugfix cemlyn007 30/09/2026 Only an engine that renders frees the predictive LOD arrays and
+	// the render statistics' string: both are process-wide, and only the render path (Prepare_LOD, End_Statistics)
+	// fills them, so a headless engine's teardown freed them under the rendering engine beside it (PLAN-023
+	// Phase 8, stage RR0a; found by ThreadSanitizer).
+	if (!TheGlobalData->m_headless || TheGlobalData->m_headlessRender)
+		PredictiveLODOptimizerClass::Free();
 
 	// shutdown
-	Debug_Statistics::Shutdown_Statistics();
+	if (!TheGlobalData->m_headless || TheGlobalData->m_headlessRender)
+		Debug_Statistics::Shutdown_Statistics();
 	if (!TheGlobalData->m_headless || TheGlobalData->m_headlessRender)
 		W3DShaderManager::shutdown();
 	m_assetManager->Free_Assets();

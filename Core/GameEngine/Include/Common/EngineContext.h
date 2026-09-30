@@ -200,6 +200,21 @@ struct RTS_ENGINE_CONTEXT_API EngineContext
 	// failed init, then its destructor) releases only its own count, never another live engine's.
 	bool wwMathInitialized = false;
 
+	// GeneralsX @bugfix cemlyn007 30/09/2026 Drawable::s_modelLockCount (Drawable.cpp, under
+	// DIRTY_CONDITION_FLAGS): the depth of this engine's scene iterations that lock its drawables' dirty
+	// model state (StDrawableDirtyStuffLocker in W3DScene.cpp). Only a rendering engine locks, but every
+	// engine's Drawable::getDrawModules reads it, so one process-wide count let a headless engine's reads
+	// race the renderer's scene (PLAN-023 Phase 8, stage RR0a).
+	int drawableModelLockCount = 0;
+
+	// GeneralsX @bugfix cemlyn007 30/09/2026 Whether this engine created the process's render device
+	// (set by DX8Wrapper::Init, cleared by DX8Wrapper::Shutdown). DX8Wrapper's device state is still
+	// process-wide, so DX8Wrapper::Is_Initted, _Get_D3D_Device8 and Get_Current_Caps answer false/null
+	// for every other engine, as in a headless solo run: a headless engine beside the renderer must not
+	// reach its device or its caps (MissingTexture's lazy texture, the texture format choices; PLAN-023
+	// Phase 8, stage RR0a).
+	bool ownsRenderDevice = false;
+
 	// Per-engine slot objects, by allocateEngineSlotIndex() index; null until set.
 	void* getSlot(std::size_t index) const;
 	// Stores a slot object that this context owns and destroys with `destroy`. The index must not be set.
