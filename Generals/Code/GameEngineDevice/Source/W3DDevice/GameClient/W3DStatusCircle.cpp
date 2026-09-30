@@ -66,7 +66,9 @@
 #define VERTS_IN_BLOCK_ROW			(VERTEX_BUFFER_TILE_LENGTH+1)
 
 
-static ShaderClass detailOpaqueShader(SC_ALPHA);
+// GeneralsX @bugfix cemlyn007 30/09/2026 const, so these stay read-only data whatever the optimiser does (PLAN-023
+// Phase 8, stage RR2b).
+static const ShaderClass detailOpaqueShader(SC_ALPHA);
 Bool W3DStatusCircle::m_needUpdate;
 Int W3DStatusCircle::m_diffuse=255; // blue.
 

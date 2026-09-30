@@ -91,6 +91,62 @@
 
 // Upgraded to DX8 2/2/01 HY
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 30/09/2026 Per engine (PLAN-023 Phase 8, stage RR2b): what _Init makes on the render
+// engine's own device and _Shutdown frees (the orientation and frame tables, the point material, the index buffers)
+// and the render scratch (the 'compressed' and transformed arrays, the vertex arrays). The class statics and the
+// file globals of the same names become fields of this engine's PointGroupState.
+namespace
+{
+struct PointGroupState
+{
+	Vector3 _TriVertexLocationOrientationTable[256][3];
+	Vector3 _QuadVertexLocationOrientationTable[256][4];
+	Vector2* _TriVertexUVFrameTable[5] = { nullptr, nullptr, nullptr, nullptr, nullptr };
+	Vector2* _QuadVertexUVFrameTable[5] = { nullptr, nullptr, nullptr, nullptr, nullptr };
+	VertexMaterialClass* PointMaterial = nullptr;
+
+	// Static arrays for intermediate calcs (never resized down, just up):
+	VectorClass<Vector3> compressed_loc;
+	VectorClass<Vector4> compressed_diffuse;
+	VectorClass<float> compressed_size;
+	VectorClass<unsigned char> compressed_orient;
+	VectorClass<unsigned char> compressed_frame;
+	VectorClass<Vector3> transformed_loc;
+
+	VectorClass<Vector3> VertexLoc;
+	VectorClass<Vector4> VertexDiffuse;
+	VectorClass<Vector2> VertexUV;
+
+	DX8IndexBufferClass* Tris = nullptr;
+	DX8IndexBufferClass* Quads = nullptr;
+	SortingIndexBufferClass* SortingTris = nullptr;
+	SortingIndexBufferClass* SortingQuads = nullptr;
+
+	SimpleVecClass<unsigned long> remap;
+};
+rts::PerEngineStatic<PointGroupState> PointGroupState_perEngine;
+} // namespace
+#define _TriVertexLocationOrientationTable (PointGroupState_perEngine.get()._TriVertexLocationOrientationTable)
+#define _QuadVertexLocationOrientationTable (PointGroupState_perEngine.get()._QuadVertexLocationOrientationTable)
+#define _TriVertexUVFrameTable (PointGroupState_perEngine.get()._TriVertexUVFrameTable)
+#define _QuadVertexUVFrameTable (PointGroupState_perEngine.get()._QuadVertexUVFrameTable)
+#define PointMaterial (PointGroupState_perEngine.get().PointMaterial)
+#define compressed_loc (PointGroupState_perEngine.get().compressed_loc)
+#define compressed_diffuse (PointGroupState_perEngine.get().compressed_diffuse)
+#define compressed_size (PointGroupState_perEngine.get().compressed_size)
+#define compressed_orient (PointGroupState_perEngine.get().compressed_orient)
+#define compressed_frame (PointGroupState_perEngine.get().compressed_frame)
+#define transformed_loc (PointGroupState_perEngine.get().transformed_loc)
+#define VertexLoc (PointGroupState_perEngine.get().VertexLoc)
+#define VertexDiffuse (PointGroupState_perEngine.get().VertexDiffuse)
+#define VertexUV (PointGroupState_perEngine.get().VertexUV)
+#define Tris (PointGroupState_perEngine.get().Tris)
+#define Quads (PointGroupState_perEngine.get().Quads)
+#define SortingTris (PointGroupState_perEngine.get().SortingTris)
+#define SortingQuads (PointGroupState_perEngine.get().SortingQuads)
+#define remap (PointGroupState_perEngine.get().remap)
+#else
 // static data members
 Vector3 PointGroupClass::_TriVertexLocationOrientationTable[256][3];
 Vector3 PointGroupClass::_QuadVertexLocationOrientationTable[256][4];
@@ -105,6 +161,7 @@ VectorClass<float>			PointGroupClass::compressed_size;		// point sizes 'compress
 VectorClass<unsigned char>	PointGroupClass::compressed_orient;	// point orientations 'compressed' by APT
 VectorClass<unsigned char>	PointGroupClass::compressed_frame;		// point frames 'compressed' by APT
 VectorClass<Vector3>		PointGroupClass::transformed_loc;		// transformed point locations
+#endif
 
 // This array has vertex locations for screenspace mode - calculated to cover exactly 1x1 and 2x2 pixels.
 Vector3 PointGroupClass::_ScreenspaceVertexLocationSizeTable[2][3] =
@@ -121,10 +178,12 @@ Vector3 PointGroupClass::_ScreenspaceVertexLocationSizeTable[2][3] =
 static Vector3 GroundMultiplierX(1.0f, 0.0f, 0.0f);
 static Vector3 GroundMultiplierY(0.0f, 1.0f, 0.0f);
 
+#if !RTS_ENGINE_CONTEXT
 // Some internal variables
 VectorClass<Vector3>			VertexLoc;		// camera-space vertex locations
 VectorClass<Vector4>			VertexDiffuse;	// vertex diffuse/alpha colors
 VectorClass<Vector2>			VertexUV;		// vertex texture coords
+#endif
 
 // Some DX 8 variables
 #define MAX_VB_SIZE			2048
@@ -133,8 +192,10 @@ VectorClass<Vector2>			VertexUV;		// vertex texture coords
 #define MAX_QUAD_POINTS		MAX_VB_SIZE/4
 #define MAX_QUAD_IB_SIZE	6*MAX_QUAD_POINTS
 
+#if !RTS_ENGINE_CONTEXT
 DX8IndexBufferClass			*Tris, *Quads;						// Index buffers.
 SortingIndexBufferClass		*SortingTris, *SortingQuads;	// Sorting index buffers.
+#endif
 
 /**************************************************************************
  * PointGroupClass::PointGroupClass -- PointGroupClass CTor.              *
@@ -771,7 +832,9 @@ int PointGroupClass::Get_Polygon_Count()
  *   12/10/1998 NH  : Created.                                            *
  *   02/08/2001 HY  : Upgraded to DX8                                     *
  *========================================================================*/
+#if !RTS_ENGINE_CONTEXT
 static SimpleVecClass<unsigned long> remap;
+#endif
 void PointGroupClass::Render(RenderInfoClass &rinfo)
 {
 	/// @todo lorenzen asks: is particle culling in the shader perhaps faster than in DoParticles? Fix winding and find out...

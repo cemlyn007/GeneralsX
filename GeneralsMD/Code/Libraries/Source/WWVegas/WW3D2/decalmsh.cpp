@@ -175,8 +175,24 @@ void DecalPolyClass::Clip(const PlaneClass & plane,DecalPolyClass & dest) const
 	}
 }
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 30/09/2026 Per engine: the decal clipping polygons, filled and consumed
+// within one decal (PLAN-023 Phase 8, stage RR2b).
+namespace
+{
+struct DecalClipState
+{
+	DecalPolyClass _DecalPoly0;
+	DecalPolyClass _DecalPoly1;
+};
+rts::PerEngineStatic<DecalClipState> DecalClipState_perEngine;
+} // namespace
+#define _DecalPoly0 (DecalClipState_perEngine.get()._DecalPoly0)
+#define _DecalPoly1 (DecalClipState_perEngine.get()._DecalPoly1)
+#else
 static DecalPolyClass _DecalPoly0;
 static DecalPolyClass _DecalPoly1;
+#endif
 
 
 /*

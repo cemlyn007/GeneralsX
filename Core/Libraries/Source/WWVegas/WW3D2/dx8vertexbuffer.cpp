@@ -49,6 +49,45 @@
 
 #define DEFAULT_VB_SIZE 5000
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 30/09/2026 Per engine: the dynamic vertex buffers, their cursors and the buffer
+// statistics, so that each render engine draws through buffers made on its own device (PLAN-023 Phase 8, stage
+// RR2b). Do_Onetime_Device_Dependent_Shutdowns releases the buffers (_Deinit) as before.
+namespace
+{
+struct DynamicVertexBufferState
+{
+	bool _DynamicSortingVertexArrayInUse = false;
+	SortingVertexBufferClass* _DynamicSortingVertexArray = nullptr;
+	unsigned short _DynamicSortingVertexArraySize = 0;
+	unsigned short _DynamicSortingVertexArrayOffset = 0;
+
+	bool _DynamicDX8VertexBufferInUse = false;
+	DX8VertexBufferClass* _DynamicDX8VertexBuffer = nullptr;
+	unsigned short _DynamicDX8VertexBufferSize = DEFAULT_VB_SIZE;
+	unsigned short _DynamicDX8VertexBufferOffset = 0;
+
+	int _DX8VertexBufferCount = 0;
+
+	int _VertexBufferCount = 0;
+	int _VertexBufferTotalVertices = 0;
+	int _VertexBufferTotalSize = 0;
+};
+rts::PerEngineStatic<DynamicVertexBufferState> DynamicVertexBufferState_perEngine;
+} // namespace
+#define _DynamicSortingVertexArrayInUse (DynamicVertexBufferState_perEngine.get()._DynamicSortingVertexArrayInUse)
+#define _DynamicSortingVertexArray (DynamicVertexBufferState_perEngine.get()._DynamicSortingVertexArray)
+#define _DynamicSortingVertexArraySize (DynamicVertexBufferState_perEngine.get()._DynamicSortingVertexArraySize)
+#define _DynamicSortingVertexArrayOffset (DynamicVertexBufferState_perEngine.get()._DynamicSortingVertexArrayOffset)
+#define _DynamicDX8VertexBufferInUse (DynamicVertexBufferState_perEngine.get()._DynamicDX8VertexBufferInUse)
+#define _DynamicDX8VertexBuffer (DynamicVertexBufferState_perEngine.get()._DynamicDX8VertexBuffer)
+#define _DynamicDX8VertexBufferSize (DynamicVertexBufferState_perEngine.get()._DynamicDX8VertexBufferSize)
+#define _DynamicDX8VertexBufferOffset (DynamicVertexBufferState_perEngine.get()._DynamicDX8VertexBufferOffset)
+#define _DX8VertexBufferCount (DynamicVertexBufferState_perEngine.get()._DX8VertexBufferCount)
+#define _VertexBufferCount (DynamicVertexBufferState_perEngine.get()._VertexBufferCount)
+#define _VertexBufferTotalVertices (DynamicVertexBufferState_perEngine.get()._VertexBufferTotalVertices)
+#define _VertexBufferTotalSize (DynamicVertexBufferState_perEngine.get()._VertexBufferTotalSize)
+#else
 static bool _DynamicSortingVertexArrayInUse=false;
 //static VertexFormatXYZNDUV2* _DynamicSortingVertexArray=nullptr;
 static SortingVertexBufferClass* _DynamicSortingVertexArray=nullptr;
@@ -60,13 +99,14 @@ static DX8VertexBufferClass* _DynamicDX8VertexBuffer=nullptr;
 static unsigned short _DynamicDX8VertexBufferSize=DEFAULT_VB_SIZE;
 static unsigned short _DynamicDX8VertexBufferOffset=0;
 
-static const FVFInfoClass _DynamicFVFInfo(dynamic_fvf_type);
-
 static int _DX8VertexBufferCount=0;
 
 static int _VertexBufferCount;
 static int _VertexBufferTotalVertices;
 static int _VertexBufferTotalSize;
+#endif
+
+static const FVFInfoClass _DynamicFVFInfo(dynamic_fvf_type);
 
 // ----------------------------------------------------------------------------
 //

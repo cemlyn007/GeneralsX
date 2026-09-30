@@ -269,11 +269,21 @@ void	LineGroupClass::Render(RenderInfoClass &rinfo)
 	const bool sort = (Shader.Get_Dst_Blend_Func() != ShaderClass::DSTBLEND_ZERO) && (Shader.Get_Alpha_Test() == ShaderClass::ALPHATEST_DISABLE) && (WW3D::Is_Sorting_Enabled());
 
 	// the 3 offsets in view space
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 30/09/2026 Locals: draw scratch, never shared between engines (PLAN-023 Phase 8,
+	// stage RR2b).
+	const Vector3 offset_a = Vector3(WWMath::Cos(WWMATH_PI / 2),			WWMath::Sin(WWMATH_PI /2 ), 0);
+	const Vector3 offset_b = Vector3(WWMath::Cos(7 * WWMATH_PI / 6),		WWMath::Sin(7 * WWMATH_PI / 6), 0);
+	const Vector3 offset_c = Vector3(WWMath::Cos(11 * WWMATH_PI / 6),	WWMath::Sin(11 * WWMATH_PI / 6), 0);
+
+	Vector3 offset[3];
+#else
 	const static Vector3 offset_a = Vector3(WWMath::Cos(WWMATH_PI / 2),			WWMath::Sin(WWMATH_PI /2 ), 0);
 	const static Vector3 offset_b = Vector3(WWMath::Cos(7 * WWMATH_PI / 6),		WWMath::Sin(7 * WWMATH_PI / 6), 0);
 	const static Vector3 offset_c = Vector3(WWMath::Cos(11 * WWMATH_PI / 6),	WWMath::Sin(11 * WWMATH_PI / 6), 0);
 
 	static Vector3 offset[3];
+#endif
 
 	offset[0].Set(offset_a);
 	offset[1].Set(offset_b);

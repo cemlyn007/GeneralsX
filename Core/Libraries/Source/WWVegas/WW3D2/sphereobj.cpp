@@ -92,16 +92,28 @@
 #include "visrasterizer.h"
 
 #if RTS_ENGINE_CONTEXT
-// GeneralsX @feature cemlyn007 28/09/2026 Built once per process, under std::call_once: the LOD meshes come from
-// constants, the same for every engine, and several engines may be the first (PLAN-023 Phase 3).
-#include <mutex>
-static std::once_flag Sphere_Array_Once;
+// GeneralsX @feature cemlyn007 30/09/2026 Per engine, made on the engine's first sphere: every sphere's draw sets its
+// alpha vector on the shared LOD meshes (Render), so they are draw state, not constants, and they take
+// the first sphere's alpha vector (PLAN-023 Phase 8, stage RR2b; Phase 3 had built them once per process).
+namespace
+{
+struct SphereMeshState
+{
+	bool Sphere_Array_Valid = false;
+	SphereMeshClass SphereMeshArray[SPHERE_NUM_LOD];
+	float SphereLODCosts[SPHERE_NUM_LOD + 1] = {}; // SPHERE_NUM_LOD doesn't include the null LOD
+};
+rts::PerEngineStatic<SphereMeshState> SphereMeshState_perEngine;
+} // namespace
+#define Sphere_Array_Valid (SphereMeshState_perEngine.get().Sphere_Array_Valid)
+#define SphereMeshArray (SphereMeshState_perEngine.get().SphereMeshArray)
+#define SphereLODCosts (SphereMeshState_perEngine.get().SphereLODCosts)
 #else
 static bool Sphere_Array_Valid = false;
-#endif
 
 SphereMeshClass SphereMeshArray[SPHERE_NUM_LOD];
 float SphereLODCosts[SPHERE_NUM_LOD + 1];	// SPHERE_NUM_LOD doesn't include the null LOD
+#endif
 
 
 /*
@@ -301,11 +313,7 @@ SphereRenderObjClass & SphereRenderObjClass::operator = (const SphereRenderObjCl
 void SphereRenderObjClass::Generate_Shared_Mesh_Arrays (const AlphaVectorStruct &alphavector)
 {
 	// Generate shared Mesh Arrays
-#if RTS_ENGINE_CONTEXT
-	std::call_once(Sphere_Array_Once, [&alphavector]() {
-#else
 	if (!Sphere_Array_Valid) {
-#endif
 
 		float size = SPHERE_LOWEST_LOD;
 		float step = (SPHERE_HIGHEST_LOD - SPHERE_LOWEST_LOD);
@@ -324,12 +332,8 @@ void SphereRenderObjClass::Generate_Shared_Mesh_Arrays (const AlphaVectorStruct 
 
 		}
 
-#if RTS_ENGINE_CONTEXT
-	});
-#else
 		Sphere_Array_Valid = true;
 	}
-#endif
 }
 
 

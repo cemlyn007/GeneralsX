@@ -246,8 +246,10 @@ void W3DTreeBuffer::W3DTreeTextureClass::Apply(unsigned int stage)
 	ShaderClass::ALPHATEST_ENABLE, ShaderClass::CULL_MODE_ENABLE, \
 	ShaderClass::DETAILCOLOR_DISABLE, ShaderClass::DETAILALPHA_DISABLE) )
 #endif
-static ShaderClass detailAlphaShader(SC_ALPHA_DETAIL);
-static ShaderClass detailAlphaShader2X(SC_ALPHA_DETAIL_2X);
+// GeneralsX @bugfix cemlyn007 30/09/2026 const, so these stay read-only data whatever the optimiser does (PLAN-023
+// Phase 8, stage RR2b).
+static const ShaderClass detailAlphaShader(SC_ALPHA_DETAIL);
+static const ShaderClass detailAlphaShader2X(SC_ALPHA_DETAIL_2X);
 
 
 /*

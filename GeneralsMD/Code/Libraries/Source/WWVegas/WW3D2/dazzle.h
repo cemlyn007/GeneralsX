@@ -251,7 +251,11 @@ class DazzleRenderObjClass : public RenderObjClass
 	float radius;	// Used to cast rays against
 	unsigned int creation_time;
 
+#if !RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 30/09/2026 With RTS_ENGINE_CONTEXT, per engine: dazzle.cpp (PLAN-023 Phase 8,
+	// stage RR2b).
 	static bool	_dazzle_rendering_enabled;
+#endif
 
 //	static void Draw_Debug_Dazzle(int idx);
 	void vis_render_dazzle(SpecialRenderInfoClass & rinfo);
@@ -327,8 +331,13 @@ public:
 	static void Install_Dazzle_Visibility_Handler(const DazzleVisibilityClass * visibility_handler);
 
 	// Globally disable/enable dazzle rendering
+#if RTS_ENGINE_CONTEXT
+	static void Enable_Dazzle_Rendering(bool onoff);
+	static bool Is_Dazzle_Rendering_Enabled();
+#else
 	static void Enable_Dazzle_Rendering(bool onoff) { _dazzle_rendering_enabled = onoff; }
 	static bool Is_Dazzle_Rendering_Enabled() { return _dazzle_rendering_enabled; }
+#endif
 };
 
 

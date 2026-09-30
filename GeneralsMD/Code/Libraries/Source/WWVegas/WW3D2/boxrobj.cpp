@@ -156,10 +156,30 @@ static Vector3						_BoxVertexNormals[NUM_BOX_VERTS] =
 
 
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 30/09/2026 Per engine: whether the box render system is up, its display mask and its
+// material, which the render engine's WW3D::Init (Init) makes and WW3D::Shutdown (Shutdown) frees. The shader is a
+// constant, set once (PLAN-023 Phase 8, stage RR2b).
+namespace
+{
+struct BoxRenderState
+{
+	bool IsInitted = false;
+	int DisplayMask = 0;
+	VertexMaterialClass* _BoxMaterial = nullptr;
+};
+rts::PerEngineStatic<BoxRenderState> BoxRenderState_perEngine;
+} // namespace
+#define IsInitted (BoxRenderState_perEngine.get().IsInitted)
+#define DisplayMask (BoxRenderState_perEngine.get().DisplayMask)
+#define _BoxMaterial (BoxRenderState_perEngine.get()._BoxMaterial)
+static const ShaderClass				_BoxShader = ShaderClass::_PresetAlphaSolidShader; //_PresetAdditiveSolidShader;
+#else
 bool										BoxRenderObjClass::IsInitted			= false;
 int										BoxRenderObjClass::DisplayMask		= 0;
 static VertexMaterialClass *		_BoxMaterial								= nullptr;
 static ShaderClass					_BoxShader;
+#endif
 
 
 /*
@@ -360,7 +380,9 @@ void BoxRenderObjClass::Init()
 	_BoxMaterial->Set_Opacity(1.0f);		// uses vertex alpha...
 	_BoxMaterial->Set_Shininess(0.0f);
 
+#if !RTS_ENGINE_CONTEXT
 	_BoxShader = ShaderClass::_PresetAlphaSolidShader; //_PresetAdditiveSolidShader;
+#endif
 
 	IsInitted = true;
 }
@@ -446,7 +468,11 @@ void BoxRenderObjClass::render_box(RenderInfoClass & rinfo,const Vector3 & cente
 	if (!IsInitted) return;
 	if (DisplayMask & Get_Collision_Type()) {
 
+#if RTS_ENGINE_CONTEXT
+		Vector3 verts[NUM_BOX_VERTS]; // GeneralsX @feature cemlyn007 30/09/2026 draw scratch, not shared (RR2b)
+#else
 		static Vector3 verts[NUM_BOX_VERTS];
+#endif
 
 		// compute the vertex positions
 		for (int ivert=0; ivert<NUM_BOX_VERTS; ivert++) {
@@ -534,7 +560,11 @@ void BoxRenderObjClass::vis_render_box(SpecialRenderInfoClass & rinfo,const Vect
 {
 	if (!IsInitted) return;
 
+#if RTS_ENGINE_CONTEXT
+	Vector3 verts[NUM_BOX_VERTS]; // GeneralsX @feature cemlyn007 30/09/2026 draw scratch, not shared (RR2b)
+#else
 	static Vector3 verts[NUM_BOX_VERTS];
+#endif
 
 	// compute the vertex positions
 	for (int ivert=0; ivert<NUM_BOX_VERTS; ivert++) {

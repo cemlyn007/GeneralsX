@@ -297,7 +297,7 @@ WW3DErrorType WW3D::Init(void *hwnd, char *defaultpal, bool lite)
 #if RTS_ENGINE_CONTEXT
 	// GeneralsX @feature cemlyn007 30/09/2026 This engine's render state (WW3D's and DX8Wrapper's), before the first
 	// write below; freed at the end of Shutdown (PLAN-023 Phase 8, stage RR2a-2).
-	DX8Wrapper::Create_Render_State();
+	DX8Wrapper::Create_Render_State(true);
 #endif
 	assert(IsInitted == false);
 	WWDEBUG_SAY(("WW3D::Init hwnd = %p",hwnd));

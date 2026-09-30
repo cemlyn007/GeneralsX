@@ -103,11 +103,16 @@ namespace rts
 {
 
 // GeneralsX @feature cemlyn007 30/09/2026 The alignment, and so the size granule, of the render states an engine's
-// w3dRender and ww3dState point to (W3DRenderState, WW3DState): the largest memory page size of the targets (16 KiB
-// on Apple silicon, 4 KiB on x86-64 Linux), so that their defaults fill whole pages of their own, which a host can
-// make read-only (W3D_Protect_Render_Defaults; PLAN-023 Phase 8, stage RR2a-2).
-#ifdef __APPLE__
+// w3dRender and ww3dState point to (W3DRenderState, WW3DState): the largest memory page size the target can run with
+// (16 KiB on Apple silicon; 64 KiB on 64-bit Arm, POWER and LoongArch Linux, whose kernels may be built with 4, 16 or
+// 64 KiB pages; 4 KiB on x86-64), so that their defaults fill whole pages of their own, which a host can make
+// read-only (W3D_Protect_Render_Defaults; PLAN-023 Phase 8, stage RR2a-2).
+// GeneralsX @bugfix cemlyn007 30/09/2026 64 KiB on those Linux targets, where 4 KiB made every protect fail on a
+// 16 or 64 KiB page kernel (PLAN-023 Phase 8, stage RR2b).
+#if defined(__APPLE__)
 inline constexpr std::size_t renderStateAlignment = 16384;
+#elif defined(__aarch64__) || defined(__powerpc64__) || defined(__loongarch64)
+inline constexpr std::size_t renderStateAlignment = 65536;
 #else
 inline constexpr std::size_t renderStateAlignment = 4096;
 #endif

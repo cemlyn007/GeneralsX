@@ -46,7 +46,14 @@
 #include "texture.h"
 #include "WWMath/vector2i.h"
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 30/09/2026 Per engine: the font image being minimised, so that two engines loading
+// fonts never swap surfaces (PLAN-023 Phase 8, stage RR2b).
+static rts::PerEngineStatic<SurfaceClass*> _surface_perEngine;
+#define _surface (_surface_perEngine.get())
+#else
 static	SurfaceClass	*_surface;
+#endif
 
 /***********************************************************************************************
  *                                                                                             *

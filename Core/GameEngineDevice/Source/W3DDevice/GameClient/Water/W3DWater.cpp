@@ -163,8 +163,10 @@ static inline DWORD F2DW( FLOAT f ) { return *((DWORD*)&f); }
 	ShaderClass::SRCBLEND_SRC_ALPHA, ShaderClass::DSTBLEND_ONE_MINUS_SRC_ALPHA, ShaderClass::FOG_DISABLE, ShaderClass::GRADIENT_MODULATE, ShaderClass::SECONDARY_GRADIENT_DISABLE, \
 	ShaderClass::TEXTURING_ENABLE, ShaderClass::ALPHATEST_DISABLE, ShaderClass::CULL_MODE_DISABLE, ShaderClass::DETAILCOLOR_DISABLE, ShaderClass::DETAILALPHA_DISABLE) )
 
-static ShaderClass zFillAlphaShader(SC_ZFILL_BLEND3);
-static ShaderClass blendStagesShader(SC_DETAIL_BLEND);
+// GeneralsX @bugfix cemlyn007 30/09/2026 const, so these stay read-only data whatever the optimiser does (PLAN-023
+// Phase 8, stage RR2b).
+static const ShaderClass zFillAlphaShader(SC_ZFILL_BLEND3);
+static const ShaderClass blendStagesShader(SC_DETAIL_BLEND);
 
 #if !RTS_ENGINE_CONTEXT
 WaterRenderObjClass *TheWaterRenderObj=nullptr; ///<global water rendering object

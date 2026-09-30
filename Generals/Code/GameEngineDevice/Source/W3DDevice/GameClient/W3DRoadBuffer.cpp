@@ -80,7 +80,9 @@ static const Real TEE_WIDTH_ADJUSTMENT = 1.03f;
 	ShaderClass::ALPHATEST_DISABLE, ShaderClass::CULL_MODE_ENABLE, \
 	ShaderClass::DETAILCOLOR_SCALE, ShaderClass::DETAILALPHA_DISABLE) )
 
-static ShaderClass detailAlphaShader(SC_ALPHA_DETAIL);
+// GeneralsX @bugfix cemlyn007 30/09/2026 const, so these stay read-only data whatever the optimiser does (PLAN-023
+// Phase 8, stage RR2b).
+static const ShaderClass detailAlphaShader(SC_ALPHA_DETAIL);
 
 
 #define SC_ALPHA_MIRROR ( SHADE_CNST(ShaderClass::PASS_LEQUAL, ShaderClass::DEPTH_WRITE_DISABLE, ShaderClass::COLOR_WRITE_ENABLE, ShaderClass::SRCBLEND_ONE, \
@@ -88,7 +90,9 @@ static ShaderClass detailAlphaShader(SC_ALPHA_DETAIL);
 	ShaderClass::ALPHATEST_DISABLE, ShaderClass::CULL_MODE_DISABLE, \
 	ShaderClass::DETAILCOLOR_DISABLE, ShaderClass::DETAILALPHA_DISABLE) )
 
-static ShaderClass detailShader(SC_ALPHA_MIRROR);
+// GeneralsX @bugfix cemlyn007 30/09/2026 const, so these stay read-only data whatever the optimiser does (PLAN-023
+// Phase 8, stage RR2b).
+static const ShaderClass detailShader(SC_ALPHA_MIRROR);
 
 
 // The radius of the center of the road is 1.5 - outer radius 2.0, inner radius 1.0.
