@@ -47,7 +47,12 @@
 
 
 Bool TheDebugIgnoreSyncErrors = FALSE;
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 30/09/2026 The engine's own (WW3D2/dx8wrapper.h; PLAN-023 Phase 8, stage RR2a-1).
+#define DX8Wrapper_PreserveFPU (::rts::ctx()->dx8PreserveFPU)
+#else
 extern Int DX8Wrapper_PreserveFPU;
+#endif
 
 #ifdef DEBUG_CRC
 Int TheCRCFirstFrameToLog = -1;
