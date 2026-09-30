@@ -987,6 +987,19 @@ bool DX8Wrapper::Create_Device()
 
 	dbgHelpGuard.deactivate();
 
+	// GeneralsX @feature cemlyn007 30/09/2026 The formats the device was made with, once per device
+	// (so once per engine): an embed host's windowless device must match its windowed one, since
+	// W3DWater's soft shore edge blends on destination alpha (PLAN-023 Phase 8, stage RR0c).
+	{
+		StringClass backbufferFormat;
+		StringClass depthFormat;
+		Get_Format_Name(_PresentParameters.BackBufferFormat, &backbufferFormat);
+		Get_Format_Name(_PresentParameters.AutoDepthStencilFormat, &depthFormat);
+		fprintf(stderr, "INFO: DX8Wrapper::Create_Device: window=%s BackBufferFormat=%s AutoDepthStencilFormat=%s %ux%u\n",
+			_Hwnd ? "yes" : "none", backbufferFormat.str(), depthFormat.str(),
+			(unsigned)_PresentParameters.BackBufferWidth, (unsigned)_PresentParameters.BackBufferHeight);
+	}
+
 	/*
 	** Initialize all subsystems
 	*/
@@ -1283,6 +1296,12 @@ void DX8Wrapper::Get_Format_Name(unsigned int format, StringClass *tex_format)
 
 void DX8Wrapper::Resize_And_Position_Window()
 {
+	// GeneralsX @feature cemlyn007 30/09/2026 A windowless device (a null _Hwnd: an embed host's image
+	// observations) has no window to size; its back buffer takes the resolution as it is (PLAN-023
+	// Phase 8, stage RR0c).
+	if (_Hwnd == nullptr)
+		return;
+
 	// Get the current dimensions of the 'render area' of the window
 	RECT rect = { 0 };
 	::GetClientRect (_Hwnd, &rect);
@@ -1430,7 +1449,13 @@ bool DX8Wrapper::Set_Render_Device(int dev, int width, int height, int bits, int
 
 		D3DDISPLAYMODE desktop_mode;
 		::ZeroMemory(&desktop_mode, sizeof(D3DDISPLAYMODE));
-		D3DInterface->GetAdapterDisplayMode( CurRenderDevice, &desktop_mode );
+		const HRESULT display_mode_result = D3DInterface->GetAdapterDisplayMode( CurRenderDevice, &desktop_mode );
+
+		// GeneralsX @feature cemlyn007 30/09/2026 A windowless device has no desktop to match: if the
+		// adapter reports no display mode, take the 32-bit format the promotion below expects from a
+		// desktop, so it keeps the same back buffer as a windowed one (PLAN-023 Phase 8, stage RR0c).
+		if (_Hwnd == nullptr && (FAILED(display_mode_result) || desktop_mode.Format == D3DFMT_UNKNOWN))
+			desktop_mode.Format = D3DFMT_X8R8G8B8;
 
 		DisplayFormat=_PresentParameters.BackBufferFormat = desktop_mode.Format;
 

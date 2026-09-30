@@ -360,6 +360,7 @@ W3DDisplay::W3DDisplay()
 	m_2DScene = nullptr;
 	m_3DInterfaceScene = nullptr;
 	m_averageFPS = TheGlobalData->m_framesPerSecondLimit;
+	m_loggedCooperativeLevel = FALSE;
 #if defined(RTS_DEBUG)
 	m_timerAtCumuFPSStart = 0;
 #endif
@@ -2035,7 +2036,14 @@ AGAIN:
 		}
 	}
 
-	WW3D::Update_Logic_Frame_Time(TheFramePacer->getLogicTimeStepMilliseconds());
+	// GeneralsX @bugfix cemlyn007 30/09/2026 Render-headless (an embed host's image observations) advances
+	// WW3D's clock only by the logic frames it draws. Every draw adds a frame's time to the clock's pending
+	// time, which the next Sync with a logic update takes in whole, so the draws the load screen and the
+	// start-of-game fade make while the map loads (paced by the wall clock: about 180,000-310,000 of them,
+	// fewer on a busy machine) set every animation's phase for the rest of the game, and the images of two
+	// runs of one game differed (PLAN-023 Phase 8, stage RR0c).
+	if (!(TheGlobalData->m_headless && TheGlobalData->m_headlessRender) || TheGameLogic->hasUpdated())
+		WW3D::Update_Logic_Frame_Time(TheFramePacer->getLogicTimeStepMilliseconds());
 
 	// TheSuperHackers @info This binds the WW3D update to the logic update.
 	WW3D::Sync(TheGameLogic->hasUpdated());
@@ -2056,7 +2064,17 @@ AGAIN:
 	do {
 
 		// update all views of the world - recomputes data which will affect drawing
-		if (DX8Wrapper::_Get_D3D_Device8() && (DX8Wrapper::_Get_D3D_Device8()->TestCooperativeLevel()) == D3D_OK)
+		// GeneralsX @feature cemlyn007 30/09/2026 The first result logged once per engine: whether a hidden
+		// or windowless device reports D3D_OK here (WW3D::Begin_Render skips the check for them) decides
+		// whether updateViews runs (PLAN-023 Phase 8, stage RR0c).
+		const HRESULT cooperativeLevel = DX8Wrapper::_Get_D3D_Device8() ? DX8Wrapper::_Get_D3D_Device8()->TestCooperativeLevel() : D3DERR_INVALIDCALL;
+		if (DX8Wrapper::_Get_D3D_Device8() && !m_loggedCooperativeLevel)
+		{
+			m_loggedCooperativeLevel = TRUE;
+			fprintf(stderr, "DEBUG: W3DDisplay::draw: TestCooperativeLevel = 0x%08x%s\n", (unsigned)cooperativeLevel,
+				cooperativeLevel == D3D_OK ? " (D3D_OK)" : "");
+		}
+		if (DX8Wrapper::_Get_D3D_Device8() && cooperativeLevel == D3D_OK)
 		{	//Checking if we have the device before updating views because the heightmap crashes otherwise while
 			//trying to refresh the visible terrain geometry.
 //			if(TheGlobalData->m_loadScreenRender != TRUE)
