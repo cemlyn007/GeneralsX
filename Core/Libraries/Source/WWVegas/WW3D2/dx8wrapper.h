@@ -301,7 +301,14 @@ public:
 	static void Do_Onetime_Device_Dependent_Shutdowns();
 
 	static bool Is_Device_Lost() { return IsDeviceLost; }
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @bugfix cemlyn007 30/09/2026 Only the engine that created the device sees it: every other
+	// engine gets false here and null from _Get_D3D_Device8, as in a headless solo run (PLAN-023 Phase 8,
+	// stage RR0a; see EngineContext::ownsRenderDevice).
+	static bool Is_Initted() { return IsInitted && ::rts::ctx()->ownsRenderDevice; }
+#else
 	static bool Is_Initted() { return IsInitted; }
+#endif
 
 	static bool Has_Stencil ();
 	static void Get_Format_Name(unsigned int format, StringClass *tex_format);
@@ -564,7 +571,12 @@ public:
 
 
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @bugfix cemlyn007 30/09/2026 Null for an engine that did not create the device (see Is_Initted).
+	static IDirect3DDevice8* _Get_D3D_Device8() { return ::rts::ctx()->ownsRenderDevice ? D3DDevice : nullptr; }
+#else
 	static IDirect3DDevice8* _Get_D3D_Device8() { return D3DDevice; }
+#endif
 	static IDirect3D8* _Get_D3D8() { return D3DInterface; }
 	/// Returns the display format - added by TR for video playback - not part of W3D
 	static WW3DFormat	getBackBufferFormat();
