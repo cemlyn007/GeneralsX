@@ -523,6 +523,45 @@ bool TexProjectClass::Is_Depth_Gradient_Enabled(bool onoff)
 	return Get_Flag(USE_DEPTH_GRADIENT);
 }
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 30/09/2026 Per engine: Init_Multiplicative's and Init_Additive's shaders. Each call
+// changes its shader before it copies it into the material pass, so they are scratch that carries over between calls,
+// as in a solo run. File statics, so that their slots are taken at static initialisation, not at the first call
+// (PLAN-023 Phase 8, stage RR2b).
+static rts::PerEngineStatic<ShaderClass> mult_shader_perEngine([](ShaderClass& shader) {
+	shader = ShaderClass(SHADE_CNST(
+		ShaderClass::PASS_LEQUAL,						//depth_compare,
+		ShaderClass::DEPTH_WRITE_DISABLE,			//depth_mask,
+		ShaderClass::COLOR_WRITE_ENABLE,				//color_mask,
+		ShaderClass::SRCBLEND_ZERO,					//src_blend,
+		ShaderClass::DSTBLEND_SRC_COLOR,				//dst_blend,
+		ShaderClass::FOG_DISABLE,						//fog,
+		ShaderClass::GRADIENT_ADD,						//pri_grad,
+		ShaderClass::SECONDARY_GRADIENT_DISABLE,	//sec_grad,
+		ShaderClass::TEXTURING_ENABLE,				//texture,
+		ShaderClass::ALPHATEST_DISABLE,				//alpha_test,
+		ShaderClass::CULL_MODE_ENABLE,				//cull mode
+		0,														//post_det_color,
+		0));
+});
+static rts::PerEngineStatic<ShaderClass> add_shader_perEngine([](ShaderClass& shader) {
+	shader = ShaderClass(SHADE_CNST(
+		ShaderClass::PASS_LEQUAL,						//depth_compare,
+		ShaderClass::DEPTH_WRITE_DISABLE,			//depth_mask,
+		ShaderClass::COLOR_WRITE_ENABLE,				//color_mask,
+		ShaderClass::SRCBLEND_ONE,						//src_blend,
+		ShaderClass::DSTBLEND_ONE,						//dst_blend,
+		ShaderClass::FOG_DISABLE,						//fog,
+		ShaderClass::GRADIENT_MODULATE,				//pri_grad,
+		ShaderClass::SECONDARY_GRADIENT_DISABLE,	//sec_grad,
+		ShaderClass::TEXTURING_ENABLE,				//texture,
+		ShaderClass::ALPHATEST_DISABLE,				//alpha_test,
+		ShaderClass::CULL_MODE_ENABLE,				//cullmode,
+		ShaderClass::DETAILCOLOR_DISABLE,			//post_det_color,
+		ShaderClass::DETAILALPHA_DISABLE));
+});
+#endif
+
 /***********************************************************************************************
  * TexProjectClass::Init_Multiplicative -- Initialize this to be a multiplicative texture proj *
  *                                                                                             *
@@ -545,6 +584,9 @@ void TexProjectClass::Init_Multiplicative()
 	/*
 	** Set up the shader
 	*/
+#if RTS_ENGINE_CONTEXT
+	ShaderClass& mult_shader = mult_shader_perEngine.get();
+#else
 	static ShaderClass mult_shader(		SHADE_CNST(	ShaderClass::PASS_LEQUAL,						//depth_compare,
 																	ShaderClass::DEPTH_WRITE_DISABLE,			//depth_mask,
 																	ShaderClass::COLOR_WRITE_ENABLE,				//color_mask,
@@ -559,6 +601,7 @@ void TexProjectClass::Init_Multiplicative()
 																	ShaderClass::CULL_MODE_ENABLE,				//cull mode
 																	0,														//post_det_color,
 																	0) );													//post_det_alpha
+#endif
 
 	if (WW3DAssetManager::Get_Instance()->Get_Activate_Fog_On_Load()) {
 		mult_shader.Enable_Fog ("TexProjectClass");
@@ -650,6 +693,9 @@ void TexProjectClass::Init_Additive()
 	/*
 	** Set up the shader
 	*/
+#if RTS_ENGINE_CONTEXT
+	ShaderClass& add_shader = add_shader_perEngine.get();
+#else
 	static ShaderClass add_shader(		SHADE_CNST(	ShaderClass::PASS_LEQUAL,						//depth_compare,
 																	ShaderClass::DEPTH_WRITE_DISABLE,			//depth_mask,
 																	ShaderClass::COLOR_WRITE_ENABLE,				//color_mask,
@@ -663,6 +709,7 @@ void TexProjectClass::Init_Additive()
 																	ShaderClass::CULL_MODE_ENABLE,				//cullmode,
 																	ShaderClass::DETAILCOLOR_DISABLE,			//post_det_color,
 																	ShaderClass::DETAILALPHA_DISABLE) );		//post_det_alpha
+#endif
 
 	if (WW3DAssetManager::Get_Instance()->Get_Activate_Fog_On_Load()) {
 		add_shader.Enable_Fog ("TexProjectClass");

@@ -58,7 +58,20 @@
 #include "WWDebug/wwmemlog.h"
 #include "assetmgr.h"
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 30/09/2026 Per engine: the screen rectangle each render engine sets for its device
+// (Set_Screen_Resolution, at DX8Wrapper::Init and every resolution change), so each engine's 2D draws scale to its
+// own image (PLAN-023 Phase 8, stage RR2b).
+static rts::PerEngineStatic<RectClass> ScreenResolution_perEngine([](RectClass& rect) { rect = RectClass(0, 0, 0, 0); });
+#define ScreenResolution (ScreenResolution_perEngine.get())
+
+const RectClass& Render2DClass::Get_Screen_Resolution()
+{
+	return ScreenResolution;
+}
+#else
 RectClass							Render2DClass::ScreenResolution( 0,0,0,0 );
+#endif
 
 
 /*

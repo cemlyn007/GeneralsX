@@ -262,7 +262,11 @@ private:
 	static void			Apply_Null();
 	unsigned long		Compute_CRC() const;
 
+#if !RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 30/09/2026 With RTS_ENGINE_CONTEXT, per engine: vertmaterial.cpp (PLAN-023 Phase 8,
+	// stage RR2b).
 	static VertexMaterialClass *Presets[PRESET_COUNT];
+#endif
 };
 
 inline void VertexMaterialClass::Set_Mapper(TextureMapperClass *mapper, int stage)

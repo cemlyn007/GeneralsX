@@ -126,11 +126,15 @@ static_assert(DEFAULT_MSAA == D3DMULTISAMPLE_NONE, "W3DRenderState's default MSA
 
 W3DRenderState W3DRenderState::Defaults;
 
-void DX8Wrapper::Create_Render_State()
+void DX8Wrapper::Create_Render_State(bool ownedByWW3D)
 {
 	::rts::EngineContext* const context = ::rts::ctx();
 	if (context->w3dRender == nullptr)
 		context->w3dRender = new W3DRenderState();
+	// GeneralsX @bugfix cemlyn007 30/09/2026 Who frees them: WW3D::Shutdown once WW3D::Init has taken them, Shutdown
+	// otherwise (PLAN-023 Phase 8, stage RR2b).
+	if (ownedByWW3D)
+		context->w3dRender->OwnedByWW3D = true;
 	// GeneralsX @feature cemlyn007 30/09/2026 WW3D's state comes and goes with DX8Wrapper's (PLAN-023 Phase 8, stage
 	// RR2a-2).
 	if (context->ww3dState == nullptr)
@@ -146,8 +150,16 @@ static bool Protect_Pages(void* object, std::size_t size, bool readOnly)
 	(void)readOnly;
 	return false;
 #else
+	// GeneralsX @bugfix cemlyn007 30/09/2026 A page larger than rts::renderStateAlignment cannot hold the defaults
+	// alone: say so (PLAN-023 Phase 8, stage RR2b).
 	const long pageSize = sysconf(_SC_PAGESIZE);
-	if (pageSize <= 0 || reinterpret_cast<std::uintptr_t>(object) % static_cast<std::uintptr_t>(pageSize) != 0 ||
+	if (pageSize <= 0 || static_cast<std::size_t>(pageSize) > ::rts::renderStateAlignment)
+	{
+		WWDEBUG_SAY(("W3D_Protect_Render_Defaults: page size %ld is larger than the render state alignment %u", pageSize,
+			(unsigned)::rts::renderStateAlignment));
+		return false;
+	}
+	if (reinterpret_cast<std::uintptr_t>(object) % static_cast<std::uintptr_t>(pageSize) != 0 ||
 		size % static_cast<std::size_t>(pageSize) != 0)
 		return false;
 	return mprotect(object, size, readOnly ? PROT_READ : PROT_READ | PROT_WRITE) == 0;
@@ -168,9 +180,16 @@ bool W3D_Protect_Render_Defaults(bool readOnly)
 		static std::once_flag s_exitHandlerOnce;
 		std::call_once(s_exitHandlerOnce, [] { std::atexit(Unprotect_Render_Defaults_At_Exit); });
 	}
-	const bool render = Protect_Pages(&W3DRenderState::Defaults, sizeof(W3DRenderState), readOnly);
-	const bool ww3d = Protect_Pages(&WW3DState::Defaults, sizeof(WW3DState), readOnly);
-	return render && ww3d;
+	// GeneralsX @bugfix cemlyn007 30/09/2026 All or nothing: when the second fails, the first is put back, so a
+	// failed call leaves both as they were (PLAN-023 Phase 8, stage RR2b).
+	if (!Protect_Pages(&W3DRenderState::Defaults, sizeof(W3DRenderState), readOnly))
+		return false;
+	if (!Protect_Pages(&WW3DState::Defaults, sizeof(WW3DState), readOnly))
+	{
+		Protect_Pages(&W3DRenderState::Defaults, sizeof(W3DRenderState), !readOnly);
+		return false;
+	}
+	return true;
 }
 
 void DX8Wrapper::Destroy_Render_State()
@@ -862,6 +881,12 @@ void DX8Wrapper::Shutdown()
 	// GeneralsX @feature cemlyn007 30/09/2026 With RTS_ENGINE_CONTEXT the engine's render state outlives its device
 	// until the end of WW3D::Shutdown, which writes WW3D's own after this (PLAN-023 Phase 8, stages RR2a-1 and
 	// RR2a-2): Destroy_Render_State.
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @bugfix cemlyn007 30/09/2026 Unless WW3D::Init never took it: an Init and Shutdown pair on its own
+	// would otherwise leave both states to the engine's end (PLAN-023 Phase 8, stage RR2b).
+	if (!W3D_Render_State().OwnedByWW3D)
+		Destroy_Render_State();
+#endif
 }
 
 void DX8Wrapper::Do_Onetime_Device_Dependent_Inits()

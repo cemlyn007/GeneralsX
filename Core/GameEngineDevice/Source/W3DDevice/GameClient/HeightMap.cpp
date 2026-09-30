@@ -104,7 +104,9 @@ HeightMapRenderObjClass *TheHeightMap = nullptr;
 	ShaderClass::DSTBLEND_ZERO, ShaderClass::FOG_DISABLE, ShaderClass::GRADIENT_MODULATE, ShaderClass::SECONDARY_GRADIENT_DISABLE, ShaderClass::TEXTURING_ENABLE, \
 	ShaderClass::ALPHATEST_DISABLE, ShaderClass::CULL_MODE_ENABLE, ShaderClass::DETAILCOLOR_SCALE, ShaderClass::DETAILALPHA_DISABLE) )
 
-static ShaderClass detailOpaqueShader(SC_DETAIL_BLEND);
+// GeneralsX @bugfix cemlyn007 30/09/2026 const, so these stay read-only data whatever the optimiser does (PLAN-023
+// Phase 8, stage RR2b).
+static const ShaderClass detailOpaqueShader(SC_DETAIL_BLEND);
 
 #define DEFAULT_MAX_FRAME_EXTRABLEND_TILES		256	//default number of terrain tiles rendered per call (must fit in one VB)
 #define DEFAULT_MAX_MAP_EXTRABLEND_TILES		2048	//default size of array allocated to hold all map extra blend tiles.

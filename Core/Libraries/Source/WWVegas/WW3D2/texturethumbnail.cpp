@@ -30,8 +30,25 @@
 #include "WWDebug/wwprofile.h"
 #include <windows.h>
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 30/09/2026 Per engine: the thumbnail managers the render engine's
+// TextureLoader::Init makes and its Deinit frees, so one engine's Deinit cannot free another's (PLAN-023 Phase 8,
+// stage RR2b).
+namespace
+{
+struct ThumbnailManagerState
+{
+	DLListClass<ThumbnailManagerClass> ThumbnailManagerList;
+	ThumbnailManagerClass* GlobalThumbnailManager = nullptr;
+};
+rts::PerEngineStatic<ThumbnailManagerState> ThumbnailManagerState_perEngine;
+} // namespace
+#define ThumbnailManagerList (ThumbnailManagerState_perEngine.get().ThumbnailManagerList)
+#define GlobalThumbnailManager (ThumbnailManagerState_perEngine.get().GlobalThumbnailManager)
+#else
 static DLListClass<ThumbnailManagerClass> ThumbnailManagerList;
 static ThumbnailManagerClass* GlobalThumbnailManager;
+#endif
 bool ThumbnailManagerClass::CreateThumbnailIfNotFound=false;
 
 static void Create_Hash_Name(StringClass& name, const StringClass& thumb_name)

@@ -226,10 +226,52 @@ LensflareName=DEFAULT_LENSFLARE
 // Global instance of a dazzle loader
 DazzleLoaderClass		_DazzleLoader;
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 30/09/2026 Per engine (PLAN-023 Phase 8, stage RR2b): the dazzle types and lens flares
+// the render engine's WW3D::Init loads from dazzle.ini and its WW3D::Shutdown frees (Deinit), the layer its scene
+// draws into, its visibility handler and its switch. The unused temp_ptrs is left out, and the shaders are built
+// once, at static initialisation (Init_Shaders, below).
+
+// static instance of a default dazzle visibility handler (defined further down upstream)
+static DazzleVisibilityClass		_DefaultVisibilityHandler;
+
+namespace
+{
+struct DazzleState
+{
+	DazzleTypeClass** types = nullptr;
+	unsigned type_count = 0;
+	DazzleLayerClass* current_dazzle_layer = nullptr;
+	LensflareTypeClass** lensflares = nullptr;
+	unsigned lensflare_count = 0;
+	const DazzleVisibilityClass* _VisibilityHandler = &_DefaultVisibilityHandler;
+	bool _dazzle_rendering_enabled = true;
+};
+rts::PerEngineStatic<DazzleState> DazzleState_perEngine;
+} // namespace
+#define types (DazzleState_perEngine.get().types)
+#define type_count (DazzleState_perEngine.get().type_count)
+#define current_dazzle_layer (DazzleState_perEngine.get().current_dazzle_layer)
+#define lensflares (DazzleState_perEngine.get().lensflares)
+#define lensflare_count (DazzleState_perEngine.get().lensflare_count)
+#define _VisibilityHandler (DazzleState_perEngine.get()._VisibilityHandler)
+#define _dazzle_rendering_enabled (DazzleState_perEngine.get()._dazzle_rendering_enabled)
+
+void DazzleRenderObjClass::Enable_Dazzle_Rendering(bool onoff)
+{
+	_dazzle_rendering_enabled = onoff;
+}
+
+bool DazzleRenderObjClass::Is_Dazzle_Rendering_Enabled()
+{
+	return _dazzle_rendering_enabled;
+}
+#else
 static SimpleVecClass<DazzleRenderObjClass*> temp_ptrs;
 
 static DazzleTypeClass** types;
 static unsigned type_count;
+#endif
 
 // GeneralsX @bugfix cemlyn007 30/09/2026 The dazzle types belong to the render engine: its WW3D::Init loads
 // them from dazzle.ini and its WW3D::Shutdown frees them. Every engine's dazzle render objects read them
@@ -260,22 +302,26 @@ static inline unsigned Engine_Type_Count()
 	return type_count;
 }
 
+#if !RTS_ENGINE_CONTEXT
 // Current dazzle layer - must be set before rendering
 static DazzleLayerClass * current_dazzle_layer = nullptr;
 
 static LensflareTypeClass** lensflares;
 static unsigned lensflare_count;
+#endif
 
 static ShaderClass default_dazzle_shader;
 static ShaderClass default_halo_shader;
 static ShaderClass vis_shader;
 static ShaderClass debug_shader;
 
+#if !RTS_ENGINE_CONTEXT
 // static instance of a default dazzle visibility handler
 static DazzleVisibilityClass		_DefaultVisibilityHandler;
 static const DazzleVisibilityClass *	_VisibilityHandler = &_DefaultVisibilityHandler;
 
 bool	DazzleRenderObjClass::_dazzle_rendering_enabled = true;
+#endif
 
 
 static void Init_Shaders()
@@ -315,6 +361,14 @@ static void Init_Shaders()
 	debug_shader.Set_Texturing( ShaderClass::TEXTURING_DISABLE );
 
 }
+
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 30/09/2026 The shaders are the same for every engine: built once, at static
+// initialisation, and only read after, instead of rewritten at every load of dazzle.ini (PLAN-023 Phase 8, stage
+// RR2b).
+static const bool _DazzleShadersBuilt = (Init_Shaders(), true);
+#define Init_Shaders() ((void)_DazzleShadersBuilt)
+#endif
 
 /*
 ** Derived INI to support Vector4

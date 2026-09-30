@@ -101,7 +101,9 @@ FlatHeightMapRenderObjClass *TheFlatHeightMap = nullptr;
 	ShaderClass::DSTBLEND_ZERO, ShaderClass::FOG_DISABLE, ShaderClass::GRADIENT_MODULATE, ShaderClass::SECONDARY_GRADIENT_DISABLE, ShaderClass::TEXTURING_ENABLE, \
 	ShaderClass::ALPHATEST_DISABLE, ShaderClass::CULL_MODE_ENABLE, ShaderClass::DETAILCOLOR_SCALE, ShaderClass::DETAILALPHA_DISABLE) )
 
-static ShaderClass detailOpaqueShader(SC_DETAIL_BLEND);
+// GeneralsX @bugfix cemlyn007 30/09/2026 const, so these stay read-only data whatever the optimiser does (PLAN-023
+// Phase 8, stage RR2b).
+static const ShaderClass detailOpaqueShader(SC_DETAIL_BLEND);
 
 
 #define DEFAULT_MAX_BATCH_SHORELINE_TILES		512	//maximum number of terrain tiles rendered per call (must fit in one VB)

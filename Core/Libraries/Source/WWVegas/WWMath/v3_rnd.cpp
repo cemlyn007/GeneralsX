@@ -39,7 +39,17 @@
 
 const float Vector3Randomizer::OOIntMax = 1.0f / (float)INT_MAX;
 const float Vector3Randomizer::OOUIntMax = 1.0f / (float)UINT_MAX;
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 30/09/2026 Per engine, default seeded as the static was (PLAN-023 Phase 8, stage RR2b).
+static rts::PerEngineStatic<Random3Class> Randomizer_perEngine;
+
+Random3Class& Vector3Randomizer::Randomizer_State()
+{
+	return Randomizer_perEngine.get();
+}
+#else
 Random3Class Vector3Randomizer::Randomizer;
+#endif
 
 Vector3SolidBoxRandomizer::Vector3SolidBoxRandomizer(const Vector3 & extents)
 {

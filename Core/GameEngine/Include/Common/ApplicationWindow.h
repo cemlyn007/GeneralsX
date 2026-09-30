@@ -20,14 +20,25 @@
 // RR2a-2)
 //
 // TheSDL3Window (the SDL3 window, SDL3Main.cpp's) and ApplicationHWnd (the same window as an HWND, or the Win32
-// window, WinMain.cpp's). Upstream declared them `extern` in each file that used them; include this instead. Include
-// it after the HWND type (windows.h, or the compat headers PreRTS.h brings in).
+// window, WinMain.cpp's). Upstream declared them `extern` in each file that used them; include this instead.
 //
 // With RTS_ENGINE_CONTEXT they are the current engine's (rts::EngineContext::sdl3Window and applicationHWnd): the
 // game's main() sets its engine's, an embedding host its viewer engine's, and every other engine has none (null),
 // so an engine never reaches another engine's window. Without it they are the process's globals, defined in the
 // game's SDL3Main.cpp or WinMain.cpp.
+// GeneralsX @bugfix cemlyn007 30/09/2026 It includes what it uses: the engine context and HWND, from the same
+// headers PreRTS.h takes them from (PLAN-023 Phase 8, stage RR2b).
 #pragma once
+
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include "windows_compat.h"
+#endif
+
+#if RTS_ENGINE_CONTEXT
+#include "Common/EngineContext.h"
+#endif
 
 struct SDL_Window;
 

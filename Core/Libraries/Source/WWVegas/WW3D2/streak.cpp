@@ -48,7 +48,11 @@
 #include "WWMath/Vector3i.h"
 #include "sortingrenderer.h"
 
+#if !RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 30/09/2026 Never used, and with RTS_ENGINE_CONTEXT left out, so that no line
+// renderer is shared between engines (PLAN-023 Phase 8, stage RR2b).
 static SegLineRendererClass _LineRenderer;
+#endif
 
 
 /*
