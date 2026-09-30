@@ -47,9 +47,22 @@
 #include "dx8caps.h"
 
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 30/09/2026 ShaderClass's device state is the current engine's W3DRenderState fields
+// (w3drenderstate.h; PLAN-023 Phase 8, stage RR2a-2), with the upstream initial values there.
+#define ShaderDirty (W3D_Render_State().ShaderDirty)
+#define CurrentShader (W3D_Render_State().CurrentShader)
+#define _PolygonCullMode (W3D_Render_State()._PolygonCullMode)
+
+void ShaderClass::Invalidate()
+{
+	ShaderDirty = true;
+}
+#else
 bool ShaderClass::ShaderDirty=true;
 unsigned long ShaderClass::CurrentShader=0;
 unsigned long _PolygonCullMode = D3DCULL_CW;
+#endif
 
 
 /*
@@ -62,35 +75,35 @@ unsigned long _PolygonCullMode = D3DCULL_CW;
 	DSTBLEND_ZERO, FOG_DISABLE, GRADIENT_MODULATE, SECONDARY_GRADIENT_DISABLE, TEXTURING_ENABLE, \
 	ALPHATEST_DISABLE, CULL_MODE_ENABLE, \
 	DETAILCOLOR_DISABLE, DETAILALPHA_DISABLE) )
-ShaderClass ShaderClass::_PresetOpaqueShader(SC_OPAQUE);
+const ShaderClass ShaderClass::_PresetOpaqueShader(SC_OPAQUE);
 
 // Texturing, zbuffer, disabled zbuffer write, primary gradient, additive blending
 #define SC_ADDITIVE ( SHADE_CNST(PASS_LEQUAL, DEPTH_WRITE_DISABLE, COLOR_WRITE_ENABLE, SRCBLEND_ONE, \
 	DSTBLEND_ONE, FOG_DISABLE, GRADIENT_MODULATE, SECONDARY_GRADIENT_DISABLE, TEXTURING_ENABLE, \
 	ALPHATEST_DISABLE, CULL_MODE_ENABLE, \
 	DETAILCOLOR_DISABLE, DETAILALPHA_DISABLE) )
-ShaderClass ShaderClass::_PresetAdditiveShader(SC_ADDITIVE);
+const ShaderClass ShaderClass::_PresetAdditiveShader(SC_ADDITIVE);
 
 // Texturing, zbuffer, disabled zbuffer write, primary gradient, additive blending, bumpenvmap
 #define SC_BUMPENVMAP ( SHADE_CNST(PASS_LEQUAL, DEPTH_WRITE_DISABLE, COLOR_WRITE_ENABLE, SRCBLEND_ONE, \
 	DSTBLEND_ONE, FOG_DISABLE, GRADIENT_BUMPENVMAP, SECONDARY_GRADIENT_DISABLE, TEXTURING_ENABLE, \
 	ALPHATEST_DISABLE, CULL_MODE_ENABLE, \
 	DETAILCOLOR_ADD, DETAILALPHA_DISABLE) )
-ShaderClass ShaderClass::_PresetBumpenvmapShader(SC_BUMPENVMAP);
+const ShaderClass ShaderClass::_PresetBumpenvmapShader(SC_BUMPENVMAP);
 
 // Texturing, zbuffer, disabled zbuffer write, primary gradient, alpha blending
 #define SC_ALPHA ( SHADE_CNST(PASS_LEQUAL, DEPTH_WRITE_DISABLE, COLOR_WRITE_ENABLE, SRCBLEND_SRC_ALPHA, \
 	DSTBLEND_ONE_MINUS_SRC_ALPHA, FOG_DISABLE, GRADIENT_MODULATE, SECONDARY_GRADIENT_DISABLE, TEXTURING_ENABLE, \
 	ALPHATEST_DISABLE, CULL_MODE_ENABLE, \
 	DETAILCOLOR_DISABLE, DETAILALPHA_DISABLE) )
-ShaderClass ShaderClass::_PresetAlphaShader(SC_ALPHA);
+const ShaderClass ShaderClass::_PresetAlphaShader(SC_ALPHA);
 
 // Texturing, zbuffer, disabled zbuffer write, primary gradient, multiplicative blending
 #define SC_MULTIPLICATIVE ( SHADE_CNST(PASS_LEQUAL, DEPTH_WRITE_DISABLE, COLOR_WRITE_ENABLE, SRCBLEND_ZERO, \
 	DSTBLEND_SRC_COLOR, FOG_DISABLE, GRADIENT_MODULATE, SECONDARY_GRADIENT_DISABLE, TEXTURING_ENABLE, \
 	ALPHATEST_DISABLE, CULL_MODE_ENABLE, \
 	DETAILCOLOR_DISABLE, DETAILALPHA_DISABLE) )
-ShaderClass ShaderClass::_PresetMultiplicativeShader(SC_MULTIPLICATIVE);
+const ShaderClass ShaderClass::_PresetMultiplicativeShader(SC_MULTIPLICATIVE);
 
 // Texturing, no zbuffer reading/writing, no gradients, no blending, no
 // fogging - mostly for opaque 2D objects.
@@ -98,7 +111,7 @@ ShaderClass ShaderClass::_PresetMultiplicativeShader(SC_MULTIPLICATIVE);
 	DSTBLEND_ZERO, FOG_DISABLE, GRADIENT_DISABLE, SECONDARY_GRADIENT_DISABLE, TEXTURING_ENABLE, \
 	ALPHATEST_DISABLE, CULL_MODE_ENABLE, \
 	DETAILCOLOR_DISABLE, DETAILALPHA_DISABLE) )
-ShaderClass ShaderClass::_PresetOpaque2DShader(SC_OP_2D);
+const ShaderClass ShaderClass::_PresetOpaque2DShader(SC_OP_2D);
 
 // Texturing, default zbuffer reading, no zbuffer writing, no gradients, no blending, no
 // fogging - mostly for opaque sprite objects.
@@ -106,7 +119,7 @@ ShaderClass ShaderClass::_PresetOpaque2DShader(SC_OP_2D);
 	DSTBLEND_ZERO, FOG_DISABLE, GRADIENT_DISABLE, SECONDARY_GRADIENT_DISABLE, TEXTURING_ENABLE, \
 	ALPHATEST_DISABLE, CULL_MODE_ENABLE, \
 	DETAILCOLOR_DISABLE, DETAILALPHA_DISABLE) )
-ShaderClass ShaderClass::_PresetOpaqueSpriteShader(SC_OP_SPRITE);
+const ShaderClass ShaderClass::_PresetOpaqueSpriteShader(SC_OP_SPRITE);
 
 
 // Texturing, no zbuffer reading/writing, no gradients, additive blending,
@@ -115,7 +128,7 @@ ShaderClass ShaderClass::_PresetOpaqueSpriteShader(SC_OP_SPRITE);
 	DSTBLEND_ONE, FOG_DISABLE, GRADIENT_DISABLE, SECONDARY_GRADIENT_DISABLE, TEXTURING_ENABLE, \
 	ALPHATEST_DISABLE, CULL_MODE_ENABLE, \
 	DETAILCOLOR_DISABLE, DETAILALPHA_DISABLE) )
-ShaderClass ShaderClass::_PresetAdditive2DShader(SC_ADD_2D);
+const ShaderClass ShaderClass::_PresetAdditive2DShader(SC_ADD_2D);
 
 // Texturing, no zbuffer reading/writing, no gradients, alpha blending, no
 // fogging - mostly for alpha-blended 2D objects.
@@ -123,7 +136,7 @@ ShaderClass ShaderClass::_PresetAdditive2DShader(SC_ADD_2D);
 	SRCBLEND_SRC_ALPHA, DSTBLEND_ONE_MINUS_SRC_ALPHA, FOG_DISABLE, GRADIENT_DISABLE, \
 	SECONDARY_GRADIENT_DISABLE, TEXTURING_ENABLE, \
 	ALPHATEST_DISABLE, CULL_MODE_ENABLE, DETAILCOLOR_DISABLE, DETAILALPHA_DISABLE) )
-ShaderClass ShaderClass::_PresetAlpha2DShader(SC_ALPHA_2D);
+const ShaderClass ShaderClass::_PresetAlpha2DShader(SC_ALPHA_2D);
 
 // Texturing, default zbuffer reading, no zbuffer writing, no gradients,
 // additive blending, no fogging - mostly for use in additive sprite
@@ -132,7 +145,7 @@ ShaderClass ShaderClass::_PresetAlpha2DShader(SC_ALPHA_2D);
 	SRCBLEND_ONE, DSTBLEND_ONE, FOG_DISABLE, GRADIENT_DISABLE, SECONDARY_GRADIENT_DISABLE, \
 	TEXTURING_ENABLE, ALPHATEST_DISABLE, CULL_MODE_ENABLE, \
 	DETAILCOLOR_DISABLE, DETAILALPHA_DISABLE) )
-ShaderClass ShaderClass::_PresetAdditiveSpriteShader(SC_ADD_SPRITE);
+const ShaderClass ShaderClass::_PresetAdditiveSpriteShader(SC_ADD_SPRITE);
 
 // Texturing, default zbuffer reading, no zbuffer writing, no gradients,
 // alpha blending, no fogging - mostly for use in alpha-blended sprite
@@ -141,7 +154,7 @@ ShaderClass ShaderClass::_PresetAdditiveSpriteShader(SC_ADD_SPRITE);
 	SRCBLEND_SRC_ALPHA, DSTBLEND_ONE_MINUS_SRC_ALPHA, FOG_DISABLE, GRADIENT_DISABLE, \
 	SECONDARY_GRADIENT_DISABLE, TEXTURING_ENABLE, \
 	ALPHATEST_DISABLE, CULL_MODE_ENABLE, DETAILCOLOR_DISABLE, DETAILALPHA_DISABLE) )
-ShaderClass ShaderClass::_PresetAlphaSpriteShader(SC_ALPHA_SPRITE);
+const ShaderClass ShaderClass::_PresetAlphaSpriteShader(SC_ALPHA_SPRITE);
 
 // No texturing, default zbuffer reading/writing, primary gradient, no
 // blending, no fogging - mostly for use in solid-colored opaque objects.
@@ -149,7 +162,7 @@ ShaderClass ShaderClass::_PresetAlphaSpriteShader(SC_ALPHA_SPRITE);
 	SRCBLEND_ONE, DSTBLEND_ZERO, FOG_DISABLE, GRADIENT_MODULATE, SECONDARY_GRADIENT_DISABLE, \
 	TEXTURING_DISABLE, ALPHATEST_DISABLE, CULL_MODE_ENABLE, \
 	DETAILCOLOR_DISABLE, DETAILALPHA_DISABLE) )
-ShaderClass ShaderClass::_PresetOpaqueSolidShader(SC_OPAQUE_SOLID);
+const ShaderClass ShaderClass::_PresetOpaqueSolidShader(SC_OPAQUE_SOLID);
 
 // No texturing, default zbuffer reading, no zbuffer writing, primary
 // gradient, additive blending, no fogging - mostly for use in solid-colored
@@ -158,7 +171,7 @@ ShaderClass ShaderClass::_PresetOpaqueSolidShader(SC_OPAQUE_SOLID);
 	SRCBLEND_ONE, DSTBLEND_ONE, FOG_DISABLE, GRADIENT_MODULATE, SECONDARY_GRADIENT_DISABLE, \
 	TEXTURING_DISABLE, ALPHATEST_DISABLE, CULL_MODE_ENABLE, \
 	DETAILCOLOR_DISABLE, DETAILALPHA_DISABLE) )
-ShaderClass ShaderClass::_PresetAdditiveSolidShader(SC_ADDITIVE_SOLID);
+const ShaderClass ShaderClass::_PresetAdditiveSolidShader(SC_ADDITIVE_SOLID);
 
 // No texturing, default zbuffer reading, no zbuffer writing, primary
 // gradient, alpha blending, no fogging - mostly for use in solid-colored
@@ -167,7 +180,7 @@ ShaderClass ShaderClass::_PresetAdditiveSolidShader(SC_ADDITIVE_SOLID);
 	SRCBLEND_SRC_ALPHA, DSTBLEND_ONE_MINUS_SRC_ALPHA, FOG_DISABLE, GRADIENT_MODULATE, \
 	SECONDARY_GRADIENT_DISABLE, TEXTURING_DISABLE, \
 	ALPHATEST_DISABLE, CULL_MODE_ENABLE, DETAILCOLOR_DISABLE, DETAILALPHA_DISABLE) )
-ShaderClass ShaderClass::_PresetAlphaSolidShader(SC_ALPHA_SOLID);
+const ShaderClass ShaderClass::_PresetAlphaSolidShader(SC_ALPHA_SOLID);
 
 // Texturing, no zbuffer reading/writing, no gradients, no blending, alpha
 // testing, no fogging - mostly for "pure" alpha-tested 2D objects.
@@ -175,7 +188,7 @@ ShaderClass ShaderClass::_PresetAlphaSolidShader(SC_ALPHA_SOLID);
 	SRCBLEND_ONE, DSTBLEND_ZERO, FOG_DISABLE, GRADIENT_DISABLE, SECONDARY_GRADIENT_DISABLE, \
 	TEXTURING_ENABLE, ALPHATEST_ENABLE, CULL_MODE_ENABLE, \
 	DETAILCOLOR_DISABLE, DETAILALPHA_DISABLE) )
-ShaderClass ShaderClass::_PresetATest2DShader(SC_ATEST_2D);
+const ShaderClass ShaderClass::_PresetATest2DShader(SC_ATEST_2D);
 
 // Texturing, default zbuffer reading and writing, no gradients, no
 // blending, alpha testing, no fogging - mostly for "pure" alpha-tested
@@ -184,7 +197,7 @@ ShaderClass ShaderClass::_PresetATest2DShader(SC_ATEST_2D);
 	SRCBLEND_ONE, DSTBLEND_ZERO, FOG_DISABLE, GRADIENT_DISABLE, SECONDARY_GRADIENT_DISABLE, \
 	TEXTURING_ENABLE, ALPHATEST_ENABLE, CULL_MODE_ENABLE, \
 	DETAILCOLOR_DISABLE, DETAILALPHA_DISABLE) )
-ShaderClass ShaderClass::_PresetATestSpriteShader(SC_ATEST_SPRITE);
+const ShaderClass ShaderClass::_PresetATestSpriteShader(SC_ATEST_SPRITE);
 
 // Texturing, no zbuffer reading/writing, no gradients, alpha blending AND
 // alpha testing, no fogging - mostly for alpha-tested and blended 2D
@@ -193,7 +206,7 @@ ShaderClass ShaderClass::_PresetATestSpriteShader(SC_ATEST_SPRITE);
 	SRCBLEND_SRC_ALPHA, DSTBLEND_ONE_MINUS_SRC_ALPHA, FOG_DISABLE, GRADIENT_DISABLE, \
 	SECONDARY_GRADIENT_DISABLE, TEXTURING_ENABLE, \
 	ALPHATEST_ENABLE, CULL_MODE_ENABLE, DETAILCOLOR_DISABLE, DETAILALPHA_DISABLE) )
-ShaderClass ShaderClass::_PresetATestBlend2DShader(SC_ATESTBLEND_2D);
+const ShaderClass ShaderClass::_PresetATestBlend2DShader(SC_ATESTBLEND_2D);
 
 // Texturing, default zbuffer reading and writing, no gradients, alpha
 // blending AND alpha testing, no fogging - mostly for use in alpha-tested
@@ -202,7 +215,7 @@ ShaderClass ShaderClass::_PresetATestBlend2DShader(SC_ATESTBLEND_2D);
 	SRCBLEND_SRC_ALPHA, DSTBLEND_ONE_MINUS_SRC_ALPHA, FOG_DISABLE, GRADIENT_DISABLE, \
 	SECONDARY_GRADIENT_DISABLE, TEXTURING_ENABLE, \
 	ALPHATEST_ENABLE, CULL_MODE_ENABLE, DETAILCOLOR_DISABLE, DETAILALPHA_DISABLE) )
-ShaderClass ShaderClass::_PresetATestBlendSpriteShader(SC_ATESTBLEND_SPRITE);
+const ShaderClass ShaderClass::_PresetATestBlendSpriteShader(SC_ATESTBLEND_SPRITE);
 
 // Texturing, no zbuffer reading/writing, no gradients, screen blending,
 // no fogging - mostly for screen-blended 2D objects.
@@ -210,7 +223,7 @@ ShaderClass ShaderClass::_PresetATestBlendSpriteShader(SC_ATESTBLEND_SPRITE);
 	DSTBLEND_ONE_MINUS_SRC_COLOR, FOG_DISABLE, GRADIENT_DISABLE, SECONDARY_GRADIENT_DISABLE, \
 	TEXTURING_ENABLE, ALPHATEST_DISABLE, CULL_MODE_ENABLE, \
 	DETAILCOLOR_DISABLE, DETAILALPHA_DISABLE) )
-ShaderClass ShaderClass::_PresetScreen2DShader(SC_SCREEN_2D);
+const ShaderClass ShaderClass::_PresetScreen2DShader(SC_SCREEN_2D);
 
 // Texturing, default zbuffer reading, no zbuffer writing, no gradients,
 // screen blending, no fogging - mostly for use in screen-blended sprite
@@ -219,7 +232,7 @@ ShaderClass ShaderClass::_PresetScreen2DShader(SC_SCREEN_2D);
 	SRCBLEND_ONE, DSTBLEND_ONE_MINUS_SRC_COLOR, FOG_DISABLE, GRADIENT_DISABLE, SECONDARY_GRADIENT_DISABLE, \
 	TEXTURING_ENABLE, ALPHATEST_DISABLE, CULL_MODE_ENABLE, \
 	DETAILCOLOR_DISABLE, DETAILALPHA_DISABLE) )
-ShaderClass ShaderClass::_PresetScreenSpriteShader(SC_SCREEN_SPRITE);
+const ShaderClass ShaderClass::_PresetScreenSpriteShader(SC_SCREEN_SPRITE);
 
 // Texturing, no zbuffer reading/writing, no gradients, multiplicative
 // blending, no fogging - mostly for multiplicatively blended 2D objects.
@@ -227,7 +240,7 @@ ShaderClass ShaderClass::_PresetScreenSpriteShader(SC_SCREEN_SPRITE);
 	DSTBLEND_SRC_COLOR, FOG_DISABLE, GRADIENT_DISABLE, SECONDARY_GRADIENT_DISABLE, TEXTURING_ENABLE, \
 	ALPHATEST_DISABLE, CULL_MODE_ENABLE, \
 	DETAILCOLOR_DISABLE, DETAILALPHA_DISABLE) )
-ShaderClass ShaderClass::_PresetMultiplicative2DShader(SC_MUL_2D);
+const ShaderClass ShaderClass::_PresetMultiplicative2DShader(SC_MUL_2D);
 
 // Texturing, default zbuffer reading, no zbuffer writing, no gradients,
 // multiplicative blending, no fogging - mostly for use in multiplicatively
@@ -236,7 +249,7 @@ ShaderClass ShaderClass::_PresetMultiplicative2DShader(SC_MUL_2D);
 	SRCBLEND_ZERO, DSTBLEND_SRC_COLOR, FOG_DISABLE, GRADIENT_DISABLE, SECONDARY_GRADIENT_DISABLE, \
 	TEXTURING_ENABLE, ALPHATEST_DISABLE, CULL_MODE_ENABLE, \
 	DETAILCOLOR_DISABLE, DETAILALPHA_DISABLE) )
-ShaderClass ShaderClass::_PresetMultiplicativeSpriteShader(SC_MUL_SPRITE);
+const ShaderClass ShaderClass::_PresetMultiplicativeSpriteShader(SC_MUL_SPRITE);
 
 
 /***********************************************************************************************

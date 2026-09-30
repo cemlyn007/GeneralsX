@@ -96,9 +96,21 @@ class RTS3DInterfaceScene;
 class W3DAssetManager;
 class WW3DAssetManager;
 struct W3DRenderState;
+struct WW3DState;
+struct SDL_Window;
 
 namespace rts
 {
+
+// GeneralsX @feature cemlyn007 30/09/2026 The alignment, and so the size granule, of the render states an engine's
+// w3dRender and ww3dState point to (W3DRenderState, WW3DState): the largest memory page size of the targets (16 KiB
+// on Apple silicon, 4 KiB on x86-64 Linux), so that their defaults fill whole pages of their own, which a host can
+// make read-only (W3D_Protect_Render_Defaults; PLAN-023 Phase 8, stage RR2a-2).
+#ifdef __APPLE__
+inline constexpr std::size_t renderStateAlignment = 16384;
+#else
+inline constexpr std::size_t renderStateAlignment = 4096;
+#endif
 
 // Destroys one per-engine slot object (see EngineContext::setSlot).
 typedef void (*EngineSlotDestroyFn)(void* object);
@@ -210,8 +222,9 @@ struct RTS_ENGINE_CONTEXT_API EngineContext
 
 	// GeneralsX @feature cemlyn007 30/09/2026 This engine's DX8Wrapper state (WW3D2/w3drenderstate.h): its Direct3D
 	// interface and device, caps, render targets, cached states and statistics. DX8Wrapper::Init allocates it
-	// (Set_Display_Size_Provider, just before, too), DX8Wrapper::Shutdown frees it, and it is null for an engine
-	// that does not render. DX8Wrapper reads W3DRenderState::Defaults (no device, IsInitted false) while it is
+	// (Set_Display_Size_Provider, just before, too), the end of WW3D::Shutdown frees it (RR2a-2: after
+	// DX8Wrapper::Shutdown, since WW3D's own state goes with it), and it is null for an engine that does not
+	// render. DX8Wrapper reads W3DRenderState::Defaults (no device, IsInitted false) while it is
 	// null, so a headless engine beside a renderer never reaches the renderer's device or caps and answers as in
 	// a headless solo run (this replaces RR0a's ownsRenderDevice flag). A direct field, not a slot: DX8Wrapper's
 	// inline state-cache setters are on the draw's hot path (PLAN-023 Phase 8, stage RR2a-1).
@@ -222,6 +235,20 @@ struct RTS_ENGINE_CONTEXT_API EngineContext
 	// device, so before w3dRender exists (PLAN-023 Phase 8, stage RR2a-1).
 	bool dx8HeadlessRender = false;
 	int dx8PreserveFPU = 0;
+
+	// GeneralsX @feature cemlyn007 30/09/2026 This engine's WW3D state (WW3D2/ww3d.h, WW3DState): WW3D's render
+	// settings and render-loop statics (IsInitted, the render backend, the static sort lists, the debug shaders,
+	// the texture filter and reduction, ...). Allocated beside w3dRender and freed with it (at the end of
+	// WW3D::Shutdown), null for an engine that does not render, which reads WW3DState::Defaults (PLAN-023 Phase 8,
+	// stage RR2a-2).
+	::WW3DState* ww3dState = nullptr;
+
+	// GeneralsX @feature cemlyn007 30/09/2026 The engine's window: TheSDL3Window and ApplicationHWnd (an HWND,
+	// the same handle cast; Common/ApplicationWindow.h names both), set by whoever made the window (the game's
+	// main(), or a host for its viewer) before the engine boots, and null for a windowless engine. Not owned:
+	// the window outlives the engine (PLAN-023 Phase 8, stage RR2a-2).
+	::SDL_Window* sdl3Window = nullptr;
+	void* applicationHWnd = nullptr;
 
 	// Per-engine slot objects, by allocateEngineSlotIndex() index; null until set.
 	void* getSlot(std::size_t index) const;
@@ -520,6 +547,55 @@ struct IndirectContextField<S, Pointer, Defaults, E[N], Field>
 	E& operator[](std::size_t index) const noexcept
 	{
 		return get()[index];
+	}
+};
+
+// GeneralsX @feature cemlyn007 30/09/2026 A stand-in whose field is whatever `Get` returns (PLAN-023 Phase 8,
+// stage RR2a-2), for a class whose per-engine state struct cannot be complete where the stand-ins are declared
+// (WW3D's, which holds WW3D's own nested enum types): the class declares `static T& name_State() noexcept;`,
+// defines it once the struct is complete, and declares
+// `static constexpr rts::AccessorContextField<T, &C::name_State> name{};`. The same operators as ContextField,
+// and the same limits: `sizeof` and `&` give the stand-in's (scripts/cpp/engine_context_standins.py fails on
+// both).
+template <typename T, T& (*Get)() noexcept>
+struct AccessorContextField
+{
+	operator T&() const noexcept
+	{
+		return Get();
+	}
+	T operator->() const noexcept
+	{
+		return Get();
+	}
+	// An explicit cast to an enum type (`(SomeEnum)name`, for an int field) casts the field's value.
+	template <typename E, typename = std::enable_if_t<std::is_enum_v<E>>>
+	explicit operator E() const noexcept
+	{
+		return static_cast<E>(Get());
+	}
+	const AccessorContextField& operator=(T value) const noexcept
+	{
+		Get() = value;
+		return *this;
+	}
+	T& operator++() const noexcept
+	{
+		return ++Get();
+	}
+	T operator++(int) const noexcept
+	{
+		return Get()++;
+	}
+	template <typename U>
+	T& operator+=(const U& value) const noexcept
+	{
+		return Get() += value;
+	}
+	template <typename U>
+	T& operator-=(const U& value) const noexcept
+	{
+		return Get() -= value;
 	}
 };
 

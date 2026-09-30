@@ -38,7 +38,8 @@
 
 
 
-extern HWND ApplicationHWnd;
+// GeneralsX @refactor cemlyn007 30/09/2026 The window handles (PLAN-023 Phase 8, stage RR2a-2).
+#include "Common/ApplicationWindow.h"
 
 //-------------------------------------------------------------------------------------------------
 static void RTSFlagsToOSFlags(UnsignedInt buttonFlags, UnsignedInt otherFlags, UnsignedInt& outWindowsFlags)

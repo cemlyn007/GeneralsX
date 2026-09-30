@@ -88,7 +88,8 @@
 // assert path reads it, so engines on separate threads would race on a plain bool (PLAN-023 Phase 5b).
 #include <atomic>
 extern std::atomic<bool> DX8Wrapper_IsWindowed;
-extern HWND ApplicationHWnd;
+// GeneralsX @refactor cemlyn007 30/09/2026 The window handles (PLAN-023 Phase 8, stage RR2a-2).
+#include "Common/ApplicationWindow.h"
 
 extern const char *gAppPrefix; /// So WB can have a different log file name.
 

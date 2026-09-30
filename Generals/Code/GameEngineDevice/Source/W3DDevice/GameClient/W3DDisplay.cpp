@@ -116,6 +116,8 @@ static void drawFramerateBar();
 #endif
 
 #include "WinMain.h"
+// GeneralsX @refactor cemlyn007 30/09/2026 The window handles (PLAN-023 Phase 8, stage RR2a-2).
+#include "Common/ApplicationWindow.h"
 
 
 // DEFINE AND ENUMS ///////////////////////////////////////////////////////////
@@ -465,7 +467,6 @@ inline Bool isResolutionSupported(const ResolutionDescClass &res)
 #ifdef SAGE_USE_SDL3
 static bool SDL3_GetNativeDisplaySize(int& outW, int& outH, float& outDensity)
 {
-	extern SDL_Window* TheSDL3Window;
 	if (!TheSDL3Window) return false;
 	SDL_DisplayID displayId = SDL_GetDisplayForWindow(TheSDL3Window);
 	const SDL_DisplayMode* mode = SDL_GetCurrentDisplayMode(displayId);
@@ -478,7 +479,6 @@ static bool SDL3_GetNativeDisplaySize(int& outW, int& outH, float& outDensity)
 
 static bool SDL3_GetWindowSizeInPixels(int& outW, int& outH, float& outDensity)
 {
-	extern SDL_Window* TheSDL3Window;
 	if (!TheSDL3Window) return false;
 	int logW = 0, logH = 0, physW = 0, physH = 0;
 	SDL_GetWindowSize(TheSDL3Window, &logW, &logH);
@@ -544,7 +544,6 @@ static void SDL3_CenterWindowOnCurrentDisplay(SDL_Window* window, Int width, Int
 // GeneralsX @bugfix GitHub Copilot 27/04/2026 Apply SDL3 window sizing/fullscreen only after the final render resolution is known.
 static void SDL3_ApplyWindowModeForRenderConfig(Bool windowed, Int renderWidth, Int renderHeight)
 {
-	extern SDL_Window* TheSDL3Window;
 	if (!TheSDL3Window) return;
 
 	if (!windowed) {
@@ -948,7 +947,6 @@ void W3DDisplay::init()
 
 		// GeneralsX @bugfix felipebraz 16/02/2026 Show window after DirectX8/DXVK initialized
 		#ifndef _WIN32
-		extern SDL_Window* TheSDL3Window;
 		if (TheSDL3Window) {
 			fprintf(stderr, "DEBUG: Showing SDL3 window after WW3D init...\n");
 			SDL_ShowWindow(TheSDL3Window);
@@ -1154,9 +1152,11 @@ void W3DDisplay::updateAverageFPS()
 {
 	constexpr const Int FPS_HISTORY_SIZE = 30;
 
-	static Int64 lastUpdateTime64 = 0;
-	static Int historyOffset = 0;
-	static Real fpsHistory[FPS_HISTORY_SIZE] = {0};
+	// GeneralsX @refactor cemlyn007 30/09/2026 The display's own, not function-local statics (PLAN-023 Phase 8, stage
+	// RR2a-2): each render engine's draw keeps its own FPS history and statistics.
+	Int64& lastUpdateTime64 = m_fpsLastUpdateTime64;
+	Int& historyOffset = m_fpsHistoryOffset;
+	Real (&fpsHistory)[FPS_HISTORY_SIZE] = m_fpsHistory;
 
 	const Int64 freq64 = getPerformanceCounterFrequency();
 	const Int64 time64 = getPerformanceCounter();
@@ -1196,11 +1196,13 @@ ICoord2D TheMousePos;
 //=============================================================================
 void W3DDisplay::gatherDebugStats()
 {
-	static UnsignedInt s_framesRenderedSinceLastUpdate = 0;
-	static Int64 s_lastUpdateTime64 = 0;
-	static double s_timeSinceLastUpdateInSecs = 0.0;
-	static Int s_drawCallsSinceLastUpdate = 0;
-	static Int s_sortedPolysSinceLastUpdate = 0;
+	// GeneralsX @refactor cemlyn007 30/09/2026 The display's own, not function-local statics (PLAN-023 Phase 8, stage
+	// RR2a-2): each render engine's draw keeps its own FPS history and statistics.
+	UnsignedInt& s_framesRenderedSinceLastUpdate = m_statsFramesRenderedSinceLastUpdate;
+	Int64& s_lastUpdateTime64 = m_statsLastUpdateTime64;
+	double& s_timeSinceLastUpdateInSecs = m_statsTimeSinceLastUpdateInSecs;
+	Int& s_drawCallsSinceLastUpdate = m_statsDrawCallsSinceLastUpdate;
+	Int& s_sortedPolysSinceLastUpdate = m_statsSortedPolysSinceLastUpdate;
 
 	// allocate the display strings if needed
 	if( m_displayStrings[0] == nullptr )
@@ -1924,7 +1926,6 @@ void W3DDisplay::draw()
 	// GeneralsX @feature xxorza 15/04/2026 Process deferred window resize for pillarbox
 	DX8Wrapper::Pillarbox_Process_Resize();
 
-	extern HWND ApplicationHWnd;
 	if (ApplicationHWnd && ::IsIconic(ApplicationHWnd)) {
 		return;
 	}

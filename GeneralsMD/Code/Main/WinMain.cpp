@@ -74,7 +74,11 @@
 
 // GLOBALS ////////////////////////////////////////////////////////////////////
 HINSTANCE ApplicationHInstance = nullptr;  ///< our application instance
+// GeneralsX @refactor cemlyn007 30/09/2026 With RTS_ENGINE_CONTEXT the handles are the engine's (Common/ApplicationWindow.h;
+// PLAN-023 Phase 8, stage RR2a-2).
+#if !RTS_ENGINE_CONTEXT
 HWND ApplicationHWnd = nullptr;  ///< our application window handle
+#endif
 Win32Mouse *TheWin32Mouse = nullptr;  ///< for the WndProc() only
 DWORD TheMessageTime = 0;	///< For getting the time that a message was posted from Windows.
 

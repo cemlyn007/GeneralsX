@@ -41,6 +41,10 @@
 #include "WW3D2/layer.h"
 #include "WW3D2/w3derr.h"
 #include "WW3D2/robjlist.h"
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 30/09/2026 WW3DState holds two ShaderClass values (PLAN-023 Phase 8, stage RR2a-2).
+#include "WW3D2/shader.h"
+#endif
 
 class		SceneClass;
 class		CameraClass;
@@ -333,9 +337,19 @@ public:
 
 	// These clock all the time under user control, and are used to update
    // Stats.UserStat* when performance sampling is enabled.
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 30/09/2026 The engine's (WW3DState, below; PLAN-023 Phase 8, stage RR2a-2).
+	static inline long& UserStat0_State() noexcept;
+	static inline long& UserStat1_State() noexcept;
+	static inline long& UserStat2_State() noexcept;
+	static constexpr rts::AccessorContextField<long, &WW3D::UserStat0_State> UserStat0{};
+	static constexpr rts::AccessorContextField<long, &WW3D::UserStat1_State> UserStat1{};
+	static constexpr rts::AccessorContextField<long, &WW3D::UserStat2_State> UserStat2{};
+#else
    static long             UserStat0;
    static long             UserStat1;
    static long             UserStat2;
+#endif
 
 	// Gamma control
 	static void					Set_Gamma(float gamma,float bright,float contrast,bool calibrate=true);
@@ -382,6 +396,89 @@ private:
 	static unsigned int PreviousSyncTime;
 #endif
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 30/09/2026 The current engine's WW3DState fields (below; PLAN-023 Phase 8, stage
+	// RR2a-2): each name is a stand-in for the field its accessor returns, so the uses are unchanged.
+	static inline float& PixelCenterX_State() noexcept;
+	static inline float& PixelCenterY_State() noexcept;
+	static inline IRenderBackend*& RenderBackend_State() noexcept;
+	static inline bool& IsInitted_State() noexcept;
+	static inline bool& IsRendering_State() noexcept;
+	static inline bool& IsCapturing_State() noexcept;
+	static inline bool& IsSortingEnabled_State() noexcept;
+	static inline bool& IsScreenUVBiased_State() noexcept;
+	static inline bool& AreDecalsEnabled_State() noexcept;
+	static inline float& DecalRejectionDistance_State() noexcept;
+	static inline bool& AreStaticSortListsEnabled_State() noexcept;
+	static inline bool& MungeSortOnLoad_State() noexcept;
+	static inline bool& OverbrightModifyOnLoad_State() noexcept;
+	static inline FrameGrabClass*& Movie_State() noexcept;
+	static inline bool& PauseRecord_State() noexcept;
+	static inline bool& RecordNextFrame_State() noexcept;
+	static inline VertexMaterialClass*& DefaultDebugMaterial_State() noexcept;
+	static inline ShaderClass& DefaultDebugShader_State() noexcept;
+	static inline ShaderClass& LightmapDebugShader_State() noexcept;
+	static inline PrelitModeEnum& PrelitMode_State() noexcept;
+	static inline bool& ExposePrelit_State() noexcept;
+	static inline int& TextureFilter_State() noexcept;
+	static inline int& AnisotropyLevel_State() noexcept;
+	static inline bool& SnapshotActivated_State() noexcept;
+	static inline bool& ThumbnailEnabled_State() noexcept;
+	static inline MeshDrawModeEnum& MeshDrawMode_State() noexcept;
+	static inline NPatchesGapFillingModeEnum& NPatchesGapFillingMode_State() noexcept;
+	static inline unsigned& NPatchesLevel_State() noexcept;
+	static inline bool& IsTexturingEnabled_State() noexcept;
+	static inline bool& IsColoringEnabled_State() noexcept;
+	static inline bool& Lite_State() noexcept;
+	static inline float& DefaultNativeScreenSize_State() noexcept;
+	static inline StaticSortListClass*& DefaultStaticSortLists_State() noexcept;
+	static inline StaticSortListClass*& CurrentStaticSortLists_State() noexcept;
+	static inline int& LastFrameMemoryAllocations_State() noexcept;
+	static inline int& LastFrameMemoryFrees_State() noexcept;
+
+	static constexpr rts::AccessorContextField<float, &WW3D::PixelCenterX_State> PixelCenterX{};
+	static constexpr rts::AccessorContextField<float, &WW3D::PixelCenterY_State> PixelCenterY{};
+	static constexpr rts::AccessorContextField<IRenderBackend*, &WW3D::RenderBackend_State> RenderBackend{};
+	static constexpr rts::AccessorContextField<bool, &WW3D::IsInitted_State> IsInitted{};
+	static constexpr rts::AccessorContextField<bool, &WW3D::IsRendering_State> IsRendering{};
+	static constexpr rts::AccessorContextField<bool, &WW3D::IsCapturing_State> IsCapturing{};
+	static constexpr rts::AccessorContextField<bool, &WW3D::IsSortingEnabled_State> IsSortingEnabled{};
+	static constexpr rts::AccessorContextField<bool, &WW3D::IsScreenUVBiased_State> IsScreenUVBiased{};
+	static constexpr rts::AccessorContextField<bool, &WW3D::AreDecalsEnabled_State> AreDecalsEnabled{};
+	static constexpr rts::AccessorContextField<float, &WW3D::DecalRejectionDistance_State> DecalRejectionDistance{};
+	static constexpr rts::AccessorContextField<bool, &WW3D::AreStaticSortListsEnabled_State> AreStaticSortListsEnabled{};
+	static constexpr rts::AccessorContextField<bool, &WW3D::MungeSortOnLoad_State> MungeSortOnLoad{};
+	static constexpr rts::AccessorContextField<bool, &WW3D::OverbrightModifyOnLoad_State> OverbrightModifyOnLoad{};
+	static constexpr rts::AccessorContextField<FrameGrabClass*, &WW3D::Movie_State> Movie{};
+	static constexpr rts::AccessorContextField<bool, &WW3D::PauseRecord_State> PauseRecord{};
+	static constexpr rts::AccessorContextField<bool, &WW3D::RecordNextFrame_State> RecordNextFrame{};
+	static constexpr rts::AccessorContextField<VertexMaterialClass*, &WW3D::DefaultDebugMaterial_State> DefaultDebugMaterial{};
+	static constexpr rts::AccessorContextField<ShaderClass, &WW3D::DefaultDebugShader_State> DefaultDebugShader{};
+	static constexpr rts::AccessorContextField<ShaderClass, &WW3D::LightmapDebugShader_State> LightmapDebugShader{};
+	static constexpr rts::AccessorContextField<PrelitModeEnum, &WW3D::PrelitMode_State> PrelitMode{};
+	static constexpr rts::AccessorContextField<bool, &WW3D::ExposePrelit_State> ExposePrelit{};
+	static constexpr rts::AccessorContextField<int, &WW3D::TextureFilter_State> TextureFilter{};
+	static constexpr rts::AccessorContextField<int, &WW3D::AnisotropyLevel_State> AnisotropyLevel{};
+	static constexpr rts::AccessorContextField<bool, &WW3D::SnapshotActivated_State> SnapshotActivated{};
+	static constexpr rts::AccessorContextField<bool, &WW3D::ThumbnailEnabled_State> ThumbnailEnabled{};
+	static constexpr rts::AccessorContextField<MeshDrawModeEnum, &WW3D::MeshDrawMode_State> MeshDrawMode{};
+	static constexpr rts::AccessorContextField<NPatchesGapFillingModeEnum, &WW3D::NPatchesGapFillingMode_State> NPatchesGapFillingMode{};
+	static constexpr rts::AccessorContextField<unsigned, &WW3D::NPatchesLevel_State> NPatchesLevel{};
+	static constexpr rts::AccessorContextField<bool, &WW3D::IsTexturingEnabled_State> IsTexturingEnabled{};
+	static constexpr rts::AccessorContextField<bool, &WW3D::IsColoringEnabled_State> IsColoringEnabled{};
+	static constexpr rts::AccessorContextField<bool, &WW3D::Lite_State> Lite{};
+	static constexpr rts::AccessorContextField<float, &WW3D::DefaultNativeScreenSize_State> DefaultNativeScreenSize{};
+	static constexpr rts::AccessorContextField<StaticSortListClass*, &WW3D::DefaultStaticSortLists_State> DefaultStaticSortLists{};
+	static constexpr rts::AccessorContextField<StaticSortListClass*, &WW3D::CurrentStaticSortLists_State> CurrentStaticSortLists{};
+	static constexpr rts::AccessorContextField<int, &WW3D::LastFrameMemoryAllocations_State> LastFrameMemoryAllocations{};
+	static constexpr rts::AccessorContextField<int, &WW3D::LastFrameMemoryFrees_State> LastFrameMemoryFrees{};
+
+	static constexpr rts::ContextField<int, &rts::EngineContext::ww3dFrameCount> FrameCount{};
+
+	// Declared upstream, never defined or used.
+	static bool							IsBackfaceDebugEnabled;
+	static VertexMaterialClass *	BackfaceDebugMaterial;
+#else
 	static float						PixelCenterX;
 	static float						PixelCenterY;
 
@@ -451,7 +548,139 @@ private:
 	// Memory allocation statistics
 	static int							LastFrameMemoryAllocations;
 	static int							LastFrameMemoryFrees;
+#endif
 };
+
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 30/09/2026 One render engine's WW3D state (PLAN-023 Phase 8, stage RR2a-2)
+//
+// WW3D's mutable statics (the render settings and render-loop state its Init, Shutdown, render loop, static sort
+// lists and options write) and ww3d.cpp's file statics, as one struct with the statics' names and upstream initial
+// values. Each render engine owns one, rts::EngineContext::ww3dState, allocated beside its W3DRenderState
+// (DX8Wrapper::Create_Render_State) and freed with it at the end of WW3D::Shutdown; an engine that does not render
+// reads WW3DState::Defaults, which nothing may write (W3D_Protect_Render_Defaults makes its pages read-only). Page
+// aligned, so the defaults fill whole pages of their own.
+struct RTS_ENGINE_CONTEXT_API alignas(::rts::renderStateAlignment) WW3DState
+{
+	// ww3d.cpp: the two debug shaders' bits and the texture filter defaults (TextureFilterClass) are its own.
+	WW3DState();
+
+	static WW3DState Defaults;
+
+	bool IsSortingEnabled = true;
+
+	float PixelCenterX = 0.0f;
+	float PixelCenterY = 0.0f;
+
+	IRenderBackend* RenderBackend = nullptr;
+
+	bool IsInitted = false;
+	bool IsRendering = false;
+	bool IsCapturing = false;
+	bool IsScreenUVBiased = false;
+
+	bool AreDecalsEnabled = true;
+	float DecalRejectionDistance = 1000000.0f;
+
+	bool AreStaticSortListsEnabled = false;
+	bool MungeSortOnLoad = false;
+
+	bool OverbrightModifyOnLoad = false;
+
+	FrameGrabClass* Movie = nullptr;
+	bool PauseRecord = false;
+	bool RecordNextFrame = false;
+
+	long UserStat0 = 0;
+	long UserStat1 = 0;
+	long UserStat2 = 0;
+
+	float DefaultNativeScreenSize = 1.0f;
+
+	StaticSortListClass* DefaultStaticSortLists = nullptr;
+	StaticSortListClass* CurrentStaticSortLists = nullptr;
+
+	VertexMaterialClass* DefaultDebugMaterial = nullptr;
+	ShaderClass DefaultDebugShader;
+	ShaderClass LightmapDebugShader;
+
+	WW3D::PrelitModeEnum PrelitMode = WW3D::PRELIT_MODE_LIGHTMAP_MULTI_PASS;
+	bool ExposePrelit = false;
+
+	bool SnapshotActivated = false;
+	bool ThumbnailEnabled = true;
+
+	WW3D::MeshDrawModeEnum MeshDrawMode = WW3D::MESH_DRAW_MODE_OLD;
+	WW3D::NPatchesGapFillingModeEnum NPatchesGapFillingMode = WW3D::NPATCHES_GAP_FILLING_ENABLED;
+	unsigned NPatchesLevel = 1;
+	bool IsTexturingEnabled = true;
+	bool IsColoringEnabled = false;
+
+	int LastFrameMemoryAllocations = 0;
+	int LastFrameMemoryFrees = 0;
+
+	int TextureFilter;
+	int AnisotropyLevel;
+
+	bool Lite = false;
+
+	// ww3d.cpp's file statics (an HWND), and Make_Screen_Shot's file number.
+	void* _Hwnd = nullptr;
+	int _TextureReduction = 0;
+	int _TextureMinDim = 1;
+	bool _LargeTextureExtraReductionEnabled = false;
+	int ScreenShotFrameNumber = 1;
+};
+
+// The current engine's WW3D state, or WW3DState::Defaults for an engine that has none.
+inline WW3DState& WW3D_State() noexcept
+{
+	return ::rts::indirectContext<WW3DState, &::rts::EngineContext::ww3dState, WW3DState::Defaults>();
+}
+
+#define WW3D_STATE_ACCESSOR(name) \
+	inline decltype(WW3DState::name)& WW3D::name##_State() noexcept { return WW3D_State().name; }
+WW3D_STATE_ACCESSOR(UserStat0)
+WW3D_STATE_ACCESSOR(UserStat1)
+WW3D_STATE_ACCESSOR(UserStat2)
+WW3D_STATE_ACCESSOR(PixelCenterX)
+WW3D_STATE_ACCESSOR(PixelCenterY)
+WW3D_STATE_ACCESSOR(RenderBackend)
+WW3D_STATE_ACCESSOR(IsInitted)
+WW3D_STATE_ACCESSOR(IsRendering)
+WW3D_STATE_ACCESSOR(IsCapturing)
+WW3D_STATE_ACCESSOR(IsSortingEnabled)
+WW3D_STATE_ACCESSOR(IsScreenUVBiased)
+WW3D_STATE_ACCESSOR(AreDecalsEnabled)
+WW3D_STATE_ACCESSOR(DecalRejectionDistance)
+WW3D_STATE_ACCESSOR(AreStaticSortListsEnabled)
+WW3D_STATE_ACCESSOR(MungeSortOnLoad)
+WW3D_STATE_ACCESSOR(OverbrightModifyOnLoad)
+WW3D_STATE_ACCESSOR(Movie)
+WW3D_STATE_ACCESSOR(PauseRecord)
+WW3D_STATE_ACCESSOR(RecordNextFrame)
+WW3D_STATE_ACCESSOR(DefaultDebugMaterial)
+WW3D_STATE_ACCESSOR(DefaultDebugShader)
+WW3D_STATE_ACCESSOR(LightmapDebugShader)
+WW3D_STATE_ACCESSOR(PrelitMode)
+WW3D_STATE_ACCESSOR(ExposePrelit)
+WW3D_STATE_ACCESSOR(TextureFilter)
+WW3D_STATE_ACCESSOR(AnisotropyLevel)
+WW3D_STATE_ACCESSOR(SnapshotActivated)
+WW3D_STATE_ACCESSOR(ThumbnailEnabled)
+WW3D_STATE_ACCESSOR(MeshDrawMode)
+WW3D_STATE_ACCESSOR(NPatchesGapFillingMode)
+WW3D_STATE_ACCESSOR(NPatchesLevel)
+WW3D_STATE_ACCESSOR(IsTexturingEnabled)
+WW3D_STATE_ACCESSOR(IsColoringEnabled)
+WW3D_STATE_ACCESSOR(Lite)
+WW3D_STATE_ACCESSOR(DefaultNativeScreenSize)
+WW3D_STATE_ACCESSOR(DefaultStaticSortLists)
+WW3D_STATE_ACCESSOR(CurrentStaticSortLists)
+WW3D_STATE_ACCESSOR(LastFrameMemoryAllocations)
+WW3D_STATE_ACCESSOR(LastFrameMemoryFrees)
+#undef WW3D_STATE_ACCESSOR
+#endif // RTS_ENGINE_CONTEXT
 
 
 /*

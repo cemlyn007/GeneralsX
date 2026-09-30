@@ -181,9 +181,6 @@ void SDL3GameEngine::init(void)
 	}
 
 	// Verify window was created by SDL3Main.cpp
-	extern SDL_Window* TheSDL3Window;
-	extern HWND ApplicationHWnd;
-
 	// GeneralsX @feature cemlyn007 30/09/2026 Windowless render-headless: an embed host that draws
 	// image observations brings the render device up with no window at all (a null HWND: DXVK then
 	// gives the device a back buffer and no presenter), so the engine binds none and makes no SDL

@@ -29,6 +29,8 @@
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
 #include "Common/ActionManager.h"
+// GeneralsX @refactor cemlyn007 30/09/2026 The window handles (PLAN-023 Phase 8, stage RR2a-2).
+#include "Common/ApplicationWindow.h"
 #include "Common/AudioAffect.h"
 #include "Common/BuildAssistant.h"
 #include "Common/CRCDebug.h"
@@ -258,7 +260,6 @@ static void updateWindowTitle()
 		AsciiString titleA;
 		titleA.translate(title);	//get ASCII version for Win 9x
 
-		extern HWND ApplicationHWnd;  ///< our application window handle
 		if (ApplicationHWnd) {
 // TheSuperHackers @build fighter19 11/02/2026 SetWindowText is Windows-only
 #ifdef _WIN32
@@ -1181,7 +1182,6 @@ void GameEngine::update()
 // assert path reads it, so engines on separate threads would race on a plain bool (PLAN-023 Phase 5b).
 #include <atomic>
 extern std::atomic<bool> DX8Wrapper_IsWindowed;
-extern HWND ApplicationHWnd;
 
 /** -----------------------------------------------------------------------------------------------
  * The "main loop" of the game engine. It will not return until the game exits.

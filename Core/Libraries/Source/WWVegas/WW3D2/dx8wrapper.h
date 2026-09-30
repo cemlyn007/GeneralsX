@@ -703,8 +703,10 @@ protected:
 	static D3DMATRIX						old_prj;
 	static RenderInfoClass*				Render_Info;
 
-	// Allocates this engine's W3DRenderState if it has none (Init, Set_Display_Size_Provider).
+	// Allocates this engine's W3DRenderState and WW3DState if it has none (WW3D::Init, Init,
+	// Set_Display_Size_Provider); Destroy_Render_State frees both (the end of WW3D::Shutdown, RR2a-2).
 	static void Create_Render_State();
+	static void Destroy_Render_State();
 #else
 	static DX8_CleanupHook *m_pCleanupHook;
 
@@ -1292,7 +1294,13 @@ WWINLINE void DX8Wrapper::Set_Material(const VertexMaterialClass* material)
 
 WWINLINE void DX8Wrapper::Set_Shader(const ShaderClass& shader)
 {
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 30/09/2026 ShaderClass's dirty flag is the engine's (PLAN-023 Phase 8, stage
+	// RR2a-2).
+	if (!W3D_Render_State().ShaderDirty && ((unsigned&)shader==(unsigned&)render_state.shader)) {
+#else
 	if (!ShaderClass::ShaderDirty && ((unsigned&)shader==(unsigned&)render_state.shader)) {
+#endif
 		return;
 	}
 	render_state.shader=shader;
