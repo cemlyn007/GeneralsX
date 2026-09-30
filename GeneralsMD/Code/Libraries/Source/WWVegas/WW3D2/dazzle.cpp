@@ -231,6 +231,35 @@ static SimpleVecClass<DazzleRenderObjClass*> temp_ptrs;
 static DazzleTypeClass** types;
 static unsigned type_count;
 
+// GeneralsX @bugfix cemlyn007 30/09/2026 The dazzle types belong to the render engine: its WW3D::Init loads
+// them from dazzle.ini and its WW3D::Shutdown frees them. Every engine's dazzle render objects read them
+// (the constructors, Set_Transform, Get_Type_ID), so a headless engine beside a renderer read the
+// renderer's types on its own thread (a race with their load and free, a use-after-free once freed) and
+// got type ids and radii its solo run, which has no types, never sees. Only the engine that owns the
+// render device sees them (PLAN-023 Phase 8, stage RR1; the device is up for the whole of WW3D::Init's and
+// Shutdown's dazzle work).
+static inline DazzleTypeClass** Engine_Types()
+{
+#if RTS_ENGINE_CONTEXT
+	if (!DX8Wrapper::Is_Initted())
+	{
+		return nullptr;
+	}
+#endif
+	return types;
+}
+
+static inline unsigned Engine_Type_Count()
+{
+#if RTS_ENGINE_CONTEXT
+	if (!DX8Wrapper::Is_Initted())
+	{
+		return 0;
+	}
+#endif
+	return type_count;
+}
+
 // Current dazzle layer - must be set before rendering
 static DazzleLayerClass * current_dazzle_layer = nullptr;
 
@@ -778,8 +807,9 @@ DazzleRenderObjClass::DazzleRenderObjClass(unsigned t)
 	visibility(0.0f),
 	current_scale(1.0f)
 {
-	if (types && types[t]) {
-		radius = types[t]->radius;
+	DazzleTypeClass** engine_types = Engine_Types();
+	if (engine_types && engine_types[t]) {
+		radius = engine_types[t]->radius;
 	} else {
 		radius = 0.0f;
 	}
@@ -807,8 +837,9 @@ DazzleRenderObjClass::DazzleRenderObjClass(const char * type_name)
 	current_scale(1.0f)
 {
 	int id = Get_Type_ID(type_name);
-	if (types && types[id]) {
-		radius = types[id]->radius;
+	DazzleTypeClass** engine_types = Engine_Types();
+	if (engine_types && engine_types[id]) {
+		radius = engine_types[id]->radius;
 	} else {
 		radius = 0.0f;
 	}
@@ -1254,7 +1285,7 @@ void DazzleRenderObjClass::Render_Dazzle(CameraClass* camera)
 void DazzleRenderObjClass::Set_Transform(const Matrix3D &m)
 {
 	RenderObjClass::Set_Transform(m);
-	if (type<type_count) {
+	if (type<Engine_Type_Count()) {
 		Matrix3D::Rotate_Vector(m,types[type]->ic.dazzle_direction,&current_dir);
 	}
 }
@@ -1268,7 +1299,8 @@ void DazzleRenderObjClass::Set_Transform(const Matrix3D &m)
 
 unsigned DazzleRenderObjClass::Get_Type_ID(const char* name)
 {
-	for (unsigned a=0;a<type_count;++a) {
+	const unsigned count = Engine_Type_Count();
+	for (unsigned a=0;a<count;++a) {
 		if (types[a] && types[a]->name==name) return a;
 	}
 	return UINT_MAX;
@@ -1285,7 +1317,7 @@ unsigned DazzleRenderObjClass::Get_Type_ID(const char* name)
 
 const char * DazzleRenderObjClass::Get_Type_Name(unsigned id)
 {
-	if ((id < type_count) && (id >= 0)) {
+	if ((id < Engine_Type_Count()) && (id >= 0)) {
 		return types[id]->name;
 	} else {
 		return "DEFAULT";
@@ -1302,7 +1334,7 @@ const char * DazzleRenderObjClass::Get_Type_Name(unsigned id)
 
 DazzleTypeClass* DazzleRenderObjClass::Get_Type_Class(unsigned id) // Return dazzle type class pointer, or null if not found
 {
-	if (id>=type_count) return nullptr;
+	if (id>=Engine_Type_Count()) return nullptr;
 	return types[id];
 }
 
