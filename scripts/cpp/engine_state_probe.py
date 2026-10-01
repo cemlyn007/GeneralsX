@@ -76,6 +76,8 @@ ALLOWLIST = {
     "theMemoryManagerUsers": "the refcounted memory manager's user count, under its mutex",
     "s_totalOpen": "a std::atomic open-file counter for a debug assert",
     "std::__detail::__waiter_pool_base::_S_for(void const*)::__w": "libstdc++'s wait pool for std::atomic::wait, process-wide by design",
+    # GeneralsX @feature cemlyn007 01/10/2026 (PLAN-023 Phase 8, stage RR3)
+    "rts::(anonymous namespace)::theNextSlotIndex": "the PER_ENGINE_STATIC slot index counter (atomic): a function-local PER_ENGINE_STATIC takes its index at its first use",
     "fcrandbuf": "fontconfig's random state (third-party; its cache file names): whether it is safe with renderers on several threads is ThreadSanitizer's to find (RR4)",
     "statebuf": "fontconfig's random state (third-party; its cache file names): whether it is safe with renderers on several threads is ThreadSanitizer's to find (RR4)",
 }
@@ -185,6 +187,13 @@ class Report:
             return "worklist", f"rewritten at every render boot until {phase}"
         if key in probe.allowlist:
             return "allowed", probe.allowlist[key]
+        # GeneralsX @feature cemlyn007 01/10/2026 A PER_ENGINE_STATIC's slot index (the symbol is the index, the
+        # object is each engine's own): written once, by its first use under the static-init guard when it is a
+        # function-local one, the same for every engine by design (PLAN-023 Phase 8, stage RR3). Judged by what
+        # the symbol is (the classifier's structural rule), not by its class.
+        row = probe.rows.get(key)
+        if row is not None and row.get("by") == "rule:per-engine-static":
+            return "allowed", "a PER_ENGINE_STATIC's slot index, taken at its first use"
         return "unexpected", ""
 
     def written(self, key):
