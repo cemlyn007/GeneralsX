@@ -66,7 +66,9 @@ struct SmudgeSet
 
 	W3DMPO_CODE(SmudgeSet)
 
-	SmudgeSet();
+	// GeneralsX @refactor cemlyn007 01/10/2026 The unused smudges are its manager's, given here (PLAN-023 Phase 8,
+	// stage RR3).
+	explicit SmudgeSet(SmudgeDeque &freeSmudgeList);
 	~SmudgeSet();
 
 	void reset();
@@ -83,7 +85,9 @@ private:
 
 	SmudgeDeque m_usedSmudgeList;	///<list of smudges in this set.
 	SmudgeIdToPtrMap m_usedSmudgeMap;
-	static SmudgeDeque m_freeSmudgeList;	///<list of unused smudges for use by SmudgeSets.
+	// GeneralsX @refactor cemlyn007 01/10/2026 Its manager's list (SmudgeManager::m_freeSmudgeList), not a class static
+	// every engine's smudge sets shared (PLAN-023 Phase 8, stage RR3).
+	SmudgeDeque &m_freeSmudgeList;	///<list of unused smudges for use by SmudgeSets.
 };
 
 typedef std::deque<SmudgeSet*> SmudgeSetDeque;
@@ -114,6 +118,9 @@ protected:
 
 	SmudgeSetDeque m_usedSmudgeSetList;	///<used SmudgeSets
 	SmudgeSetDeque m_freeSmudgeSetList;	///<unused SmudgeSets ready for re-use.
+	// GeneralsX @refactor cemlyn007 01/10/2026 SmudgeSet's class static before: each engine's manager pools its own
+	// smudges (PLAN-023 Phase 8, stage RR3).
+	SmudgeDeque m_freeSmudgeList;	///<list of unused smudges for use by SmudgeSets.
 	Int m_smudgeCountLastFrame;	//number of total smudges in manager last frame.
 };
 

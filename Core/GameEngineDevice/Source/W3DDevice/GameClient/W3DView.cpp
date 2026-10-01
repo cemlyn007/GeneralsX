@@ -1398,7 +1398,7 @@ void W3DView::update()
 		updateTerrain();
 	}
 
-	static Real followFactor = -1;
+	Real& followFactor = m_followFactor;	// GeneralsX @refactor cemlyn007 01/10/2026 the view's own (RR3)
 	ObjectID cameraLock = getCameraLock();
 	if (cameraLock == INVALID_ID)
 	{

@@ -28,6 +28,7 @@
 #include "GameClient/Shadow.h"
 
 class Drawable;	//forward reference
+class FrustumClass;	//forward reference
 
 // ShadowManager -------------------------------------------------------------
 class W3DShadowManager
@@ -51,6 +52,10 @@ public:
 	void setTimeOfDay(TimeOfDay tod);
 	void invalidateCachedLightPositions();	///<forces shadow volumes to update regardless of last lightposition
 	Vector3 &getLightPosWorld(Int lightIndex);	///<returns the position of specified light source.
+	// GeneralsX @refactor cemlyn007 01/10/2026 The frustum of the camera the shadows are drawn for, set by DoShadows at each
+	// draw (PLAN-023 Phase 8, stage RR3).
+	const FrustumClass *getShadowCameraFrustum() { return m_shadowCameraFrustum; }
+	void setShadowCameraFrustum(const FrustumClass *frustum) { m_shadowCameraFrustum = frustum; }
 	Bool	isShadowScene()	{return m_isShadowScene;}
 	void setStencilShadowMask(int mask) {m_stencilShadowMask=mask;}	///<mask used to mask out stencil bits used for storing occlusion/playerColor
 	Int getStencilShadowMask()	{return m_stencilShadowMask;}
@@ -65,6 +70,13 @@ protected:
 		Bool	m_isShadowScene;	///<flag if current scene needs shadows.  No shadows on pre-pass and 2D.
 		UnsignedInt m_shadowColor;	///<color and alpha for all shadows in scene.
 		Int m_stencilShadowMask;
+		// GeneralsX @refactor cemlyn007 01/10/2026 W3DShadow.cpp's shadowCameraFrustum and LightPosWorld, globals before: each
+		// render engine's shadows use their own camera and light (PLAN-023 Phase 8, stage RR3).
+		const FrustumClass *m_shadowCameraFrustum = nullptr;
+		Vector3 m_lightPosWorld[ MAX_SHADOW_LIGHTS ] =
+		{
+			Vector3( 94.0161f, 50.499f, 200.0f)
+		};
 };
 
 #if !RTS_ENGINE_CONTEXT

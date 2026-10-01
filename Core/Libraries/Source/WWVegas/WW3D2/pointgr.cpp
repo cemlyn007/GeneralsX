@@ -961,15 +961,18 @@ void PointGroupClass::Render(RenderInfoClass &rinfo)
 		// Not using vector processor class because we are discarding w
 		// Not using T&L in DX8 because we don't want DX8 to transform
 		// 3 times per particle when we can do it once
+		// GeneralsX @refactor cemlyn007 01/10/2026 Bound once, not looked up per point: with RTS_ENGINE_CONTEXT it is
+		// this engine's (PLAN-023 Phase 8, stage RR3).
+		VectorClass<Vector3>& transformed = transformed_loc;
 		for (int i=0; i<PointCount; i++)
 		{
 			/// @todo lorenzen sez: use pointer arithmetic here and a fast while loop
 			Vector4 result=view*current_loc[i];
-			transformed_loc[i].X=result.X;
-			transformed_loc[i].Y=result.Y;
-			transformed_loc[i].Z=result.Z;
+			transformed[i].X=result.X;
+			transformed[i].Y=result.Y;
+			transformed[i].Z=result.Z;
 		}
-		current_loc = &transformed_loc[0];
+		current_loc = &transformed[0];
 	}
 
 	// Update the arrays with the offsets.
@@ -1023,6 +1026,11 @@ void PointGroupClass::Render(RenderInfoClass &rinfo)
 			int i;
 			unsigned char *vb=(unsigned char*)Lock.Get_Formatted_Vertex_Array();
 			const FVFInfoClass& fvfinfo=PointVerts.FVF_Info();
+			// GeneralsX @refactor cemlyn007 01/10/2026 Bound once, not looked up per vertex: with RTS_ENGINE_CONTEXT
+			// they are this engine's (PLAN-023 Phase 8, stage RR3).
+			VectorClass<Vector3>& vertexLoc = VertexLoc;
+			VectorClass<Vector4>& vertexDiffuse = VertexDiffuse;
+			VectorClass<Vector2>& vertexUV = VertexUV;
 
 			for (i = current; i < current + delta; i++)
 			{
@@ -1030,15 +1038,15 @@ void PointGroupClass::Render(RenderInfoClass &rinfo)
 				/// @todo lorenzen sez: delare thes locals outside this loop
 				/// @todo lorenzen sez: use a fast while loop
 				// Copy Locations
-				*(Vector3*)(vb+fvfinfo.Get_Location_Offset())=VertexLoc[i];
+				*(Vector3*)(vb+fvfinfo.Get_Location_Offset())=vertexLoc[i];
 				if (current_diffuse) {
-					unsigned color=DX8Wrapper::Convert_Color_Clamp(VertexDiffuse[i]);
+					unsigned color=DX8Wrapper::Convert_Color_Clamp(vertexDiffuse[i]);
 					*(unsigned int*)(vb+fvfinfo.Get_Diffuse_Offset())=color;
 				}
 				else
 					*(unsigned int*)(vb+fvfinfo.Get_Diffuse_Offset())=
 						DX8Wrapper::Convert_Color_Clamp(Vector4(DefaultPointColor[0],DefaultPointColor[1],DefaultPointColor[2],DefaultPointAlpha));
-				*(Vector2*)(vb+fvfinfo.Get_Tex_Offset(0))=VertexUV[i];
+				*(Vector2*)(vb+fvfinfo.Get_Tex_Offset(0))=vertexUV[i];
 				vb+=fvfinfo.Get_FVF_Size();
 			}
 		}
@@ -1143,6 +1151,10 @@ void PointGroupClass::Update_Arrays(
 
 	vert = 0;
 	Vector3 *vertex_loc = &VertexLoc[0];
+	// GeneralsX @refactor cemlyn007 01/10/2026 Bound once, not looked up per point: with RTS_ENGINE_CONTEXT they are
+	// this engine's (PLAN-023 Phase 8, stage RR3).
+	Vector3 (&triOffsets)[256][3] = _TriVertexLocationOrientationTable;
+	Vector3 (&quadOffsets)[256][4] = _QuadVertexLocationOrientationTable;
 
 
 	/// @todo lorenzen sez: this switch statement may be done more compactly another way... look into it
@@ -1153,9 +1165,9 @@ void PointGroupClass::Update_Arrays(
 			{
 				// Setup constant vertex offsets (since size and orientation are invariants)
 				Vector3 scaled_offset[3];
-				scaled_offset[0] = _TriVertexLocationOrientationTable[DefaultPointOrientation][0] * DefaultPointSize;
-				scaled_offset[1] = _TriVertexLocationOrientationTable[DefaultPointOrientation][1] * DefaultPointSize;
-				scaled_offset[2] = _TriVertexLocationOrientationTable[DefaultPointOrientation][2] * DefaultPointSize;
+				scaled_offset[0] = triOffsets[DefaultPointOrientation][0] * DefaultPointSize;
+				scaled_offset[1] = triOffsets[DefaultPointOrientation][1] * DefaultPointSize;
+				scaled_offset[2] = triOffsets[DefaultPointOrientation][2] * DefaultPointSize;
 
 				// Add vertex offsets to point locations to get vertex locations
 				for (i = 0; i < active_points; i++) {
@@ -1174,11 +1186,11 @@ void PointGroupClass::Update_Arrays(
 				// Scale vertex offsets and add them to point locations to get vertex locations
 				for (i = 0; i < active_points; i++) {
 					vertex_loc[vert + 0] = point_loc[i] +
-						_TriVertexLocationOrientationTable[DefaultPointOrientation][0] * point_size[i];
+						triOffsets[DefaultPointOrientation][0] * point_size[i];
 					vertex_loc[vert + 1] = point_loc[i] +
-						_TriVertexLocationOrientationTable[DefaultPointOrientation][1] * point_size[i];
+						triOffsets[DefaultPointOrientation][1] * point_size[i];
 					vertex_loc[vert + 2] = point_loc[i] +
-						_TriVertexLocationOrientationTable[DefaultPointOrientation][2] * point_size[i];
+						triOffsets[DefaultPointOrientation][2] * point_size[i];
 					vert += 3;
 				}
 			}
@@ -1191,11 +1203,11 @@ void PointGroupClass::Update_Arrays(
 				// Scale vertex offsets and add them to point locations to get vertex locations
 				for (i = 0; i < active_points; i++) {
 					vertex_loc[vert + 0] = point_loc[i] +
-						_TriVertexLocationOrientationTable[point_orientation[i]][0] * DefaultPointSize;
+						triOffsets[point_orientation[i]][0] * DefaultPointSize;
 					vertex_loc[vert + 1] = point_loc[i] +
-						_TriVertexLocationOrientationTable[point_orientation[i]][1] * DefaultPointSize;
+						triOffsets[point_orientation[i]][1] * DefaultPointSize;
 					vertex_loc[vert + 2] = point_loc[i] +
-						_TriVertexLocationOrientationTable[point_orientation[i]][2] * DefaultPointSize;
+						triOffsets[point_orientation[i]][2] * DefaultPointSize;
 					vert += 3;
 				}
 			}
@@ -1208,11 +1220,11 @@ void PointGroupClass::Update_Arrays(
 				// Scale vertex offsets and add them to point locations to get vertex locations
 				for (i = 0; i < active_points; i++) {
 					vertex_loc[vert + 0] = point_loc[i] +
-						_TriVertexLocationOrientationTable[point_orientation[i]][0] * point_size[i];
+						triOffsets[point_orientation[i]][0] * point_size[i];
 					vertex_loc[vert + 1] = point_loc[i] +
-						_TriVertexLocationOrientationTable[point_orientation[i]][1] * point_size[i];
+						triOffsets[point_orientation[i]][1] * point_size[i];
 					vertex_loc[vert + 2] = point_loc[i] +
-						_TriVertexLocationOrientationTable[point_orientation[i]][2] * point_size[i];
+						triOffsets[point_orientation[i]][2] * point_size[i];
 					vert += 3;
 				}
 			}
@@ -1222,10 +1234,10 @@ void PointGroupClass::Update_Arrays(
 			{
 				// Setup constant vertex offsets (since size and orientation are invariants)
 				Vector3 scaled_offset[4];
-				scaled_offset[0] = _QuadVertexLocationOrientationTable[DefaultPointOrientation][0] * DefaultPointSize;
-				scaled_offset[1] = _QuadVertexLocationOrientationTable[DefaultPointOrientation][1] * DefaultPointSize;
-				scaled_offset[2] = _QuadVertexLocationOrientationTable[DefaultPointOrientation][2] * DefaultPointSize;
-				scaled_offset[3] = _QuadVertexLocationOrientationTable[DefaultPointOrientation][3] * DefaultPointSize;
+				scaled_offset[0] = quadOffsets[DefaultPointOrientation][0] * DefaultPointSize;
+				scaled_offset[1] = quadOffsets[DefaultPointOrientation][1] * DefaultPointSize;
+				scaled_offset[2] = quadOffsets[DefaultPointOrientation][2] * DefaultPointSize;
+				scaled_offset[3] = quadOffsets[DefaultPointOrientation][3] * DefaultPointSize;
 
 				// Add vertex offsets to point locations to get vertex locations
 				for (i = 0; i < active_points; i++) {
@@ -1245,13 +1257,13 @@ void PointGroupClass::Update_Arrays(
 				// Scale vertex offsets and add them to point locations to get vertex locations
 				for (i = 0; i < active_points; i++) {
 					vertex_loc[vert + 0] = point_loc[i] +
-						_QuadVertexLocationOrientationTable[DefaultPointOrientation][0] * point_size[i];
+						quadOffsets[DefaultPointOrientation][0] * point_size[i];
 					vertex_loc[vert + 1] = point_loc[i] +
-						_QuadVertexLocationOrientationTable[DefaultPointOrientation][1] * point_size[i];
+						quadOffsets[DefaultPointOrientation][1] * point_size[i];
 					vertex_loc[vert + 2] = point_loc[i] +
-						_QuadVertexLocationOrientationTable[DefaultPointOrientation][2] * point_size[i];
+						quadOffsets[DefaultPointOrientation][2] * point_size[i];
 					vertex_loc[vert + 3] = point_loc[i] +
-						_QuadVertexLocationOrientationTable[DefaultPointOrientation][3] * point_size[i];
+						quadOffsets[DefaultPointOrientation][3] * point_size[i];
 					vert += 4;
 				}
 			}
@@ -1264,13 +1276,13 @@ void PointGroupClass::Update_Arrays(
 				// Scale vertex offsets and add them to point locations to get vertex locations
 				for (i = 0; i < active_points; i++) {
 					vertex_loc[vert + 0] = point_loc[i] +
-						_QuadVertexLocationOrientationTable[point_orientation[i]][0] * DefaultPointSize;
+						quadOffsets[point_orientation[i]][0] * DefaultPointSize;
 					vertex_loc[vert + 1] = point_loc[i] +
-						_QuadVertexLocationOrientationTable[point_orientation[i]][1] * DefaultPointSize;
+						quadOffsets[point_orientation[i]][1] * DefaultPointSize;
 					vertex_loc[vert + 2] = point_loc[i] +
-						_QuadVertexLocationOrientationTable[point_orientation[i]][2] * DefaultPointSize;
+						quadOffsets[point_orientation[i]][2] * DefaultPointSize;
 					vertex_loc[vert + 3] = point_loc[i] +
-						_QuadVertexLocationOrientationTable[point_orientation[i]][3] * DefaultPointSize;
+						quadOffsets[point_orientation[i]][3] * DefaultPointSize;
 					vert += 4;
 				}
 			}
@@ -1336,13 +1348,13 @@ void PointGroupClass::Update_Arrays(
 					} else {
 
 						vertex_loc[vert + 0] = point_loc[i] +
-							_QuadVertexLocationOrientationTable[point_orientation[i]][0] * point_size[i];
+							quadOffsets[point_orientation[i]][0] * point_size[i];
 						vertex_loc[vert + 1] = point_loc[i] +
-							_QuadVertexLocationOrientationTable[point_orientation[i]][1] * point_size[i];
+							quadOffsets[point_orientation[i]][1] * point_size[i];
 						vertex_loc[vert + 2] = point_loc[i] +
-							_QuadVertexLocationOrientationTable[point_orientation[i]][2] * point_size[i];
+							quadOffsets[point_orientation[i]][2] * point_size[i];
 						vertex_loc[vert + 3] = point_loc[i] +
-							_QuadVertexLocationOrientationTable[point_orientation[i]][3] * point_size[i];
+							quadOffsets[point_orientation[i]][3] * point_size[i];
 					}
 					vert += 4;
 				}
@@ -1542,18 +1554,21 @@ void PointGroupClass::_Init()
 
 	float angle = 0.0f;	// In radians
 	float angle_step = (WWMATH_PI * 2.0f) / 256.0f;	// In radians
+	// GeneralsX @refactor cemlyn007 01/10/2026 Bound once (PLAN-023 Phase 8, stage RR3; see Update_Arrays).
+	Vector3 (&triOffsets)[256][3] = _TriVertexLocationOrientationTable;
+	Vector3 (&quadOffsets)[256][4] = _QuadVertexLocationOrientationTable;
 	for (i = 0; i < 256; i++) {
 		float c = WWMath::Fast_Cos(angle);
 		float s = WWMath::Fast_Sin(angle);
 		for (j = 0; j < 3; j++) {
-			_TriVertexLocationOrientationTable[i][j].X = tri_locs[j].X * c - tri_locs[j].Y * s;
-			_TriVertexLocationOrientationTable[i][j].Y = tri_locs[j].X * s + tri_locs[j].Y * c;
-			_TriVertexLocationOrientationTable[i][j].Z = tri_locs[j].Z;
+			triOffsets[i][j].X = tri_locs[j].X * c - tri_locs[j].Y * s;
+			triOffsets[i][j].Y = tri_locs[j].X * s + tri_locs[j].Y * c;
+			triOffsets[i][j].Z = tri_locs[j].Z;
 		}
 		for (j = 0; j < 4; j++) {
-			_QuadVertexLocationOrientationTable[i][j].X = quad_locs[j].X * c - quad_locs[j].Y * s;
-			_QuadVertexLocationOrientationTable[i][j].Y = quad_locs[j].X * s + quad_locs[j].Y * c;
-			_QuadVertexLocationOrientationTable[i][j].Z = quad_locs[j].Z;
+			quadOffsets[i][j].X = quad_locs[j].X * c - quad_locs[j].Y * s;
+			quadOffsets[i][j].Y = quad_locs[j].X * s + quad_locs[j].Y * c;
+			quadOffsets[i][j].Z = quad_locs[j].Z;
 		}
 		angle += angle_step;
 	}
@@ -1873,6 +1888,8 @@ void PointGroupClass::RenderVolumeParticle(RenderInfoClass &rinfo, unsigned int 
 			Vector3 volumeLayerShift;
 			Vector3 cameraPosition = rinfo.Camera.Get_Position();
 
+			// GeneralsX @refactor cemlyn007 01/10/2026 Bound once, not looked up per point (PLAN-023 Phase 8, stage RR3).
+			VectorClass<Vector3>& transformed = transformed_loc;
 			for (int i=0; i<PointCount; i++)
 			{
 				/// @todo lorenzen sez: use pointer arithmetic here and a fast while loop
@@ -1889,11 +1906,11 @@ void PointGroupClass::RenderVolumeParticle(RenderInfoClass &rinfo, unsigned int 
 				temp.Z = current_loc[i].Z + cameraToPointDelta.Z;
 
 				Vector4 result= view * temp;
-				transformed_loc[i].X=result.X;
-				transformed_loc[i].Y=result.Y;
-				transformed_loc[i].Z=result.Z;
+				transformed[i].X=result.X;
+				transformed[i].Y=result.Y;
+				transformed[i].Z=result.Z;
 			}
-			current_loc = &transformed_loc[0];
+			current_loc = &transformed[0];
 		}
 
 		// Update the arrays with the offsets.
@@ -1953,6 +1970,11 @@ void PointGroupClass::RenderVolumeParticle(RenderInfoClass &rinfo, unsigned int 
 				int i;
 				unsigned char *vb=(unsigned char*)Lock.Get_Formatted_Vertex_Array();
 				const FVFInfoClass& fvfinfo = PointVerts.FVF_Info();
+				// GeneralsX @refactor cemlyn007 01/10/2026 Bound once, not looked up per vertex (PLAN-023 Phase 8, stage
+				// RR3; see Render).
+				VectorClass<Vector3>& vertexLoc = VertexLoc;
+				VectorClass<Vector4>& vertexDiffuse = VertexDiffuse;
+				VectorClass<Vector2>& vertexUV = VertexUV;
 
 
 				for (i = current; i < current + delta; i++)
@@ -1961,16 +1983,16 @@ void PointGroupClass::RenderVolumeParticle(RenderInfoClass &rinfo, unsigned int 
 					/// @todo lorenzen sez: delare thes locals outside this loop
 					/// @todo lorenzen sez: use a fast while loop
 					// Copy Locations
-					*(Vector3*)(vb+fvfinfo.Get_Location_Offset()) = VertexLoc[i];
+					*(Vector3*)(vb+fvfinfo.Get_Location_Offset()) = vertexLoc[i];
 
 					if (current_diffuse) {
-						unsigned color=DX8Wrapper::Convert_Color_Clamp(VertexDiffuse[i]);
+						unsigned color=DX8Wrapper::Convert_Color_Clamp(vertexDiffuse[i]);
 						*(unsigned int*)(vb+fvfinfo.Get_Diffuse_Offset())=color;
 					}
 					else
 						*(unsigned int*)(vb+fvfinfo.Get_Diffuse_Offset())=
 							DX8Wrapper::Convert_Color_Clamp(Vector4(DefaultPointColor[0],DefaultPointColor[1],DefaultPointColor[2],DefaultPointAlpha));
-					*(Vector2*)(vb+fvfinfo.Get_Tex_Offset(0))=VertexUV[i];
+					*(Vector2*)(vb+fvfinfo.Get_Tex_Offset(0))=vertexUV[i];
 					vb+=fvfinfo.Get_FVF_Size();
 				}
 			}

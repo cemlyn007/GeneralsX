@@ -68,6 +68,7 @@
 #include "W3DDevice/GameClient/W3DPoly.h"
 #include "W3DDevice/GameClient/W3DScene.h"
 #include "W3DDevice/GameClient/W3DCustomScene.h"
+#include "W3DDevice/GameClient/W3DDrawClock.h"	// GeneralsX @bugfix cemlyn007 01/10/2026 (RR3)
 
 
 
@@ -1022,7 +1023,7 @@ Int WaterRenderObjClass::init(Real waterLevel, Real dx, Real dy, SceneClass *par
 	m_dy=dy;
 	m_level=waterLevel;
 
-	m_LastUpdateTime=timeGetTime();
+	m_LastUpdateTime=W3D_DRAW_CLOCK_MS();	// GeneralsX @bugfix cemlyn007 01/10/2026 the draw clock (W3DDrawClock.h, RR3)
 	m_uScrollPerMs=0.001f;
 	m_vScrollPerMs=0.001f;
 	m_uOffset=0;
@@ -2083,7 +2084,7 @@ void WaterRenderObjClass::renderSky()
 
 	Setting *setting=&m_settings[m_tod];
 
-	timeNow=timeGetTime();
+	timeNow=W3D_DRAW_CLOCK_MS();	// GeneralsX @bugfix cemlyn007 01/10/2026 the draw clock (W3DDrawClock.h, RR3)
 
 	timeDiff=timeNow-m_LastUpdateTime;
 	m_LastUpdateTime=timeNow;
