@@ -89,9 +89,11 @@ bool WWMemoryLogClass::IsMemoryLogEnabled=false;
 #endif
 
 // GeneralsX @bugfix cemlyn007 01/10/2026 The allocation and free counts WW3D::Begin_Render reads and resets
-// every frame, per thread: one count per process was read and reset by every engine drawing at once on its
-// own thread (PLAN-023 Phase 8, stage RR4), a data race, and an engine's frame statistics counted the others'
-// allocations. Each now counts the allocations of the thread it is drawn on.
+// every frame, per thread (PLAN-023 Phase 8, stage RR4). Nothing calls Allocate_Memory or Release_Memory in
+// this build, so the counts are always zero, but WW3D::Begin_Render's Reset_Counters wrote that zero into the
+// one process-wide pair from every engine drawing at once on its own thread: a data race (ThreadSanitizer),
+// however harmless the value. Per thread, should anything count again, each engine's frame statistics also
+// count only the allocations of the thread it is drawn on.
 static thread_local unsigned AllocateCount;
 static thread_local unsigned FreeCount;
 
