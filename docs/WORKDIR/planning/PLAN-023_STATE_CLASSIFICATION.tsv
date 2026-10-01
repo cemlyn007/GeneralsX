@@ -517,7 +517,7 @@ scrollDir	namespace	local	.bss	1	4	Core/GameEngine/Source/GameClient/MessageStre
 prevCursor	namespace	local	.data	1	4	Core/GameEngine/Source/GameClient/MessageStream/LookAtXlat.cpp:84	render-only		mouse/scroll input: headless has MouseDummy and no input	hand
 PlaceEventTranslator::translateGameMessage(GameMessage const*)::noCanDoSound_perEngine	function	local	.bss	1	16	Core/GameEngine/Source/GameClient/MessageStream/PlaceEventTranslator.cpp:304	process-global		PER_ENGINE_STATIC slot index, written once at static initialisation; the object lives in each engine's EngineContext	rule:per-engine-static
 guard variable for PlaceEventTranslator::translateGameMessage(GameMessage const*)::noCanDoSound_perEngine	guard	local	.bss	1	8	Core/GameEngine/Source/GameClient/MessageStream/PlaceEventTranslator.cpp:304	process-global		guard variable of that static: PER_ENGINE_STATIC slot index, written once at static initialisation; the object lives in each engine's EngineContext	guard
-TheWeatherSetting_perEngine	namespace	global	.bss	1	16	Core/GameEngine/Source/GameClient/Snow.cpp:124	process-global		PER_ENGINE_STATIC slot index, written once at static initialisation; the object lives in each engine's EngineContext	rule:per-engine-static
+TheWeatherSetting_perEngine	namespace	global	.bss	1	16	Core/GameEngine/Source/GameClient/Snow.cpp:125	process-global		PER_ENGINE_STATIC slot index, written once at static initialisation; the object lives in each engine's EngineContext	rule:per-engine-static
 SnowRandom_perEngine	namespace	local	.bss	1	16	Core/GameEngine/Source/GameClient/Snow.cpp:41	process-global		PER_ENGINE_STATIC slot index, written once at static initialisation; the object lives in each engine's EngineContext	rule:per-engine-static
 DebugDisplay::printf(char const*, ...)::text	function	local	.bss	1	5120	Core/GameEngine/Source/GameClient/System/DebugDisplay.cpp:202	debug-only		debug display text buffer	hand
 ParticleSystem::computePointOnUnitSphere()::point	function	local	.tbss	1	12	Core/GameEngine/Source/GameClient/System/ParticleSys.cpp:1441	process-global		thread_local returned-by-pointer scratch, consumed at once (PLAN-023 Phase 5b): per thread by design	hand
@@ -859,10 +859,10 @@ ThumbnailManagerClass::CreateThumbnailIfNotFound	class	global	.bss	1	1	Core/Libr
 (anonymous namespace)::VisClipState_perEngine	namespace	local	.bss	1	16	Core/Libraries/Source/WWVegas/WW3D2/visrasterizer.cpp:144	process-global		PER_ENGINE_STATIC slot index, written once at static initialisation; the object lives in each engine's EngineContext	rule:per-engine-static
 DAZZLE_INI_FILENAME	namespace	global	.data	1	8	Core/Libraries/Source/WWVegas/WW3D2/ww3d.cpp:127	render-const		the dazzle INI's name, never reassigned	hand
 WW3DState::Defaults	class	global	.bss	1	4096	Core/Libraries/Source/WWVegas/WW3D2/ww3d.cpp:176	render-const		the WW3D state an engine without one reads (RR2a-2): every field at its upstream initial value, built at static initialisation and never written (a host makes its pages read-only, W3D_Protect_Render_Defaults)	hand
-_TheMemLog	namespace	local	.bss	1	8	Core/Libraries/Source/WWVegas/WWDebug/wwmemlog.cpp:251	debug-only		WW memory log	file
+_TheMemLog	namespace	local	.bss	1	8	Core/Libraries/Source/WWVegas/WWDebug/wwmemlog.cpp:255	debug-only		WW memory log	file
 WWMemoryLogClass::IsMemoryLogEnabled	class	global	.bss	1	1	Core/Libraries/Source/WWVegas/WWDebug/wwmemlog.cpp:86	debug-only		WW memory log	file
-AllocateCount	namespace	local	.bss	1	4	Core/Libraries/Source/WWVegas/WWDebug/wwmemlog.cpp:91	debug-only		WW memory log	file
-FreeCount	namespace	local	.bss	1	4	Core/Libraries/Source/WWVegas/WWDebug/wwmemlog.cpp:92	debug-only		WW memory log	file
+AllocateCount	namespace	local	.tbss	1	4	Core/Libraries/Source/WWVegas/WWDebug/wwmemlog.cpp:95	debug-only		WW memory log	file
+FreeCount	namespace	local	.tbss	1	4	Core/Libraries/Source/WWVegas/WWDebug/wwmemlog.cpp:96	debug-only		WW memory log	file
 CDownload::PumpMessages()::reenter	function	local	.bss	1	4	Core/Libraries/Source/WWVegas/WWDownload/Download.cpp:172	process-global		patch/map downloader (menus only), one per process	file
 Cftp::AsyncGetHostByName(char*, sockaddr_in&)::stat	function	local	.bss	1	4	Core/Libraries/Source/WWVegas/WWDownload/FTP.cpp:280	process-global		patch/map downloader (menus only), one per process	file
 Cftp::AsyncGetHostByName(char*, sockaddr_in&)::threadid	function	local	.bss	1	8	Core/Libraries/Source/WWVegas/WWDownload/FTP.cpp:281	process-global		patch/map downloader (menus only), one per process	file

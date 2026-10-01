@@ -88,8 +88,12 @@ bool WWMemoryLogClass::IsMemoryLogEnabled=true;
 bool WWMemoryLogClass::IsMemoryLogEnabled=false;
 #endif
 
-static unsigned AllocateCount;
-static unsigned FreeCount;
+// GeneralsX @bugfix cemlyn007 01/10/2026 The allocation and free counts WW3D::Begin_Render reads and resets
+// every frame, per thread: one count per process was read and reset by every engine drawing at once on its
+// own thread (PLAN-023 Phase 8, stage RR4), a data race, and an engine's frame statistics counted the others'
+// allocations. Each now counts the allocations of the thread it is drawn on.
+static thread_local unsigned AllocateCount;
+static thread_local unsigned FreeCount;
 
 /*
 ** Name for each memory category.  I'm padding the array with some "undefined" strings in case
