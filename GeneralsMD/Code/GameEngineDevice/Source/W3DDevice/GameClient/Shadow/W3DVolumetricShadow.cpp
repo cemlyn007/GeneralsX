@@ -478,6 +478,12 @@ Bool isPatchShadowed(W3DShadowGeometryHeightmapMesh	*hm_mesh)
 	if (!map)
 		return FALSE;
 
+	// GeneralsX @bugfix cemlyn007 01/10/2026 The light position is the shadow manager's (per engine since PLAN-023
+	// Phase 8, stage RR3), not the removed global LightPosWorld. This block (DO_TERRAIN_SHADOW_VOLUMES, never
+	// defined) still does not compile, as upstream's did not: W3DShadowGeometryHeightmapMesh's GetPolygonIndex
+	// and buildPolygonNormal no longer match W3DShadowGeometryMesh's.
+	const Vector3 lightPosWorld = TheW3DShadowManager->getLightPosWorld(0);
+
 	hm_mesh->buildPolygonNormal( 0, &normal );
 
 	// get the vertex indices at this polygon
@@ -494,7 +500,7 @@ Bool isPatchShadowed(W3DShadowGeometryHeightmapMesh	*hm_mesh)
 	// we could use would be the object center
 	//
 	hm_mesh->GetVertex( poly[ 0 ], &vertex );
-	lightVector= vertex - LightPosWorld[0];
+	lightVector= vertex - lightPosWorld;
 
 	//
 	// dot the light vector with the normal of the polygon to see if the
@@ -521,7 +527,7 @@ Bool isPatchShadowed(W3DShadowGeometryHeightmapMesh	*hm_mesh)
 		// we could use would be the object center
 		//
 		hm_mesh->GetVertex( poly[ 0 ], &vertex );
-		lightVector= vertex - LightPosWorld[0];
+		lightVector= vertex - lightPosWorld;
 
 		//
 		// dot the light vector with the normal of the polygon to see if the

@@ -60,6 +60,7 @@
 #include "bitmaphandler.h"
 #include "WWDebug/wwprofile.h"
 #if RTS_ENGINE_CONTEXT
+#include <cstdio>
 #include <optional>
 #endif
 
@@ -299,16 +300,30 @@ struct TextureLoaderState
 	}
 
 	// Detaches each queued task from its texture (releasing the reference it holds) and deletes it. A task still
-	// holding a Direct3D texture (one TextureLoader::Deinit did not retire) is leaked instead: its device is gone,
-	// so neither its texture nor the texture it loads for may be released now.
+	// holding a Direct3D texture (one TextureLoader::Deinit did not retire) is leaked instead, and reported: its
+	// device is gone, so neither its texture nor the texture it loads for may be released now.
+	// GeneralsX @bugfix cemlyn007 01/10/2026 Reported, not silent (PLAN-023 Phase 8, stage RR3). Not expected to
+	// happen: an engine's state is destroyed only with an engine that shut down cleanly, whose WW3D::Shutdown ran
+	// TextureLoader::Deinit (Retire_Queues) first, or one that never booted. A faulted engine, whose teardown may
+	// have stopped before WW3D::Shutdown, is never destroyed (the host keeps its corrupt state allocated for the
+	// rest of the process, rlgenerals' launcher::Engine), so its tasks, texture and device stay referenced, not
+	// freed under a device that may be gone. The report makes a host that breaks that rule visible.
 	static void Retire_Queue(SynchronizedTextureLoadTaskListClass& queue)
 	{
+		int leaked = 0;
 		while (TextureLoadTaskClass* task = queue.Pop_Front()) {
 			if (task->Peek_D3D_Texture() != nullptr) {
+				++leaked;
 				continue;
 			}
 			task->Deinit();
 			delete task;
+		}
+		if (leaked > 0) {
+			std::fprintf(stderr,
+				"TextureLoader: %d queued texture load(s) still holding a Direct3D texture outlived the engine's "
+				"TextureLoader::Deinit; leaked with their device reference\n", leaked);
+			WWASSERT(leaked == 0);
 		}
 	}
 };
