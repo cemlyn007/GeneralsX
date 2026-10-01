@@ -66,7 +66,38 @@ extern Keyboard *TheKeyboard;
 extern GameWindowManager *TheWindowManager;
 #endif
 
+// GeneralsX @feature cemlyn007 01/10/2026 The embedding host's event pump lock (Common/ApplicationWindow.h;
+// PLAN-023 Phase 8, stage RR4).
+bool (*ApplicationWindow_TryLockEventPump)() = nullptr;
+void (*ApplicationWindow_UnlockEventPump)() = nullptr;
+
 namespace {
+
+// GeneralsX @feature cemlyn007 01/10/2026 Holds the host's event pump lock, if it has one, for its scope (PLAN-023
+// Phase 8, stage RR4). acquired() is false when the host's lock is busy: the caller then skips its SDL calls.
+class EventPumpLock
+{
+public:
+	EventPumpLock()
+		: m_locked(ApplicationWindow_TryLockEventPump != nullptr && ApplicationWindow_TryLockEventPump()),
+		  m_acquired(ApplicationWindow_TryLockEventPump == nullptr || m_locked)
+	{
+	}
+	~EventPumpLock()
+	{
+		if (m_locked) {
+			ApplicationWindow_UnlockEventPump();
+		}
+	}
+	EventPumpLock(const EventPumpLock&) = delete;
+	EventPumpLock& operator=(const EventPumpLock&) = delete;
+
+	bool acquired() const { return m_acquired; }
+
+private:
+	const bool m_locked;
+	const bool m_acquired;
+};
 
 Bool DecodeNextUtf8Codepoint(const char* text, size_t length, size_t& offset, UnsignedInt& outCodepoint)
 {
@@ -218,9 +249,14 @@ void SDL3GameEngine::reset(void)
 {
 	fprintf(stderr, "DEBUG: SDL3GameEngine::reset()\n");
 	if (m_SDLWindow && m_IsTextInputActive) {
-		SDL_StopTextInput(m_SDLWindow);
-		m_IsTextInputActive = false;
 		m_TextInputFocusWindow = nullptr;
+		// GeneralsX @feature cemlyn007 01/10/2026 Under the host's event pump lock; when it is busy, the next pump's
+		// updateTextInputState stops text input instead (PLAN-023 Phase 8, stage RR4).
+		const EventPumpLock pumpLock;
+		if (pumpLock.acquired()) {
+			SDL_StopTextInput(m_SDLWindow);
+			m_IsTextInputActive = false;
+		}
 	}
 	GameEngine::reset();
 }
@@ -276,6 +312,13 @@ void SDL3GameEngine::setIsActive(Bool isActive)
 void SDL3GameEngine::pollSDL3Events(void)
 {
 	if (!m_SDLWindow) {
+		return;
+	}
+
+	// GeneralsX @feature cemlyn007 01/10/2026 Under the host's event pump lock, or skipped while another thread
+	// holds it (PLAN-023 Phase 8, stage RR4).
+	const EventPumpLock pumpLock;
+	if (!pumpLock.acquired()) {
 		return;
 	}
 

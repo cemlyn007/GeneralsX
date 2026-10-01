@@ -8,6 +8,8 @@
 # found); class; phase (the stage that moves it: per-engine and render classes); note; by (hand, file = a
 # hand `file:` pattern, rule:<name>, guard, none).
 symbol	scope	binding	section	count	bytes	source	class	phase	note	by
+ApplicationWindow_TryLockEventPump	namespace	global	.bss	1	8	?	render-process		the embedding host's lock around its window's SDL event pump (RR4): set once, before the window's engine boots, and only read after that	hand
+ApplicationWindow_UnlockEventPump	namespace	global	.bss	1	8	?	render-process		the embedding host's lock around its window's SDL event pump (RR4): set once, before the window's engine boots, and only read after that	hand
 DW.ref._ZTI12INIException	namespace	local	.data	1	8	?	process-global		compiler/linker runtime object (crtstuff, DWARF personality references)	rule:toolchain
 DW.ref._ZTI16FatalEngineError	namespace	local	.data	1	8	?	process-global		compiler/linker runtime object (crtstuff, DWARF personality references)	rule:toolchain
 DW.ref._ZTI17QuitGameException	namespace	local	.data	1	8	?	process-global		compiler/linker runtime object (crtstuff, DWARF personality references)	rule:toolchain

@@ -50,3 +50,16 @@ static_assert(sizeof(HWND) == sizeof(void*), "EngineContext::applicationHWnd hol
 extern SDL_Window* TheSDL3Window;  ///< the SDL3 window (Linux, macOS)
 extern HWND ApplicationHWnd;  ///< our application window handle
 #endif
+
+// GeneralsX @feature cemlyn007 01/10/2026 The embedding host's lock around the SDL3 event pump (PLAN-023 Phase 8,
+// stage RR4).
+//
+// SDL3GameEngine::pollSDL3Events (every update() and serviceWindowsOS()) and reset()'s text-input stop are the only
+// SDL calls an engine with a window makes outside its boot and shutdown. A host that boots or shuts down other
+// engines on other threads while its window's engine updates (rlgenerals: offscreen renderers beside its viewer)
+// serialises SDL's video calls with a lock of its own, which these take around them. TryLock returns whether the
+// pump may run now; false skips this pump, and the events stay queued for the next one. Unlock follows every TryLock
+// that returned true. Null (the game's own main(): one engine on one thread) runs the pump unlocked. Set once,
+// before the window's engine boots, and only read after that.
+extern bool (*ApplicationWindow_TryLockEventPump)();
+extern void (*ApplicationWindow_UnlockEventPump)();
