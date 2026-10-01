@@ -44,7 +44,10 @@
 #                                             TSV is stale in any way (a new symbol a safe rule classifies, a
 #                                             vanished symbol, a moved definition). In every mode also exit 1
 #                                             on any per-engine symbol, in the library or the list: PLAN-023
-#                                             Phase 5b emptied the per-engine list, so one is a regression
+#                                             Phase 5b emptied the per-engine list, so one is a regression;
+#                                             likewise (strict for render, PLAN-023 Phase 8 stage RR3) on any
+#                                             render-per-engine or render-scratch symbol and any render-const one
+#                                             with a phase: RR3 emptied the render work list
 #   engine_state_symbols.py check --render LIB.so
 #                                             also print the render work list (warnings only): the
 #                                             render-per-engine and render-scratch symbols by phase, and the
@@ -873,6 +876,16 @@ def cmd_check(args):
     for key, row in sorted(recorded.items()):
         if row["class"] == PER and key not in symbols:
             errors.append(f"the list still has a per-engine entry: {key}")
+    # GeneralsX @feature cemlyn007 01/10/2026 Strict for render (PLAN-023 Phase 8, stage RR3): RR3 emptied the render
+    # work list, so a render engine's state left process-wide (render-per-engine), draw scratch shared between
+    # renderers (render-scratch) or a constant still rebuilt by a render boot (render-const with a phase) is an
+    # error in every mode, whether the TSV lists it or not.
+    for key, sym in sorted(symbols.items()):
+        if render_work(sym.cls, sym.phase):
+            errors.append(f"render state left on the work list ({sym.cls} {sym.phase}; move it into the engine, PLAN-023 Phase 8): {key} ({sym.source})")
+    for key, row in sorted(recorded.items()):
+        if render_work(row["class"], row.get("phase", "")) and key not in symbols:
+            errors.append(f"the list still has a render work-list entry: {key}")
     for line in errors:
         print(f"error: {line}")
     for line in stale:
@@ -888,6 +901,11 @@ def cmd_check(args):
     unreviewed = sum(1 for s in symbols.values() if s.cls == UNREVIEWED)
     print(f"ok: {len(symbols)} symbols, none new but what a safe rule classifies ({unreviewed} still unreviewed in the list)")
     return 0
+
+
+def render_work(cls, phase):
+    """Whether a symbol of class `cls` and phase `phase` is on the render work list (PLAN-023 Phase 8)."""
+    return cls in (RPER, RSCR) or (cls == RCONST and bool(phase))
 
 
 def render_worklist(symbols):
