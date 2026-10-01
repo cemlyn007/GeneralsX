@@ -48,6 +48,7 @@
 #include "WWMath/vp.h"
 #include "meshmatdesc.h"
 #include <stdlib.h>
+#include "WWLib/RANDOM.h"
 
 /*
 ** Debug logging for the shatter system
@@ -225,6 +226,9 @@ struct ShatterState
 	SimpleDynVecClass<DynamicMeshClass*> MeshFragments{MAX_MESH_FRAGMENTS};
 	SimpleVecClass<Vector3> TmpVertPositions{256};
 	SimpleVecClass<Vector3> TmpVertNormals{256};
+	// GeneralsX @bugfix cemlyn007 01/10/2026 The pattern choice's generator, seeded the same for every engine, not the C
+	// library's process-wide rand() (PLAN-023 Phase 8, stage RR3).
+	Random3Class PatternRandom;
 };
 rts::PerEngineStatic<ShatterState> ShatterState_perEngine;
 } // namespace
@@ -918,7 +922,11 @@ void ShatterSystem::Shatter_Mesh(MeshClass * mesh,const Vector3 & point,const Ve
 	/*
 	** Grab a random shatter pattern
 	*/
+#if RTS_ENGINE_CONTEXT
+	BSPClass * clipper = ShatterPatterns[(unsigned)ShatterState_perEngine.get().PatternRandom() % (unsigned)ShatterPatterns.Count()];
+#else
 	BSPClass * clipper = ShatterPatterns[rand() % ShatterPatterns.Count()];
+#endif
 
 	/*
 	** Compute transforms which take vertices from mesh-space to shatter-space

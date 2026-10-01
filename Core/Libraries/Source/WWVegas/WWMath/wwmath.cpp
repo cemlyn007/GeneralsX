@@ -54,6 +54,7 @@ float _FastInvSinTable[SIN_TABLE_SIZE];
 // values every time) and the last Shutdown frees them (PLAN-023 Phase 3). Each engine holds at most one
 // count (EngineContext::wwMathInitialized), so an unpaired Shutdown cannot free another engine's tables.
 #include <mutex>
+#include "WWLib/RANDOM.h"
 static std::mutex WWMathInitMutex;
 static int WWMathInitCount = 0;
 #endif
@@ -104,10 +105,22 @@ void		WWMath::Shutdown()
 	LookupTableMgrClass::Shutdown();
 }
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @bugfix cemlyn007 01/10/2026 From the engine's own generator, seeded the same for every engine, not the C
+// library's process-wide rand(): the camera shake (CameraShakeSystem) draws its frequencies and jitter from it, so an
+// engine's shake, and its image, followed whatever other engines had drawn (PLAN-023 Phase 8, stage RR3).
+static rts::PerEngineStatic<Random3Class> RandomFloat_perEngine;
+
+float		WWMath::Random_Float()
+{
+	return ((float)(RandomFloat_perEngine.get()() & 0xFFF)) / (float)(0xFFF);
+}
+#else
 float		WWMath::Random_Float()
 {
 	return ((float)(rand() & 0xFFF)) / (float)(0xFFF);
 }
+#endif
 
 
 /*

@@ -30,6 +30,16 @@
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the Game
 #include "GameClient/Snow.h"
 #include "GameClient/View.h"
+#if RTS_ENGINE_CONTEXT
+#include "WWLib/RANDOM.h"
+
+// GeneralsX @bugfix cemlyn007 01/10/2026 The snow's starting heights came from the C library's rand(), one sequence
+// for the whole process, so an engine's table depended on what every other engine had drawn from it before (its
+// headless engines included: every engine builds the table). Each engine draws them from its own generator, seeded
+// the same for every engine, so its table equals its solo run's (PLAN-023 Phase 8, stage RR3). It continues across
+// updateIniSettings calls, as rand()'s sequence did.
+static rts::PerEngineStatic<Random3Class> SnowRandom_perEngine;
+#endif
 
 
 #if !RTS_ENGINE_CONTEXT
@@ -62,7 +72,11 @@ void SnowManager::updateIniSettings()
 	{
 		for (Int x=0; x<SNOW_NOISE_X; x++)
 		{
+#if RTS_ENGINE_CONTEXT
+			*dst=(Real)((unsigned)SnowRandom_perEngine.get()()%(unsigned)(boxDimensions));
+#else
 			*dst=(Real)(rand()%(boxDimensions));
+#endif
 			dst++;
 		}
 	}
