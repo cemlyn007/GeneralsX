@@ -258,12 +258,29 @@ struct TextureLoaderState
 	// TextureLoader::Deinit frees the free lists: free what is left with the engine.
 	// GeneralsX @bugfix cemlyn007 01/10/2026 Also the tasks still queued, each holding a reference to its texture,
 	// which leaked (PLAN-023 Phase 8, stage RR3). Only this state's own lists are touched: the engine's slot is
-	// already cleared when this runs, so the names above would make a new state.
+	// already cleared when this runs, so the names above would make a new state. A render engine's
+	// TextureLoader::Deinit has already retired its queues while its device was up (Retire_Queues); what is left
+	// here holds no Direct3D object (a headless engine's tasks, never begun).
 	~TextureLoaderState()
 	{
 		Retire_Queue(_ForegroundQueue);
 		Retire_Queue(_BackgroundQueue);
 		Delete_Free_Pool();
+	}
+
+	// GeneralsX @bugfix cemlyn007 01/10/2026 The render engine's queues, from its TextureLoader::Deinit while its
+	// device is up (PLAN-023 Phase 8, stage RR3): a task Begin_Load_And_Queue began holds a Direct3D texture with
+	// its surfaces locked, and with no loader thread on Unix nothing finishes it. Each is abandoned (its texture
+	// unlocked and released, nothing applied) and returned to the free lists, which Delete_Free_Pool then frees;
+	// dropping the task's texture reference may destroy the texture, whose destructor needs the device too.
+	void Retire_Queues()
+	{
+		for (SynchronizedTextureLoadTaskListClass* queue : {&_ForegroundQueue, &_BackgroundQueue}) {
+			while (TextureLoadTaskClass* task = queue->Pop_Front()) {
+				task->Abandon_Load();
+				task->Destroy();
+			}
+		}
 	}
 
 	// TextureLoadTaskClass::Delete_Free_Pool's body, for this state's free lists.
@@ -281,10 +298,15 @@ struct TextureLoaderState
 		}
 	}
 
-	// Detaches each queued task from its texture (releasing the reference it holds) and deletes it.
+	// Detaches each queued task from its texture (releasing the reference it holds) and deletes it. A task still
+	// holding a Direct3D texture (one TextureLoader::Deinit did not retire) is leaked instead: its device is gone,
+	// so neither its texture nor the texture it loads for may be released now.
 	static void Retire_Queue(SynchronizedTextureLoadTaskListClass& queue)
 	{
 		while (TextureLoadTaskClass* task = queue.Pop_Front()) {
+			if (task->Peek_D3D_Texture() != nullptr) {
+				continue;
+			}
 			task->Deinit();
 			delete task;
 		}
@@ -431,6 +453,9 @@ void TextureLoader::Deinit()
 #endif
 
 	ThumbnailManagerClass::Deinit();
+#if RTS_ENGINE_CONTEXT
+	TextureLoaderState_perEngine.get().Retire_Queues(); // GeneralsX @bugfix cemlyn007 01/10/2026 (RR3; see above)
+#endif
 	TextureLoadTaskClass::Delete_Free_Pool();
 }
 
@@ -1265,6 +1290,21 @@ void TextureLoadTaskClass::Destroy()
 	Deinit();
 	_TexLoadFreeList.Push_Front(this);
 }
+
+
+#if RTS_ENGINE_CONTEXT
+void TextureLoadTaskClass::Abandon_Load()
+{
+	WWASSERT(TextureLoader::Is_DX8_Thread());
+	if (D3DTexture == nullptr) {
+		return;
+	}
+	Unlock_Surfaces();
+	D3DTexture->Release();
+	D3DTexture = nullptr;
+	State = STATE_NONE;
+}
+#endif
 
 
 void TextureLoadTaskClass::Delete_Free_Pool()

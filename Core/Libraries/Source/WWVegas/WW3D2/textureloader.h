@@ -248,6 +248,11 @@ class TextureLoadTaskClass : public TextureLoadTaskListNodeClass
 		void						Apply_Missing_Texture	();
 
 #if RTS_ENGINE_CONTEXT
+		// GeneralsX @bugfix cemlyn007 01/10/2026 Drops a begun load's Direct3D texture (its surfaces unlocked first),
+		// applying nothing, for an engine's TextureLoader::Deinit while its device is still up (PLAN-023 Phase 8,
+		// stage RR3). The task is then left as if never begun, for Destroy().
+		void						Abandon_Load				();
+
 		// GeneralsX @feature cemlyn007 28/09/2026 The engine that queued this task for the background loader,
 		// which the loader thread enters while it loads the task (PLAN-023 Phase 3): the W3D file factory
 		// reads the current engine's file system, and one process-wide loader thread serves every engine.
