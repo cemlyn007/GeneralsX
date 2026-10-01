@@ -56,6 +56,7 @@
 #include "GameClient/Drawable.h"
 #include "W3DDevice/GameClient/Module/W3DModelDraw.h"
 #include "W3DDevice/GameClient/W3DShadow.h"
+#include "W3DDevice/GameClient/W3DVolumetricShadow.h"	// GeneralsX @refactor cemlyn007 01/10/2026 its draw buffers (RR3)
 
 
 /** @todo: We're going to have a pool of a couple rendertargets to use
@@ -78,14 +79,15 @@ Maybe project onto a deformed terrain patch that molds to trays/bibs.
 W3DProjectedShadowManager *TheW3DProjectedShadowManager=nullptr;	//global singleton
 ProjectedShadowManager	*TheProjectedShadowManager;				//global singleton with simpler interface.
 #endif
-extern const FrustumClass *shadowCameraFrustum;	//defined in W3DShadow.
+// GeneralsX @refactor cemlyn007 01/10/2026 The shadow managers' (PLAN-023 Phase 8, stage RR3).
+#define shadowCameraFrustum (TheW3DShadowManager->getShadowCameraFrustum())
 ///@todo: Externs from volumetric shadow renderer - these need to be moved into W3DBufferManager
-extern LPDIRECT3DVERTEXBUFFER8 shadowVertexBufferD3D;		///<D3D vertex buffer
-extern LPDIRECT3DINDEXBUFFER8	shadowIndexBufferD3D;	///<D3D index buffer
-extern int nShadowVertsInBuf;	//model vetices in vertex buffer
-extern int nShadowStartBatchVertex;
-extern int nShadowIndicesInBuf;	//model vetices in vertex buffer
-extern int nShadowStartBatchIndex;
+#define shadowVertexBufferD3D (TheW3DVolumetricShadowManager->m_shadowVertexBufferD3D)
+#define shadowIndexBufferD3D (TheW3DVolumetricShadowManager->m_shadowIndexBufferD3D)
+#define nShadowVertsInBuf (TheW3DVolumetricShadowManager->m_nShadowVertsInBuf)
+#define nShadowStartBatchVertex (TheW3DVolumetricShadowManager->m_nShadowStartBatchVertex)
+#define nShadowIndicesInBuf (TheW3DVolumetricShadowManager->m_nShadowIndicesInBuf)
+#define nShadowStartBatchIndex (TheW3DVolumetricShadowManager->m_nShadowStartBatchIndex)
 extern int SHADOW_VERTEX_SIZE;
 extern int SHADOW_INDEX_SIZE;
 
@@ -99,14 +101,16 @@ struct SHADOW_DECAL_VERTEX	//vertex structure passed to D3D
 
 #define SHADOW_DECAL_FVF	D3DFVF_XYZ|D3DFVF_TEX1|D3DFVF_DIFFUSE
 
-LPDIRECT3DVERTEXBUFFER8 shadowDecalVertexBufferD3D=nullptr;		///<D3D vertex buffer
-LPDIRECT3DINDEXBUFFER8	shadowDecalIndexBufferD3D=nullptr;	///<D3D index buffer
-int nShadowDecalVertsInBuf=0;	//model vetices in vertex buffer
-int nShadowDecalStartBatchVertex=0;
-int nShadowDecalIndicesInBuf=0;	//model vetices in vertex buffer
-int nShadowDecalStartBatchIndex=0;
-int	nShadowDecalPolysInBatch=0;
-int	nShadowDecalVertsInBatch=0;
+// GeneralsX @refactor cemlyn007 01/10/2026 The decals' draw state is the projected shadow manager's, so each render
+// engine's (W3DProjectedShadowManager::m_shadowDecalVertexBufferD3D, ...; PLAN-023 Phase 8, stage RR3).
+#define shadowDecalVertexBufferD3D (TheW3DProjectedShadowManager->m_shadowDecalVertexBufferD3D)
+#define shadowDecalIndexBufferD3D (TheW3DProjectedShadowManager->m_shadowDecalIndexBufferD3D)
+#define nShadowDecalVertsInBuf (TheW3DProjectedShadowManager->m_nShadowDecalVertsInBuf)
+#define nShadowDecalStartBatchVertex (TheW3DProjectedShadowManager->m_nShadowDecalStartBatchVertex)
+#define nShadowDecalIndicesInBuf (TheW3DProjectedShadowManager->m_nShadowDecalIndicesInBuf)
+#define nShadowDecalStartBatchIndex (TheW3DProjectedShadowManager->m_nShadowDecalStartBatchIndex)
+#define nShadowDecalPolysInBatch (TheW3DProjectedShadowManager->m_nShadowDecalPolysInBatch)
+#define nShadowDecalVertsInBatch (TheW3DProjectedShadowManager->m_nShadowDecalVertsInBatch)
 int SHADOW_DECAL_VERTEX_SIZE=32768;
 int SHADOW_DECAL_INDEX_SIZE=65536;
 
@@ -345,7 +349,7 @@ void W3DProjectedShadowManager::updateRenderTargetTextures()
 ///Renders shadow on part of terrain covered by world-space bounding box.
 Int W3DProjectedShadowManager::renderProjectedTerrainShadow(W3DProjectedShadow *shadow, AABoxClass &box)
 {
-	static	Matrix4x4 mWorld(true);	//initialize to identity matrix
+	Matrix4x4 mWorld(true);	//initialize to identity matrix (GeneralsX @refactor cemlyn007 01/10/2026 a local, RR3)
 	struct SHADOW_VOLUME_VERTEX	//vertex structure passed to D3D
 	{
 		float x,y,z;
@@ -679,7 +683,7 @@ void TestBlendRender(RenderInfoClass & rinfo)
 
 void W3DProjectedShadowManager::flushDecals(W3DShadowTexture *texture, ShadowType type)
 {
-	static	Matrix4x4 mWorld(true);	//initialize to identity matrix
+	Matrix4x4 mWorld(true);	//initialize to identity matrix (GeneralsX @refactor cemlyn007 01/10/2026 a local, RR3)
 
 	if (nShadowDecalVertsInBatch == 0 && nShadowDecalPolysInBatch == 0)
 	{	//nothing to render
@@ -811,7 +815,7 @@ void W3DProjectedShadowManager::queueDecal(W3DProjectedShadow *shadow)
 	Matrix3D   objXform(1);
 	Real cx,cy,dx,dy;
 	Real mapScaleInv=1.0f/MAP_XY_FACTOR;
-	static Vector3 objCenter(0,0,0);
+	const Vector3 objCenter(0,0,0);	// GeneralsX @refactor cemlyn007 01/10/2026 never changed: a local (RR3)
 	Vector3 uVector,vVector;
 	Real uOffset,vOffset,vecLength;
 	Int borderSize;
@@ -1312,8 +1316,9 @@ Int W3DProjectedShadowManager::renderShadows(RenderInfoClass & rinfo)
 		return	projectionCount;	//there are no shadows to render.
 
 	W3DProjectedShadow *shadow;
-	static AABoxClass aaBox;
-	static SphereClass sphere;
+	// GeneralsX @refactor cemlyn007 01/10/2026 Scratch, set before each use: locals (PLAN-023 Phase 8, stage RR3).
+	AABoxClass aaBox;
+	SphereClass sphere;
 
 	//According to Nvidia there's a D3D bug that happens if you don't start with a
 	//new dynamic VB each frame - so we force a DISCARD by overflowing the counter.

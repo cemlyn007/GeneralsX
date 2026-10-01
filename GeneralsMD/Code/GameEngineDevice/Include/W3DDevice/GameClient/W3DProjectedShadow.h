@@ -40,6 +40,8 @@ class W3DShadowTextureManager;	//forward reference
 class Drawable;	//forward reference
 class W3DProjectedShadow; //forward reference.
 class TexProjectClass;
+struct IDirect3DVertexBuffer8;	//forward reference
+struct IDirect3DIndexBuffer8;	//forward reference
 
 class W3DProjectedShadowManager	: public ProjectedShadowManager
 {
@@ -73,6 +75,19 @@ class W3DProjectedShadowManager	: public ProjectedShadowManager
 		void queueDecal(W3DProjectedShadow *shadow);	///<add shadow decal to render list - decal conforms to terrain.
 		void queueSimpleDecal(W3DProjectedShadow *shadow);	///< add shadow decal to render list - decal floats on terrain.
 		void flushDecals(W3DShadowTexture *texture, ShadowType type);	///<empty queue by rendering all decals with given texture
+
+		// GeneralsX @refactor cemlyn007 01/10/2026 The decals' draw state, file statics of W3DProjectedShadow.cpp before
+		// (PLAN-023 Phase 8, stage RR3): the dynamic vertex and index buffers this manager makes on its device and their
+		// batch cursors. Members, so that each render engine's decals draw with their own; W3DProjectedShadow.cpp
+		// reaches them by their old names.
+		IDirect3DVertexBuffer8 *m_shadowDecalVertexBufferD3D = nullptr;	///<D3D vertex buffer
+		IDirect3DIndexBuffer8 *m_shadowDecalIndexBufferD3D = nullptr;	///<D3D index buffer
+		int m_nShadowDecalVertsInBuf = 0;	//model vetices in vertex buffer
+		int m_nShadowDecalStartBatchVertex = 0;
+		int m_nShadowDecalIndicesInBuf = 0;	//model vetices in vertex buffer
+		int m_nShadowDecalStartBatchIndex = 0;
+		int m_nShadowDecalPolysInBatch = 0;
+		int m_nShadowDecalVertsInBatch = 0;
 
 	private:
 		Int renderProjectedTerrainShadow(W3DProjectedShadow *shadow, AABoxClass &box);	///<render shadow on map terrain.
