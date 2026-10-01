@@ -234,6 +234,24 @@ static FastCriticalSectionClass					_BackgroundCriticalSection;
 #define RTS_TEXTURE_LOADER_NO_THREAD 0
 #endif
 
+// GeneralsX @refactor cemlyn007 01/10/2026 TextureLoadTaskClass::Delete_Free_Pool's body, for the free lists given:
+// the process's, or (with the engine context) an engine's TextureLoaderState's, so both free them alike (PLAN-023
+// Phase 8, stage RR3).
+static void Delete_Free_Lists(TextureLoadTaskListClass& tex_list, TextureLoadTaskListClass& cube_list,
+	TextureLoadTaskListClass& vol_list)
+{
+	// (gth) We should probably just MEMPool these task objects...
+	while (TextureLoadTaskClass *task = tex_list.Pop_Front()) {
+		delete task;
+	}
+	while (TextureLoadTaskClass *task = cube_list.Pop_Front()) {
+		delete task;
+	}
+	while (TextureLoadTaskClass *task = vol_list.Pop_Front()) {
+		delete task;
+	}
+}
+
 #if RTS_ENGINE_CONTEXT
 // GeneralsX @feature cemlyn007 30/09/2026 Per engine (PLAN-023 Phase 8, stage RR2b): the load queues, the free lists
 // of load tasks, and the suspend switch and inactive-texture time, so that each engine loads, recycles and retires
@@ -284,19 +302,10 @@ struct TextureLoaderState
 		}
 	}
 
-	// TextureLoadTaskClass::Delete_Free_Pool's body, for this state's free lists.
+	// TextureLoadTaskClass::Delete_Free_Pool's body (Delete_Free_Lists), for this state's free lists.
 	void Delete_Free_Pool()
 	{
-		// (gth) We should probably just MEMPool these task objects...
-		while (TextureLoadTaskClass *task = _TexLoadFreeList.Pop_Front()) {
-			delete task;
-		}
-		while (TextureLoadTaskClass *task = _CubeTexLoadFreeList.Pop_Front()) {
-			delete task;
-		}
-		while (TextureLoadTaskClass *task = _VolTexLoadFreeList.Pop_Front()) {
-			delete task;
-		}
+		Delete_Free_Lists(_TexLoadFreeList, _CubeTexLoadFreeList, _VolTexLoadFreeList);
 	}
 
 	// Detaches each queued task from its texture (releasing the reference it holds) and deletes it. A task still
@@ -1329,16 +1338,7 @@ void TextureLoadTaskClass::Delete_Free_Pool()
 	// RR3).
 	TextureLoaderState_perEngine.get().Delete_Free_Pool();
 #else
-	// (gth) We should probably just MEMPool these task objects...
-	while (TextureLoadTaskClass *task = _TexLoadFreeList.Pop_Front()) {
-		delete task;
-	}
-	while (TextureLoadTaskClass *task = _CubeTexLoadFreeList.Pop_Front()) {
-		delete task;
-	}
-	while (TextureLoadTaskClass *task = _VolTexLoadFreeList.Pop_Front()) {
-		delete task;
-	}
+	Delete_Free_Lists(_TexLoadFreeList, _CubeTexLoadFreeList, _VolTexLoadFreeList);
 #endif
 }
 
