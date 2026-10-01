@@ -180,15 +180,22 @@ bool W3D_Protect_Render_Defaults(bool readOnly)
 		static std::once_flag s_exitHandlerOnce;
 		std::call_once(s_exitHandlerOnce, [] { std::atexit(Unprotect_Render_Defaults_At_Exit); });
 	}
+	// GeneralsX @bugfix cemlyn007 01/10/2026 The protection both have now (they change together), so that a rollback
+	// puts back what was there rather than the opposite of what was asked for: making read-only defaults read-only
+	// again must leave them read-only when the second call fails (PLAN-023 Phase 8, stage RR3). Atomic: a host may
+	// call this from more than one thread (it should not do so at once).
+	static std::atomic<bool> s_defaultsReadOnly{false};
+	const bool wasReadOnly = s_defaultsReadOnly.load();
 	// GeneralsX @bugfix cemlyn007 30/09/2026 All or nothing: when the second fails, the first is put back, so a
 	// failed call leaves both as they were (PLAN-023 Phase 8, stage RR2b).
 	if (!Protect_Pages(&W3DRenderState::Defaults, sizeof(W3DRenderState), readOnly))
 		return false;
 	if (!Protect_Pages(&WW3DState::Defaults, sizeof(WW3DState), readOnly))
 	{
-		Protect_Pages(&W3DRenderState::Defaults, sizeof(W3DRenderState), !readOnly);
+		Protect_Pages(&W3DRenderState::Defaults, sizeof(W3DRenderState), wasReadOnly);
 		return false;
 	}
+	s_defaultsReadOnly.store(readOnly);
 	return true;
 }
 

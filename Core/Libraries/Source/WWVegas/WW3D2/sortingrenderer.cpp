@@ -384,17 +384,20 @@ static SortingNodeStruct* overlapping_nodes[MAX_OVERLAPPING_NODES];
 
 void SortingRendererClass::Insert_To_Sorted_List(SortingNodeStruct *state)
 {
+	// GeneralsX @refactor cemlyn007 01/10/2026 Bound once, not looked up per node: with RTS_ENGINE_CONTEXT it is this
+	// engine's (PLAN-023 Phase 8, stage RR3).
+	SortingNodeStructList& sortedList = sorted_list;
 	/// @todo lorenzen sez use a bucket sort here... and stop copying so much data so many times
 
-	for (SortingNodeStructList::iterator node = sorted_list.begin(); node != sorted_list.end(); ++node)
+	for (SortingNodeStructList::iterator node = sortedList.begin(); node != sortedList.end(); ++node)
 	{
 		if (state->transformed_center.Z > (*node)->transformed_center.Z) {
-			sorted_list.insert(node, state);
+			sortedList.insert(node, state);
 			return;
 		}
 	}
 
-	sorted_list.push_back(state);
+	sortedList.push_back(state);
 }
 
 // ----------------------------------------------------------------------------
@@ -468,18 +471,25 @@ static void Apply_Render_State(RenderStateStruct& render_state)
 
 void SortingRendererClass::Flush_Sorting_Pool()
 {
-	if (!overlapping_node_count) return;
+	// GeneralsX @refactor cemlyn007 01/10/2026 Bound once, not looked up per node: with RTS_ENGINE_CONTEXT they are
+	// this engine's (PLAN-023 Phase 8, stage RR3).
+	unsigned& overlappingNodeCount = overlapping_node_count;
+	unsigned& overlappingPolygonCount = overlapping_polygon_count;
+	unsigned& overlappingVertexCount = overlapping_vertex_count;
+	SortingNodeStruct* (&overlappingNodes)[MAX_OVERLAPPING_NODES] = overlapping_nodes;
+	SortingNodeStructList& cleanList = clean_list;
+	if (!overlappingNodeCount) return;
 
 	SNAPSHOT_SAY(("SortingSystem - Flush"));
 
 	// Fill dynamic index buffer with sorting index buffer vertices
-	TempIndexStruct* tis=Get_Temp_Index_Array(overlapping_polygon_count);
+	TempIndexStruct* tis=Get_Temp_Index_Array(overlappingPolygonCount);
 
-	unsigned vertexAllocCount = overlapping_vertex_count;
+	unsigned vertexAllocCount = overlappingVertexCount;
 	if (DynamicVBAccessClass::Get_Default_Vertex_Count() < DEFAULT_SORTING_VERTEX_COUNT)
 		vertexAllocCount = DEFAULT_SORTING_VERTEX_COUNT;	//make sure that we force the DX8 dynamic vertex buffer to maximum size
-	if (overlapping_vertex_count > vertexAllocCount)
-		vertexAllocCount = overlapping_vertex_count;
+	if (overlappingVertexCount > vertexAllocCount)
+		vertexAllocCount = overlappingVertexCount;
 	WWASSERT(DEFAULT_SORTING_VERTEX_COUNT == 1 || vertexAllocCount <= DEFAULT_SORTING_VERTEX_COUNT);
 	DynamicVBAccessClass dyn_vb_access(BUFFER_TYPE_DYNAMIC_DX8,dynamic_fvf_type,vertexAllocCount/*overlapping_vertex_count*/);
 	{
@@ -488,8 +498,8 @@ void SortingRendererClass::Flush_Sorting_Pool()
 
 		unsigned polygon_array_offset=0;
 		unsigned vertex_array_offset=0;
-		for (unsigned node_id=0;node_id<overlapping_node_count;++node_id) {
-			SortingNodeStruct* state=overlapping_nodes[node_id];
+		for (unsigned node_id=0;node_id<overlappingNodeCount;++node_id) {
+			SortingNodeStruct* state=overlappingNodes[node_id];
 			VertexFormatXYZNDUV2* src_verts=nullptr;
 			SortingVertexBufferClass* vertex_buffer=static_cast<SortingVertexBufferClass*>(state->sorting_state.vertex_buffers[0]);
 			WWASSERT(vertex_buffer);
@@ -529,7 +539,7 @@ void SortingRendererClass::Flush_Sorting_Pool()
 					const VertexFormatXYZNDUV2 *v2 = src_verts + idx2;
 					const VertexFormatXYZNDUV2 *v3 = src_verts + idx3;
 					unsigned array_index=i+polygon_array_offset;
-					WWASSERT(array_index<overlapping_polygon_count);
+					WWASSERT(array_index<overlappingPolygonCount);
 					TempIndexStruct *tis_ptr = tis + array_index;
 					tis_ptr->tri.i = idx1 + vertex_array_offset;
 					tis_ptr->tri.j = idx2 + vertex_array_offset;
@@ -550,7 +560,7 @@ void SortingRendererClass::Flush_Sorting_Pool()
 					const VertexFormatXYZNDUV2 *v2 = src_verts + idx2;
 					const VertexFormatXYZNDUV2 *v3 = src_verts + idx3;
 					unsigned array_index=i+polygon_array_offset;
-					WWASSERT(array_index<overlapping_polygon_count);
+					WWASSERT(array_index<overlappingPolygonCount);
 					TempIndexStruct *tis_ptr = tis + array_index;
 					tis_ptr->tri.i = idx1 + vertex_array_offset;
 					tis_ptr->tri.j = idx2 + vertex_array_offset;
@@ -570,15 +580,15 @@ void SortingRendererClass::Flush_Sorting_Pool()
 		}
 	}
 
-	Sort(tis, tis + overlapping_polygon_count);
+	Sort(tis, tis + overlappingPolygonCount);
 
 	// TheSuperHackers @fix stephanmeesters 10/06/2026
 	// Split rendering into chunks to prevent a crash when exceeding the 16-bit index buffer limit.
 	constexpr const unsigned MAX_INDEX_CHUNK = 65535;
 	unsigned chunkOffset = 0;
-	while (chunkOffset < overlapping_polygon_count)
+	while (chunkOffset < overlappingPolygonCount)
 	{
-		unsigned chunkCount = overlapping_polygon_count - chunkOffset;
+		unsigned chunkCount = overlappingPolygonCount - chunkOffset;
 		if (chunkCount * 3 > MAX_INDEX_CHUNK) {
 			chunkCount = MAX_INDEX_CHUNK / 3;
 		}
@@ -606,7 +616,7 @@ void SortingRendererClass::Flush_Sorting_Pool()
 		unsigned node_id=tis[chunkOffset].idx;
 		for (unsigned i=chunkOffset + 1;i<chunkEnd;++i) {
 			if (node_id!=tis[i].idx) {
-				SortingNodeStruct* state=overlapping_nodes[node_id];
+				SortingNodeStruct* state=overlappingNodes[node_id];
 				Apply_Render_State(state->sorting_state);
 
 				DX8Wrapper::Draw_Triangles(
@@ -624,7 +634,7 @@ void SortingRendererClass::Flush_Sorting_Pool()
 
 		// Render any remaining polygons...
 		if (count_to_render) {
-			SortingNodeStruct* state=overlapping_nodes[node_id];
+			SortingNodeStruct* state=overlappingNodes[node_id];
 			Apply_Render_State(state->sorting_state);
 
 			DX8Wrapper::Draw_Triangles(
@@ -638,14 +648,14 @@ void SortingRendererClass::Flush_Sorting_Pool()
 	}
 
 	// Release all references and return nodes back to the clean list for the frame...
-	for (unsigned node_id=0;node_id<overlapping_node_count;++node_id) {
-		SortingNodeStruct* state=overlapping_nodes[node_id];
+	for (unsigned node_id=0;node_id<overlappingNodeCount;++node_id) {
+		SortingNodeStruct* state=overlappingNodes[node_id];
 		Release_Refs(state);
-		clean_list.push_front(state);
+		cleanList.push_front(state);
 	}
-	overlapping_node_count=0;
-	overlapping_polygon_count=0;
-	overlapping_vertex_count=0;
+	overlappingNodeCount=0;
+	overlappingPolygonCount=0;
+	overlappingVertexCount=0;
 
 	SNAPSHOT_SAY(("SortingSystem - Done flushing"));
 
@@ -655,6 +665,11 @@ void SortingRendererClass::Flush_Sorting_Pool()
 
 void SortingRendererClass::Flush()
 {
+	// GeneralsX @refactor cemlyn007 01/10/2026 Bound once, not looked up per node: with RTS_ENGINE_CONTEXT they are
+	// this engine's (PLAN-023 Phase 8, stage RR3).
+	SortingNodeStructList& sortedList = sorted_list;
+	SortingNodeStructList& unsortedList = unsorted_list;
+	SortingNodeStructList& cleanList = clean_list;
 	WWPROFILE("SortingRenderer::Flush");
 	Matrix4x4 old_view;
 	Matrix4x4 old_world;
@@ -663,15 +678,15 @@ void SortingRendererClass::Flush()
 
 	// TheSuperHackers @perf stephanmeesters 04/07/2026
 	// Splice nodes that have no bounding information (Z=0.0) at the correct location into the sorted list.
-	SortingNodeStructList::iterator node = sorted_list.begin();
-	while (node != sorted_list.end() && (*node)->transformed_center.Z > 0.0f) {
+	SortingNodeStructList::iterator node = sortedList.begin();
+	while (node != sortedList.end() && (*node)->transformed_center.Z > 0.0f) {
 		++node;
 	}
-	sorted_list.splice(node, unsorted_list);
+	sortedList.splice(node, unsortedList);
 
-	while (!sorted_list.empty()) {
-		SortingNodeStruct* state = sorted_list.front();
-		sorted_list.pop_front();
+	while (!sortedList.empty()) {
+		SortingNodeStruct* state = sortedList.front();
+		sortedList.pop_front();
 
 		if ((state->sorting_state.index_buffer_type==BUFFER_TYPE_SORTING || state->sorting_state.index_buffer_type==BUFFER_TYPE_DYNAMIC_SORTING) &&
 			(state->sorting_state.vertex_buffer_types[0]==BUFFER_TYPE_SORTING || state->sorting_state.vertex_buffer_types[0]==BUFFER_TYPE_DYNAMIC_SORTING)) {
@@ -682,7 +697,7 @@ void SortingRendererClass::Flush()
 			DX8Wrapper::Draw_Triangles(state->start_index,state->polygon_count,state->min_vertex_index,state->vertex_count);
 			DX8Wrapper::Release_Render_State();
 			Release_Refs(state);
-			clean_list.push_front(state);
+			cleanList.push_front(state);
 		}
 	}
 
