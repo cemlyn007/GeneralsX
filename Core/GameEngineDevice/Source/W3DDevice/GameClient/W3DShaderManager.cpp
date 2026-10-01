@@ -96,6 +96,84 @@ protected:
 	Int m_numPasses;						///<number of passes to complete shader
 };
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 01/10/2026 Per engine (PLAN-023 Phase 8, stage RR3): W3DShaderManager's state, the shader and filter tables, and
+// the screen filters' class statics (the black-and-white and cross fades and the motion blur's zoom target, which
+// scripts drive) are fields of the current engine's W3DShaderManagerData, behind macros of their old names; the
+// shader and filter objects (some holding D3D pixel shaders and textures of the engine's device) and their lists are
+// members of its W3DShaderManagerState (below, with the master lists). One per engine, made on its first use and
+// freed with it: init and shutdown keep their upstream work (shutdown releases the D3D objects, a device reset runs
+// shutdown then init), and the script-driven filter state outlives them as the statics did. Every field starts at
+// the statics' initial value (all zero).
+namespace
+{
+struct W3DShaderManagerData
+{
+	//this table will contain custom versions of each shader tuned for specific video card and user options.
+	W3DFilterInterface* Filters[FT_MAX] = {};
+	W3DShaderInterface* Shaders[W3DShaderManager::ST_MAX] = {};
+	Int ShadersPassCount[W3DShaderManager::ST_MAX] = {};	//number of passes for each of the above shaders
+
+	TextureClass* Textures[8] = {};
+	W3DShaderManager::ShaderTypes CurrentShader = {};
+	FilterTypes CurrentFilter = FT_NULL_FILTER;
+	Int CurrentShaderPass = 0;
+	ChipsetType CurrentChipset = {};
+	GraphicsVenderID CurrentVendor = {};
+	Int64 DriverVersion = 0;
+
+	Bool RenderingToTexture = false;
+	IDirect3DSurface8* OldRenderSurface = nullptr;
+	IDirect3DTexture8* RenderTexture = nullptr;
+	IDirect3DSurface8* NewRenderSurface = nullptr;
+	IDirect3DSurface8* OldDepthSurface = nullptr;
+
+	// ScreenBWFilter's.
+	Int BWFadeFrames = 0;
+	Int BWCurFadeFrame = 0;
+	Real BWCurFadeValue = 0.0f;
+	Int BWFadeDirection = 0;
+
+	// ScreenCrossFadeFilter's.
+	Int CrossFadeFrames = 0;
+	Int CrossFadeCurFadeFrame = 0;
+	Real CrossFadeCurFadeValue = 0.0f;
+	Int CrossFadeDirection = 0;
+	TextureClass* CrossFadePatternTexture = nullptr;
+	Bool CrossFadeSkipRender = FALSE;
+
+	// ScreenMotionBlurFilter's.
+	Coord3D ZoomToPos = {};
+	Bool ZoomToValid = false;
+};
+
+W3DShaderManagerData& ShaderManagerData();
+} // namespace
+
+#define W3DFilters (ShaderManagerData().Filters)
+#define W3DShaders (ShaderManagerData().Shaders)
+#define W3DShadersPassCount (ShaderManagerData().ShadersPassCount)
+#define m_Textures (ShaderManagerData().Textures)
+#define m_currentShader (ShaderManagerData().CurrentShader)
+#define m_currentFilter (ShaderManagerData().CurrentFilter)
+#define m_currentShaderPass (ShaderManagerData().CurrentShaderPass)
+#define m_currentChipset (ShaderManagerData().CurrentChipset)
+#define m_currentVendor (ShaderManagerData().CurrentVendor)
+#define m_driverVersion (ShaderManagerData().DriverVersion)
+#define m_renderingToTexture (ShaderManagerData().RenderingToTexture)
+#define m_oldRenderSurface (ShaderManagerData().OldRenderSurface)
+#define m_renderTexture (ShaderManagerData().RenderTexture)
+#define m_newRenderSurface (ShaderManagerData().NewRenderSurface)
+#define m_oldDepthSurface (ShaderManagerData().OldDepthSurface)
+
+GraphicsVenderID W3DShaderManager::getCurrentVendor() {return m_currentVendor;}
+Int64 W3DShaderManager::getCurrentDriverVersion() {return m_driverVersion; }
+void W3DShaderManager::setTexture(Int stage,TextureClass* texture) {m_Textures[stage]=texture;}
+TextureClass *W3DShaderManager::getShaderTexture(Int stage) { return m_Textures[stage];}
+W3DShaderManager::ShaderTypes W3DShaderManager::getCurrentShader() {return m_currentShader;}
+Bool W3DShaderManager::canRenderToTexture() { return (m_oldRenderSurface && m_newRenderSurface);}
+Bool W3DShaderManager::isRenderingToTexture() {return m_renderingToTexture; }
+#else
 //this table will contain custom versions of each shader tuned for specific video card and user options.
 static W3DFilterInterface *W3DFilters[FT_MAX];
 static W3DShaderInterface *W3DShaders[W3DShaderManager::ST_MAX];
@@ -114,6 +192,7 @@ IDirect3DSurface8 *W3DShaderManager::m_oldRenderSurface=nullptr;	///<previous re
 IDirect3DTexture8 *W3DShaderManager::m_renderTexture=nullptr;		///<texture into which rendering will be redirected.
 IDirect3DSurface8 *W3DShaderManager::m_newRenderSurface=nullptr;	///<new render target inside m_renderTexture
 IDirect3DSurface8 *W3DShaderManager::m_oldDepthSurface=nullptr;	///<previous depth buffer surface
+#endif
 /*===========================================================================================*/
 /*=========      Screen Shaders	=============================================================*/
 /*===========================================================================================*/
@@ -130,16 +209,23 @@ protected:
 	virtual void reset() override;		///<do any custom resetting necessary to bring W3D in sync.
 };
 
+#if RTS_ENGINE_CONTEXT
+static ScreenDefaultFilter& screenDefaultFilter_State(); // GeneralsX @feature cemlyn007 01/10/2026 the engine's (W3DShaderManagerState, RR3)
+#define screenDefaultFilter (screenDefaultFilter_State())
+#else
 ScreenDefaultFilter screenDefaultFilter;
+#endif
 
 ///Default filter that just renders screen to off-screen texture and then copies it the the screen.
 ///Useful because we added some full-time unit effects (microwave tank smudge) to Generals MD that need access
 ///to the background as a texture.  This filter makes that texture always available for these effects.
+#if !RTS_ENGINE_CONTEXT
 W3DFilterInterface *ScreenDefaultFilterList[]=
 {
 	&screenDefaultFilter,
 	nullptr
 };
+#endif
 
 Int ScreenDefaultFilter::init()
 {
@@ -256,6 +342,25 @@ void ScreenDefaultFilter::reset()
 /*=========  ScreenBWFilter	=============================================================*/
 ///converts viewport to black & white.
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 01/10/2026 The engine's (W3DShaderManagerData, W3DShaderManagerState; RR3), through this section.
+#define m_fadeFrames (ShaderManagerData().BWFadeFrames)
+#define m_curFadeFrame (ShaderManagerData().BWCurFadeFrame)
+#define m_curFadeValue (ShaderManagerData().BWCurFadeValue)
+#define m_fadeDirection (ShaderManagerData().BWFadeDirection)
+
+void ScreenBWFilter::setFadeParameters(Int fadeFrames, Int direction)
+{
+	m_curFadeFrame = 0;
+	m_fadeFrames = fadeFrames;
+	m_fadeDirection = direction;
+}
+
+static ScreenBWFilter& screenBWFilter_State();
+static ScreenBWFilterDOT3& screenBWFilterDOT3_State();
+#define screenBWFilter (screenBWFilter_State())
+#define screenBWFilterDOT3 (screenBWFilterDOT3_State())
+#else
 Int ScreenBWFilter::m_fadeFrames;
 Int ScreenBWFilter::m_curFadeFrame;
 Real ScreenBWFilter::m_curFadeValue;
@@ -263,14 +368,17 @@ Int ScreenBWFilter::m_fadeDirection;
 
 ScreenBWFilter screenBWFilter;
 ScreenBWFilterDOT3 screenBWFilterDOT3;	//slower version for older cards without pixel shaders.
+#endif
 
 ///List of different BW shader implementations in order of preference
+#if !RTS_ENGINE_CONTEXT
 W3DFilterInterface *ScreenBWFilterList[]=
 {
 	&screenBWFilter,
 	&screenBWFilterDOT3,	//slower version for older cards without pixel shaders.
 	nullptr
 };
+#endif
 
 Int ScreenBWFilter::init()
 {
@@ -669,6 +777,31 @@ Int ScreenBWFilterDOT3::shutdown()
 /*=========  ScreenCrossFadeFilter	=============================================================*/
 ///Fades screen between 2 different views of the scene with both being visible at once.
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 01/10/2026 The engine's (W3DShaderManagerData, W3DShaderManagerState; RR3), through this section.
+#undef m_fadeFrames
+#undef m_curFadeFrame
+#undef m_curFadeValue
+#undef m_fadeDirection
+#define m_fadeFrames (ShaderManagerData().CrossFadeFrames)
+#define m_curFadeFrame (ShaderManagerData().CrossFadeCurFadeFrame)
+#define m_curFadeValue (ShaderManagerData().CrossFadeCurFadeValue)
+#define m_fadeDirection (ShaderManagerData().CrossFadeDirection)
+#define m_fadePatternTexture (ShaderManagerData().CrossFadePatternTexture)
+#define m_skipRender (ShaderManagerData().CrossFadeSkipRender)
+
+void ScreenCrossFadeFilter::setFadeParameters(Int fadeFrames, Int direction)
+{
+	m_curFadeFrame = 0;
+	m_fadeFrames = fadeFrames;
+	m_fadeDirection = direction;
+}
+Real ScreenCrossFadeFilter::getCurrentFadeValue()	{ return m_curFadeValue;}
+TextureClass *ScreenCrossFadeFilter::getCurrentMaskTexture() { return m_fadePatternTexture;}
+
+static ScreenCrossFadeFilter& screenCrossFadeFilter_State();
+#define screenCrossFadeFilter (screenCrossFadeFilter_State())
+#else
 Int ScreenCrossFadeFilter::m_fadeFrames;
 Int ScreenCrossFadeFilter::m_curFadeFrame;
 Real ScreenCrossFadeFilter::m_curFadeValue;
@@ -677,14 +810,17 @@ TextureClass *ScreenCrossFadeFilter::m_fadePatternTexture=nullptr;
 Bool ScreenCrossFadeFilter::m_skipRender = FALSE;
 
 ScreenCrossFadeFilter screenCrossFadeFilter;
+#endif
 
 ///List of different BW shader implementations in order of preference
 ///@todo: Add a version that doesn't require pixel shader
+#if !RTS_ENGINE_CONTEXT
 W3DFilterInterface *ScreenCrossFadeFilterList[]=
 {
 	&screenCrossFadeFilter,
 	nullptr
 };
+#endif
 
 Int ScreenCrossFadeFilter::init()
 {
@@ -910,10 +1046,28 @@ Int ScreenCrossFadeFilter::shutdown()
 /*=========  ScreenMotionBlurFilter	=============================================================*/
 ///applies motion blur to viewport.
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 01/10/2026 The engine's (W3DShaderManagerData, W3DShaderManagerState; RR3). m_skipRender is the motion blur's own
+// member here.
+#undef m_fadeFrames
+#undef m_curFadeFrame
+#undef m_curFadeValue
+#undef m_fadeDirection
+#undef m_fadePatternTexture
+#undef m_skipRender
+#define m_zoomToPos (ShaderManagerData().ZoomToPos)
+#define m_zoomToValid (ShaderManagerData().ZoomToValid)
+
+void ScreenMotionBlurFilter::setZoomToPos(const Coord3D *pos) {m_zoomToPos = *pos; m_zoomToValid = true;}
+
+static ScreenMotionBlurFilter& screenMotionBlurFilter_State();
+#define screenMotionBlurFilter (screenMotionBlurFilter_State())
+#else
 ScreenMotionBlurFilter screenMotionBlurFilter;
 
 Coord3D ScreenMotionBlurFilter::m_zoomToPos;
 Bool ScreenMotionBlurFilter::m_zoomToValid = false;
+#endif
 
 ScreenMotionBlurFilter::ScreenMotionBlurFilter():
 m_decrement(false),
@@ -923,11 +1077,13 @@ m_skipRender(false)
 {
 }
 ///List of different motion blur implementations in order of preference
+#if !RTS_ENGINE_CONTEXT
 W3DFilterInterface *ScreenMotionBlurFilterList[]=
 {
 	&screenMotionBlurFilter,
 	nullptr
 };
+#endif
 
 Int ScreenMotionBlurFilter::init()
 {
@@ -1186,14 +1342,22 @@ class ShroudTextureShader : public W3DShaderInterface
 	virtual Int init() override;			///<perform any one time initialization and validation
 	virtual void reset() override;		///<do any custom resetting necessary to bring W3D in sync.
 	Int m_stageOfSet;
+#if RTS_ENGINE_CONTEXT
+};
+static ShroudTextureShader& shroudTextureShader_State(); // GeneralsX @feature cemlyn007 01/10/2026 the engine's (W3DShaderManagerState, RR3)
+#define shroudTextureShader (shroudTextureShader_State())
+#else
 } shroudTextureShader;
+#endif
 
 ///List of different shroud shader implementations in order of preference
+#if !RTS_ENGINE_CONTEXT
 W3DShaderInterface *ShroudShaderList[]=
 {
 	&shroudTextureShader,
 	nullptr
 };
+#endif
 
 //#define SHROUD_STRETCH_FACTOR	(1.0f/MAP_XY_FACTOR)	//1 texel per heightmap cell width
 
@@ -1286,14 +1450,22 @@ class FlatShroudTextureShader : public W3DShaderInterface
 	virtual Int init() override;			///<perform any one time initialization and validation
 	virtual void reset() override;		///<do any custom resetting necessary to bring W3D in sync.
 	Int m_stageOfSet;
+#if RTS_ENGINE_CONTEXT
+};
+static FlatShroudTextureShader& flatShroudTextureShader_State(); // GeneralsX @feature cemlyn007 01/10/2026 the engine's (W3DShaderManagerState, RR3)
+#define flatShroudTextureShader (flatShroudTextureShader_State())
+#else
 } flatShroudTextureShader;
+#endif
 
 ///List of different shroud shader implementations in order of preference
+#if !RTS_ENGINE_CONTEXT
 W3DShaderInterface *FlatShroudShaderList[]=
 {
 	&flatShroudTextureShader,
 	nullptr
 };
+#endif
 
 //#define SHROUD_STRETCH_FACTOR	(1.0f/MAP_XY_FACTOR)	//1 texel per heightmap cell width
 
@@ -1378,14 +1550,22 @@ class MaskTextureShader : public W3DShaderInterface
 	virtual Int set(Int pass) override;		///<setup shader for the specified rendering pass.
 	virtual Int init() override;			///<perform any one time initialization and validation
 	virtual void reset() override;		///<do any custom resetting necessary to bring W3D in sync.
+#if RTS_ENGINE_CONTEXT
+};
+static MaskTextureShader& maskTextureShader_State(); // GeneralsX @feature cemlyn007 01/10/2026 the engine's (W3DShaderManagerState, RR3)
+#define maskTextureShader (maskTextureShader_State())
+#else
 } maskTextureShader;
+#endif
 
 ///List of different shroud shader implementations in order of preference
+#if !RTS_ENGINE_CONTEXT
 W3DShaderInterface *MaskShaderList[]=
 {
 	&maskTextureShader,
 	nullptr
 };
+#endif
 
 Int MaskTextureShader::init()
 {
@@ -1499,7 +1679,13 @@ public:
 	void updateCloud();
 	void updateNoise1 (D3DXMATRIX *destMatrix,D3DXMATRIX *curViewInverse, Bool doUpdate=true);	///<generate the uv coordinates for Noise1 (i.e clouds)
 	void updateNoise2 (D3DXMATRIX *destMatrix,D3DXMATRIX *curViewInverse, Bool doUpdate=true);	///<generate the uv coordinates for Noise2 (i.e lightmap)
+#if RTS_ENGINE_CONTEXT
+};
+static TerrainShader2Stage& terrainShader2Stage_State(); // GeneralsX @feature cemlyn007 01/10/2026 the engine's (W3DShaderManagerState, RR3)
+#define terrainShader2Stage (terrainShader2Stage_State())
+#else
 } terrainShader2Stage;
+#endif
 
 ///regular terrain shader that should work on all multi-texture video cards (slowest version)
 class FlatTerrainShader2Stage : public W3DShaderInterface
@@ -1508,7 +1694,13 @@ public:
 	virtual Int set(Int pass) override;		///<setup shader for the specified rendering pass.
 	virtual Int init() override;			///<perform any one time initialization and validation
 	virtual void reset() override;		///<do any custom resetting necessary to bring W3D in sync.
+#if RTS_ENGINE_CONTEXT
+};
+static FlatTerrainShader2Stage& flatTerrainShader2Stage_State(); // GeneralsX @feature cemlyn007 01/10/2026 the engine's (W3DShaderManagerState, RR3)
+#define flatTerrainShader2Stage (flatTerrainShader2Stage_State())
+#else
 } flatTerrainShader2Stage;
+#endif
 
 ///regular terrain shader that should work on all multi-texture video cards (slowest version)
 class FlatTerrainShaderPixelShader : public W3DShaderInterface
@@ -1522,7 +1714,13 @@ public:
 	virtual Int init() override;			///<perform any one time initialization and validation
 	virtual void reset() override;		///<do any custom resetting necessary to bring W3D in sync.
 	virtual Int shutdown() override;			///<release resources used by shader
+#if RTS_ENGINE_CONTEXT
+};
+static FlatTerrainShaderPixelShader& flatTerrainShaderPixelShader_State(); // GeneralsX @feature cemlyn007 01/10/2026 the engine's (W3DShaderManagerState, RR3)
+#define flatTerrainShaderPixelShader (flatTerrainShaderPixelShader_State())
+#else
 } flatTerrainShaderPixelShader;
+#endif
 
 ///8 stage terrain shader which only works on certain Nvidia cards.
 class TerrainShader8Stage : public W3DShaderInterface
@@ -1530,7 +1728,13 @@ class TerrainShader8Stage : public W3DShaderInterface
 	virtual Int set(Int pass) override;		///<setup shader for the specified rendering pass.
 	virtual void reset() override;		///<do any custom resetting necessary to bring W3D in sync.
 	virtual Int init() override;			///<perform any one time initialization and validation
+#if RTS_ENGINE_CONTEXT
+};
+static TerrainShader8Stage& terrainShader8Stage_State(); // GeneralsX @feature cemlyn007 01/10/2026 the engine's (W3DShaderManagerState, RR3)
+#define terrainShader8Stage (terrainShader8Stage_State())
+#else
 } terrainShader8Stage;
+#endif
 
 //Offsets into constant register pool used by vertex shader
 #define CV_WORLDVIEWPROJ_0	0	//4 vectors for transform of world->clip space.
@@ -1546,9 +1750,16 @@ class TerrainShaderPixelShader : public W3DShaderInterface
 	virtual void reset() override;		///<do any custom resetting necessary to bring W3D in sync.
 	virtual Int init() override;			///<perform any one time initialization and validation
 	virtual Int shutdown() override;			///<release resources used by shader
+#if RTS_ENGINE_CONTEXT
+};
+static TerrainShaderPixelShader& terrainShaderPixelShader_State(); // GeneralsX @feature cemlyn007 01/10/2026 the engine's (W3DShaderManagerState, RR3)
+#define terrainShaderPixelShader (terrainShaderPixelShader_State())
+#else
 } terrainShaderPixelShader;
+#endif
 
 ///List of different terrain shader implementations in order of preference
+#if !RTS_ENGINE_CONTEXT
 W3DShaderInterface *TerrainShaderList[]=
 {
 	&terrainShaderPixelShader,
@@ -1556,14 +1767,17 @@ W3DShaderInterface *TerrainShaderList[]=
 	&terrainShader2Stage,
 	nullptr
 };
+#endif
 
 ///List of different terrain shader implementations in order of preference
+#if !RTS_ENGINE_CONTEXT
 W3DShaderInterface *FlatTerrainShaderList[]=
 {
 	&flatTerrainShaderPixelShader,
 	&flatTerrainShader2Stage,
 	nullptr
 };
+#endif
 
 Int TerrainShader2Stage::init()
 {
@@ -2172,14 +2386,22 @@ class CloudTextureShader : public W3DShaderInterface
 	virtual Int init() override;			///<perform any one time initialization and validation
 	virtual void reset() override;		///<do any custom resetting necessary to bring W3D in sync.
 	Int m_stageOfSet;
+#if RTS_ENGINE_CONTEXT
+};
+static CloudTextureShader& cloudTextureShader_State(); // GeneralsX @feature cemlyn007 01/10/2026 the engine's (W3DShaderManagerState, RR3)
+#define cloudTextureShader (cloudTextureShader_State())
+#else
 } cloudTextureShader;
+#endif
 
 ///List of different cloud shader implementations in order of preference
+#if !RTS_ENGINE_CONTEXT
 W3DShaderInterface *CloudShaderList[]=
 {
 	&cloudTextureShader,
 	nullptr
 };
+#endif
 
 Int CloudTextureShader::init()
 {
@@ -2247,7 +2469,13 @@ class RoadShaderPixelShader : public W3DShaderInterface
 	virtual void reset() override;		///<do any custom resetting necessary to bring W3D in sync.
 	virtual Int init() override;			///<perform any one time initialization and validation
 	virtual Int shutdown() override;			///<release resources used by shader
+#if RTS_ENGINE_CONTEXT
+};
+static RoadShaderPixelShader& roadShaderPixelShader_State(); // GeneralsX @feature cemlyn007 01/10/2026 the engine's (W3DShaderManagerState, RR3)
+#define roadShaderPixelShader (roadShaderPixelShader_State())
+#else
 } roadShaderPixelShader;
+#endif
 
 class RoadShader2Stage : public W3DShaderInterface
 {	friend class RoadShaderPixelShader;	//pixel shader version uses some of the same features.
@@ -2255,15 +2483,23 @@ class RoadShader2Stage : public W3DShaderInterface
 	virtual Int set(Int pass) override;		///<setup shader for the specified rendering pass.
 	virtual Int init() override;			///<perform any one time initialization and validation
 	virtual void reset() override;
+#if RTS_ENGINE_CONTEXT
+};
+static RoadShader2Stage& roadShader2Stage_State(); // GeneralsX @feature cemlyn007 01/10/2026 the engine's (W3DShaderManagerState, RR3)
+#define roadShader2Stage (roadShader2Stage_State())
+#else
 } roadShader2Stage;
+#endif
 
 ///List of different terrain shader implementations in order of preference
+#if !RTS_ENGINE_CONTEXT
 W3DShaderInterface *RoadShaderList[]=
 {
 	&roadShaderPixelShader,
 	&roadShader2Stage,
 	nullptr
 };
+#endif
 
 Int RoadShaderPixelShader::shutdown()
 {
@@ -2573,6 +2809,97 @@ void RoadShader2Stage::reset()
 	DX8Wrapper::Set_DX8_Texture_Stage_State( 1, D3DTSS_TEXCOORDINDEX, D3DTSS_TCI_PASSTHRU|1);
 }
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 01/10/2026 One engine's shader and filter objects and their lists (PLAN-023 Phase 8, stage RR3; see
+// W3DShaderManagerData): every object a file static before, and each list in its order of preference, with the
+// master lists of lists. Value-initialised (a defaulted constructor), so every object starts zeroed as the statics
+// did, the motion blur's members its constructor leaves alone included.
+namespace
+{
+struct W3DShaderManagerState
+{
+	W3DShaderManagerState() = default;
+	W3DShaderManagerState(const W3DShaderManagerState&) = delete;
+	W3DShaderManagerState& operator=(const W3DShaderManagerState&) = delete;
+
+	W3DShaderManagerData Data;
+
+	ScreenDefaultFilter ScreenDefault;
+	ScreenBWFilter ScreenBW;
+	ScreenBWFilterDOT3 ScreenBWDOT3;
+	ScreenCrossFadeFilter ScreenCrossFade;
+	ScreenMotionBlurFilter ScreenMotionBlur;
+	ShroudTextureShader ShroudTexture;
+	FlatShroudTextureShader FlatShroudTexture;
+	MaskTextureShader MaskTexture;
+	TerrainShader2Stage Terrain2Stage;
+	FlatTerrainShader2Stage FlatTerrain2Stage;
+	FlatTerrainShaderPixelShader FlatTerrainPixelShader;
+	TerrainShader8Stage Terrain8Stage;
+	TerrainShaderPixelShader TerrainPixelShader;
+	CloudTextureShader CloudTexture;
+	RoadShaderPixelShader RoadPixelShader;
+	RoadShader2Stage Road2Stage;
+
+	W3DFilterInterface* ScreenDefaultFilterList[2] = { &ScreenDefault, nullptr };
+	W3DFilterInterface* ScreenBWFilterList[3] = { &ScreenBW, &ScreenBWDOT3, nullptr };
+	W3DFilterInterface* ScreenCrossFadeFilterList[2] = { &ScreenCrossFade, nullptr };
+	W3DFilterInterface* ScreenMotionBlurFilterList[2] = { &ScreenMotionBlur, nullptr };
+	W3DShaderInterface* ShroudShaderList[2] = { &ShroudTexture, nullptr };
+	W3DShaderInterface* FlatShroudShaderList[2] = { &FlatShroudTexture, nullptr };
+	W3DShaderInterface* MaskShaderList[2] = { &MaskTexture, nullptr };
+	W3DShaderInterface* TerrainShaderList[4] = { &TerrainPixelShader, &Terrain8Stage, &Terrain2Stage, nullptr };
+	W3DShaderInterface* FlatTerrainShaderList[3] = { &FlatTerrainPixelShader, &FlatTerrain2Stage, nullptr };
+	W3DShaderInterface* CloudShaderList[2] = { &CloudTexture, nullptr };
+	W3DShaderInterface* RoadShaderList[3] = { &RoadPixelShader, &Road2Stage, nullptr };
+
+	W3DShaderInterface** MasterShaderList[8] = {
+		TerrainShaderList,
+		ShroudShaderList,
+		FlatShroudShaderList,
+		RoadShaderList,
+		MaskShaderList,
+		CloudShaderList,
+		FlatTerrainShaderList,
+		nullptr
+	};
+	W3DFilterInterface** MasterFilterList[5] = {
+		ScreenDefaultFilterList,
+		ScreenBWFilterList,
+		ScreenMotionBlurFilterList,
+		ScreenCrossFadeFilterList,
+		nullptr
+	};
+};
+
+rts::PerEngineStatic<W3DShaderManagerState> W3DShaderManagerState_perEngine;
+
+W3DShaderManagerData& ShaderManagerData()
+{
+	return W3DShaderManagerState_perEngine.get().Data;
+}
+} // namespace
+
+static ScreenDefaultFilter& screenDefaultFilter_State() { return W3DShaderManagerState_perEngine.get().ScreenDefault; }
+static ScreenBWFilter& screenBWFilter_State() { return W3DShaderManagerState_perEngine.get().ScreenBW; }
+static ScreenBWFilterDOT3& screenBWFilterDOT3_State() { return W3DShaderManagerState_perEngine.get().ScreenBWDOT3; }
+static ScreenCrossFadeFilter& screenCrossFadeFilter_State() { return W3DShaderManagerState_perEngine.get().ScreenCrossFade; }
+static ScreenMotionBlurFilter& screenMotionBlurFilter_State() { return W3DShaderManagerState_perEngine.get().ScreenMotionBlur; }
+static ShroudTextureShader& shroudTextureShader_State() { return W3DShaderManagerState_perEngine.get().ShroudTexture; }
+static FlatShroudTextureShader& flatShroudTextureShader_State() { return W3DShaderManagerState_perEngine.get().FlatShroudTexture; }
+static MaskTextureShader& maskTextureShader_State() { return W3DShaderManagerState_perEngine.get().MaskTexture; }
+static TerrainShader2Stage& terrainShader2Stage_State() { return W3DShaderManagerState_perEngine.get().Terrain2Stage; }
+static FlatTerrainShader2Stage& flatTerrainShader2Stage_State() { return W3DShaderManagerState_perEngine.get().FlatTerrain2Stage; }
+static FlatTerrainShaderPixelShader& flatTerrainShaderPixelShader_State() { return W3DShaderManagerState_perEngine.get().FlatTerrainPixelShader; }
+static TerrainShader8Stage& terrainShader8Stage_State() { return W3DShaderManagerState_perEngine.get().Terrain8Stage; }
+static TerrainShaderPixelShader& terrainShaderPixelShader_State() { return W3DShaderManagerState_perEngine.get().TerrainPixelShader; }
+static CloudTextureShader& cloudTextureShader_State() { return W3DShaderManagerState_perEngine.get().CloudTexture; }
+static RoadShaderPixelShader& roadShaderPixelShader_State() { return W3DShaderManagerState_perEngine.get().RoadPixelShader; }
+static RoadShader2Stage& roadShader2Stage_State() { return W3DShaderManagerState_perEngine.get().Road2Stage; }
+
+#define MasterShaderList (W3DShaderManagerState_perEngine.get().MasterShaderList)
+#define MasterFilterList (W3DShaderManagerState_perEngine.get().MasterFilterList)
+#else
 /** List of all custom shader lists - each list in this list contains variations of the same
 	shader to allow it to work on different hardware configurations.
 */
@@ -2599,6 +2926,7 @@ W3DFilterInterface **MasterFilterList[]=
 	ScreenCrossFadeFilterList,
 	nullptr
 };
+#endif
 
 // W3DShaderManager::W3DShaderManager =========================================
 /** Constructor - just clears some variables */
