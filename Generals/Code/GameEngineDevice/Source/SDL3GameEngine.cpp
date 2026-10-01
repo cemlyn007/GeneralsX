@@ -67,36 +67,10 @@ extern GameWindowManager *TheWindowManager;
 
 // GeneralsX @feature cemlyn007 01/10/2026 The embedding host's event pump lock (Common/ApplicationWindow.h;
 // PLAN-023 Phase 8, stage RR4).
-bool (*ApplicationWindow_TryLockEventPump)() = nullptr;
-void (*ApplicationWindow_UnlockEventPump)() = nullptr;
+std::atomic<bool (*)()> ApplicationWindow_TryLockEventPump{nullptr};
+std::atomic<void (*)()> ApplicationWindow_UnlockEventPump{nullptr};
 
 namespace {
-
-// GeneralsX @feature cemlyn007 01/10/2026 Holds the host's event pump lock, if it has one, for its scope (PLAN-023
-// Phase 8, stage RR4). acquired() is false when the host's lock is busy: the caller then skips its SDL calls.
-class EventPumpLock
-{
-public:
-	EventPumpLock()
-		: m_locked(ApplicationWindow_TryLockEventPump != nullptr && ApplicationWindow_TryLockEventPump()),
-		  m_acquired(ApplicationWindow_TryLockEventPump == nullptr || m_locked)
-	{
-	}
-	~EventPumpLock()
-	{
-		if (m_locked) {
-			ApplicationWindow_UnlockEventPump();
-		}
-	}
-	EventPumpLock(const EventPumpLock&) = delete;
-	EventPumpLock& operator=(const EventPumpLock&) = delete;
-
-	bool acquired() const { return m_acquired; }
-
-private:
-	const bool m_locked;
-	const bool m_acquired;
-};
 
 Bool DecodeNextUtf8Codepoint(const char* text, size_t length, size_t& offset, UnsignedInt& outCodepoint)
 {
@@ -172,6 +146,9 @@ SDL3GameEngine::SDL3GameEngine()
  */
 SDL3GameEngine::~SDL3GameEngine()
 {
+	// GeneralsX @info cemlyn007 01/10/2026 Not under the embedding host's event pump lock: the engine is destroyed by
+	// its shutdown, which such a host runs under that same lock (Common/ApplicationWindow.h; PLAN-023 Phase 8,
+	// stage RR4).
 	if (m_SDLWindow && m_IsTextInputActive) {
 		SDL_StopTextInput(m_SDLWindow);
 		m_IsTextInputActive = false;

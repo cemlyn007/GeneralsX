@@ -2031,7 +2031,22 @@ void W3DDisplay::draw()
 	//USE_PERF_TIMER(W3DDisplay_draw)
 
 	// GeneralsX @feature xxorza 15/04/2026 Process deferred window resize for pillarbox
-	DX8Wrapper::Pillarbox_Process_Resize();
+	// GeneralsX @bugfix cemlyn007 01/10/2026 With a window, under the embedding host's lock
+	// (Common/ApplicationWindow.h), or skipped until the next frame while another thread holds it: its window-size
+	// query and, on a resize, Reset_Device are SDL calls, which such a host serialises with other engines' boots and
+	// shutdowns on other threads. Without a window it makes none, so it takes no lock (PLAN-023 Phase 8, stage RR4).
+#ifdef SAGE_USE_SDL3
+	if (TheSDL3Window != nullptr) {
+		const EventPumpLock pumpLock;
+		if (pumpLock.acquired()) {
+			DX8Wrapper::Pillarbox_Process_Resize();
+		}
+	}
+	else
+#endif
+	{
+		DX8Wrapper::Pillarbox_Process_Resize();
+	}
 
 	if (ApplicationHWnd && ::IsIconic(ApplicationHWnd)) {
 		return;
