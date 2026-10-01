@@ -54,10 +54,15 @@ extern HWND ApplicationHWnd;  ///< our application window handle
 // GeneralsX @feature cemlyn007 01/10/2026 The embedding host's lock around the SDL3 event pump (PLAN-023 Phase 8,
 // stage RR4).
 //
-// SDL3GameEngine::pollSDL3Events (every update() and serviceWindowsOS()) and reset()'s text-input stop are the only
-// SDL calls an engine with a window makes outside its boot and shutdown. A host that boots or shuts down other
-// engines on other threads while its window's engine updates (rlgenerals: offscreen renderers beside its viewer)
-// serialises SDL's video calls with a lock of its own, which these take around them. TryLock returns whether the
+// SDL3GameEngine::pollSDL3Events (every update() and serviceWindowsOS()) and reset()'s text-input stop take it around
+// their SDL calls. A host that boots or shuts down other engines on other threads while its window's engine updates
+// (rlgenerals: offscreen renderers beside its viewer) serialises SDL's video calls with a lock of its own. They are
+// the only SDL calls such a host's window engine makes outside its boot and shutdown only because that engine is
+// headless (GlobalData::m_headless, which rlgenerals requires of every render boot): GameClient::init then makes no
+// keyboard and a MouseDummy, so SDL3Mouse's per-frame calls (draw()'s setCursor -> SDL_SetCursor, the event
+// translation's SDL_GetWindowFromID, SDL_GetWindowSize and SDL_GetMouseState, capture()'s SDL_CaptureMouse and
+// SDL_SetWindowMouseGrab) and SDL3Keyboard's never run, and W3DDisplay's window-mode calls run only at its init
+// (the boot). A host with a non-headless window engine would have to take its lock around those too. TryLock returns whether the
 // pump may run now; false skips this pump, and the events stay queued for the next one. Unlock follows every TryLock
 // that returned true. Null (the game's own main(): one engine on one thread) runs the pump unlocked. Set once,
 // before the window's engine boots, and only read after that.
