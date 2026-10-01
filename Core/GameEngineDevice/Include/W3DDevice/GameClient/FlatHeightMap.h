@@ -87,6 +87,12 @@ protected:
 					STATE_UPDATE_TEXTURES		 // Camera stopped, updating textures.
 	} m_updateState;
 
+	// GeneralsX @refactor cemlyn007 01/10/2026 updateCenter's last logged counts: were function-local statics
+	// (PLAN-023 Phase 8, stage RR3).
+	Int m_prevCulled = 0;
+	Int m_prevT2X = 0;
+	Int m_prevT4X = 0;
+
 protected:
 	void releaseTiles();
 

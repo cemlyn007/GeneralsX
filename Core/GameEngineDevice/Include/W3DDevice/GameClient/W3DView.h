@@ -274,6 +274,9 @@ private:
 	TZoomCameraInfo m_zcInfo;
 	TMoveAlongWaypointPathInfo m_mcwpInfo;					///< Move camera along waypoint path info.
 	Bool m_CameraArrivedAtWaypointOnPathFlag;
+	// GeneralsX @refactor cemlyn007 01/10/2026 update()'s camera-lock follow smoothing (-1 when not following): was a
+	// function-local static, so one render engine's lock moved another's camera (PLAN-023 Phase 8, stage RR3).
+	Real m_followFactor = -1;
 
 	Real		m_FXPitch;															///< Camera effects pitch.  0 = flat, infinite = look down, 1 = normal.
 

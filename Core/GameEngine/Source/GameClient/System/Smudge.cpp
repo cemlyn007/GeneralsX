@@ -31,7 +31,7 @@
 #include "GameClient/Smudge.h"
 
 
-SmudgeDeque SmudgeSet::m_freeSmudgeList;	///<list of unused smudges for use by SmudgeSets.
+// GeneralsX @refactor cemlyn007 01/10/2026 SmudgeSet::m_freeSmudgeList is SmudgeManager's (PLAN-023 Phase 8, stage RR3).
 
 SmudgeManager::SmudgeManager()
 {
@@ -51,9 +51,9 @@ SmudgeManager::~SmudgeManager()
 	}
 
 	//free memory used by smudges
-	while (!SmudgeSet::m_freeSmudgeList.empty()) {
-		Smudge* smudge = SmudgeSet::m_freeSmudgeList.front();
-		SmudgeSet::m_freeSmudgeList.pop_front();
+	while (!m_freeSmudgeList.empty()) {
+		Smudge* smudge = m_freeSmudgeList.front();
+		m_freeSmudgeList.pop_front();
 		delete smudge;
 	}
 }
@@ -91,7 +91,7 @@ SmudgeSet *SmudgeManager::addSmudgeSet()
 		return smudgeSet;
 	}
 
-	SmudgeSet* smudgeSet = W3DNEW SmudgeSet();
+	SmudgeSet* smudgeSet = W3DNEW SmudgeSet(m_freeSmudgeList);
 	m_usedSmudgeSetList.push_back(smudgeSet);	//add to used list.
 	return smudgeSet;
 }
@@ -108,7 +108,7 @@ Smudge *SmudgeManager::findSmudge(Smudge::Identifier identifier)
 }
 
 
-SmudgeSet::SmudgeSet()
+SmudgeSet::SmudgeSet(SmudgeDeque &freeSmudgeList) : m_freeSmudgeList(freeSmudgeList)
 {
 }
 

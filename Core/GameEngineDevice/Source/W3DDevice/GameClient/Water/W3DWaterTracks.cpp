@@ -62,6 +62,7 @@
 #include "WW3D2/camera.h"
 #include "WW3D2/assetmgr.h"
 #include "WW3D2/dx8wrapper.h"
+#include "W3DDevice/GameClient/W3DDrawClock.h"	// GeneralsX @bugfix cemlyn007 01/10/2026 (RR3)
 
 //number of vertex pages allocated - allows double buffering of vertex updates.
 //while one is being rendered, another is being updated.  Improves HW parallelism.
@@ -823,10 +824,18 @@ void WaterTracksRenderSystem::shutdown()
 void WaterTracksRenderSystem::update()
 {
 
-	static  Int iLastTime=timeGetTime();
+	// GeneralsX @refactor cemlyn007 01/10/2026 This system's own clock, on the draw clock (logic-frame time for an
+	// embedding host's image observations, W3DDrawClock.h), not a function-local static on the wall clock (PLAN-023
+	// Phase 8, stage RR3).
+	if (!m_lastUpdateTimeSet)
+	{
+		m_lastUpdateTime = W3D_DRAW_CLOCK_MS();
+		m_lastUpdateTimeSet = true;
+	}
+	Int& iLastTime = m_lastUpdateTime;
 	WaterTracksObj *mod=m_usedModules,*nextMod;
 
-	Int timeDiff = timeGetTime()-iLastTime;
+	Int timeDiff = W3D_DRAW_CLOCK_MS()-iLastTime;
 	iLastTime += timeDiff;
 
 	//first update all the tracks
