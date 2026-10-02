@@ -69,6 +69,7 @@
 #include <sys/stat.h>   // mkdir()
 #include <cstdlib>      // getenv()
 #include <filesystem>   // std::filesystem::create_directories()
+#include <system_error>  // std::error_code
 
 // GeneralsX @feature BenderAI 24/02/2026 Phase 5 macOS cross-platform exe path detection
 #ifdef __APPLE__
@@ -1478,7 +1479,13 @@ AsciiString GlobalData::BuildUserDataPathFromRegistry()
 		const char* home = getenv("HOME");
 		if (home) {
 			std::filesystem::path path = std::filesystem::path(home) / "Library" / "Application Support" / "GeneralsX" / "GeneralsZH";
-			std::filesystem::create_directories(path);
+			// GeneralsX @bugfix cemlyn007 02/10/2026 The throwing overload crashed the constructor (and so
+			// the whole engine boot) whenever the default could not be created, e.g. a read-only $HOME in a
+			// sandbox: an engine given its own user-data directory still paid for the shared default being
+			// creatable. The error_code overload lets a host with no write access to the default boot as
+			// long as it (or a later setPath_UserData override) provides a directory that does exist.
+			std::error_code ec;
+			std::filesystem::create_directories(path, ec);
 			userDataDir = path.string().c_str();
 			if (!userDataDir.endsWith("/"))
 				userDataDir.concat('/');
@@ -1504,7 +1511,10 @@ AsciiString GlobalData::BuildUserDataPathFromRegistry()
 		}
 
 		path = path / "GeneralsX" / "GeneralsZH";
-		std::filesystem::create_directories(path);
+		// GeneralsX @bugfix cemlyn007 02/10/2026 As the macOS branch above: do not let an uncreatable
+		// default (a read-only $HOME) throw out of the constructor and fault the whole engine.
+		std::error_code ec;
+		std::filesystem::create_directories(path, ec);
 		userDataDir = path.string().c_str();
 		if (!userDataDir.endsWith("/"))
 			userDataDir.concat('/');
