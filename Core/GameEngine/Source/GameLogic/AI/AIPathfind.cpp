@@ -1241,7 +1241,7 @@ PathfindCell::~PathfindCell()
 	if (m_info) PathfindCellInfo::releaseACellInfo(m_info);
 	m_info = nullptr;
 	// GeneralsX @bugfix cemlyn007 02/10/2026 Not debug-only: every engine's pathfinder frees its own cells
-	// on its own thread (finding w2-r2-5), the same misclassification RT3 fixed for ScriptEngine's st_*.
+	// on its own thread, the same misclassification RT3 fixed for ScriptEngine's st_*.
 #if RTS_ENGINE_CONTEXT
 	static rts::PerEngineStatic<Bool> warn_perEngine([](Bool &value) { value = true; });
 	Bool &warn = warn_perEngine.get();

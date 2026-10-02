@@ -76,7 +76,7 @@ StringClass::Get_String (int length, bool is_temp)
 	//
 	//	Should we attempt to use a temp buffer for this string?
 	//
-	// GeneralsX @bugfix cemlyn007 29/09/2026, revised 02/10/2026 (PLAN-023 Phase 5b, TSan; finding w2-r2-7)
+	// GeneralsX @bugfix cemlyn007 29/09/2026, revised 02/10/2026 (PLAN-023 Phase 5b, TSan)
 	// Upstream checked ReservedMask against ALL_TEMP_STRINGS_USED_MASK before taking the lock, an
 	// unsynchronised read of a word other threads write under it: a data race once engines run on
 	// several threads. ReservedMask is now std::atomic<unsigned>, so this relaxed load is a race-free

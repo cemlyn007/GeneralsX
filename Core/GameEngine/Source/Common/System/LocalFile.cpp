@@ -266,8 +266,8 @@ Bool LocalFile::open( const Char *filename, Int access, size_t bufferSize )
 
 #endif
 
-	// GeneralsX @bugfix cemlyn007 02/10/2026 Removed s_totalOpen (finding w2-r2-5): a process-wide counter
-	// every engine's own thread wrote on the release open/close path, with no reader left but a
+	// GeneralsX @bugfix cemlyn007 02/10/2026 Removed s_totalOpen: a process-wide counter every engine's
+	// own thread wrote on the release open/close path, with no reader left but a
 	// commented-out DEBUG_LOG. Nothing needs it; deleting it removes the race instead of synchronising it.
 	if ( m_access & APPEND )
 	{

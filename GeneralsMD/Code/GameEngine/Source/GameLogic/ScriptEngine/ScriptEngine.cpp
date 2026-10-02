@@ -126,7 +126,7 @@ struct ScriptEngineDebugHooks
 	int getTeamNamedWarnCount; ///< GeneralsX @bugfix cemlyn007 02/10/2026 sim-path writer, not debug-only (see below)
 #ifdef DO_VTUNE_STUFF
 	// GeneralsX @bugfix cemlyn007 02/10/2026 The VTune handles have the same cross-engine write pattern RT3
-	// fixed for the hooks above (finding w2-r2-6): _initVTune/_cleanUpVTune/_updateVTune run on every
+	// fixed for the hooks above: _initVTune/_cleanUpVTune/_updateVTune run on every
 	// ScriptEngine's own init()/destructor/update(), so with DO_VTUNE_STUFF (RTS_DEBUG) and engines on
 	// several threads a later boot or teardown raced with a stepping engine's reads, and on Windows a
 	// teardown's FreeLibrary could unload the DLL under another engine's VTPause/VTResume calls.
