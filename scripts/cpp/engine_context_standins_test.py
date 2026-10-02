@@ -4,10 +4,18 @@
 # `std::addressof`, and a stand-in passed bare through a variadic logger). cemlyn007 02/10/2026: a
 # multi-word cast (`(unsigned char*)&name`) and the variadic check's false positives on a converted
 # argument (`(int)name`, `static_cast<int>(name)`, `name == 32`, `f(name)`) were both review-fix gaps too.
+# MainTest covers main() end to end: a stand-in whose class's members are defined in a differently named
+# file (the MapObject/WorldHeightMap.cpp gap, found by content now, not by file name) and a violation in
+# an `--extra-dir` tree (a consumer's own C++ outside Core/Generals/GeneralsMD).
 #
 # Usage: python3 engine_context_standins_test.py
 
+import contextlib
+import io
+import os
+import shutil
 import sys
+import tempfile
 import unittest
 
 import engine_context_standins as ecs
@@ -97,6 +105,100 @@ class UsesTest(unittest.TestCase):
     def test_qualified_name(self):
         self.assert_flagged("(void*)&DX8Wrapper::BitDepth", qualifier="DX8Wrapper")
         self.assert_clean("DX8Wrapper::BitDepth & mask", qualifier="DX8Wrapper")
+
+
+class MainTest(unittest.TestCase):
+    """End-to-end tests of main(), against a temporary GeneralsX-shaped tree."""
+
+    def setUp(self):
+        self.root = tempfile.mkdtemp(prefix="ecs_main_test_")
+        self.addCleanup(shutil.rmtree, self.root, ignore_errors=True)
+        for d in ("Core", "Generals", "GeneralsMD"):
+            os.makedirs(os.path.join(self.root, d), exist_ok=True)
+
+    def write(self, relpath, content):
+        path = os.path.join(self.root, relpath)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(content)
+        return path
+
+    def run_main(self, argv):
+        old_argv = sys.argv
+        sys.argv = ["engine_context_standins.py"] + argv
+        out = io.StringIO()
+        try:
+            with contextlib.redirect_stdout(out):
+                code = ecs.main()
+        finally:
+            sys.argv = old_argv
+        return code, out.getvalue()
+
+    def test_unqualified_use_in_differently_named_member_file(self):
+        # The MapObject/WorldHeightMap.cpp gap: a stand-in's class's members are defined in a file
+        # that is not named after the class, so unqualified-use scanning must find it by content.
+        self.write(
+            "Core/MapObject.h",
+            "class MapObject {\n"
+            "public:\n"
+            "    static constexpr rts::ContextField<MapObject*, &rts::EngineContext::mapObjectList> "
+            "TheMapObjectListPtr{};\n"
+            "};\n",
+        )
+        self.write(
+            "Core/WorldHeightMap.cpp",
+            '#include "MapObject.h"\n'
+            "void MapObject::fastAssignAllUniqueIDs()\n"
+            "{\n"
+            "    MapObject** link = &TheMapObjectListPtr;\n"
+            "}\n",
+        )
+        code, out = self.run_main(["--root", self.root])
+        self.assertEqual(code, 1, out)
+        self.assertIn("WorldHeightMap.cpp", out)
+        self.assertIn("TheMapObjectListPtr", out)
+
+    def test_unqualified_use_outside_own_files_is_not_flagged(self):
+        # The same class/stand-in, but the unqualified use sits in a file that neither declares the
+        # stand-in nor defines any of the class's members: not flagged (it would not compile either).
+        self.write(
+            "Core/MapObject.h",
+            "class MapObject {\n"
+            "public:\n"
+            "    static constexpr rts::ContextField<MapObject*, &rts::EngineContext::mapObjectList> "
+            "TheMapObjectListPtr{};\n"
+            "};\n",
+        )
+        self.write(
+            "Core/WorldHeightMap.cpp",
+            '#include "MapObject.h"\nvoid MapObject::fastAssignAllUniqueIDs() {}\n',
+        )
+        self.write(
+            "Core/Unrelated.cpp",
+            "// just a comment mentioning TheMapObjectListPtr by name, for coverage\n"
+            "int x = 0;\n",
+        )
+        code, out = self.run_main(["--root", self.root])
+        self.assertEqual(code, 0, out)
+
+    def test_extra_dir_violation_is_reported(self):
+        # A consumer's own C++ outside the Core/Generals/GeneralsMD layout, found through --extra-dir.
+        self.write(
+            "Core/MapObject.h",
+            "class MapObject {\n"
+            "public:\n"
+            "    static constexpr rts::ContextField<MapObject*, &rts::EngineContext::mapObjectList> "
+            "TheMapObjectListPtr{};\n"
+            "};\n",
+        )
+        extra_dir = tempfile.mkdtemp(prefix="ecs_extra_dir_test_")
+        self.addCleanup(shutil.rmtree, extra_dir, ignore_errors=True)
+        with open(os.path.join(extra_dir, "launcher.cpp"), "w", encoding="utf-8") as f:
+            f.write('#include "MapObject.h"\n' "auto *p = &MapObject::TheMapObjectListPtr;\n")
+        code, out = self.run_main(["--root", self.root, "--extra-dir", extra_dir])
+        self.assertEqual(code, 1, out)
+        self.assertIn("launcher.cpp", out)
+        self.assertIn("TheMapObjectListPtr", out)
 
 
 if __name__ == "__main__":

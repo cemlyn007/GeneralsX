@@ -10,13 +10,16 @@
 # macro instead, as DX8Wrapper's names have: WW3D2/w3drenderstate_names.h).
 #
 # Where it looks, for a stand-in `name` of class `C` declared in `c.h`: `C::name` in every source file, and
-# `name` unqualified in `c.h` and in the files named `c.cpp`/`c.inl` (any directory, any case), where `C`'s
-# members are defined. `sizeof(name[0])`, `&name[i]`, `&name->x` and `&name.x` are allowed: they reach the
-# field itself. `std::addressof(name)` is the same hazard as unary `&` and is caught too. A unary `&` is also
-# recognised after a C-style pointer cast (`(void*)&name`, `(char*)&name`) and after `&&` (`a && &name`), not
-# only after the fixed set of operators it is otherwise unambiguous after. `name` passed bare to a known
-# variadic logger (the printf family, `WWDEBUG_SAY`, `DEBUG_LOG`, `DEBUG_ASSERTLOG`) is flagged too: it passes
-# the empty stand-in object instead of the field's value. Comments and string literals are ignored.
+# `name` unqualified in `c.h` and in every file that defines one of `C`'s members (a line matching
+# `C::member(`, found by content, not by file name: a class's members are not always defined in a file
+# named after the class, e.g. MapObject's are in WorldHeightMap.cpp). `sizeof(name[0])`, `&name[i]`,
+# `&name->x` and `&name.x` are allowed: they reach the field itself. `std::addressof(name)` is the same
+# hazard as unary `&` and is caught too. A unary `&` is also recognised after a C-style pointer cast
+# (`(void*)&name`, `(unsigned char*)&name`, `(struct Foo*)&name`) and after `&&` (`a && &name`), not only
+# after the fixed set of operators it is otherwise unambiguous after. `name` passed bare as a whole
+# argument to a known variadic logger (the printf family, `WWDEBUG_SAY`, `DEBUG_LOG`, `DEBUG_ASSERTLOG`) is
+# flagged too: it passes the empty stand-in object instead of the field's value. Comments and string
+# literals are ignored.
 #
 # Usage: engine_context_standins.py [--root GeneralsX] [--extra-dir DIR ...] [--list]
 #   exit 0 when no stand-in is used with sizeof, &, std::addressof or a variadic logger, 1 (with each use
@@ -232,14 +235,35 @@ def main():
         for owner, name, path in standins:
             print(f"{owner}::{name}  [{os.path.relpath(path, args.root)}]")
 
-    by_stem = {}
-    for path in raw:
-        by_stem.setdefault(os.path.splitext(os.path.basename(path))[0].lower(), []).append(path)
+    # Files that define at least one member of each class with a stand-in, found by content (a class's
+    # members are not always defined in a file named after the class, e.g. MapObject's are in
+    # WorldHeightMap.cpp): a line (after optional leading whitespace and an optional return type) of
+    # `C::member(`, destructors (`C::~member(`) included.
+    owners = {owner for owner, _, _ in standins if owner}
+    defines_member = {}
+    if owners:
+        member_def = re.compile(
+            r"^[ \t]*(?P<prefix>(?:[\w:<>,&*]+[ \t]+)*)(?P<cls>"
+            + "|".join(re.escape(o) for o in sorted(owners))
+            + r")\s*::\s*(?P<member>~?[A-Za-z_]\w*)\s*\(",
+            re.M,
+        )
+        for path, text in files.items():
+            classes = set()
+            for m in member_def.finditer(text):
+                # A bare call statement (`Class::Method();`) matches the same shape as a definition
+                # with no return type; only a constructor or destructor legitimately has none, so
+                # require either a return-type prefix or that the member is one of those.
+                member = m.group("member")
+                cls = m.group("cls")
+                if m.group("prefix").strip() or member == cls or member.startswith("~"):
+                    classes.add(cls)
+            if classes:
+                defines_member[path] = classes
 
     violations = []
     for owner, name, header in standins:
-        stem = os.path.splitext(os.path.basename(header))[0].lower()
-        own = {header} | {p for p in by_stem.get(stem, []) if not p.endswith((".h", ".hpp"))}
+        own = {header} | {p for p, classes in defines_member.items() if owner in classes}
         for path, text in files.items():
             found = uses(text, name, owner) if owner else []
             if path in own:
