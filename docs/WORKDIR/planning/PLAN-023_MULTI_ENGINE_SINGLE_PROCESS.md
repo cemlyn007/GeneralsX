@@ -296,7 +296,7 @@ Result (rlgenerals' build of `ed2e91dc9`, GCC, fastbuild): 3,885 entries, 3,272 
 
 | Class | Entries | Mostly |
 |---|---|---|
-| per-engine | 186 | the work list below: Phase 2 50, Phase 3 51, Phase 4 85 (19 of them threads only) |
+| per-engine | 186 | the work list below: Phase 2 50, Phase 3 51, Phase 4 85; 19 threads only in all (6, 8 and 5) |
 | process-global | 1,437 | 610 third-party (openal-soft, curl, OpenSSL, absl, protobuf, ...), 500 cached NameKeys (Decision 2), 100 LAN/online multiplayer state, the context mechanism, the NameKey generator, the memory manager, critical sections, CPU detection, WWLib string pools |
 | constant | 334 | FieldParse and other tables, `const` objects, string constants, W3D prototype loaders |
 | render-only | 1,226 | menus and window callbacks (about 740: a headless engine has `GameWindowManagerDummy`, so no `.wnd` parse and no callbacks; the GUI files a headless engine does reach are classified by name, see below), the W3D render path (`DX8Wrapper`, shaders, shadows, water, sorting, statistics, `W3DShaderManager`), `W3DRadar`/`W3DView`/mouse state (headless has the dummies) |
