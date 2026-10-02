@@ -367,18 +367,27 @@ class SourceIndex:
         var_re = re.compile(rf"\b{re.escape(parsed.var)}\b")
         if parsed.scope in ("function", "guard") and parsed.func:
             func = re.escape(parsed.func)
+            # GeneralsX @bugfix cemlyn007 02/10/2026 Two cases fell through to the class-head macro guess.
+            # First, bare() cannot keep an operator's symbol apart from the parameter list that follows it
+            # with no separating space (`operator[](int const&) const`), so it returns the bare keyword
+            # "operator"; match any run of non-word characters between it and the call's own "(" instead of
+            # requiring them adjacent, which also accepts the spaced spelling ("operator [] ("). Second, `\b`
+            # cannot bound a destructor's leading '~': neither the character before it nor '~' itself is a
+            # word character, so `\b~X\s*\(` never matches, in or out of a class body. A negative lookbehind
+            # that also excludes '~' gives the same one-sided boundary for identifiers while letting '~' lead.
+            is_operator = parsed.func == "operator"
+            func_call = rf"{func}[^\w\n(]*\(" if is_operator else rf"(?<![\w~]){func}\s*\("
             owner = re.compile(
-                rf"\b{re.escape(parsed.cls)}\s*(?:<[^;{{}}]*?>)?\s*::\s*{func}\s*\("
+                rf"\b{re.escape(parsed.cls)}\s*(?:<[^;{{}}]*?>)?\s*::\s*{func_call}"
                 if parsed.cls
-                else rf"\b{func}\s*\("
+                else func_call
             )
-            # GeneralsX @bugfix cemlyn007 02/10/2026 A destructor's bare name keeps its leading '~' (needed
-            # in the regexes above), but the word index only ever stores identifier characters, so a
-            # destructor-scoped static's `where` lookup must drop it or every candidates() call below comes
-            # back empty (found while auditing w2-r2-5's new PER_ENGINE_STATICs).
+            # The word index only ever stores identifier characters, so a destructor-scoped static's
+            # `where` lookup must drop the leading '~' or every candidates() call below comes back empty;
+            # an operator's bare name is already the plain keyword "operator", which the index does store.
             func_word = parsed.func.lstrip("~")
             # Defined out of line, then (inline in the class body) anywhere after the function's name.
-            for branch, owner_re in (("owner", owner), ("inline", re.compile(rf"\b{func}\s*\("))):
+            for branch, owner_re in (("owner", owner), ("inline", re.compile(func_call))):
                 for rel in self.candidates(parsed.var, func_word, parsed.cls):
                     fm = owner_re.search(self.files[rel])
                     if not fm:
