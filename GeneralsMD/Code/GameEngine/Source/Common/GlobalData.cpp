@@ -80,10 +80,11 @@
 // branches, so these includes cannot stay confined to '#ifndef _WIN32' -- that left setPath_UserData
 // calling std::filesystem::create_directories()/is_directory() on Windows with neither <filesystem>
 // nor <system_error> included, failing to compile there (the win32-vcpkg and mingw-w64 z_generals
-// targets). std::filesystem needs VS2017 15.7 (_MSC_VER 1914); VC6 (_MSC_VER < 1300, which this file
-// already special-cases elsewhere) has no std::filesystem at all, so setPath_UserData falls back to
-// the Win32 API there (see GENERALSX_HAVE_STD_FILESYSTEM below), matching the guard
-// UserPreferences.cpp already uses for the same gap.
+// targets). std::filesystem needs VS2017 15.7 (_MSC_VER 1914); MSVC before that -- in practice VC6
+// (_MSC_VER < 1300, which this file already special-cases elsewhere), the only preset still built,
+// though the guard also covers the unbuilt VS2002-VS2017-15.6 range -- has no std::filesystem at
+// all, so setPath_UserData falls back to the Win32 API there (see GENERALSX_HAVE_STD_FILESYSTEM
+// below), matching the guard UserPreferences.cpp already uses for the same gap.
 #if !defined(_MSC_VER) || (_MSC_VER >= 1914)
 #define GENERALSX_HAVE_STD_FILESYSTEM 1
 #include <filesystem>    // std::filesystem::create_directories()
@@ -1445,7 +1446,8 @@ UnsignedInt GlobalData::generateExeCRC()
 // GeneralsX @bugfix cemlyn007 02/10/2026 setPath_UserData used std::filesystem unconditionally, but
 // GlobalData.cpp only included <filesystem>/<system_error> on non-Windows (117-gx-w1-r3-19): this
 // helper exists only when GENERALSX_HAVE_STD_FILESYSTEM is defined (see the includes above), i.e.
-// everywhere except VC6, which setPath_UserData falls back to the Win32 API for instead.
+// everywhere except MSVC before 19.14 (in practice VC6, the only such preset still built), which
+// setPath_UserData falls back to the Win32 API for instead.
 #if GENERALSX_HAVE_STD_FILESYSTEM
 static Bool createUserDataDirectory(const std::filesystem::path &path, const char *label)
 {
@@ -1487,9 +1489,19 @@ static Bool isUserDataDirectoryWritable(const AsciiString &pathWithSeparator)
 }
 
 #if !GENERALSX_HAVE_STD_FILESYSTEM
-// GeneralsX @bugfix cemlyn007 02/10/2026 VC6 (_MSC_VER < 1300) has no std::filesystem, so
-// setPath_UserData falls back to the Win32 API here: CreateDirectoryA is not recursive (unlike
-// std::filesystem::create_directories), so each ancestor is created in turn before the leaf.
+// GeneralsX @bugfix cemlyn007 02/10/2026 MSVC before 19.14 (in practice VC6, the only preset that
+// still takes this path) has no std::filesystem, so setPath_UserData falls back to the Win32 API
+// here: CreateDirectoryA is not recursive (unlike std::filesystem::create_directories), so each
+// ancestor is created in turn before the leaf.
+// GeneralsX @bugfix cemlyn007 02/10/2026 117-gx-w2-r2-10: VC6's own winbase.h predates
+// INVALID_FILE_ATTRIBUTES (added in a later Platform SDK), and nothing else in the tree defines it
+// for that preset -- every other VC6-era GetFileAttributes check in this codebase (W3DView
+// GraphicView.cpp, Utils.cpp, WWVegas agg_def.cpp, WorldBuilderDoc.cpp) compares against the literal
+// 0xFFFFFFFF instead. Provide the macro here when the headers do not, so this is the fallback VC6
+// needs rather than the line that breaks its build.
+#ifndef INVALID_FILE_ATTRIBUTES
+#define INVALID_FILE_ATTRIBUTES ((DWORD)-1)
+#endif
 static Bool createUserDataDirectoryWin32(const AsciiString &path)
 {
 	const char *str = path.str();
