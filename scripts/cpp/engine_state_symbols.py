@@ -284,12 +284,6 @@ DEF_BODY_RE = re.compile(
     r"\s*(?:(?:const|override|final)\b\s*|noexcept\s*(?:\([^(){};]*\))?\s*)*(?::[^{};]*)?\{"
 )
 
-# A `SomeClass::` (optionally templated) immediately before a match: tells the inline branch's unqualified
-# `func(` regex that this particular occurrence is actually qualified, so it belongs to `SomeClass`, not
-# necessarily the class whose method we are searching for.
-QUALIFIER_RE = re.compile(r"(\w+)\s*(?:<[^;{}]*?>)?\s*::\s*$")
-
-
 class Parsed:
     def __init__(self, key):
         self.guarded = None
@@ -329,6 +323,16 @@ BRACE_CLASS_RE = re.compile(r"\b(?:class|struct|union)\b[^;{}]*$")
 # ever used on code already known to be short (a function signature, `namespace X`, `class Foo : public Bar`).
 BRACE_LOOKBACK = 400
 
+# A preprocessor conditional: `#if`/`#ifdef`/`#ifndef` opens one, `#elif`/`#else` starts a sibling branch of
+# the SAME one, and `#endif` closes it. Braces are counted without evaluating which branch the build takes
+# (PartitionManager.cpp's `#ifndef ... { ... #else ... { ... #endif`, each branch opening its own `{` closed
+# by one shared `}` after `#endif`), so every branch after the first must restart from the brace stack seen
+# at the conditional's own `#if`, or two never-taken branches that each open a `{` leave the rest of the
+# file one scope too deep.
+PP_IF_RE = re.compile(r"^[ \t]*#\s*(?:if|ifdef|ifndef)\b", re.M)
+PP_ELSE_RE = re.compile(r"^[ \t]*#\s*(?:elif|else)\b", re.M)
+PP_ENDIF_RE = re.compile(r"^[ \t]*#\s*endif\b", re.M)
+
 
 def _scope_events(text):
     """Every `{`/`}` in `text`, as two parallel lists: positions (strictly increasing, each one past the
@@ -336,7 +340,23 @@ def _scope_events(text):
     Built once per file, bisected on the positions to find the stack enclosing any candidate site's offset."""
     positions, stacks = [0], [()]
     stack = []
+    pp_events = sorted(
+        [(m.start(), "if") for m in PP_IF_RE.finditer(text)]
+        + [(m.start(), "else") for m in PP_ELSE_RE.finditer(text)]
+        + [(m.start(), "endif") for m in PP_ENDIF_RE.finditer(text)]
+    )
+    pp_idx = 0
+    pp_stack = []
     for i, c in enumerate(text):
+        while pp_idx < len(pp_events) and pp_events[pp_idx][0] == i:
+            kind = pp_events[pp_idx][1]
+            if kind == "if":
+                pp_stack.append(list(stack))
+            elif kind == "else" and pp_stack:
+                stack = list(pp_stack[-1])
+            elif kind == "endif" and pp_stack:
+                pp_stack.pop()
+            pp_idx += 1
         if c == "{":
             tail = text[max(0, i - BRACE_LOOKBACK) : i]
             if BRACE_NAMESPACE_RE.search(tail):
@@ -363,6 +383,7 @@ class SourceIndex:
         self.root = root
         self.files = {}
         self._scope_cache = {}
+        self._is_class_cache = {}
         self.where = collections.defaultdict(set)
         for scan_root in SCAN_ROOTS:
             for dirpath, dirnames, filenames in os.walk(os.path.join(root, scan_root)):
@@ -399,6 +420,18 @@ class SourceIndex:
                 depth += (c == "{") - (c == "}")
                 i += 1
             yield m.end(), i
+
+    def is_class_name(self, cls):
+        """Whether `cls` is declared as a class/struct ANYWHERE in the scanned tree (as opposed to a
+        namespace): every out-of-line `Cls::method(...)` implies a `class`/`struct Cls { ... };` somewhere
+        to compile against, even when that declaration lives in a different file (a header) from the
+        in-line method the inline branch is restricted to Cls's own body against."""
+        cached = self._is_class_cache.get(cls)
+        if cached is None:
+            cached = self._is_class_cache[cls] = any(
+                True for rel in self.candidates(cls) for _ in self.class_bodies(rel, cls)
+            )
+        return cached
 
     def line_of(self, rel, pos):
         return self.files[rel].count("\n", 0, pos) + 1
@@ -471,20 +504,30 @@ class SourceIndex:
             for branch, owner_re in (("owner", owner), ("inline", re.compile(rf"\b{func}\s*\("))):
                 for rel in self.candidates(parsed.var, parsed.func, parsed.cls):
                     text = self.files[rel]
+                    # The inline branch's bare `func(` regex carries no class qualifier of its own (it
+                    # exists for a method defined inline, unqualified, inside its own class body), so, when
+                    # `parsed.cls` genuinely names a class (declared with `class`/`struct` somewhere, even in
+                    # a different file than this one: every out-of-line `Cls::func(...)` implies one exists
+                    # to compile against), it is only ever this class's own definition when the match sits
+                    # inside THIS class's own body here. Unrestricted, an out-of-line definition (qualified,
+                    # `Other::func(...)`) or any other class's own inline definition of a same-named method,
+                    # sharing this file, would be wrongly attributed to this class (W3DAssetManager::
+                    # Create_Render_Obj's own `static int warning_count` taken for WW3DAssetManager::
+                    # Create_Render_Obj's; or Derived's own inline method stealing Base::func()'s static
+                    # purely because Derived mentions `Base::func(` inside its own body). When `parsed.cls`
+                    # is not a class at all (a namespace nesting the function instead), there is no body to
+                    # restrict to, and the bare regex is simply this namespace-scoped function's own name.
+                    class_spans = (
+                        list(self.class_bodies(rel, parsed.cls))
+                        if branch == "inline" and parsed.cls and self.is_class_name(parsed.cls)
+                        else None
+                    )
+                    if class_spans is not None and not class_spans:
+                        continue
                     site = None
                     for fm in owner_re.finditer(text):
-                        # The inline branch's bare `func(` regex carries no class qualifier of its own (it
-                        # exists for a method defined inline, unqualified, inside its own class body), so a
-                        # match immediately qualified by a DIFFERENT class's `OtherClass::` is that other
-                        # class's own out-of-line definition (or a call to it), never this one:
-                        # unrestricted, it would wrongly attribute a different same-named method's static to
-                        # this class (W3DAssetManager::Create_Render_Obj's own `static int warning_count`
-                        # taken for WW3DAssetManager::Create_Render_Obj's, the two sharing a file).
-                        if branch == "inline" and parsed.cls:
-                            tail = text[max(0, fm.start() - 200) : fm.start()]
-                            qm = QUALIFIER_RE.search(tail)
-                            if qm and qm.group(1) != parsed.cls:
-                                continue
+                        if class_spans is not None and not any(s <= fm.start() < e for s, e in class_spans):
+                            continue
                         close = skip_balanced(text, fm.end() - 1, "(", ")")
                         head = DEF_BODY_RE.match(text, close)
                         if not head:
@@ -553,19 +596,26 @@ class SourceIndex:
                         continue
                     if ns_re and not ns_re.search(self.files[rel], 0, ls):
                         continue
-                    # Any match enclosed by a function body is a local of some unrelated function (ours is
-                    # matched by the function branch above, never reaching here), never this namespace- or
-                    # class-scope name: a plain text search for the bare identifier cannot otherwise tell a
-                    # local `parent` in nlohmann::json's code from this symbol's own `parent`.
                     scope = self.scope_at(rel, ls + a)
+                    # A class body's own member (static or not, however it is written) is the qualified/
+                    # in-class branches' job, not this one: never take it for a namespace- or file-scope
+                    # name just because an unrelated class happens to declare a same-named member.
+                    if "class" in scope:
+                        continue
+                    # A match enclosed by a function body is a local of some unrelated function (ours is
+                    # matched by the function branch above, never reaching here), never this namespace- or
+                    # class-scope name, column 0 included: a plain text search for the bare identifier
+                    # cannot otherwise tell a local `parent` in nlohmann::json's code from this symbol's own
+                    # `parent`, or an unindented local (StackDump.cpp's `HANDLE thread = ...;`) from a file
+                    # static. `_scope_events` evaluates `#if`/`#else`/`#endif` branches so this stays
+                    # accurate even when a preprocessor conditional's un-taken branch opens its own `{`.
                     if "function" in scope:
                         continue
                     indented = line[:1] in (" ", "\t")
                     # Indented: a local-looking variable unless it is `static` or genuinely inside a
-                    # namespace block (a class body's own static is the in-class branch's job, not this one).
-                    if indented and not re.search(r"\bstatic\b", line[:a]) and (
-                        "namespace" not in scope or "class" in scope
-                    ):
+                    # namespace block (a class body's own static is the in-class branch's job, not this one,
+                    # and is already excluded above).
+                    if indented and not re.search(r"\bstatic\b", line[:a]) and "namespace" not in scope:
                         continue
                     found.append(((indented, not is_source), ls, line, rel))
                     break
@@ -759,10 +809,58 @@ CONST_PTR_DECL_RE = re.compile(r"\*\s*const\s+\w+\s*(?:\[[^\]]*\]\s*)*$")
 LOOKUP_INIT_RE = re.compile(r"->|\w+\s*\(")
 # A read through a global pointer (`TheGlobalData->m_mapName`, `TheWriterSomething->field`): per-engine or
 # INI/map-dependent state captured by the first engine to run, whether the static itself is a pointer or a
-# by-value object. A bare function call (GameMakeColor(...), DEG_TO_RADF(45), a value constructor of
-# literals) is not rejected here: only a `->` member read is, since that is what every one-time global-data
-# lookup in this codebase goes through.
+# by-value object.
 GLOBAL_LOOKUP_RE = re.compile(r"->")
+# Any identifier immediately followed by `(`: a call. By value, this is safe only when it is a pure value
+# constructor: the declared type's own name (`WaypointMap()`, a default-constructed value, never a read)
+# or one on the allow-list below; everything else (a one-time lookup, a getter backed by engine globals, an
+# RNG draw such as GameLogicRandomValue advancing the per-engine logic RNG) is rejected, even when its own
+# arguments are literals: literal-ness of the arguments says nothing about what the called function itself
+# reads or advances.
+CALL_INIT_RE = re.compile(r"\b(\w+)\s*\(")
+# Pure value constructors used in this codebase to build a by-value const from literals alone: no lookup, no
+# engine-state read, no counter or RNG draw. Nothing outside this list (and the declared type's own name) is
+# accepted as a call initializer.
+SAFE_VALUE_CONSTRUCTOR_NAMES = {
+    "GameMakeColor",
+    "DEG_TO_RAD",
+    "DEG_TO_RADF",
+    "RAD_TO_DEG",
+    "RAD_TO_DEGF",
+    "Vector2",
+    "Vector3",
+    "Vector4",
+    "Coord2D",
+    "Coord3D",
+    "ICoord2D",
+    "ICoord3D",
+    "Region2D",
+    "Region3D",
+    "RGBColor",
+    "RGBAColorReal",
+    "RGBAColorInt",
+}
+# Storage/qualifier keywords that are never the declared type or the variable name, skipped when reading
+# a declaration's last two identifiers off (the variable name, then its type).
+DECL_KEYWORDS = {"static", "const", "inline"}
+
+
+def _declared_type_name(decl):
+    """The declared type's own bare name (`WaypointMap` from `static const WaypointMap s_emptyWaypoints`):
+    the declaration's last identifier is the variable being declared, so the one before it is its type."""
+    tokens = [t for t in re.findall(r"[A-Za-z_]\w*", decl) if t not in DECL_KEYWORDS]
+    return tokens[-2] if len(tokens) >= 2 else ""
+
+
+def _by_value_init_is_safe(init, type_name):
+    """True unless `init` contains a call that is neither an allow-listed pure value constructor nor a call
+    to the declared type's own name (nested calls, such as an allow-listed constructor's own arguments, are
+    each checked too)."""
+    for call in CALL_INIT_RE.finditer(init):
+        if call.group(1) in SAFE_VALUE_CONSTRUCTOR_NAMES or call.group(1) == type_name:
+            continue
+        return False
+    return True
 
 
 def rule_const_object(sym):
@@ -771,8 +869,10 @@ def rule_const_object(sym):
     safe only when the pointer itself cannot be reseated (`T* const name`, not `const T*`, whatever the
     pointee type) and its initialiser is not a lookup: a per-engine pointer cache has exactly the `T* const
     name = TheX->find(...)` shape. A by-value const is unsafe too when its initialiser reads through a
-    global pointer (`static const Real r = TheGlobalData->m_maxCameraHeight;`): that captures whichever
-    engine's INI/map data ran first, the same first-engine-wins defect as the pointer case."""
+    global pointer (`static const Real r = TheGlobalData->m_maxCameraHeight;`) or calls anything other than
+    an allow-listed pure value constructor (`static const Int pick = GameLogicRandomValue(0, 3);` advances
+    the per-engine logic RNG despite its literal arguments): both capture whichever engine ran first, or
+    diverge per engine, the same first-engine-wins defect as the pointer case."""
     for d in declarations(sym):
         decl, _, init = d.partition("=")
         decl = decl.rstrip().rstrip(";").rstrip()
@@ -783,8 +883,11 @@ def rule_const_object(sym):
         if "*" in decl:
             if not CONST_PTR_DECL_RE.search(decl) or LOOKUP_INIT_RE.search(init):
                 return None
-        elif not CONST_DECL_RE.match(decl):
-            return None
+        else:
+            if not CONST_DECL_RE.match(decl):
+                return None
+            if not _by_value_init_is_safe(init, _declared_type_name(decl)):
+                return None
     return CONST, "", "const object: initialized once, never written"
 
 
@@ -845,7 +948,9 @@ TSV_HEADER = (
     "# variable); binding (local, global, unique = STB_GNU_UNIQUE); section; count (instances: TUs can each\n"
     "# have one); bytes; source (path:line of the definition, found by searching the sources, every TU's site\n"
     "# joined by `;` when several TUs define the name, `third-party:<lib>` for a vcpkg library, `?` if not\n"
-    "# found); class; phase (per-engine only); note; by (hand, file = a hand `file:` pattern, rule:<name>,\n"
+    "# found; a count-1 name can still list several `;`-joined candidate sites when the search cannot tell\n"
+    "# which one build configuration actually links, for example two platform files that are never both\n"
+    "# built); class; phase (per-engine only); note; by (hand, file = a hand `file:` pattern, rule:<name>,\n"
     "# guard, none).\n"
 )
 

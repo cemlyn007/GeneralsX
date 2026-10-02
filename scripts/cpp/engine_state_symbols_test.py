@@ -56,34 +56,50 @@ class RuleConstObjectTest(unittest.TestCase):
         # `const char*` is a mutable pointer variable, whatever the pointee; not `* const`.
         self.assert_const('static const char* p = "x";', False)
 
-    def test_reseatable_pointer_with_literal_initialiser_is_not_safe(self):
+    def test_reseatable_pointer_with_literal_initializer_is_not_safe(self):
         self.assert_const("static Foo* p = nullptr;", False)
 
-    def test_const_pointer_with_literal_initialiser_is_safe(self):
+    def test_const_pointer_with_literal_initializer_is_safe(self):
         self.assert_const("static Foo* const p = &kDefault;", True)
 
-    def test_const_pointer_with_lookup_initialiser_is_not_safe(self):
+    def test_const_pointer_with_lookup_initializer_is_not_safe(self):
         # The per-engine pointer-cache shape (ActiveBody, WaveGuideUpdate, ...): never written again, but the
         # one-time lookup differs per engine.
         self.assert_const('static ThingTemplate* const tmpl = TheThingFactory->findTemplate("X");', False)
 
-    def test_const_pointer_with_call_initialiser_is_not_safe(self):
+    def test_const_pointer_with_call_initializer_is_not_safe(self):
         self.assert_const("static Foo* const p = makeDefault();", False)
 
     def test_const_reference_is_never_safe(self):
         self.assert_const("static const T& r = *TheX->find(1);", False)
 
-    def test_by_value_const_initialised_through_a_global_pointer_is_not_safe(self):
+    def test_by_value_const_initialized_through_a_global_pointer_is_not_safe(self):
         # A pointer need not be involved: a by-value const that reads TheGlobalData (or any other global
         # pointer) at static-init time captures whichever engine's INI/map data ran first.
         self.assert_const("static const Real r = TheGlobalData->m_maxCameraHeight;", False)
 
-    def test_by_value_const_initialised_through_a_global_pointer_string_is_not_safe(self):
+    def test_by_value_const_initialized_through_a_global_pointer_string_is_not_safe(self):
         self.assert_const("static const AsciiString s = TheGlobalData->m_mapName;", False)
 
-    def test_by_value_const_initialised_from_a_plain_call_is_still_safe(self):
-        # A pure value constructor (no `->`) stays allowed: only a global-pointer read is rejected.
+    def test_by_value_const_initialized_from_an_allow_listed_constructor_is_safe(self):
+        # Only an allow-listed pure value constructor passes; a `->` read is never involved here.
         self.assert_const("static const Int c = GameMakeColor(255, 255, 255, 255);", True)
+
+    def test_by_value_const_initialized_from_its_own_declared_type_is_safe(self):
+        # `Type var = Type();`: a plain default-constructed value of its own declared type, never a read of
+        # anything (the s_emptyWaypoints shape: `static const WaypointMap s_emptyWaypoints = WaypointMap();`).
+        self.assert_const("static const WaypointMap s_emptyWaypoints = WaypointMap();", True)
+
+    def test_by_value_const_initialized_from_an_rng_call_is_not_safe(self):
+        # GameLogicRandomValue reads/advances the per-engine logic RNG: not a pure value constructor, even
+        # though its own arguments are literals, so a literal-argument check alone would miss it.
+        self.assert_const("static const Int pick = GameLogicRandomValue(0, 3);", False)
+
+    def test_by_value_const_initialized_from_a_non_allow_listed_getter_is_not_safe(self):
+        self.assert_const("static const Real h = getMaxCameraHeight();", False)
+
+    def test_by_value_const_initialized_from_an_indexed_method_call_is_not_safe(self):
+        self.assert_const("static const Int n = ThePlayerList[0].getPlayerCount();", False)
 
     def test_every_tu_must_qualify(self):
         sym = make_symbol(
@@ -104,7 +120,7 @@ class RuleNamekeyTest(unittest.TestCase):
     def test_namekey_from_macro_is_safe(self):
         self.assert_namekey('static NameKeyType s_key = NAMEKEY("Foo");', True)
 
-    def test_const_namekey_with_no_initialiser_is_safe(self):
+    def test_const_namekey_with_no_initializer_is_safe(self):
         self.assert_namekey("static const NameKeyType s_key", True)
 
     def test_namekey_from_generator_call_is_safe(self):
@@ -328,7 +344,10 @@ class SourceIndexDefinitionTest(unittest.TestCase):
         # A derived class calls the base class's method by its qualified name from its OWN same-named
         # method's body; the inline branch's bare (unqualified) regex must not wander into that unrelated
         # method's body and steal its static for the base class's symbol (the WW3DAssetManager /
-        # W3DAssetManager::Create_Render_Obj collision, both sharing one file through such a call).
+        # W3DAssetManager::Create_Render_Obj collision, both sharing one file through such a call). Both
+        # definitions are kept in ONE file here so that `find_all`'s one-site-per-file dedup cannot hide a
+        # false match recorded for the same file as the real one; see the next two tests for the dedup-proof
+        # cross-file cases.
         self.write(
             "mgr.cpp",
             "class Derived {\n"
@@ -350,6 +369,119 @@ class SourceIndexDefinitionTest(unittest.TestCase):
         sites = idx.find_all(p)
         self.assertEqual(len(sites), 1)
         self.assertEqual(sites[0][0], "Core/mgr.cpp:11")
+
+    def test_inline_branch_does_not_steal_an_unrelated_classs_static_from_another_file(self):
+        # The same collision as above, but with Base's real out-of-line definition and Derived's unrelated
+        # inline method in SEPARATE files (Base declared in its own header, as every out-of-line `Base::`
+        # definition implies, so `is_class_name` can tell Base is a real class): find_all's one-site-per-
+        # file dedup cannot mask a false match here, so this is the case that actually proves the inline
+        # branch is restricted to its own class's body.
+        self.write("base.h", "class Base {\npublic:\n    Foo* Create_Render_Obj(const char* name);\n};\n")
+        self.write(
+            "base.cpp",
+            "Foo* Base::Create_Render_Obj(char const* name) {\n"
+            "    static int warning_count = 1;\n"
+            "    return nullptr;\n"
+            "}\n",
+        )
+        # Derived inherits from Base (so "Base" is a candidate word of this file too, the way Derived's own
+        # call to Base::Create_Render_Obj was in the single-file test above) and overrides the same method
+        # inline, unqualified, with its own unrelated static of the same name.
+        self.write(
+            "derived.h",
+            "class Derived : public Base {\n"
+            "    Foo* Create_Render_Obj(const char* name) {\n"
+            "        static int warning_count = 0;\n"
+            "        return nullptr;\n"
+            "    }\n"
+            "};\n",
+        )
+        p = m.Parsed("Base::Create_Render_Obj(char const*)::warning_count")
+        idx = self.index({"warning_count", "Create_Render_Obj", "Base", "Derived"})
+        sites = idx.find_all(p)
+        self.assertEqual(len(sites), 1)
+        self.assertEqual(sites[0][0], "Core/base.cpp:2")
+
+    def test_inline_branch_finds_each_siblings_own_static_in_a_shared_file(self):
+        # The actual FXList.cpp shape: several unrelated classes, each with its own inline, unqualified
+        # `parse` method and its own same-named static, all in ONE file, with no out-of-line definition at
+        # all (so the owner branch never matches and there is nothing for find_all's per-file dedup to hide
+        # a false match behind). Unrestricted, the inline branch would always return the FIRST class's own
+        # site for every other class's symbol.
+        self.write(
+            "nuggets.cpp",
+            "class FirstNugget {\n"
+            "    static void parse() {\n"
+            "        static const FieldParse myFieldParse[] = {};\n"
+            "    }\n"
+            "};\n"
+            "class SecondNugget {\n"
+            "    static void parse() {\n"
+            "        static const FieldParse myFieldParse[] = {};\n"
+            "    }\n"
+            "};\n",
+        )
+        p = m.Parsed("SecondNugget::parse()::myFieldParse")
+        idx = self.index({"myFieldParse", "parse", "FirstNugget", "SecondNugget"})
+        source, _decl, _indented = idx.find(p)
+        self.assertEqual(source, "Core/nuggets.cpp:8")
+
+    def test_inline_branch_ignores_another_classs_qualified_out_of_line_definition(self):
+        # A file that holds only some OTHER class's qualified out-of-line definition: the inline branch's
+        # bare `func(` regex must not take it for Cls::func()'s own definition just because no qualifier
+        # differs from Cls. Cls is declared (as any real `Cls::` reference would require) but never defines
+        # `func` anywhere, inline or out of line, so its own (empty) class body correctly rules the match
+        # out; Other's site must never be the answer (the class-level macro fallback, a separate feature,
+        # may still answer from Cls's own declaration line instead).
+        self.write("cls.h", "class Cls {\npublic:\n    void unrelated();\n};\n")
+        self.write(
+            "other.cpp",
+            "Foo* Other::func(char const* name) {\n"
+            "    static int v = 9;\n"
+            "    return nullptr;\n"
+            "}\n",
+        )
+        p = m.Parsed("Cls::func(char const*)::v")
+        idx = self.index({"v", "func", "Cls", "Other"})
+        source, _decl, _indented = idx.find(p)
+        self.assertNotEqual(source, "Core/other.cpp:2")
+
+    def test_plain_scope_keeps_a_column_0_static_after_an_unbalanced_preprocessor_brace(self):
+        # `_scope_events` counts braces without evaluating preprocessor branches, so an `#ifndef ... #else
+        # ... #endif` pair that each open a `{` (PartitionManager.cpp's shape) leaves one bogus "function"
+        # scope open for the rest of the file. A column-0 file-scope definition after it is never actually a
+        # local and must still be found.
+        self.write(
+            "partition.cpp",
+            "int g() {\n"
+            "    return 1;\n"
+            "}\n"
+            "#ifndef DISABLE_X\n"
+            "void h() {\n"
+            "#else\n"
+            "void h() {\n"
+            "#endif\n"
+            "    doThing();\n"
+            "}\n"
+            "static Real ringSpacing = 5.0f;\n",
+        )
+        p = m.Parsed("ringSpacing")
+        idx = self.index({"ringSpacing"})
+        source, _decl, indented = idx.find(p)
+        self.assertEqual(source, "Core/partition.cpp:11")
+        self.assertFalse(indented)
+
+    def test_plain_scope_skips_another_classs_static_member_declaration(self):
+        # A file static elsewhere and an unrelated class's own static member of the same bare name must
+        # never be merged into one ambiguous name: a class body's own member is the qualified/in-class
+        # branches' job, not the plain branch's.
+        self.write("a.cpp", "static const int s_count = 0;\n")
+        self.write("b.h", "class Foo {\n    static int s_count;\n};\n")
+        p = m.Parsed("s_count")
+        idx = self.index({"s_count", "Foo"})
+        sites = idx.find_all(p)
+        self.assertEqual(len(sites), 1)
+        self.assertEqual(sites[0][0], "Core/a.cpp:1")
 
     def test_plain_scope_keeps_a_real_namespace_block_static(self):
         # The genuine case this filtering must not break: a namespace-scope static indented inside a
