@@ -464,24 +464,51 @@ class SourceIndexDefinitionTest(unittest.TestCase):
         self.assertEqual(source, "Core/nuggets.cpp:8")
 
     def test_inline_branch_ignores_another_classs_qualified_out_of_line_definition(self):
-        # A file that holds only some OTHER class's qualified out-of-line definition: the inline branch's
-        # bare `func(` regex must not take it for Cls::func()'s own definition just because no qualifier
-        # differs from Cls. Cls is declared (as any real `Cls::` reference would require) but never defines
-        # `func` anywhere, inline or out of line, so its own (empty) class body correctly rules the match
-        # out; Other's site must never be the answer (the class-level macro fallback, a separate feature,
-        # may still answer from Cls's own declaration line instead).
+        # A file that holds only some OTHER class's qualified out-of-line definition, but still mentions
+        # Cls (a member, so `candidates(var, func, cls)` makes it a real candidate: without that, the
+        # file is never looked at by either branch and this test would pass no matter what the class-body
+        # restriction did). The inline branch's bare `func(` regex must not take it for Cls::func()'s own
+        # definition just because no qualifier differs from Cls. Cls is declared (as any real `Cls::`
+        # reference would require) but never defines `func` anywhere, inline or out of line, so its own
+        # (empty) class body correctly rules the match out; Other's site must never be the answer (the
+        # class-level macro fallback, a separate feature, may still answer from Cls's own declaration line
+        # instead).
         self.write("cls.h", "class Cls {\npublic:\n    void unrelated();\n};\n")
         self.write(
             "other.cpp",
             "Foo* Other::func(char const* name) {\n"
             "    static int v = 9;\n"
+            "    Cls* owner = nullptr;\n"
             "    return nullptr;\n"
             "}\n",
         )
         p = m.Parsed("Cls::func(char const*)::v")
         idx = self.index({"v", "func", "Cls", "Other"})
+        self.assertIn("Core/other.cpp", idx.candidates("v", "func", "Cls"))
         source, _decl, _indented = idx.find(p)
         self.assertNotEqual(source, "Core/other.cpp:2")
+
+    def test_inline_branch_finds_a_static_in_a_function_nested_in_a_namespace(self):
+        # `cls` here is "ns", a namespace, not a class: is_class_name("ns") is False (no `class`/`struct
+        # ns` exists anywhere), so the inline branch's class-body restriction must not apply at all. Without
+        # that guard, `class_bodies(rel, "ns")` finds no body either (there is no such class), so
+        # `class_spans` would come back `[]` (restricted to nothing) rather than `None` (unrestricted), and
+        # the inline branch would skip every candidate, including this file's own real definition.
+        self.write(
+            "util.cpp",
+            "namespace ns {\n"
+            "inline int f() {\n"
+            "    static int v = 0;\n"
+            "    return v;\n"
+            "}\n"
+            "}\n",
+        )
+        p = m.Parsed("ns::f()::v")
+        idx = self.index({"v", "f", "ns"})
+        self.assertFalse(idx.is_class_name("ns"))
+        source, decl, _indented = idx.find(p)
+        self.assertEqual(source, "Core/util.cpp:3")
+        self.assertIn("v", decl)
 
     def test_plain_scope_keeps_a_column_0_static_after_an_unbalanced_preprocessor_brace(self):
         # `_scope_events` counts braces without evaluating preprocessor branches, so an `#ifndef ... #else
