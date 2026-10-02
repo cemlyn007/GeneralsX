@@ -258,7 +258,6 @@ HAND = [
     (RENDER, "", "re:_TempTransformedVertexBuffer|_TempClipFlagBuffer", "MeshModelClass::Shadow_Render scratch (the clip-flag buffer is unused)"),
     (RENDER, "", "re:ParticleBufferClass::Render_Line\\(RenderInfoClass&\\)::tmp_(points|diffuse|id)", "ParticleBufferClass::Render_Line scratch: draw only"),
     (DEBUG, "", "statistics_requested", "DX8 mesh-renderer statistics request (debug display)"),
-    (DEBUG, "", "ParticleBufferClass::TotalActiveCount", "particle-buffer statistics counter; its getter Get_Total_Active_Count has no caller"),
     (DEBUG, "", "RenderObjPersistFactoryClass::Load(ChunkLoadClass&) const::count", "warning limiters (two in the function)"),
     (CONST, "", "DX8TextureCategoryClass::m_gForceMultiply", "never written: SetForceMultiply has no caller"),
     (CONST, "", "MeshClass::Legacy_Meshes_Fogged", "never written"),
