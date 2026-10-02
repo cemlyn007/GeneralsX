@@ -790,7 +790,7 @@ def compare(key, sym, row):
     except (KeyError, ValueError):
         recorded_count = 0
     new_files = source_files(sym.source) - source_files(row.get("source", ""))
-    if sym.count > recorded_count or (recorded_count > 1 or sym.count > 1) and new_files and row.get("source") != "?":
+    if sym.count > recorded_count or new_files and row.get("source") != "?":
         errors.append(
             f"new instance of a listed name: {key}: {recorded_count} -> {sym.count} instances"
             + (f", new definition in {', '.join(sorted(new_files))}" if new_files else "")
