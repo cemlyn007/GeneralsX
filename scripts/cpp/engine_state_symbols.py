@@ -591,10 +591,9 @@ def rule_namekey(sym):
 
 
 def rule_field_parse(sym):
-    p = sym.parsed
-    if p.var in ("dataFieldParse", "myFieldParse", "commonFieldParse") or all(
-        re.search(r"\bFieldParse\b", d.split("=")[0]) for d in declarations(sym)
-    ):
+    """INI FieldParse table: built once, never written. By declared type, not by the variable's name alone
+    (a variable merely named dataFieldParse/myFieldParse/commonFieldParse is not provably one)."""
+    if all(re.search(r"\bFieldParse\b", d.split("=")[0]) for d in declarations(sym)):
         return CONST, "", "INI FieldParse table: built once, never written"
     return None
 
