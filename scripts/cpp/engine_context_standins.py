@@ -17,9 +17,12 @@
 # hazard as unary `&` and is caught too. A unary `&` is also recognised after a C-style pointer cast
 # (`(void*)&name`, `(unsigned char*)&name`, `(struct Foo*)&name`) and after `&&` (`a && &name`), not only
 # after the fixed set of operators it is otherwise unambiguous after. `name` passed bare as a whole
-# argument to a known variadic logger (the printf family, `WWDEBUG_SAY`, `DEBUG_LOG`, `DEBUG_ASSERTLOG`) is
-# flagged too: it passes the empty stand-in object instead of the field's value. Comments and string
-# literals are ignored.
+# argument to a known variadic logger (the printf family, `WWDEBUG_SAY`, `WWDEBUG_WARNING`, `DEBUG_LOG`,
+# `DEBUG_LOG_LEVEL`, `DEBUG_ASSERTLOG`, `DEBUG_CRASH`, `DEBUG_ASSERTCRASH`) is flagged too: it passes the
+# empty stand-in object instead of the field's value. A two-macro-argument logger's condition/level
+# argument (`DEBUG_ASSERTLOG`'s and `DEBUG_ASSERTCRASH`'s `c`, `DEBUG_LOG_LEVEL`'s `l`) is never flagged:
+# it reaches the field through the stand-in's own conversion operator (`!(c)`, `l & DebugLevelMask`), not
+# through `...`. Comments and string literals are ignored.
 #
 # Usage: engine_context_standins.py [--root GeneralsX] [--extra-dir DIR ...] [--list]
 #   exit 0 when no stand-in is used with sizeof, &, std::addressof or a variadic logger, 1 (with each use
@@ -55,11 +58,37 @@ CAST_BEFORE = re.compile(r"\(\s*" + _CAST_WORD + r"(?:\s+" + _CAST_WORD + r")*(?
 DOUBLE_AMP_BEFORE = re.compile(r"&&\s*$")
 # A bare stand-in passed to one of these: a variadic call takes its argument's value by its declared type
 # (`...`), with no user-defined conversion, so an empty stand-in object is passed, not the field's value.
-VARIADIC_FUNCS = ("printf", "fprintf", "sprintf", "snprintf", "WWDEBUG_SAY", "DEBUG_LOG", "DEBUG_ASSERTLOG")
+VARIADIC_FUNCS = (
+    "printf",
+    "fprintf",
+    "sprintf",
+    "snprintf",
+    "WWDEBUG_SAY",
+    "WWDEBUG_WARNING",
+    "DEBUG_LOG",
+    "DEBUG_LOG_LEVEL",
+    "DEBUG_ASSERTLOG",
+    "DEBUG_CRASH",
+    "DEBUG_ASSERTCRASH",
+)
 VARIADIC_CALL = re.compile(r"\b(?:" + "|".join(VARIADIC_FUNCS) + r")\s*\(")
-# These take one macro argument that is itself written as a parenthesised list (`WWDEBUG_SAY(("fmt", x))`),
-# a doubled-parens idiom that lets a comma inside survive the macro's own single-argument expansion.
-DOUBLE_PAREN_FUNCS = ("WWDEBUG_SAY", "DEBUG_LOG", "DEBUG_ASSERTLOG")
+# For each of these, the message argument (named by its 0-based index among the macro's own arguments,
+# split on top-level commas) is itself written as a parenthesised list, e.g. `WWDEBUG_SAY(("fmt", x))`
+# or `DEBUG_ASSERTLOG(c, ("fmt", x))` (Core/GameEngine/Include/Common/Debug.h) — a doubled-parens idiom
+# that lets a comma inside survive the macro's own argument split. A macro not listed here (the printf
+# family) takes its arguments directly, with no such wrapping, and every one of them is checked as is.
+# Any other macro argument (e.g. DEBUG_ASSERTLOG's/DEBUG_ASSERTCRASH's condition, DEBUG_LOG_LEVEL's
+# level) is never the message list and is left unchecked: it reaches the field through the stand-in's
+# own conversion operator, not through `...`.
+MESSAGE_ARG_INDEX = {
+    "WWDEBUG_SAY": 0,
+    "WWDEBUG_WARNING": 0,
+    "DEBUG_LOG": 0,
+    "DEBUG_CRASH": 0,
+    "DEBUG_LOG_LEVEL": 1,
+    "DEBUG_ASSERTLOG": 1,
+    "DEBUG_ASSERTCRASH": 1,
+}
 
 
 def strip_comments_and_strings(text):
@@ -161,17 +190,41 @@ def uses(text, name, qualifier):
         inner = text[open_paren + 1 : end]
         func = cm.group(0).split("(", 1)[0].strip()
         base = open_paren + 1
-        if func in DOUBLE_PAREN_FUNCS:
-            # `WWDEBUG_SAY(("fmt", args...))`/`DEBUG_LOG(...)`/`DEBUG_ASSERTLOG(...)` take one macro
-            # argument that is itself a parenthesised list (doubled parens, so a variadic comma inside
-            # does not split the macro's own argument list). Unwrap that one level before splitting on
-            # commas, so the format string and each logged value are checked individually.
-            lead = len(inner) - len(inner.lstrip())
-            trail = len(inner) - len(inner.rstrip())
-            stripped_inner = inner.strip()
-            if stripped_inner.startswith("(") and stripped_inner.endswith(")"):
+
+        def split_top_level_commas(s):
+            """[(start, end), ...] spans of s's top-level (depth-0) comma-separated pieces."""
+            depth3, piece_start, spans = 0, 0, []
+            for idx, ch in enumerate(s):
+                if ch in "([{":
+                    depth3 += 1
+                elif ch in ")]}":
+                    depth3 -= 1
+                elif ch == "," and depth3 == 0:
+                    spans.append((piece_start, idx))
+                    piece_start = idx + 1
+            spans.append((piece_start, len(s)))
+            return spans
+
+        macro_args = split_top_level_commas(inner)
+        msg_index = MESSAGE_ARG_INDEX.get(func)
+        if msg_index is None:
+            # Not a doubled-parens macro (the printf family): every top-level argument is checked as is.
+            check_spans = [(base + s0, base + s1) for s0, s1 in macro_args]
+        elif msg_index < len(macro_args):
+            # Only the message argument can hold a logged stand-in; the condition/level argument
+            # (DEBUG_ASSERTLOG's/DEBUG_ASSERTCRASH's `c`, DEBUG_LOG_LEVEL's `l`) reaches the field through
+            # the stand-in's own conversion operator and is never checked. The message argument is
+            # itself written as a parenthesised list (doubled parens, so a variadic comma inside it does
+            # not split the macro's own argument list): unwrap that one level before splitting on commas,
+            # so the format string and each logged value are checked individually.
+            m_start, m_end = macro_args[msg_index]
+            msg_base = base + m_start
+            msg_text = inner[m_start:m_end]
+            lead = len(msg_text) - len(msg_text.lstrip())
+            stripped_msg = msg_text.strip()
+            if stripped_msg.startswith("(") and stripped_msg.endswith(")"):
                 d, closes_at = 0, None
-                for idx, ch in enumerate(stripped_inner):
+                for idx, ch in enumerate(stripped_msg):
                     if ch == "(":
                         d += 1
                     elif ch == ")":
@@ -179,29 +232,21 @@ def uses(text, name, qualifier):
                         if d == 0:
                             closes_at = idx
                             break
-                if closes_at == len(stripped_inner) - 1:
-                    base += lead + 1
-                    inner = stripped_inner[1:-1]
+                if closes_at == len(stripped_msg) - 1:
+                    msg_base += lead + 1
+                    msg_text = stripped_msg[1:-1]
+            check_spans = [(msg_base + s0, msg_base + s1) for s0, s1 in split_top_level_commas(msg_text)]
+        else:
+            check_spans = []  # fewer macro arguments than expected: malformed call, nothing to check
         # Flag a name only when it IS a whole top-level argument (not converted by a cast, a comparison,
-        # or a call that takes it and returns something else): split on top-level commas and check each
-        # argument's stripped text against the bare/qualified name, not just whether the name occurs
-        # inside it.
-        depth2, arg_start, bounds = 0, 0, []
-        for idx, ch in enumerate(inner):
-            if ch in "([{":
-                depth2 += 1
-            elif ch in ")]}":
-                depth2 -= 1
-            elif ch == "," and depth2 == 0:
-                bounds.append((arg_start, idx))
-                arg_start = idx + 1
-        bounds.append((arg_start, len(inner)))
-        for a_start, a_end in bounds:
-            arg_text = inner[a_start:a_end]
+        # or a call that takes it and returns something else): check each argument's stripped text
+        # against the bare/qualified name, not just whether the name occurs inside it.
+        for a_start, a_end in check_spans:
+            arg_text = text[a_start:a_end]
             stripped = arg_text.strip()
             if stripped and re.fullmatch(ident, stripped):
                 arg_lead = len(arg_text) - len(arg_text.lstrip())
-                pos = base + a_start + arg_lead
+                pos = a_start + arg_lead
                 bad.append((text.count("\n", 0, pos) + 1, f"passed by value to {func}"))
     return bad
 

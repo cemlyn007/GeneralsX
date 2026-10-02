@@ -102,6 +102,41 @@ class UsesTest(unittest.TestCase):
     def test_unrelated_call_is_not_flagged(self):
         self.assert_clean("some_other_function(BitDepth)")
 
+    # DEBUG_ASSERTLOG(c, m) is two macro arguments (Debug.h), not one doubled-paren argument: its
+    # message (the second argument) must still be unwrapped and checked, and its condition (the first
+    # argument) must never be flagged, since it reaches the field through the stand-in's own conversion
+    # operator (`!(c)`), not through `...`. The 530ad166b regression this review found.
+    def test_debug_assertlog_message_is_checked(self):
+        self.assert_flagged('DEBUG_ASSERTLOG(x, ("bits %d", BitDepth))')
+
+    def test_debug_assertlog_condition_is_not_flagged(self):
+        self.assert_clean('DEBUG_ASSERTLOG(BitDepth, ("bits"))')
+
+    def test_debug_assertlog_converted_message_argument_is_not_flagged(self):
+        self.assert_clean('DEBUG_ASSERTLOG(x, ("%d", (int)BitDepth))')
+
+    # The same two-macro-argument shape applies to DEBUG_ASSERTCRASH(c, m) and DEBUG_LOG_LEVEL(l, m)
+    # (Debug.h): printf-style loggers the gate left uncovered before this review.
+    def test_debug_assertcrash_message_is_checked(self):
+        self.assert_flagged('DEBUG_ASSERTCRASH(x, ("bits %d", BitDepth))')
+
+    def test_debug_assertcrash_condition_is_not_flagged(self):
+        self.assert_clean('DEBUG_ASSERTCRASH(BitDepth, ("bits"))')
+
+    def test_debug_log_level_message_is_checked(self):
+        self.assert_flagged('DEBUG_LOG_LEVEL(LEVEL_DEBUG, ("bits %d", BitDepth))')
+
+    def test_debug_log_level_level_is_not_flagged(self):
+        self.assert_clean('DEBUG_LOG_LEVEL(BitDepth, ("bits"))')
+
+    # DEBUG_CRASH(m) and WWDEBUG_WARNING(x) are single-doubled-paren-argument loggers too (Debug.h,
+    # wwdebug.h), the same shape as WWDEBUG_SAY/DEBUG_LOG.
+    def test_debug_crash_message_is_checked(self):
+        self.assert_flagged('DEBUG_CRASH(("bits %d", BitDepth))')
+
+    def test_wwdebug_warning_message_is_checked(self):
+        self.assert_flagged('WWDEBUG_WARNING(("bits %d", BitDepth))')
+
     def test_qualified_name(self):
         self.assert_flagged("(void*)&DX8Wrapper::BitDepth", qualifier="DX8Wrapper")
         self.assert_clean("DX8Wrapper::BitDepth & mask", qualifier="DX8Wrapper")
