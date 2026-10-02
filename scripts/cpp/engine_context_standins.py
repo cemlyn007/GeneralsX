@@ -41,15 +41,22 @@ CLASS = re.compile(r"^\s*(?:class|struct)\s+(?:\w+\s+)*?(?P<name>\w+)\s*(?::[^;{
 REACHES_FIELD = re.compile(r"\s*(?:\[|\.|->|\()")
 # Before a unary `&`: an operator, an opening bracket, a separator or `return`.
 UNARY_BEFORE = re.compile(r"(?:^|[=(,{};?:!<>+\-*/%|^~\[]|\breturn)\s*$")
-# A C-style pointer cast immediately before: `(void*)`, `(char*)`, `(Foo::Bar**)`, ... A cast with no `*`
-# (`(int)&name`) is indistinguishable from `(expr)&mask` (binary `&`), so it is not matched here.
-CAST_BEFORE = re.compile(r"\(\s*(?:const\s+)?[A-Za-z_]\w*(?:\s*::\s*[A-Za-z_]\w*)*(?:\s*[*&])+\s*\)\s*$")
+# A C-style pointer cast immediately before: `(void*)`, `(char*)`, `(Foo::Bar**)`, `(unsigned char*)`,
+# `(const unsigned char *)`, `(struct Foo*)`, `(void const*)`, ... One or more type words (cv/sign/size/
+# elaborated-type keywords, or a plain/`::`-qualified identifier), in any order, then one or more `*`/`&`.
+# A cast with no `*` (`(int)&name`) is indistinguishable from `(expr)&mask` (binary `&`), so it is not
+# matched here.
+_CAST_WORD = r"(?:const|volatile|unsigned|signed|long|short|struct|class|enum|[A-Za-z_]\w*(?:\s*::\s*[A-Za-z_]\w*)*)"
+CAST_BEFORE = re.compile(r"\(\s*" + _CAST_WORD + r"(?:\s+" + _CAST_WORD + r")*(?:\s*[*&])+\s*\)\s*$")
 # `&&` (logical-and) immediately before, with or without a space: the following `&` is always unary.
 DOUBLE_AMP_BEFORE = re.compile(r"&&\s*$")
 # A bare stand-in passed to one of these: a variadic call takes its argument's value by its declared type
 # (`...`), with no user-defined conversion, so an empty stand-in object is passed, not the field's value.
 VARIADIC_FUNCS = ("printf", "fprintf", "sprintf", "snprintf", "WWDEBUG_SAY", "DEBUG_LOG", "DEBUG_ASSERTLOG")
 VARIADIC_CALL = re.compile(r"\b(?:" + "|".join(VARIADIC_FUNCS) + r")\s*\(")
+# These take one macro argument that is itself written as a parenthesised list (`WWDEBUG_SAY(("fmt", x))`),
+# a doubled-parens idiom that lets a comma inside survive the macro's own single-argument expansion.
+DOUBLE_PAREN_FUNCS = ("WWDEBUG_SAY", "DEBUG_LOG", "DEBUG_ASSERTLOG")
 
 
 def strip_comments_and_strings(text):
@@ -150,9 +157,48 @@ def uses(text, name, qualifier):
             continue
         inner = text[open_paren + 1 : end]
         func = cm.group(0).split("(", 1)[0].strip()
-        for im in re.finditer(ident, inner):
-            if not REACHES_FIELD.match(inner, im.end()):
-                pos = open_paren + 1 + im.start()
+        base = open_paren + 1
+        if func in DOUBLE_PAREN_FUNCS:
+            # `WWDEBUG_SAY(("fmt", args...))`/`DEBUG_LOG(...)`/`DEBUG_ASSERTLOG(...)` take one macro
+            # argument that is itself a parenthesised list (doubled parens, so a variadic comma inside
+            # does not split the macro's own argument list). Unwrap that one level before splitting on
+            # commas, so the format string and each logged value are checked individually.
+            lead = len(inner) - len(inner.lstrip())
+            trail = len(inner) - len(inner.rstrip())
+            stripped_inner = inner.strip()
+            if stripped_inner.startswith("(") and stripped_inner.endswith(")"):
+                d, closes_at = 0, None
+                for idx, ch in enumerate(stripped_inner):
+                    if ch == "(":
+                        d += 1
+                    elif ch == ")":
+                        d -= 1
+                        if d == 0:
+                            closes_at = idx
+                            break
+                if closes_at == len(stripped_inner) - 1:
+                    base += lead + 1
+                    inner = stripped_inner[1:-1]
+        # Flag a name only when it IS a whole top-level argument (not converted by a cast, a comparison,
+        # or a call that takes it and returns something else): split on top-level commas and check each
+        # argument's stripped text against the bare/qualified name, not just whether the name occurs
+        # inside it.
+        depth2, arg_start, bounds = 0, 0, []
+        for idx, ch in enumerate(inner):
+            if ch in "([{":
+                depth2 += 1
+            elif ch in ")]}":
+                depth2 -= 1
+            elif ch == "," and depth2 == 0:
+                bounds.append((arg_start, idx))
+                arg_start = idx + 1
+        bounds.append((arg_start, len(inner)))
+        for a_start, a_end in bounds:
+            arg_text = inner[a_start:a_end]
+            stripped = arg_text.strip()
+            if stripped and re.fullmatch(ident, stripped):
+                arg_lead = len(arg_text) - len(arg_text.lstrip())
+                pos = base + a_start + arg_lead
                 bad.append((text.count("\n", 0, pos) + 1, f"passed by value to {func}"))
     return bad
 
