@@ -669,7 +669,7 @@ def rule_const_object(sym):
                 return None
         elif not CONST_DECL_RE.match(decl):
             return None
-    return CONST, "", "const object: initialised once, never written"
+    return CONST, "", "const object: initialized once, never written"
 
 
 RULES = [
@@ -742,7 +742,7 @@ def load_library(root, lib, vcpkg_lib):
     if not vcpkg_lib:
         print(
             "warning: no vcpkg_installed/<triplet>/lib found next to the library (give --vcpkg-lib): "
-            "third-party symbols will not be recognised",
+            "third-party symbols will not be recognized",
             file=sys.stderr,
         )
     resolve_sources(root, symbols, read_third_party(vcpkg_lib))
