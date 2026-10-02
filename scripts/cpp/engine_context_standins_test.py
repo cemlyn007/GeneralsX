@@ -581,6 +581,62 @@ class MainTest(unittest.TestCase):
         self.assertEqual(code, 1, out)
         self.assertIn("WorldHeightMap.cpp", out)
 
+    def test_other_game_tree_with_same_class_name_is_not_flagged(self):
+        # A bare class name is not unique across the two games' own trees (127-gx-w2-r5-28): GeneralsMD's
+        # ScriptList has a stand-in for m_curId, but Generals has its own, unrelated ScriptList with a
+        # real static of the same name. Correct Generals code using its own static must stay clean.
+        self.write(
+            "GeneralsMD/Scripts.h",
+            "class ScriptList {\n"
+            "public:\n"
+            "    static constexpr rts::ContextField<int, &rts::EngineContext::scriptListCurId> m_curId{};\n"
+            "};\n",
+        )
+        self.write(
+            "Generals/Scripts.h",
+            "class ScriptList {\n"
+            "public:\n"
+            "    static int m_curId;\n"
+            "    void reset();\n"
+            "};\n",
+        )
+        self.write(
+            "Generals/Scripts.cpp",
+            '#include "Scripts.h"\n'
+            "void ScriptList::reset()\n"
+            "{\n"
+            "    Int* p = &ScriptList::m_curId;\n"
+            "}\n",
+        )
+        code, out = self.run_main(["--root", self.root])
+        self.assertEqual(code, 0, out)
+
+    def test_other_game_tree_stand_in_is_still_checked(self):
+        # The same scenario, but the violation is in GeneralsMD's own tree (the stand-in's own game):
+        # scoping must not swallow a real violation, only the cross-game false one.
+        self.write(
+            "GeneralsMD/Scripts.h",
+            "class ScriptList {\n"
+            "public:\n"
+            "    static constexpr rts::ContextField<int, &rts::EngineContext::scriptListCurId> m_curId{};\n"
+            "};\n",
+        )
+        self.write(
+            "Generals/Scripts.h",
+            "class ScriptList {\n"
+            "public:\n"
+            "    static int m_curId;\n"
+            "};\n",
+        )
+        self.write(
+            "GeneralsMD/user.cpp",
+            '#include "Scripts.h"\n' "Int* p = &ScriptList::m_curId;\n",
+        )
+        code, out = self.run_main(["--root", self.root])
+        self.assertEqual(code, 1, out)
+        self.assertIn("GeneralsMD", out)
+        self.assertIn("m_curId", out)
+
     def test_qualified_use_through_derived_class_name_is_checked(self):
         # `&D::name` names the same inherited stand-in as `&C::name` (127-gx-w2-r5-30), but the qualified
         # scan previously ran `uses(text, name, owner)` only, never `uses(text, name, D)`.

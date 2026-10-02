@@ -52,7 +52,12 @@
 #   listed) otherwise; --list prints the stand-ins found. Stand-ins are always declared under --root; a
 #   use is looked for there and in every --extra-dir too (a consumer's own C++, outside the
 #   Core/Generals/GeneralsMD layout, that includes GeneralsX's headers declaring them, e.g.
-#   rlgenerals/launcher), so a consumer using a stand-in with sizeof or & is caught as well.
+#   rlgenerals/launcher), so a consumer using a stand-in with sizeof or & is caught as well. A bare class
+#   name is not unique across Generals/ and GeneralsMD/ (each game has its own tree, and a class in one
+#   can share a name with an unrelated class in the other, e.g. ScriptList): a stand-in declared under
+#   one game's directory is scoped to that game's own tree plus Core (--extra-dir files are always in
+#   scope), blind to the other game's base clauses, member definitions and uses entirely; one declared
+#   under Core/ is engine-wide, as before.
 import argparse
 import os
 import re
@@ -175,6 +180,19 @@ def source_files(root, extra_dirs=()):
             for f in filenames:
                 if f.endswith(SOURCE_EXTENSIONS):
                     yield os.path.join(dirpath, f)
+
+
+def _game_of(path, root):
+    """'Generals' or 'GeneralsMD' for a source file under that game's top-level directory of root, or
+    None for a Core file, an --extra-dir file (outside root entirely) or anything else: a bare class name
+    is not unique across the two games' own trees (127-gx-w2-r5-28; GeneralsMD's ScriptList and
+    Generals' own, unrelated ScriptList are the textbook case), so a stand-in's search must tell them
+    apart. None means "not scoped to either game": always in scope."""
+    rel = os.path.relpath(path, root)
+    if rel.startswith(".." + os.sep) or rel == "..":
+        return None
+    top = rel.split(os.sep, 1)[0]
+    return top if top in ("Generals", "GeneralsMD") else None
 
 
 def find_standins(files):
@@ -416,51 +434,84 @@ def main():
     # same inherited stand-in as `C::name` (127-gx-w2-r5-30), so the qualified scan must run once per
     # name of the stand-in, not just its declaring class's own.
     descendants_of = {}
+    # A stand-in declared under Generals/ or GeneralsMD/ is scoped to that game's own tree plus Core (and
+    # any --extra-dir file, outside the layout entirely); one declared under Core/ is engine-wide, as
+    # before. 127-gx-w2-r5-28: a bare class name is not unique across the two games' own trees, so the
+    # base-clause/member-definition scan that builds class_owners/defines_member must be run once per
+    # game, each blind to the other game's files, not once globally keyed by name alone.
+    owner_game = {}
+    for owner, _, header in standins:
+        if owner:
+            owner_game.setdefault(owner, _game_of(header, args.root))
     if owners:
-        children_of = {}
-        base_clause_file = {}
-        for path, raw_text in raw.items():
-            stripped = strip_comments_and_strings(raw_text)
-            for m in BASE_CLAUSE.finditer(stripped):
-                for base in _direct_bases(m.group("bases")):
-                    children_of.setdefault(base, set()).add(m.group("name"))
-                base_clause_file.setdefault(m.group("name"), set()).add(path)
-        # class_owners[D] = every stand-in owner that D is, or (transitively) derives from.
-        class_owners = {}
-        for owner in owners:
-            stack, seen = [owner], {owner}
-            while stack:
-                cur = stack.pop()
-                class_owners.setdefault(cur, set()).add(owner)
-                for child in children_of.get(cur, ()):
-                    if child not in seen:
-                        seen.add(child)
-                        stack.append(child)
-        for cls, classes in class_owners.items():
-            for path in base_clause_file.get(cls, ()):
-                defines_member.setdefault(path, set()).update(classes)
-            for owner in classes:
-                if cls != owner:
-                    descendants_of.setdefault(owner, set()).add(cls)
-        member_def = re.compile(
-            r"(?<![\w:])(?P<cls>" + "|".join(re.escape(c) for c in sorted(class_owners)) + r")"
-            r"\s*::\s*(?P<member>~?[A-Za-z_]\w*)\s*\(",
-        )
-        for path, text in files.items():
-            classes = set()
-            for m in member_def.finditer(text):
-                close = _matching_close_paren(text, m.end() - 1)
-                if close is not None and _looks_like_definition(text, close, m.group("cls"), m.group("member")):
-                    classes.update(class_owners.get(m.group("cls"), ()))
-            if classes:
-                defines_member.setdefault(path, set()).update(classes)
+        # Only a file whose raw (unstripped) text could plausibly hold a base clause pays the
+        # per-character strip_comments_and_strings cost (127-gx-w2-r5-32: that cost had run for every
+        # one of ~4,173 files, not just the handful with one). A comment that happens to look like a
+        # base clause only widens the raw pre-filter, never narrows it (BASE_CLAUSE still runs again on
+        # the stripped text below, which is what is actually used), and this is computed once, shared by
+        # every game group, rather than redone per group.
+        base_clause_stripped = {p: strip_comments_and_strings(t) for p, t in raw.items() if BASE_CLAUSE.search(t)}
+        for game in sorted({g for g in owner_game.values()}, key=lambda g: g or ""):
+            game_owners = {o for o, g in owner_game.items() if g == game}
+            if game is None:
+                scoped_base_clause, scoped_files = base_clause_stripped, files
+            else:
+                other = "GeneralsMD" if game == "Generals" else "Generals"
+                scoped_base_clause = {p: t for p, t in base_clause_stripped.items() if _game_of(p, args.root) != other}
+                scoped_files = {p: t for p, t in files.items() if _game_of(p, args.root) != other}
+            children_of = {}
+            base_clause_file = {}
+            for path, stripped in scoped_base_clause.items():
+                for m in BASE_CLAUSE.finditer(stripped):
+                    for base in _direct_bases(m.group("bases")):
+                        children_of.setdefault(base, set()).add(m.group("name"))
+                    base_clause_file.setdefault(m.group("name"), set()).add(path)
+            # class_owners[D] = every stand-in owner (in this game) that D is, or transitively derives
+            # from.
+            class_owners = {}
+            for owner in game_owners:
+                stack, seen = [owner], {owner}
+                while stack:
+                    cur = stack.pop()
+                    class_owners.setdefault(cur, set()).add(owner)
+                    for child in children_of.get(cur, ()):
+                        if child not in seen:
+                            seen.add(child)
+                            stack.append(child)
+            for cls, classes in class_owners.items():
+                for path in base_clause_file.get(cls, ()):
+                    defines_member.setdefault(path, set()).update(classes)
+                for owner in classes:
+                    if cls != owner:
+                        descendants_of.setdefault(owner, set()).add(cls)
+            if not class_owners:
+                continue
+            member_def = re.compile(
+                r"(?<![\w:])(?P<cls>" + "|".join(re.escape(c) for c in sorted(class_owners)) + r")"
+                r"\s*::\s*(?P<member>~?[A-Za-z_]\w*)\s*\(",
+            )
+            for path, text in scoped_files.items():
+                classes = set()
+                for m in member_def.finditer(text):
+                    close = _matching_close_paren(text, m.end() - 1)
+                    if close is not None and _looks_like_definition(text, close, m.group("cls"), m.group("member")):
+                        classes.update(class_owners.get(m.group("cls"), ()))
+                if classes:
+                    defines_member.setdefault(path, set()).update(classes)
 
     violations = []
     for owner, name, header in standins:
         own = {header} | {p for p, classes in defines_member.items() if owner in classes}
         # `D::name` for every D deriving from owner names the same inherited stand-in as `owner::name`.
         qualifiers = [owner, *sorted(descendants_of.get(owner, ()))] if owner else []
+        game = owner_game.get(owner)
+        other_game = ("GeneralsMD" if game == "Generals" else "Generals") if game else None
         for path, text in files.items():
+            # A qualified or unqualified text match of `owner`'s name is meaningless in the other game's
+            # own tree: the class it resolves to there, if any, is not this stand-in's class at all
+            # (127-gx-w2-r5-28). Core and --extra-dir files are always in scope.
+            if other_game is not None and _game_of(path, args.root) == other_game:
+                continue
             found = []
             for qualifier in qualifiers:
                 found += uses(text, name, qualifier)
