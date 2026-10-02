@@ -73,6 +73,18 @@ class RuleConstObjectTest(unittest.TestCase):
     def test_const_reference_is_never_safe(self):
         self.assert_const("static const T& r = *TheX->find(1);", False)
 
+    def test_by_value_const_initialised_through_a_global_pointer_is_not_safe(self):
+        # A pointer need not be involved: a by-value const that reads TheGlobalData (or any other global
+        # pointer) at static-init time captures whichever engine's INI/map data ran first.
+        self.assert_const("static const Real r = TheGlobalData->m_maxCameraHeight;", False)
+
+    def test_by_value_const_initialised_through_a_global_pointer_string_is_not_safe(self):
+        self.assert_const("static const AsciiString s = TheGlobalData->m_mapName;", False)
+
+    def test_by_value_const_initialised_from_a_plain_call_is_still_safe(self):
+        # A pure value constructor (no `->`) stays allowed: only a global-pointer read is rejected.
+        self.assert_const("static const Int c = GameMakeColor(255, 255, 255, 255);", True)
+
     def test_every_tu_must_qualify(self):
         sym = make_symbol(
             "s",
@@ -117,6 +129,19 @@ class RuleFieldParseTest(unittest.TestCase):
 
     def test_same_named_non_fieldparse_variable_is_not_safe(self):
         sym = make_symbol("s", ["static int myFieldParse = 0;"])
+        self.assertIsNone(m.rule_field_parse(sym))
+
+    def test_mutable_fieldparse_pointer_is_not_safe(self):
+        # `FieldParse` appears in the type, but the declarator is a reassignable pointer, not a const array.
+        sym = make_symbol("s", ["static FieldParse* s_cursor = nullptr;"])
+        self.assertIsNone(m.rule_field_parse(sym))
+
+    def test_map_keyed_by_fieldparse_pointer_is_not_safe(self):
+        sym = make_symbol("s", ["static std::map<AsciiString, const FieldParse*> s_byName;"])
+        self.assertIsNone(m.rule_field_parse(sym))
+
+    def test_non_const_fieldparse_array_is_not_safe(self):
+        sym = make_symbol("s", ["static FieldParse s_scratch[16];"])
         self.assertIsNone(m.rule_field_parse(sym))
 
 
@@ -230,6 +255,112 @@ class SourceIndexDefinitionTest(unittest.TestCase):
         self.assertEqual(sym.source, "Core/only.cpp:1")
         self.assertEqual(sym.decls, [])
 
+    def test_class_static_with_header_declaration_is_not_ambiguous(self):
+        # A class static declared in the header and defined out-of-line in one .cpp is one definition, not
+        # two: the in-class declaration must not count as a second site once the qualified one is found.
+        self.write("dx8wrapper.h", "class DX8Wrapper {\n    static int BitDepth;\n    void Foo();\n};\n")
+        self.write(
+            "dx8wrapper.cpp",
+            "int DX8Wrapper::BitDepth = 32;\n"
+            "void DX8Wrapper::Foo() {\n"
+            "    static const int table = 7;\n"
+            "}\n",
+        )
+        sym = m.Symbol("DX8Wrapper::BitDepth")
+        sym.count = 1
+        symbols = {"DX8Wrapper::BitDepth": sym}
+        m.resolve_sources(self.root, symbols, {})
+        self.assertEqual(sym.source, "Core/dx8wrapper.cpp:1")
+        self.assertEqual(sym.decls, [])
+
+    def test_member_function_static_does_not_gain_header_class_line(self):
+        # The member function has a real out-of-line body with the static inside it: the class-line macro
+        # fallback must not also be recorded as a second site.
+        self.write("dx8wrapper.h", "class DX8Wrapper {\n    void Foo();\n};\n")
+        self.write(
+            "dx8wrapper.cpp",
+            "void DX8Wrapper::Foo() {\n    static const int table = 7;\n}\n",
+        )
+        sym = m.Symbol("DX8Wrapper::Foo()::table")
+        sym.count = 1
+        symbols = {"DX8Wrapper::Foo()::table": sym}
+        m.resolve_sources(self.root, symbols, {})
+        self.assertEqual(sym.source, "Core/dx8wrapper.cpp:2")
+        self.assertEqual(sym.decls, [])
+
+    def test_macro_defined_function_body_allows_backslash_continuation(self):
+        # DEFINE_AUTO_POOL-style macro: the function's `)` and `{` are split across continuation lines.
+        self.write(
+            "mempool.h",
+            "class AutoPoolClass {\n"
+            "public:\n"
+            "    static Pool* Allocator() \\\n"
+            "    { \\\n"
+            "        static Pool* const allocator = new Pool(); \\\n"
+            "        return allocator; \\\n"
+            "    }\n"
+            "};\n",
+        )
+        p = m.Parsed("AutoPoolClass::Allocator()::allocator")
+        idx = self.index({"allocator", "Allocator", "AutoPoolClass"})
+        source, decl, _indented = idx.find(p)
+        self.assertEqual(source, "Core/mempool.h:5")
+        self.assertIn("allocator", decl)
+        self.assertNotIn("defined by a macro", decl)
+
+    def test_plain_scope_skips_an_unrelated_local_in_another_function(self):
+        # A local (non-static) variable of the same bare name inside some unrelated function must never be
+        # taken for this namespace-scope symbol's own definition (the nlohmann::json `parent` collision).
+        self.write(
+            "json.hpp",
+            "namespace nlohmann {\n"
+            "void foo() {\n"
+            "    basic_json& parent = result.at(ptr);\n"
+            "}\n"
+            "}\n",
+        )
+        p = m.Parsed("parent")
+        idx = self.index({"parent"})
+        source, _decl, _indented = idx.find(p)
+        self.assertEqual(source, "?")
+
+    def test_inline_branch_does_not_cross_into_an_unrelated_classs_method(self):
+        # A derived class calls the base class's method by its qualified name from its OWN same-named
+        # method's body; the inline branch's bare (unqualified) regex must not wander into that unrelated
+        # method's body and steal its static for the base class's symbol (the WW3DAssetManager /
+        # W3DAssetManager::Create_Render_Obj collision, both sharing one file through such a call).
+        self.write(
+            "mgr.cpp",
+            "class Derived {\n"
+            "    Foo* Create_Render_Obj(const char* name) {\n"
+            "        if (!Find(name)) {\n"
+            "            return Base::Create_Render_Obj(name);\n"
+            "        }\n"
+            "        static int warning_count = 0;\n"
+            "        return nullptr;\n"
+            "    }\n"
+            "};\n"
+            "Foo* Base::Create_Render_Obj(char const* name) {\n"
+            "    static int warning_count = 1;\n"
+            "    return nullptr;\n"
+            "}\n",
+        )
+        p = m.Parsed("Base::Create_Render_Obj(char const*)::warning_count")
+        idx = self.index({"warning_count", "Create_Render_Obj", "Base", "Derived"})
+        sites = idx.find_all(p)
+        self.assertEqual(len(sites), 1)
+        self.assertEqual(sites[0][0], "Core/mgr.cpp:11")
+
+    def test_plain_scope_keeps_a_real_namespace_block_static(self):
+        # The genuine case this filtering must not break: a namespace-scope static indented inside a
+        # `namespace { ... }` block, with no enclosing function.
+        self.write("logic.cpp", "namespace Foo {\n    static int lastUpdate = 0;\n}\n")
+        p = m.Parsed("lastUpdate")
+        idx = self.index({"lastUpdate"})
+        source, _decl, indented = idx.find(p)
+        self.assertEqual(source, "Core/logic.cpp:2")
+        self.assertTrue(indented)
+
 
 class CompareTest(unittest.TestCase):
     """compare() drives `check`'s error/warning split for a symbol the TSV already lists."""
@@ -266,6 +397,20 @@ class CompareTest(unittest.TestCase):
     def test_class_change_is_an_error(self):
         errors, _stale = m.compare("k", self.sym(1, "mesh.cpp:10", cls="per-engine", phase="4"), self.row())
         self.assertTrue(any("class changed" in e for e in errors))
+
+    def test_lost_definition_is_stale_not_a_new_instance(self):
+        # The search can no longer find a listed definition (moved inside a macro, outside SCAN_ROOTS, ...):
+        # `?` must not be read as a brand-new defining file.
+        errors, stale = m.compare("k", self.sym(1, "?"), self.row())
+        self.assertEqual(errors, [])
+        self.assertTrue(any("definition moved" in s for s in stale))
+
+
+class DemangleTest(unittest.TestCase):
+    def test_empty_input_returns_empty_list_without_calling_c_filt(self):
+        # A stripped library's `nm` yields no state symbols at all: demangle([]) must short-circuit rather
+        # than sending c++filt a lone newline and tripping its own line-count mismatch guard.
+        self.assertEqual(m.demangle([]), [])
 
 
 class HandMatchesTest(unittest.TestCase):
@@ -321,11 +466,16 @@ class CmdCheckEmptyLibraryTest(unittest.TestCase):
     """A stripped or wrong-file library must fail `check` outright, not pass having checked nothing."""
 
     def test_no_symbols_exits_nonzero(self):
+        # `read_tsv` is deliberately left unmocked (and never called): the empty-library guard must fire
+        # from `load_library`'s result alone, before `read_tsv` runs, so a missing or unreadable TSV can
+        # never make this test pass for the wrong reason (the bug this test is named for).
         args = mock.Mock(root=".", lib="lib.so", vcpkg_lib=None, strict=False)
         with mock.patch.object(m, "load_library", return_value={}):
-            with self.assertRaises(SystemExit) as ctx:
-                m.cmd_check(args)
+            with mock.patch.object(m, "read_tsv", side_effect=AssertionError("read_tsv must not be called")):
+                with self.assertRaises(SystemExit) as ctx:
+                    m.cmd_check(args)
         self.assertNotEqual(ctx.exception.code, 0)
+        self.assertIn("no writable/unique symbols found", str(ctx.exception.code))
 
     def test_mostly_vanished_symbols_exits_nonzero(self):
         args = mock.Mock(root=".", lib="lib.so", vcpkg_lib=None, strict=False)

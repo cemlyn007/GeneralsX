@@ -57,6 +57,7 @@
 # Needs binutils (nm, c++filt).
 
 import argparse
+import bisect
 import collections
 import glob
 import os
@@ -121,6 +122,12 @@ def run(cmd, input_text=None):
 
 
 def demangle(names):
+    # An empty `names` would still send c++filt a lone newline and get one empty line back (a stripped
+    # library's `nm` yields no rows at all): short-circuit so the mismatched-line-count guard below is never
+    # tripped by this, and `read_library` genuinely returns no symbols for cmd_check's empty-library guard to
+    # catch.
+    if not names:
+        return []
     out = run(["c++filt"], "\n".join(names) + "\n").splitlines()
     if len(out) != len(names):
         sys.exit("c++filt returned a different number of lines")
@@ -243,8 +250,11 @@ def _blank(m):
 
 def code_only(text):
     """`text` with every comment and the contents of every string and character literal replaced by spaces
-    (newlines kept, so offsets and line numbers are unchanged): what the definition search looks at."""
-    return LEXEME_RE.sub(_blank, text)
+    (newlines kept, so offsets and line numbers are unchanged), and every line-continuation backslash
+    (a `\\` immediately before a newline, as a multi-line `#define` body uses) blanked to a space too, so a
+    function signature or body split across a macro's continuation lines reads the same as one that is not:
+    what the definition search looks at."""
+    return re.sub(r"\\(\r?\n)", r" \1", LEXEME_RE.sub(_blank, text))
 
 
 def bare(part):
@@ -274,6 +284,11 @@ DEF_BODY_RE = re.compile(
     r"\s*(?:(?:const|override|final)\b\s*|noexcept\s*(?:\([^(){};]*\))?\s*)*(?::[^{};]*)?\{"
 )
 
+# A `SomeClass::` (optionally templated) immediately before a match: tells the inline branch's unqualified
+# `func(` regex that this particular occurrence is actually qualified, so it belongs to `SomeClass`, not
+# necessarily the class whose method we are searching for.
+QUALIFIER_RE = re.compile(r"(\w+)\s*(?:<[^;{}]*?>)?\s*::\s*$")
+
 
 class Parsed:
     def __init__(self, key):
@@ -302,10 +317,52 @@ class Parsed:
             self.scope = "guard"
 
 
+#  What kind of block a `{` opens, read from the (`code_only`) text immediately before it: a function body
+# (its own definition, never a call: the same `)` [const/override/final/noexcept] [: initialiser list] `{`
+# shape as DEF_BODY_RE, but anchored at the end of the lookbehind instead of after a known `)` offset), a
+# namespace block (named or anonymous), a class/struct/union body, or anything else (if/for/while/switch, a
+# lambda, an initialiser list, ...).
+BRACE_FUNC_RE = re.compile(r"\)\s*(?:(?:const|override|final)\b\s*|noexcept\s*(?:\([^(){}]*\))?\s*)*(?::[^{};]*)?$")
+BRACE_NAMESPACE_RE = re.compile(r"\bnamespace\s+[\w:]*\s*$")
+BRACE_CLASS_RE = re.compile(r"\b(?:class|struct|union)\b[^;{}]*$")
+# How far back to look for the shape before a `{`: a type/initialiser list can run long, but this is only
+# ever used on code already known to be short (a function signature, `namespace X`, `class Foo : public Bar`).
+BRACE_LOOKBACK = 400
+
+
+def _scope_events(text):
+    """Every `{`/`}` in `text`, as two parallel lists: positions (strictly increasing, each one past the
+    brace) and the full scope-kind stack (innermost last) in force from that position until the next event.
+    Built once per file, bisected on the positions to find the stack enclosing any candidate site's offset."""
+    positions, stacks = [0], [()]
+    stack = []
+    for i, c in enumerate(text):
+        if c == "{":
+            tail = text[max(0, i - BRACE_LOOKBACK) : i]
+            if BRACE_NAMESPACE_RE.search(tail):
+                kind = "namespace"
+            elif BRACE_FUNC_RE.search(tail):
+                kind = "function"
+            elif BRACE_CLASS_RE.search(tail):
+                kind = "class"
+            else:
+                kind = "other"
+            stack.append(kind)
+            positions.append(i + 1)
+            stacks.append(tuple(stack))
+        elif c == "}":
+            if stack:
+                stack.pop()
+            positions.append(i + 1)
+            stacks.append(tuple(stack))
+    return positions, stacks
+
+
 class SourceIndex:
     def __init__(self, root, wanted):
         self.root = root
         self.files = {}
+        self._scope_cache = {}
         self.where = collections.defaultdict(set)
         for scan_root in SCAN_ROOTS:
             for dirpath, dirnames, filenames in os.walk(os.path.join(root, scan_root)):
@@ -360,6 +417,17 @@ class SourceIndex:
     def where_is(self, rel, offset, line):
         return f"{rel}:{self.line_of(rel, offset)}", re.sub(r"\s+", " ", line.strip()), line[:1] in (" ", "\t")
 
+    def scope_at(self, rel, pos):
+        """The stack of enclosing brace kinds (innermost last) at `pos` in `rel`: `"function"` in it means
+        `pos` is inside some function body (a local, whether or not it names the function we are looking
+        for: that function is matched by name separately), `"namespace"`/`"class"` a namespace or class
+        body with no enclosing function."""
+        cached = self._scope_cache.get(rel)
+        if cached is None:
+            cached = self._scope_cache[rel] = _scope_events(self.files[rel])
+        positions, stacks = cached
+        return stacks[bisect.bisect_right(positions, pos) - 1]
+
     def find(self, parsed):
         """(file:line, declaration text, whether the line is indented) of the definition, or ('?', '', False)."""
         for _branch, source, decl, indented in self.definitions(parsed):
@@ -399,11 +467,24 @@ class SourceIndex:
             # parameter list is followed by a function body (optionally `const`/`override`/`noexcept` or a
             # constructor's initialiser list, then `{`, not `;`) is a definition, and only a static inside
             # that body belongs to this function.
+            found_body = False
             for branch, owner_re in (("owner", owner), ("inline", re.compile(rf"\b{func}\s*\("))):
                 for rel in self.candidates(parsed.var, parsed.func, parsed.cls):
                     text = self.files[rel]
                     site = None
                     for fm in owner_re.finditer(text):
+                        # The inline branch's bare `func(` regex carries no class qualifier of its own (it
+                        # exists for a method defined inline, unqualified, inside its own class body), so a
+                        # match immediately qualified by a DIFFERENT class's `OtherClass::` is that other
+                        # class's own out-of-line definition (or a call to it), never this one:
+                        # unrestricted, it would wrongly attribute a different same-named method's static to
+                        # this class (W3DAssetManager::Create_Render_Obj's own `static int warning_count`
+                        # taken for WW3DAssetManager::Create_Render_Obj's, the two sharing a file).
+                        if branch == "inline" and parsed.cls:
+                            tail = text[max(0, fm.start() - 200) : fm.start()]
+                            qm = QUALIFIER_RE.search(tail)
+                            if qm and qm.group(1) != parsed.cls:
+                                continue
                         close = skip_balanced(text, fm.end() - 1, "(", ")")
                         head = DEF_BODY_RE.match(text, close)
                         if not head:
@@ -419,8 +500,11 @@ class SourceIndex:
                             break
                     if site:
                         yield (branch, *site)
-            # Made by a macro (MAKE_STANDARD_MODULE_MACRO's getModuleNameKey, ...): the class's header.
-            if parsed.cls:
+                        found_body = True
+            # Made by a macro (MAKE_STANDARD_MODULE_MACRO's getModuleNameKey, ...): the class's header. Only
+            # a fallback: a static found inside a real function body above (owner or inline) is this
+            # function's actual definition, and the macro-expanded class line is not a second one.
+            if parsed.cls and not found_body:
                 cls_re = re.compile(rf"^[ \t]*(?:class|struct)\s+(?:\w+\s+)?{re.escape(parsed.cls)}\b[^;]*$", re.M)
                 for rel in self.candidates(parsed.cls):
                     m = cls_re.search(self.files[rel])
@@ -429,28 +513,33 @@ class SourceIndex:
                         break
         if parsed.scope in ("class", "guard") and parsed.cls and not parsed.func:
             qual = re.compile(rf"\b{re.escape(parsed.cls)}\s*::\s*{re.escape(parsed.var)}\b")
+            found_qualified = False
             for rel in self.candidates(parsed.var, parsed.cls):
                 if not rel.endswith((".cpp", ".c", ".cc")):
                     continue
                 for ls, line, a, b in self.lines_with(rel, qual):
                     if is_def_prefix(line[:a]) and DEF_SUFFIX_RE.match(line[b:]):
                         yield ("qualified", *self.where_is(rel, ls, line))
+                        found_qualified = True
                         break
             # A static data member defined in the class body (inline or constexpr): only inside that class's
-            # own body, so that another class's member of the same name is never taken for it.
-            for rel in self.candidates(parsed.var, parsed.cls):
-                for body_start, body_end in self.class_bodies(rel, parsed.cls):
-                    site = None
-                    for ls, line, a, _b in self.lines_with(rel, var_re, body_start):
-                        if ls + a >= body_end:
+            # own body, so that another class's member of the same name is never taken for it. Only a
+            # fallback: when some TU has the qualified out-of-line definition, the in-class line is its
+            # declaration, not a second definition site.
+            if not found_qualified:
+                for rel in self.candidates(parsed.var, parsed.cls):
+                    for body_start, body_end in self.class_bodies(rel, parsed.cls):
+                        site = None
+                        for ls, line, a, _b in self.lines_with(rel, var_re, body_start):
+                            if ls + a >= body_end:
+                                break
+                            prefix = line[:a]
+                            if re.search(r"\bstatic\b", prefix) and "(" not in prefix:
+                                site = self.where_is(rel, ls, line)
+                                break
+                        if site:
+                            yield ("in-class", *site)
                             break
-                        prefix = line[:a]
-                        if re.search(r"\bstatic\b", prefix) and "(" not in prefix:
-                            site = self.where_is(rel, ls, line)
-                            break
-                    if site:
-                        yield ("in-class", *site)
-                        break
         if parsed.scope in ("namespace", "class", "guard") and not parsed.func:
             # Every file's first definition, ranked: a file-scope definition in a source file first.
             # A qualified name found by neither branch above is a namespace member: only a definition after
@@ -464,12 +553,20 @@ class SourceIndex:
                         continue
                     if ns_re and not ns_re.search(self.files[rel], 0, ls):
                         continue
+                    # Any match enclosed by a function body is a local of some unrelated function (ours is
+                    # matched by the function branch above, never reaching here), never this namespace- or
+                    # class-scope name: a plain text search for the bare identifier cannot otherwise tell a
+                    # local `parent` in nlohmann::json's code from this symbol's own `parent`.
+                    scope = self.scope_at(rel, ls + a)
+                    if "function" in scope:
+                        continue
                     indented = line[:1] in (" ", "\t")
-                    # Indented: a local variable unless it is a static or inside a namespace block.
-                    if indented and not re.search(r"\bstatic\b", line[:a]):
-                        text = self.files[rel]
-                        if not re.search(r"^\s*namespace\b", text[:ls], re.M):
-                            continue
+                    # Indented: a local-looking variable unless it is `static` or genuinely inside a
+                    # namespace block (a class body's own static is the in-class branch's job, not this one).
+                    if indented and not re.search(r"\bstatic\b", line[:a]) and (
+                        "namespace" not in scope or "class" in scope
+                    ):
+                        continue
                     found.append(((indented, not is_source), ls, line, rel))
                     break
             found.sort(key=lambda f: f[0])  # stable: candidates order within a rank
@@ -635,12 +732,21 @@ def rule_namekey(sym):
     return GLOBAL, "", "cached NameKeyType (a name or window ID key): process-wide by PLAN-023 Decision 2"
 
 
+# The declarator itself (before `=`) must be exactly a const FieldParse array: `FieldParse` merely
+# appearing in the type (a mutable pointer, a container or map keyed/valued by it, a non-const array) is
+# not provably a built-once table.
+FIELDPARSE_DECL_RE = re.compile(r"^(?:static\s+)?const\s+FieldParse\s+\w+\s*\[[^\]]*\]\s*$")
+
+
 def rule_field_parse(sym):
     """INI FieldParse table: built once, never written. By declared type, not by the variable's name alone
-    (a variable merely named dataFieldParse/myFieldParse/commonFieldParse is not provably one)."""
-    if all(re.search(r"\bFieldParse\b", d.split("=")[0]) for d in declarations(sym)):
-        return CONST, "", "INI FieldParse table: built once, never written"
-    return None
+    (a variable merely named dataFieldParse/myFieldParse/commonFieldParse is not provably one), and not by
+    `FieldParse` merely appearing in the type somewhere (a mutable pointer or container is not a table)."""
+    for d in declarations(sym):
+        decl = d.split("=")[0].rstrip().rstrip(";").rstrip()
+        if not FIELDPARSE_DECL_RE.match(decl):
+            return None
+    return CONST, "", "INI FieldParse table: built once, never written"
 
 
 CONST_DECL_RE = re.compile(r"^(?:static\s+)?(?:inline\s+)?(?:const\s+static|const)\b")
@@ -651,6 +757,12 @@ CONST_PTR_DECL_RE = re.compile(r"\*\s*const\s+\w+\s*(?:\[[^\]]*\]\s*)*$")
 # WaveGuideUpdate's particles, ...) would also use to fill its pointer on first call: not a constant
 # expression, even though the pointer slot itself is never written again.
 LOOKUP_INIT_RE = re.compile(r"->|\w+\s*\(")
+# A read through a global pointer (`TheGlobalData->m_mapName`, `TheWriterSomething->field`): per-engine or
+# INI/map-dependent state captured by the first engine to run, whether the static itself is a pointer or a
+# by-value object. A bare function call (GameMakeColor(...), DEG_TO_RADF(45), a value constructor of
+# literals) is not rejected here: only a `->` member read is, since that is what every one-time global-data
+# lookup in this codebase goes through.
+GLOBAL_LOOKUP_RE = re.compile(r"->")
 
 
 def rule_const_object(sym):
@@ -658,11 +770,15 @@ def rule_const_object(sym):
     initialisation. A reference is never safe here (it can alias per-engine state at any type). A pointer is
     safe only when the pointer itself cannot be reseated (`T* const name`, not `const T*`, whatever the
     pointee type) and its initialiser is not a lookup: a per-engine pointer cache has exactly the `T* const
-    name = TheX->find(...)` shape."""
+    name = TheX->find(...)` shape. A by-value const is unsafe too when its initialiser reads through a
+    global pointer (`static const Real r = TheGlobalData->m_maxCameraHeight;`): that captures whichever
+    engine's INI/map data ran first, the same first-engine-wins defect as the pointer case."""
     for d in declarations(sym):
         decl, _, init = d.partition("=")
         decl = decl.rstrip().rstrip(";").rstrip()
         if "&" in decl:
+            return None
+        if GLOBAL_LOOKUP_RE.search(init):
             return None
         if "*" in decl:
             if not CONST_PTR_DECL_RE.search(decl) or LOOKUP_INIT_RE.search(init):
@@ -834,7 +950,10 @@ def compare(key, sym, row):
         recorded_count = int(row["count"])
     except (KeyError, ValueError):
         recorded_count = 0
-    new_files = source_files(sym.source) - source_files(row.get("source", ""))
+    # `?` (no definition found) is never a "new" file: a listed definition the search can no longer find
+    # (moved into a macro, outside SCAN_ROOTS, ...) must fall through to the "definition moved" staleness
+    # below, not read as a brand-new defining file that needs review.
+    new_files = source_files(sym.source) - source_files(row.get("source", "")) - {"?"}
     if sym.count > recorded_count or new_files and row.get("source") != "?":
         errors.append(
             f"new instance of a listed name: {key}: {recorded_count} -> {sym.count} instances"
@@ -864,13 +983,15 @@ def new_symbol_error(sym, recorded):
 
 def cmd_check(args):
     symbols = load_library(args.root, args.lib, args.vcpkg_lib)
-    recorded = read_tsv(os.path.join(args.root, TSV))
     # A stripped library, or the wrong file, gives `nm` no symbols at all (GNU nm prints "no symbols" and
-    # still exits 0): every recorded row would then land in the harmless-looking "gone from the library"
-    # warning and a non-strict `check` would pass having checked nothing. Fail outright instead, and also
-    # when most of the list has vanished (the same wrong-binary symptom one symbol short of empty).
+    # still exits 0, and `demangle([])` now returns `[]` rather than tripping its own line-count guard):
+    # `read_library` then returns no symbols, and every recorded row would land in the harmless-looking
+    # "gone from the library" warning, so a non-strict `check` would pass having checked nothing. Fail
+    # outright instead. Checked before `read_tsv` (not after): a missing or unreadable TSV must never stand
+    # in for this check by exiting non-zero first for an unrelated reason.
     if not symbols:
         sys.exit(f"{args.lib}: no writable/unique symbols found (stripped library, or the wrong file?)")
+    recorded = read_tsv(os.path.join(args.root, TSV))
     if recorded and len(symbols) < len(recorded) // 2:
         sys.exit(
             f"{args.lib}: only {len(symbols)} of {len(recorded)} recorded symbols found in the library "
