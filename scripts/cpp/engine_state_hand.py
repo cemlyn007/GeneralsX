@@ -215,6 +215,21 @@ HAND = [
     (CONST, "", "re:CRC::_Table|CRC32_Table|Random3Class::Mix[12]|_box_normal|TwiddlerClassName", "constant table"),
     (CONST, "", "re:gameWindowFieldList|layoutScriptTable", ".wnd parse table (names and parsers)"),
     (CONST, "", "re:_\\w+(Loader|Factory)|_NullPrototype|_TwiddlerPersistFactory", LOADER),
+    (
+        CONST,
+        "",
+        "SpecialPowerTemplate::m_specialPowerFieldParse",
+        "INI FieldParse table, built once, never written; rule:fieldparse's declared-type check expects an "
+        "unqualified array name and this is an out-of-line, class-qualified definition",
+    ),
+    (
+        CONST,
+        "",
+        "s_allWeaponFireFlags",
+        "built once from MAKE_MODELCONDITION_MASK5 (Common/ModelState.h), which macro-expands to "
+        "ModelConditionFlags's own constructor applied to literal flags only; a textual rule cannot see "
+        "through the macro to confirm that",
+    ),
     # ---------------------------------------------------------------------------------------------------
     # Debug only.
     (DEBUG, "", "re:TheDebugIgnoreSyncErrors|TheCurrentIgnoreCrashPtr|g_LastErrorDump", "debug"),

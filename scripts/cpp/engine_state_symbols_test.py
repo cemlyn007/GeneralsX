@@ -101,6 +101,43 @@ class RuleConstObjectTest(unittest.TestCase):
     def test_by_value_const_initialized_from_an_indexed_method_call_is_not_safe(self):
         self.assert_const("static const Int n = ThePlayerList[0].getPlayerCount();", False)
 
+    def test_by_value_const_direct_initialized_from_an_rng_call_is_not_safe(self):
+        # Direct-initialisation (`name(expr)`, no `=`) must be read the same as `name = expr`: splitting
+        # only on `=` leaves the whole call after the declared name instead of in the checked initialiser.
+        self.assert_const("static const Int pick(GameLogicRandomValue(0, 3));", False)
+
+    def test_const_pointer_direct_initialized_from_a_lookup_is_not_safe(self):
+        self.assert_const('static ThingTemplate* const tmpl(TheThingFactory->findTemplate("X"));', False)
+
+    def test_by_value_const_brace_initialized_through_a_global_pointer_is_not_safe(self):
+        # Brace-initialisation (`name{expr}`) must be read the same as `name = expr`.
+        self.assert_const("static const Real r{TheGlobalData->m_maxCameraHeight};", False)
+
+    def test_by_value_const_brace_initialized_from_an_rng_call_is_not_safe(self):
+        self.assert_const("static const Int pick{GameLogicRandomValue(0, 3)};", False)
+
+    def test_by_value_const_direct_initialized_with_literal_is_safe(self):
+        self.assert_const("static const Int pick(3);", True)
+
+    def test_by_value_const_brace_initialized_with_literal_is_safe(self):
+        self.assert_const("static const Int pick{3};", True)
+
+    def test_by_value_const_with_initializer_on_a_later_source_line_is_not_safe(self):
+        # The recorded declaration is one source line; when the initialiser starts on the next one, the
+        # line this rule sees ends at a bare `=` and must not be read as having no (so trivially safe)
+        # initialiser at all.
+        self.assert_const("static const Int pick =", False)
+
+    def test_by_value_const_with_unclosed_direct_initializer_is_not_safe(self):
+        self.assert_const("static const Int pick(GameLogicRandomValue(0, 3)", False)
+
+    def test_by_value_const_with_unclosed_brace_initializer_is_not_safe(self):
+        self.assert_const("static const Real r{TheGlobalData->m_maxCameraHeight", False)
+
+    def test_by_value_const_with_no_initializer_is_still_safe(self):
+        # A default-constructed const (no `=`, `(` or `{` at all) has no initialiser to distrust.
+        self.assert_const("static const WaypointMap s_emptyWaypoints;", True)
+
     def test_every_tu_must_qualify(self):
         sym = make_symbol(
             "s",
@@ -492,6 +529,35 @@ class SourceIndexDefinitionTest(unittest.TestCase):
         source, _decl, indented = idx.find(p)
         self.assertEqual(source, "Core/logic.cpp:2")
         self.assertTrue(indented)
+
+    def test_find_reads_a_brace_initializer_that_opens_on_a_later_line(self):
+        # `lines_with` slices one source line; a `static const T arr[] =` whose `{ ... }` opens on the
+        # next line (the common StateConditionInfo/Matrix3D table shape) must still hand back the whole
+        # initialiser, not just the declarator the first line holds, or a rule reading it (rule:const) sees
+        # an empty one and cannot check what it actually contains.
+        self.write(
+            "table.cpp",
+            "void f() {\n"
+            "    static const int table[] =\n"
+            "    {\n"
+            "        1, 2, 3\n"
+            "    };\n"
+            "}\n",
+        )
+        p = m.Parsed("f()::table")
+        idx = self.index({"table", "f"})
+        _source, decl, _indented = idx.find(p)
+        self.assertIn("{ 1, 2, 3 }", decl)
+        self.assertTrue(decl.rstrip().endswith(";"))
+
+    def test_find_does_not_extend_a_statement_that_already_ends_on_its_own_line(self):
+        # The common, already-correct case must not be touched: a declaration complete on one line keeps
+        # exactly that line (nothing from the next statement bleeds in).
+        self.write("plain.cpp", "static const int x = 5;\nstatic const int y = 6;\n")
+        p = m.Parsed("x")
+        idx = self.index({"x"})
+        _source, decl, _indented = idx.find(p)
+        self.assertEqual(decl, "static const int x = 5;")
 
 
 class CompareTest(unittest.TestCase):

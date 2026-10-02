@@ -448,7 +448,35 @@ class SourceIndex:
             yield ls, line, m.start() - ls, m.end() - ls
 
     def where_is(self, rel, offset, line):
-        return f"{rel}:{self.line_of(rel, offset)}", re.sub(r"\s+", " ", line.strip()), line[:1] in (" ", "\t")
+        full = self._statement_text(self.files[rel], offset, line)
+        return f"{rel}:{self.line_of(rel, offset)}", re.sub(r"\s+", " ", full.strip()), line[:1] in (" ", "\t")
+
+    @staticmethod
+    def _statement_text(text, offset, line):
+        """`line` (the declaration's own source line, as `lines_with` sliced it) extended to cover a
+        multi-line initialiser: a direct- or brace-initialiser whose opening `(`/`{` does not close on this
+        line (an array of struct literals, `static const T arr[] =\\n{ ... };`), or a bare `name =` whose
+        value starts on the next one. `line` alone already settles the common case (ends in `;` with its
+        own brackets balanced) without scanning the file at all. Otherwise scanned forward over `text`
+        (already `code_only`, so a `;` inside a blanked comment or string literal is never read as the
+        statement's own) for the top-level `;`, bounded so a malformed file can never hang this."""
+        depth = 0
+        for c in line:
+            depth += (c in "({[") - (c in ")}]")
+        if depth <= 0 and line.rstrip().endswith(";"):
+            return line
+        limit = min(len(text), offset + 4000)
+        depth, i = 0, offset
+        while i < limit:
+            c = text[i]
+            if c in "({[":
+                depth += 1
+            elif c in ")}]":
+                depth -= 1
+            elif c == ";" and depth <= 0:
+                return text[offset : i + 1]
+            i += 1
+        return text[offset:limit]
 
     def scope_at(self, rel, pos):
         """The stack of enclosing brace kinds (innermost last) at `pos` in `rel`: `"function"` in it means
@@ -863,6 +891,35 @@ def _by_value_init_is_safe(init, type_name):
     return True
 
 
+def _split_initializer(decl):
+    """(declarator, initialiser text) for a recorded declaration line, however it initialises: copy
+    (`= expr`), direct (`name(expr)`) or brace (`name{expr}`). The initialiser is `""` when the declarator
+    has none at all (a default-constructed `static const Foo foo;`), and `None` when the recorded line
+    (one source line) does not hold it: it ends with a bare `=`, or with an unclosed `(`/`{`, because the
+    initialiser starts on the next source line. The caller must treat `None` as not provably safe, never as
+    an empty, trivially-safe one."""
+    i, n = 0, len(decl)
+    while i < n and decl[i] not in "=({":
+        i += 1
+    if i == n:
+        return decl, ""
+    declarator = decl[:i].rstrip()
+    if decl[i] == "=":
+        init = decl[i + 1 :].strip()
+        return declarator, (init or None)
+    open_c, close_c = decl[i], (")" if decl[i] == "(" else "}")
+    depth, j = 0, i
+    while j < n:
+        if decl[j] == open_c:
+            depth += 1
+        elif decl[j] == close_c:
+            depth -= 1
+            if depth == 0:
+                return declarator, decl[i : j + 1]
+        j += 1
+    return declarator, None
+
+
 def rule_const_object(sym):
     """A const object (dynamically initialised, so it lands in .data/.bss): never written after its
     initialisation. A reference is never safe here (it can alias per-engine state at any type). A pointer is
@@ -872,10 +929,14 @@ def rule_const_object(sym):
     global pointer (`static const Real r = TheGlobalData->m_maxCameraHeight;`) or calls anything other than
     an allow-listed pure value constructor (`static const Int pick = GameLogicRandomValue(0, 3);` advances
     the per-engine logic RNG despite its literal arguments): both capture whichever engine ran first, or
-    diverge per engine, the same first-engine-wins defect as the pointer case."""
+    diverge per engine, the same first-engine-wins defect as the pointer case. This holds whichever syntax
+    initialises it (copy, direct `name(expr)` or brace `name{expr}`); a declaration whose recorded line ends
+    before its initialiser does (a continuation onto the next source line) is never assumed safe."""
     for d in declarations(sym):
-        decl, _, init = d.partition("=")
-        decl = decl.rstrip().rstrip(";").rstrip()
+        d = d.rstrip().rstrip(";").rstrip()
+        decl, init = _split_initializer(d)
+        if init is None:
+            return None
         if "&" in decl:
             return None
         if GLOBAL_LOOKUP_RE.search(init):
