@@ -22,11 +22,15 @@
 # hazard as unary `&` and is caught too. A unary `&` is also recognised after a C-style pointer cast
 # (`(void*)&name`, `(unsigned char*)&name`, `(struct Foo*)&name`) and after `&&` (`a && &name`), not only
 # after the fixed set of operators it is otherwise unambiguous after. `name` passed bare as a whole
-# argument to a known variadic logger (the printf family, `WWDEBUG_SAY`, `WWDEBUG_WARNING`, `DEBUG_LOG`,
-# `DEBUG_LOG_LEVEL`, `DEBUG_ASSERTLOG`, `DEBUG_CRASH`, `DEBUG_ASSERTCRASH`) is flagged too: it passes the
-# empty stand-in object instead of the field's value. A two-macro-argument logger's condition/level
-# argument (`DEBUG_ASSERTLOG`'s and `DEBUG_ASSERTCRASH`'s `c`, `DEBUG_LOG_LEVEL`'s `l`) is never flagged:
-# it reaches the field through the stand-in's own conversion operator (`!(c)`, `l & DebugLevelMask`), not
+# argument to a known variadic logger (the printf family, `WWDEBUG_SAY`, `WWDEBUG_WARNING`, `WWDEBUG_ERROR`,
+# `WWRELEASE_SAY`, `DEBUG_LOG`, `DEBUG_LOG_RAW`, `DEBUG_LOG_LEVEL`, `DEBUG_LOG_LEVEL_RAW`, `DEBUG_ASSERTLOG`,
+# `DEBUG_CRASH`, `DEBUG_ASSERTCRASH`, `CRCDEBUG_LOG`) or to a `Format`/`format` call (`StringClass::Format`,
+# `WideStringClass::Format`, `AsciiString::format`, `UnicodeString::format`, `Debug::Format`: every
+# `Format`/`format` declared in the tree is a printf-style variadic, matched on the method name alone so a
+# call through any instance is caught) is flagged too: it passes the empty stand-in object instead of the
+# field's value. A two-macro-argument logger's condition/level argument (`DEBUG_ASSERTLOG`'s and
+# `DEBUG_ASSERTCRASH`'s `c`, `DEBUG_LOG_LEVEL`'s and `DEBUG_LOG_LEVEL_RAW`'s `l`) is never flagged: it
+# reaches the field through the stand-in's own conversion operator (`!(c)`, `l & DebugLevelMask`), not
 # through `...`. Comments and string literals are ignored.
 #
 # Usage: engine_context_standins.py [--root GeneralsX] [--extra-dir DIR ...] [--list]
@@ -70,11 +74,18 @@ VARIADIC_FUNCS = (
     "snprintf",
     "WWDEBUG_SAY",
     "WWDEBUG_WARNING",
+    "WWDEBUG_ERROR",
+    "WWRELEASE_SAY",
     "DEBUG_LOG",
+    "DEBUG_LOG_RAW",
     "DEBUG_LOG_LEVEL",
+    "DEBUG_LOG_LEVEL_RAW",
     "DEBUG_ASSERTLOG",
     "DEBUG_CRASH",
     "DEBUG_ASSERTCRASH",
+    "CRCDEBUG_LOG",
+    "Format",
+    "format",
 )
 VARIADIC_CALL = re.compile(r"\b(?:" + "|".join(VARIADIC_FUNCS) + r")\s*\(")
 # For each of these, the message argument (named by its 0-based index among the macro's own arguments,
@@ -88,9 +99,14 @@ VARIADIC_CALL = re.compile(r"\b(?:" + "|".join(VARIADIC_FUNCS) + r")\s*\(")
 MESSAGE_ARG_INDEX = {
     "WWDEBUG_SAY": 0,
     "WWDEBUG_WARNING": 0,
+    "WWDEBUG_ERROR": 0,
+    "WWRELEASE_SAY": 0,
     "DEBUG_LOG": 0,
+    "DEBUG_LOG_RAW": 0,
     "DEBUG_CRASH": 0,
+    "CRCDEBUG_LOG": 0,
     "DEBUG_LOG_LEVEL": 1,
+    "DEBUG_LOG_LEVEL_RAW": 1,
     "DEBUG_ASSERTLOG": 1,
     "DEBUG_ASSERTCRASH": 1,
 }

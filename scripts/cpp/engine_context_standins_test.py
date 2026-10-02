@@ -4,6 +4,9 @@
 # `std::addressof`, and a stand-in passed bare through a variadic logger). cemlyn007 02/10/2026: a
 # multi-word cast (`(unsigned char*)&name`) and the variadic check's false positives on a converted
 # argument (`(int)name`, `static_cast<int>(name)`, `name == 32`, `f(name)`) were both review-fix gaps too.
+# A later pass (127-gx-4's dispute) widened the variadic-logger list to DEBUG_LOG_RAW, DEBUG_LOG_LEVEL_RAW,
+# WWRELEASE_SAY, WWDEBUG_ERROR and CRCDEBUG_LOG, and added Format/format (StringClass::Format and
+# AsciiString::format/UnicodeString::format are printf-style variadics too, matched by method name alone).
 # MainTest covers main() end to end: a stand-in whose class's members are defined in a differently named
 # file (the MapObject/WorldHeightMap.cpp gap, found by content now, not by file name), a violation in an
 # `--extra-dir` tree (a consumer's own C++ outside Core/Generals/GeneralsMD), and the own-file detection's
@@ -143,6 +146,35 @@ class UsesTest(unittest.TestCase):
     def test_qualified_name(self):
         self.assert_flagged("(void*)&DX8Wrapper::BitDepth", qualifier="DX8Wrapper")
         self.assert_clean("DX8Wrapper::BitDepth & mask", qualifier="DX8Wrapper")
+
+    # 127-gx-4's dispute: the variadic-logger list left out DEBUG_LOG_RAW/DEBUG_LOG_LEVEL_RAW (same
+    # doubled-parens shape as DEBUG_LOG/DEBUG_LOG_LEVEL), WWRELEASE_SAY (the one logger live in release
+    # builds) and WWDEBUG_ERROR/CRCDEBUG_LOG, and Format/format (StringClass::Format,
+    # AsciiString::format/UnicodeString::format) were not recognised as printf-style variadics at all.
+    def test_debug_log_raw_message_is_checked(self):
+        self.assert_flagged('DEBUG_LOG_RAW(("bits %d", BitDepth))')
+
+    def test_debug_log_level_raw_message_is_checked(self):
+        self.assert_flagged('DEBUG_LOG_LEVEL_RAW(LEVEL_DEBUG, ("bits %d", BitDepth))')
+
+    def test_debug_log_level_raw_level_is_not_flagged(self):
+        self.assert_clean('DEBUG_LOG_LEVEL_RAW(BitDepth, ("bits"))')
+
+    def test_wwrelease_say_message_is_checked(self):
+        self.assert_flagged('WWRELEASE_SAY(("bits %d", BitDepth))')
+
+    def test_wwdebug_error_message_is_checked(self):
+        self.assert_flagged('WWDEBUG_ERROR(("bits %d", BitDepth))')
+
+    def test_crcdebug_log_message_is_checked(self):
+        self.assert_flagged('CRCDEBUG_LOG(("bits %d", BitDepth))')
+
+    def test_format_method_call_is_checked(self):
+        self.assert_flagged('name.Format("bits %d", BitDepth)')
+        self.assert_flagged('str.format("bits %d", BitDepth)')
+
+    def test_format_method_call_reaching_the_field_is_not_flagged(self):
+        self.assert_clean('name.Format("bits %d", BitDepth.x)')
 
 
 class MainTest(unittest.TestCase):
