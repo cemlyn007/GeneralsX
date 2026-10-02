@@ -27,16 +27,23 @@
 # hazard as unary `&` and is caught too. A unary `&` is also recognised after a C-style pointer cast
 # (`(void*)&name`, `(unsigned char*)&name`, `(struct Foo*)&name`) and after `&&` (`a && &name`), not only
 # after the fixed set of operators it is otherwise unambiguous after. `name` passed bare as a whole
-# argument to a known variadic logger (the printf family, `WWDEBUG_SAY`, `WWDEBUG_WARNING`, `WWDEBUG_ERROR`,
-# `WWRELEASE_SAY`, `DEBUG_LOG`, `DEBUG_LOG_RAW`, `DEBUG_LOG_LEVEL`, `DEBUG_LOG_LEVEL_RAW`, `DEBUG_ASSERTLOG`,
-# `DEBUG_CRASH`, `DEBUG_ASSERTCRASH`, `CRCDEBUG_LOG`) or to a `Format`/`format` call (`StringClass::Format`,
-# `WideStringClass::Format`, `AsciiString::format`, `UnicodeString::format`, `Debug::Format`: every
-# `Format`/`format` declared in the tree is a printf-style variadic, matched on the method name alone so a
-# call through any instance is caught) is flagged too: it passes the empty stand-in object instead of the
-# field's value. A two-macro-argument logger's condition/level argument (`DEBUG_ASSERTLOG`'s and
-# `DEBUG_ASSERTCRASH`'s `c`, `DEBUG_LOG_LEVEL`'s and `DEBUG_LOG_LEVEL_RAW`'s `l`) is never flagged: it
-# reaches the field through the stand-in's own conversion operator (`!(c)`, `l & DebugLevelMask`), not
-# through `...`. Comments and string literals are ignored.
+# argument to a direct variadic function (the printf family, `DebugLog`, `DebugLogRaw`, `DebugCrash`,
+# `WWDebug_Printf`, `WWDebug_Printf_Warning`, `WWDebug_Printf_Error`) or to a `Format`/`format` call
+# (`StringClass::Format`, `WideStringClass::Format`, `AsciiString::format`, `UnicodeString::format`,
+# `Debug::Format`: every `Format`/`format` declared in the tree is a printf-style variadic, matched on the
+# method name alone so a call through any instance is caught) is flagged too: it passes the empty
+# stand-in object instead of the field's value. So is `name` passed as a whole element of the
+# doubled-parens message list that every logging macro built on Debug.h's shape takes (`WWDEBUG_SAY`,
+# `WWRELEASE_SAY`, `DEBUG_LOG`, `SNAPSHOT_SAY`, `SHATTER_DEBUG_SAY`, ... and any later one, however it is
+# named): a comma inside the list survives the macro's own argument split only because the list is
+# itself one extra, whole, parenthesised argument, e.g. `WWDEBUG_SAY(("bits %d", BitDepth))`,
+# `DEBUG_ASSERTLOG(c, ("bits %d", BitDepth))`. That shape — a parenthesised argument, itself a complete
+# top-level argument, led by a string or char literal — is recognised generically, not by an enumerated
+# macro name, so a logger this gate has never heard of is still caught. A two-argument macro's
+# condition/level argument (`DEBUG_ASSERTLOG`'s and `DEBUG_ASSERTCRASH`'s `c`, `DEBUG_LOG_LEVEL`'s and
+# `DEBUG_LOG_LEVEL_RAW`'s `l`) is never flagged: it is not itself a parenthesised list, so it reaches the
+# field through the stand-in's own conversion operator (`!(c)`, `l & DebugLevelMask`), not through `...`.
+# Comments and string literals are ignored.
 #
 # Usage: engine_context_standins.py [--root GeneralsX] [--extra-dir DIR ...] [--list]
 #   exit 0 when no stand-in is used with sizeof, &, std::addressof or a variadic logger, 1 (with each use
@@ -86,51 +93,34 @@ _CAST_WORD = r"(?:const|volatile|unsigned|signed|long|short|struct|class|enum|[A
 CAST_BEFORE = re.compile(r"\(\s*" + _CAST_WORD + r"(?:\s+" + _CAST_WORD + r")*(?:\s*[*&])+\s*\)\s*$")
 # `&&` (logical-and) immediately before, with or without a space: the following `&` is always unary.
 DOUBLE_AMP_BEFORE = re.compile(r"&&\s*$")
-# A bare stand-in passed to one of these: a variadic call takes its argument's value by its declared type
-# (`...`), with no user-defined conversion, so an empty stand-in object is passed, not the field's value.
+# A bare stand-in passed to one of these: a direct variadic call takes its argument's value by its
+# declared type (`...`), with no user-defined conversion, so an empty stand-in object is passed, not the
+# field's value. These take their format string and values directly as ordinary comma-separated
+# arguments, with no doubled-parens wrapping (contrast the macros `_doubled_paren_message_lists` finds
+# generically, by shape, below).
 VARIADIC_FUNCS = (
     "printf",
     "fprintf",
     "sprintf",
     "snprintf",
-    "WWDEBUG_SAY",
-    "WWDEBUG_WARNING",
-    "WWDEBUG_ERROR",
-    "WWRELEASE_SAY",
-    "DEBUG_LOG",
-    "DEBUG_LOG_RAW",
-    "DEBUG_LOG_LEVEL",
-    "DEBUG_LOG_LEVEL_RAW",
-    "DEBUG_ASSERTLOG",
-    "DEBUG_CRASH",
-    "DEBUG_ASSERTCRASH",
-    "CRCDEBUG_LOG",
+    "vsnprintf",
+    "_snprintf",
+    "swprintf",
+    "vswprintf",
+    "DebugLog",
+    "DebugLogRaw",
+    "DebugCrash",
+    "WWDebug_Printf",
+    "WWDebug_Printf_Warning",
+    "WWDebug_Printf_Error",
     "Format",
     "format",
 )
 VARIADIC_CALL = re.compile(r"\b(?:" + "|".join(VARIADIC_FUNCS) + r")\s*\(")
-# For each of these, the message argument (named by its 0-based index among the macro's own arguments,
-# split on top-level commas) is itself written as a parenthesised list, e.g. `WWDEBUG_SAY(("fmt", x))`
-# or `DEBUG_ASSERTLOG(c, ("fmt", x))` (Core/GameEngine/Include/Common/Debug.h) — a doubled-parens idiom
-# that lets a comma inside survive the macro's own argument split. A macro not listed here (the printf
-# family) takes its arguments directly, with no such wrapping, and every one of them is checked as is.
-# Any other macro argument (e.g. DEBUG_ASSERTLOG's/DEBUG_ASSERTCRASH's condition, DEBUG_LOG_LEVEL's
-# level) is never the message list and is left unchecked: it reaches the field through the stand-in's
-# own conversion operator, not through `...`.
-MESSAGE_ARG_INDEX = {
-    "WWDEBUG_SAY": 0,
-    "WWDEBUG_WARNING": 0,
-    "WWDEBUG_ERROR": 0,
-    "WWRELEASE_SAY": 0,
-    "DEBUG_LOG": 0,
-    "DEBUG_LOG_RAW": 0,
-    "DEBUG_CRASH": 0,
-    "CRCDEBUG_LOG": 0,
-    "DEBUG_LOG_LEVEL": 1,
-    "DEBUG_LOG_LEVEL_RAW": 1,
-    "DEBUG_ASSERTLOG": 1,
-    "DEBUG_ASSERTCRASH": 1,
-}
+# A parenthesised argument that is itself a complete doubled-parens message list: an opening `(`
+# immediately after the call's own `(` (`IDENT((...))`), or after a `,` (`IDENT(c, (...))`), either way
+# with any amount of whitespace in between.
+_DOUBLED_PAREN_OPEN = re.compile(r"(?P<prev>[(,])\s*(?P<open>\()")
 
 
 def strip_comments_and_strings(text):
@@ -235,6 +225,80 @@ def _looks_like_definition(text, close_idx, cls, member):
     return text[i] == ":" and member == cls
 
 
+def _split_top_level_commas(s):
+    """[(start, end), ...] spans of s's top-level (depth-0) comma-separated pieces."""
+    depth, piece_start, spans = 0, 0, []
+    for idx, ch in enumerate(s):
+        if ch in "([{":
+            depth += 1
+        elif ch in ")]}":
+            depth -= 1
+        elif ch == "," and depth == 0:
+            spans.append((piece_start, idx))
+            piece_start = idx + 1
+    spans.append((piece_start, len(s)))
+    return spans
+
+
+def _enclosing_open_paren(text, pos):
+    """The index of the `(` that owns the top-level argument list containing position pos, i.e. the
+    nearest unmatched `(` scanning backward from pos."""
+    depth, i = 0, pos - 1
+    while i >= 0:
+        c = text[i]
+        if c == ")":
+            depth += 1
+        elif c == "(":
+            if depth == 0:
+                return i
+            depth -= 1
+        i -= 1
+    return None
+
+
+def _call_name_before(text, open_idx):
+    """The identifier (or keyword) immediately before text[open_idx] (that call's own open paren),
+    skipping whitespace, or a generic placeholder when there is none to find."""
+    i = open_idx
+    while i > 0 and text[i - 1] in " \t\r\n":
+        i -= 1
+    j = i
+    while j > 0 and (text[j - 1].isalnum() or text[j - 1] == "_"):
+        j -= 1
+    return text[j:i] or "a logger"
+
+
+def _doubled_paren_message_lists(text):
+    """(func_name, content_base_index, content, item_spans) for every argument, anywhere in text, that
+    is itself a complete parenthesised list led by a string or char literal: the doubled-parens idiom
+    every logging macro built on Debug.h's shape takes (WWDEBUG_SAY, WWRELEASE_SAY, DEBUG_LOG,
+    SNAPSHOT_SAY, SHATTER_DEBUG_SAY, ... and any later one), recognised by that shape alone, not by an
+    enumerated macro name, so a logger this gate has never heard of is still caught."""
+    out = []
+    for m in _DOUBLED_PAREN_OPEN.finditer(text):
+        open_idx = m.start("open")
+        close_idx = _matching_close_paren(text, open_idx)
+        if close_idx is None:
+            continue
+        j = close_idx + 1
+        while j < len(text) and text[j] in " \t\r\n":
+            j += 1
+        if j < len(text) and text[j] not in ")," :
+            continue  # not a complete, standalone argument of whatever call or list encloses it
+        content = text[open_idx + 1 : close_idx]
+        items = _split_top_level_commas(content)
+        first = content[items[0][0] : items[0][1]].strip()
+        if not first or first[0] not in "\"'":
+            continue  # not format-string-led: an ordinary parenthesised sub-expression, not this idiom
+        if m.group("prev") == "(":
+            enclosing_open = m.start("prev")
+        else:
+            enclosing_open = _enclosing_open_paren(text, m.start("prev"))
+        func = _call_name_before(text, enclosing_open) if enclosing_open is not None else "a logger"
+        out.append((func, open_idx + 1, content, items))
+    return out
+
+
 def uses(text, name, qualifier):
     """(line, what) of each `sizeof`, unary `&`, `std::addressof` or bare variadic-argument use of the
     stand-in in the stripped text."""
@@ -260,78 +324,34 @@ def uses(text, name, qualifier):
             bad.append((text.count("\n", 0, m.start()) + 1, "std::addressof"))
     for cm in VARIADIC_CALL.finditer(text):
         open_paren = cm.end() - 1
-        depth, i, end = 0, open_paren, None
-        while i < len(text):
-            if text[i] == "(":
-                depth += 1
-            elif text[i] == ")":
-                depth -= 1
-                if depth == 0:
-                    end = i
-                    break
-            i += 1
-        if end is None:
+        close_paren = _matching_close_paren(text, open_paren)
+        if close_paren is None:
             continue
-        inner = text[open_paren + 1 : end]
+        inner = text[open_paren + 1 : close_paren]
         func = cm.group(0).split("(", 1)[0].strip()
         base = open_paren + 1
-
-        def split_top_level_commas(s):
-            """[(start, end), ...] spans of s's top-level (depth-0) comma-separated pieces."""
-            depth3, piece_start, spans = 0, 0, []
-            for idx, ch in enumerate(s):
-                if ch in "([{":
-                    depth3 += 1
-                elif ch in ")]}":
-                    depth3 -= 1
-                elif ch == "," and depth3 == 0:
-                    spans.append((piece_start, idx))
-                    piece_start = idx + 1
-            spans.append((piece_start, len(s)))
-            return spans
-
-        macro_args = split_top_level_commas(inner)
-        msg_index = MESSAGE_ARG_INDEX.get(func)
-        if msg_index is None:
-            # Not a doubled-parens macro (the printf family): every top-level argument is checked as is.
-            check_spans = [(base + s0, base + s1) for s0, s1 in macro_args]
-        elif msg_index < len(macro_args):
-            # Only the message argument can hold a logged stand-in; the condition/level argument
-            # (DEBUG_ASSERTLOG's/DEBUG_ASSERTCRASH's `c`, DEBUG_LOG_LEVEL's `l`) reaches the field through
-            # the stand-in's own conversion operator and is never checked. The message argument is
-            # itself written as a parenthesised list (doubled parens, so a variadic comma inside it does
-            # not split the macro's own argument list): unwrap that one level before splitting on commas,
-            # so the format string and each logged value are checked individually.
-            m_start, m_end = macro_args[msg_index]
-            msg_base = base + m_start
-            msg_text = inner[m_start:m_end]
-            lead = len(msg_text) - len(msg_text.lstrip())
-            stripped_msg = msg_text.strip()
-            if stripped_msg.startswith("(") and stripped_msg.endswith(")"):
-                d, closes_at = 0, None
-                for idx, ch in enumerate(stripped_msg):
-                    if ch == "(":
-                        d += 1
-                    elif ch == ")":
-                        d -= 1
-                        if d == 0:
-                            closes_at = idx
-                            break
-                if closes_at == len(stripped_msg) - 1:
-                    msg_base += lead + 1
-                    msg_text = stripped_msg[1:-1]
-            check_spans = [(msg_base + s0, msg_base + s1) for s0, s1 in split_top_level_commas(msg_text)]
-        else:
-            check_spans = []  # fewer macro arguments than expected: malformed call, nothing to check
-        # Flag a name only when it IS a whole top-level argument (not converted by a cast, a comparison,
-        # or a call that takes it and returns something else): check each argument's stripped text
-        # against the bare/qualified name, not just whether the name occurs inside it.
-        for a_start, a_end in check_spans:
-            arg_text = text[a_start:a_end]
+        # A direct variadic call (not a doubled-parens macro): every top-level argument is checked as is.
+        for a0, a1 in _split_top_level_commas(inner):
+            arg_text = text[base + a0 : base + a1]
             stripped = arg_text.strip()
             if stripped and re.fullmatch(ident, stripped):
                 arg_lead = len(arg_text) - len(arg_text.lstrip())
-                pos = a_start + arg_lead
+                pos = base + a0 + arg_lead
+                bad.append((text.count("\n", 0, pos) + 1, f"passed by value to {func}"))
+    # Every doubled-parens message list, under any macro name: the format string and each logged value
+    # are its top-level comma-separated items, found generically by the list's own shape (a parenthesised
+    # argument, itself a complete top-level argument, led by a string or char literal), not by matching a
+    # macro name. DEBUG_ASSERTLOG's/DEBUG_ASSERTCRASH's condition and DEBUG_LOG_LEVEL's/
+    # DEBUG_LOG_LEVEL_RAW's level sit in a different, unwrapped argument and are never reached by this.
+    for func, content_base, content, items in _doubled_paren_message_lists(text):
+        for s0, s1 in items:
+            arg_text = content[s0:s1]
+            stripped = arg_text.strip()
+            # Flag a name only when it IS a whole top-level item (not converted by a cast, a comparison,
+            # or a call that takes it and returns something else).
+            if stripped and re.fullmatch(ident, stripped):
+                arg_lead = len(arg_text) - len(arg_text.lstrip())
+                pos = content_base + s0 + arg_lead
                 bad.append((text.count("\n", 0, pos) + 1, f"passed by value to {func}"))
     return bad
 

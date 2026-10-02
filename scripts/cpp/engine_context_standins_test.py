@@ -4,9 +4,14 @@
 # `std::addressof`, and a stand-in passed bare through a variadic logger). cemlyn007 02/10/2026: a
 # multi-word cast (`(unsigned char*)&name`) and the variadic check's false positives on a converted
 # argument (`(int)name`, `static_cast<int>(name)`, `name == 32`, `f(name)`) were both review-fix gaps too.
-# A later pass (127-gx-4's dispute) widened the variadic-logger list to DEBUG_LOG_RAW, DEBUG_LOG_LEVEL_RAW,
-# WWRELEASE_SAY, WWDEBUG_ERROR and CRCDEBUG_LOG, and added Format/format (StringClass::Format and
-# AsciiString::format/UnicodeString::format are printf-style variadics too, matched by method name alone).
+# A later pass widened the variadic-logger list to DEBUG_LOG_RAW, DEBUG_LOG_LEVEL_RAW, WWRELEASE_SAY,
+# WWDEBUG_ERROR and CRCDEBUG_LOG, and added Format/format (StringClass::Format and AsciiString::format/
+# UnicodeString::format are printf-style variadics too, matched by method name alone). A further pass
+# replaced that enumerated macro-name list with a generic doubled-parens detector: a stand-in passed bare
+# inside a parenthesised, string-literal-led argument list is flagged under any macro name at all
+# (SNAPSHOT_SAY, WWRELEASE_WARNING/ERROR, SHATTER_DEBUG_SAY, SLOTLIST_DEBUG_LOG, and any later one), and
+# the direct variadic-function list grew DebugLog, DebugLogRaw, DebugCrash, WWDebug_Printf and its
+# Warning/Error siblings, _snprintf, swprintf and vswprintf.
 # MainTest covers main() end to end: a stand-in whose class's members are defined in a differently named
 # file (the MapObject/WorldHeightMap.cpp gap, found by content now, not by file name), a violation in an
 # `--extra-dir` tree (a consumer's own C++ outside Core/Generals/GeneralsMD), and the own-file detection's
@@ -150,10 +155,11 @@ class UsesTest(unittest.TestCase):
         self.assert_flagged("(void*)&DX8Wrapper::BitDepth", qualifier="DX8Wrapper")
         self.assert_clean("DX8Wrapper::BitDepth & mask", qualifier="DX8Wrapper")
 
-    # 127-gx-4's dispute: the variadic-logger list left out DEBUG_LOG_RAW/DEBUG_LOG_LEVEL_RAW (same
-    # doubled-parens shape as DEBUG_LOG/DEBUG_LOG_LEVEL), WWRELEASE_SAY (the one logger live in release
-    # builds) and WWDEBUG_ERROR/CRCDEBUG_LOG, and Format/format (StringClass::Format,
-    # AsciiString::format/UnicodeString::format) were not recognised as printf-style variadics at all.
+    # DEBUG_LOG_RAW/DEBUG_LOG_LEVEL_RAW (same doubled-parens shape as DEBUG_LOG/DEBUG_LOG_LEVEL),
+    # WWRELEASE_SAY, WWDEBUG_ERROR and CRCDEBUG_LOG, and Format/format (StringClass::Format,
+    # AsciiString::format/UnicodeString::format): WWRELEASE_SAY is not the only logger live in release
+    # builds (wwdebug.h also defines WWRELEASE_WARNING and WWRELEASE_ERROR, unconditionally, right beside
+    # it), it just happens to be the one this group of tests originally covered.
     def test_debug_log_raw_message_is_checked(self):
         self.assert_flagged('DEBUG_LOG_RAW(("bits %d", BitDepth))')
 
@@ -178,6 +184,68 @@ class UsesTest(unittest.TestCase):
 
     def test_format_method_call_reaching_the_field_is_not_flagged(self):
         self.assert_clean('name.Format("bits %d", BitDepth.x)')
+
+    # The doubled-parens message list is now found generically, by its own shape (a parenthesised,
+    # string-literal-led argument list that is itself a complete top-level argument), not by an
+    # enumerated macro name: a logger the gate has never heard of is still caught. SNAPSHOT_SAY
+    # (Core/Libraries/Source/WWVegas/WW3D2/ww3d.h), WWRELEASE_WARNING/WWRELEASE_ERROR (wwdebug.h, right
+    # beside WWRELEASE_SAY) and SHATTER_DEBUG_SAY/SLOTLIST_DEBUG_LOG (shattersystem.cpp,
+    # WOLGameSetupMenu.cpp) all share WWDEBUG_SAY's doubled-parens shape and are among the loggers this
+    # closed (127-gx-4's second dispute: f70b11fed's enumerated list still missed all of these).
+    def test_snapshot_say_message_is_checked(self):
+        self.assert_flagged('SNAPSHOT_SAY(("bits %d", BitDepth))')
+
+    def test_wwrelease_warning_message_is_checked(self):
+        self.assert_flagged('WWRELEASE_WARNING(("bits %d", BitDepth))')
+
+    def test_wwrelease_error_message_is_checked(self):
+        self.assert_flagged('WWRELEASE_ERROR(("bits %d", BitDepth))')
+
+    def test_shatter_debug_say_message_is_checked(self):
+        self.assert_flagged('SHATTER_DEBUG_SAY(("bits %d", BitDepth))')
+
+    def test_slotlist_debug_log_message_is_checked(self):
+        self.assert_flagged('SLOTLIST_DEBUG_LOG(("bits %d", BitDepth))')
+
+    # A macro the gate has no name for at all: the generic, shape-based detection does not need one.
+    def test_unenumerated_doubled_parens_macro_is_checked(self):
+        self.assert_flagged('SOME_FUTURE_LOGGER(("bits %d", BitDepth))')
+
+    # The direct variadic functions behind the macros above (and the C-library printf-family functions
+    # they are sometimes called through directly, with no doubled-parens wrapping at all).
+    def test_debuglog_function_is_checked(self):
+        self.assert_flagged('DebugLog("bits %d", BitDepth)')
+
+    def test_debuglograw_function_is_checked(self):
+        self.assert_flagged('DebugLogRaw("bits %d", BitDepth)')
+
+    def test_debugcrash_function_is_checked(self):
+        self.assert_flagged('DebugCrash("bits %d", BitDepth)')
+
+    def test_wwdebug_printf_function_is_checked(self):
+        self.assert_flagged('WWDebug_Printf("bits %d", BitDepth)')
+        self.assert_flagged('WWDebug_Printf_Warning("bits %d", BitDepth)')
+        self.assert_flagged('WWDebug_Printf_Error("bits %d", BitDepth)')
+
+    def test_snprintf_function_is_checked(self):
+        self.assert_flagged('_snprintf(buf, 10, "%d", BitDepth)')
+
+    def test_swprintf_function_is_checked(self):
+        self.assert_flagged('swprintf(buf, L"%d", BitDepth)')
+
+    # An ordinary parenthesised sub-expression that happens to be a whole argument, and happens to start
+    # with a string literal, is not this idiom unless the call turns out to also carry the stand-in as one
+    # of that list's own comma-separated items: a plain redundant-paren argument must stay clean.
+    def test_redundant_parens_around_unrelated_argument_is_not_flagged(self):
+        self.assert_clean('foo(("just a literal"), c)')
+        self.assert_clean('foo((a + b), c)')
+
+    # DEBUG_ASSERTLOG's/DEBUG_ASSERTCRASH's condition and DEBUG_LOG_LEVEL's/DEBUG_LOG_LEVEL_RAW's level
+    # are each the call's own first, unwrapped argument, not a doubled-parens list, so the generic
+    # detector must not reach into them even when the stand-in sits there bare.
+    def test_unwrapped_macro_argument_is_not_flagged_generically(self):
+        self.assert_clean('DEBUG_ASSERTLOG(BitDepth, ("bits %d", 1))')
+        self.assert_clean('DEBUG_LOG_LEVEL(BitDepth, ("bits %d", 1))')
 
 
 class MainTest(unittest.TestCase):
