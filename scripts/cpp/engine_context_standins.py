@@ -18,9 +18,12 @@
 # variadic logger (the printf family, `WWDEBUG_SAY`, `DEBUG_LOG`, `DEBUG_ASSERTLOG`) is flagged too: it passes
 # the empty stand-in object instead of the field's value. Comments and string literals are ignored.
 #
-# Usage: engine_context_standins.py [--root GeneralsX] [--list]
+# Usage: engine_context_standins.py [--root GeneralsX] [--extra-dir DIR ...] [--list]
 #   exit 0 when no stand-in is used with sizeof, &, std::addressof or a variadic logger, 1 (with each use
-#   listed) otherwise; --list prints the stand-ins found.
+#   listed) otherwise; --list prints the stand-ins found. Stand-ins are always declared under --root; a
+#   use is looked for there and in every --extra-dir too (a consumer's own C++, outside the
+#   Core/Generals/GeneralsMD layout, that includes GeneralsX's headers declaring them, e.g.
+#   rlgenerals/launcher), so a consumer using a stand-in with sizeof or & is caught as well.
 import argparse
 import os
 import re
@@ -78,9 +81,17 @@ def strip_comments_and_strings(text):
     return "".join(out)
 
 
-def source_files(root):
+def source_files(root, extra_dirs=()):
+    """Every source file under --root's SOURCE_DIRS, plus every one under each of extra_dirs directly
+    (no Core/Generals/GeneralsMD layout expected there: a consumer's own tree, e.g. rlgenerals/launcher)."""
     for top in SOURCE_DIRS:
         for dirpath, dirnames, filenames in os.walk(os.path.join(root, top)):
+            dirnames[:] = [d for d in dirnames if not d.startswith(".")]
+            for f in filenames:
+                if f.endswith(SOURCE_EXTENSIONS):
+                    yield os.path.join(dirpath, f)
+    for extra in extra_dirs:
+        for dirpath, dirnames, filenames in os.walk(extra):
             dirnames[:] = [d for d in dirnames if not d.startswith(".")]
             for f in filenames:
                 if f.endswith(SOURCE_EXTENSIONS):
@@ -149,11 +160,19 @@ def uses(text, name, qualifier):
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0] if __doc__ else None)
     parser.add_argument("--root", default=".", help="the GeneralsX checkout (default: the current directory)")
+    parser.add_argument(
+        "--extra-dir",
+        action="append",
+        default=[],
+        metavar="DIR",
+        help="additional directory (relative to the current directory, or absolute) to scan directly for "
+        "uses, e.g. a consumer's own C++ that includes GeneralsX's headers; repeatable",
+    )
     parser.add_argument("--list", action="store_true", help="print the stand-ins found")
     args = parser.parse_args()
 
     raw = {}
-    for path in source_files(args.root):
+    for path in source_files(args.root, args.extra_dir):
         with open(path, encoding="utf-8", errors="replace") as f:
             raw[path] = f.read()
     standins = find_standins({p: strip_comments_and_strings(t) for p, t in raw.items() if "ContextField" in t})
