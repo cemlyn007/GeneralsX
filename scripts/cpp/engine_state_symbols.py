@@ -519,9 +519,15 @@ def resolve_sources(root, symbols, third_party):
         if library and (source == "?" or not at_file_scope or p.scope == "class" or sym.count == 1 and p.scope != "namespace"):
             sym.library = library
             source = f"third-party:{library}"
-        elif sym.count > 1:
+        else:
             # Several instances (TU-local statics of one name): record every definition site, so that the
             # list shows each TU the one classification covers and a new TU's static is a visible change.
+            # Also run this for a single-instance name: `index.find` can only guess which of several
+            # same-named TU definitions is the one the linker actually kept (it has no symbol-to-TU mapping,
+            # only candidates() sorted .cpp-first then alphabetically), so a count of 1 with more than one
+            # candidate site is recorded as ambiguous the same way, rather than silently picking one (the
+            # linker may have dropped it as unreferenced, as it did Diplomacy's unused ControlBarPopupDescription
+            # siblings of `theLayout`/`theWindow`).
             sites = index.find_all(p)
             if len(sites) > 1:
                 source = SITE_SEP.join(site for site, _decl in sites)
