@@ -1474,8 +1474,11 @@ static Bool createUserDataDirectory(const std::filesystem::path &path, const cha
 // the directory already exists in the image -- passed, and every later write still failed silently
 // (117-gx-w1-r3-21). Probe with an actual write: create and remove a small marker file, which also
 // exercises the one permission that matters (directory write access), not just the mode bits
-// access()/_access() would read (which can disagree with the effective result on some filesystems,
-// e.g. a read-only bind mount that still reports writable permission bits).
+// access()/_access() would read. access()/_access() can still disagree with the real write: access()
+// checks the real uid rather than the effective one (irrelevant here, but a trap if this code is ever
+// reused somewhere setuid), root-squashed NFS and some FUSE filesystems can diverge from what an
+// actual open does, and on Windows _access() only looks at the read-only attribute bit, not ACLs, so
+// it can report writable for a directory an ACL-denied write would reject (117-gx-w2-r2-11).
 static Bool isUserDataDirectoryWritable(const AsciiString &pathWithSeparator)
 {
 	AsciiString probe = pathWithSeparator;
