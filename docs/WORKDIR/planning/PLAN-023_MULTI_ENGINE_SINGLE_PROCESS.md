@@ -21,7 +21,7 @@ rlgenerals' answers to the [open questions](#open-questions) (from its `docs/pla
 
 1. **Thread migration: not needed.** One engine stays on one thread for its whole life. `Scope` stays per call, so migration remains possible, but it is not tested first.
 2. **Render mode: N headless engines plus at most one rendering engine per process is enough.** Phase 8 is off the critical path.
-3. **Create/destroy: create N at the start, `reset()` in place, destroy only on close or after a fault.** Create, destroy, create must work (tests and fault recovery), but it need not be fast.
+3. **Create/destroy: create N at the start, `reset()` in place, destroy only on close; after a fault the context is leaked and replaced (create, fault, leak, create).** Create, destroy, create must work (tests and fault recovery), but it need not be fast. (A faulted engine's context is never destroyed, since `~GameEngine` on corrupt state may crash; see "Faulted engines" below, which this answer must stay consistent with.)
 4. **Shared INI/asset data: not a goal now.** Revisit after the consumer's threaded benchmarks.
 5. **Upstream shape: fork-only behind `RTS_ENGINE_CONTEXT` is fine.**
 
