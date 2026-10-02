@@ -128,8 +128,8 @@ void DX8Wrapper::Create_Render_State()
 }
 
 // GeneralsX @bugfix cemlyn007 02/10/2026 Create_Render_State's inverse, for a caller that allocated this
-// engine's state but never reaches a device: Init's failure returns, and DX8Backend's lite mode (its
-// destructor only calls Shutdown, the other place this runs, when it is not lite).
+// engine's state but never reaches a device: Init's failure returns; a lite backend reaches it through
+// Shutdown, which ~DX8Backend now calls unconditionally with RTS_ENGINE_CONTEXT (Backend/DX8Backend.cpp).
 void DX8Wrapper::Free_Render_State()
 {
 	::rts::EngineContext* const context = ::rts::ctx();
