@@ -11,8 +11,13 @@ pooled objects. Upstream notes that many engine types are "not properly zero ini
 rely on this. Correctness therefore depends on which allocator built the object. An object gets
 garbage in the members its constructor skips when it is built:
 
-- by an embedding host's own `operator new` (rlgenerals' `libgeneralsx.so` hides the engine's
-  overloads since PR #11, so `NEW SkirmishGameInfo` in rlgenerals uses the host's `new`),
+- by an embedding host's own plain `new`, or through `W3DNEW`/`W3DNEWARRAY`/`MSGW3DNEW`/`NEW_REF`
+  (rlgenerals' `libgeneralsx.so` hides the engine's replaceable `operator new` overloads since
+  PR #11, and those four macros still expand to a plain `new` in Null mode, so they reach the
+  host's non-zeroing `new`). Since 11ed61c87, `NEW`, `MSGNEW`, `newInstance` and
+  `newInstanceDesc` expand to `new(__FILE__, __LINE__)` in Null mode instead, which always
+  resolves to the engine's exported `(size_t, const char *, int)` overload, so a host's
+  `NEW SkirmishGameInfo` is zero-filled again, the same as an engine-built object,
 - on the stack or in static storage with a non-trivial constructor,
 - under a non-zeroing allocator (`LD_PRELOAD=libjemalloc.so.2`).
 
@@ -31,6 +36,7 @@ Found by grepping rlgenerals for `new` / `NEW` and stack-constructed engine type
 | `Version` | `launcher/launcher.cpp` (`NEW`) | All members set |
 | `FramePacer` (+ `FrameRateLimit`) | `launcher/launcher.cpp` (`new`) | All members set |
 | `Coord3D`, `ICoord3D` | stack | Plain structs; host initialises them |
+| `SurfaceClass` | `launcher/window.cpp` (`NEW_REF`) | All members set: its constructor initialises `D3DSurface`, `SurfaceFormat` and `RefCountClass::NumRefs` itself. `NEW_REF` is still a plain host `new` in Null mode (it is not one of the four macros 11ed61c87 routed through the engine), so a future host `NEW_REF` of a W3D type whose constructor relies on zero-fill would not be safe |
 
 `GameInfo::reset()` skips `m_localIP` on purpose (it would clobber the IP `LANGameInfo` sets in
 its constructor), so the fix sets it in `GameInfo::GameInfo()` before `reset()`. Derived
