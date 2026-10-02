@@ -52,3 +52,17 @@ public:
 // Process-wide. Set it before the first engine is initialised; off by default.
 FATAL_ENGINE_ERROR_API void SetEngineEmbeddedMode(bool embedded);
 FATAL_ENGINE_ERROR_API bool IsEngineEmbeddedMode();
+
+// GeneralsX @feature cemlyn007 02/10/2026 Sticky fault latch: fault delivery to the host otherwise
+// depends on every catch (...) between RELEASE_CRASH and the host having a
+// catch (const FatalEngineError&) { throw; } in front of it. Something that swallows the
+// exception anyway (a catch (...) added later, upstream or in a merge) still sets this latch
+// first, so a host that polls HasEngineFaulted() after each call into the engine can detect the
+// fault even when the exception itself never reaches it. The flag is process-wide, like
+// IsEngineEmbeddedMode() above: a host with more than one EngineContext alive must poll it after
+// every entry into every engine, since it cannot yet tell which engine set it. ClearEngineFault()
+// is for a host that has already handled (or decided to ignore) a detected fault and wants to
+// detect the next one; nothing in this engine clears it on its own, since the engine that set it
+// is corrupt and the host must not call back into it to ask.
+FATAL_ENGINE_ERROR_API bool HasEngineFaulted();
+FATAL_ENGINE_ERROR_API void ClearEngineFault();

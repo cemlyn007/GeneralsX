@@ -797,12 +797,45 @@ bool IsEngineEmbeddedMode()
 #endif
 }
 
+// GeneralsX @feature cemlyn007 02/10/2026 Sticky fault latch (see FatalEngineError.h): set before
+// the throw below, so a catch (...) that swallows the exception anyway still leaves a trace a
+// polling host can find. Same VC6/pre-C++11 fallback as theEngineEmbeddedMode above.
+#if !(defined(_MSC_VER) && _MSC_VER < 1300)
+static std::atomic<bool> theEngineHasFaulted(false);
+#else
+static volatile bool theEngineHasFaulted = false;
+#endif
+
+bool HasEngineFaulted()
+{
+#if !(defined(_MSC_VER) && _MSC_VER < 1300)
+	return theEngineHasFaulted.load();
+#else
+	return theEngineHasFaulted;
+#endif
+}
+
+void ClearEngineFault()
+{
+#if !(defined(_MSC_VER) && _MSC_VER < 1300)
+	theEngineHasFaulted.store(false);
+#else
+	theEngineHasFaulted = false;
+#endif
+}
+
 // GeneralsX @bugfix cemlyn007 02/10/2026 Single place for the embedded-mode throw, used by both
 // ReleaseCrash and ReleaseCrashLocalized's two throw sites each, so a future change (for example
-// a sticky fault latch) only needs to touch one function instead of drifting across four copies.
+// the sticky fault latch above) only needs to touch one function instead of drifting across four
+// copies.
 static void ThrowIfEmbedded(const char *reason)
 {
 	if (IsEngineEmbeddedMode()) {
+#if !(defined(_MSC_VER) && _MSC_VER < 1300)
+		theEngineHasFaulted.store(true);
+#else
+		theEngineHasFaulted = true;
+#endif
 		throw FatalEngineError(reason ? reason : "");
 	}
 }
