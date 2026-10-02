@@ -30,8 +30,11 @@
 #pragma once
 
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
+#include "Common/AsciiString.h"
 #include "Common/Snapshot.h"
 #include "Common/SubsystemInterface.h"
+
+#include <vector>
 
 // FORWARD REFERENCES /////////////////////////////////////////////////////////////////////////////
 class Xfer;
@@ -64,6 +67,13 @@ protected:
 	// GeneralsX @bugfix cemlyn007 27/09/2026 Resolved once in init() so the teardown cleanup in
 	// ~GameStateMap depends on no other subsystem still being alive.
 	AsciiString m_saveDirectory;
+
+	// GeneralsX @bugfix cemlyn007 02/10/2026 Paths this instance's extractAndSaveMap wrote (xfer,
+	// XFER_LOAD). clearScratchPadMaps deletes only these, not every *.map in m_saveDirectory: two
+	// engines can resolve the same shared user-data Save dir (PLAN-023 R1's per-engine
+	// user_data_dir is a later phase), and deleting the whole directory would remove a scratch-pad
+	// map another live engine's embedInUseMap still needs.
+	std::vector<AsciiString> m_scratchPadMaps;
 
 };
 

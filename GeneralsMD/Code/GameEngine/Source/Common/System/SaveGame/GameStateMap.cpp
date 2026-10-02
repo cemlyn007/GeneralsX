@@ -402,6 +402,10 @@ void GameStateMap::xfer( Xfer *xfer )
 		//
 		extractAndSaveMap( saveGameInfo->saveGameMapName, xfer );
 
+		// GeneralsX @bugfix cemlyn007 02/10/2026 Record what this instance just extracted, so
+		// clearScratchPadMaps deletes only this engine's scratch-pad maps (see GameStateMap.h).
+		m_scratchPadMaps.push_back( saveGameInfo->saveGameMapName );
+
 	}
 
 	//
@@ -473,21 +477,16 @@ void GameStateMap::clearScratchPadMaps()
 	if( m_saveDirectory.isEmpty() )
 		return;
 
-	// GeneralsX @bugfix cemlyn007 27/09/2026 List and delete by absolute path instead of switching the process
-	// into the save directory. On macOS/Linux the switch failed silently while the save directory did not exist
-	// yet (nothing saved so far), so every *.map in the working directory (usually the install directory) was
-	// deleted. The switch also changed the working directory under every other thread. The local file system
-	// lists the directory on every platform, and a save directory that does not exist yet lists nothing.
-	// TheLocalFileSystem is initialised before TheGameStateMap, so it is still alive in ~GameStateMap.
-	FilenameList mapFiles;
-	TheLocalFileSystem->getFileListInDirectory( AsciiString::TheEmptyString, m_saveDirectory, "*.map", mapFiles, FALSE );
-
-	for( FilenameList::const_iterator it = mapFiles.begin(); it != mapFiles.end(); ++it )
+	// GeneralsX @bugfix cemlyn007 02/10/2026 Delete only the scratch-pad maps this instance's
+	// extractAndSaveMap wrote (tracked in m_scratchPadMaps), instead of every *.map that happens to
+	// be sitting in m_saveDirectory. m_saveDirectory is the shared, process-wide user-data Save
+	// directory until PLAN-023 R1's per-engine user_data_dir lands, so another live engine can have
+	// its own scratch-pad map in the same directory; listing and deleting the whole directory would
+	// remove that map out from under it (its next embedInUseMap would then fail with
+	// SC_INVALID_DATA). This also only ever matches exact paths this instance wrote, so it cannot
+	// be fooled by a case-variant name the way a case-insensitive directory listing could.
+	for( std::vector<AsciiString>::const_iterator it = m_scratchPadMaps.begin(); it != m_scratchPadMaps.end(); ++it )
 	{
-
-		// Win32 wildcards also match longer extensions through 8.3 short names, so check the extension itself
-		if( it->endsWithNoCase( ".map" ) == FALSE )
-			continue;
 
 		// a scratch pad map left behind would be picked up by a later load, so say when one cannot be deleted
 		if( DeleteFile( it->str() ) == 0 )
@@ -497,5 +496,7 @@ void GameStateMap::clearScratchPadMaps()
 		}
 
 	}
+
+	m_scratchPadMaps.clear();
 
 }
