@@ -145,6 +145,13 @@ HAND = [
     (GLOBAL, "", "re:TheNameKeyGenerator|\\(anonymous namespace\\)::thePriming(Mutex|State|Failure)|NameKeyGenerator::perturbForTesting\\(.*\\)::calls", "shared immortal NameKey generator and its priming latch (PLAN-023 Decision 2)"),
     (GLOBAL, "", "re:.*::(key_\\w+|jetKey)", "cached NameKeyType (a NAMEKEY(...) in an inline function): process-wide by PLAN-023 Decision 2"),
     (GLOBAL, "", "re:ControlBar::update(OCLTimer|Construction)TextDisplay\\(.*\\)::(descID|barID)", "cached window NameKey held as UnsignedInt: process-wide by PLAN-023 Decision 2"),
+    # rule:namekey (05224a1d0) now requires the declaration itself to initialise from NAMEKEY(...) or
+    # TheNameKeyGenerator->nameToKey(...): sound for most caches, but these are declared `= NAMEKEY_INVALID`
+    # (or with no initialiser, for an array) and filled from the generator later, in a separate init function
+    # (ControlBar::initObserverControls, ShowDiplomacy, InGamePopupMessageInit, LobbyUtils, ...), so the rule
+    # no longer sees them. Still process-wide NameKey caches by PLAN-023 Decision 2.
+    (GLOBAL, "", "re:buttonOkID|buttonCancelID|buttonMuteID|buttonUnMuteID|buttonPlayerID|parentID|staticTextPlayerID|staticTextSideID|staticTextTeamID|staticTextStatusID|radioButtonInGameID|radioButtonBuddiesID|winInGameID|winBuddiesID|winSoloID|s_replayObserverNameKey", "cached NameKeyType (a window/button ID key), declared `= NAMEKEY_INVALID` and filled from TheNameKeyGenerator by a later init call: process-wide by PLAN-023 Decision 2"),
+    (GLOBAL, "", "re:ControlBar::(updateBuildQueueDisabledImages|populateBuildQueue)\\(.*\\)::buildQueueIDs", "cached NameKeyType array, declared empty and filled from TheNameKeyGenerator in the same function: process-wide by PLAN-023 Decision 2, with the ID statics above"),
     (GLOBAL, "", "re:Object::Object\\(.*\\)::\\w+ModuleData", "threads only: shared helper ModuleData; every Object writes the same (Decision 2) NameKey tag into it, but the write is unsynchronised"),
     (GLOBAL, "", "re:scoringBuilding(Create|Destroy)?Mask", "threads only: rewritten (a KindOfMaskType::set(), a non-atomic read-modify-write) with the same constant KindOf bits by every ScoreKeeper"),
     (GLOBAL, "", "re:ModuleInfo::clearCopiedFromDefaultEntries\\(.*\\)::\\w+Mask", "threads only: rewritten with the same constant KindOf bits on every call, unsynchronised"),
