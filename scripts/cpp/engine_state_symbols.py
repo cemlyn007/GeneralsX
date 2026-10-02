@@ -253,6 +253,28 @@ def bare(part):
     return m.group(1) if m else ""
 
 
+def skip_balanced(text, open_idx, open_char, close_char):
+    """The index just past the bracket matching `text[open_idx]` (which must be `open_char`), depth-counted
+    over `text` as-is (comments and literals already blanked by `code_only`, so a stray bracket in either
+    never miscounts)."""
+    depth, i = 1, open_idx + 1
+    n = len(text)
+    while depth and i < n:
+        c = text[i]
+        depth += (c == open_char) - (c == close_char)
+        i += 1
+    return i
+
+
+# What can follow a function's closing `)` in its own definition (never in a call or a declaration): an
+# optional `const`/`override`/`final`/`noexcept(...)`, then, for a constructor, a `: base(), member(x)`
+# initialiser list (no brace or semicolon inside it, so it cannot itself hide a body), then the body's `{`.
+# A plain declaration or a call both end in `;` instead and never match.
+DEF_BODY_RE = re.compile(
+    r"\s*(?:(?:const|override|final)\b\s*|noexcept\s*(?:\([^(){};]*\))?\s*)*(?::[^{};]*)?\{"
+)
+
+
 class Parsed:
     def __init__(self, key):
         self.guarded = None
@@ -370,16 +392,32 @@ class SourceIndex:
                 if parsed.cls
                 else rf"\b{func}\s*\("
             )
-            # Defined out of line, then (inline in the class body) anywhere after the function's name.
+            # Defined out of line, then (inline in the class body) anywhere after the function's name. Each
+            # match of the name followed by `(` can be a call rather than this function's own definition (a
+            # qualified call to it, or, with no class, any same-named inline function); only a match whose
+            # parameter list is followed by a function body (optionally `const`/`override`/`noexcept` or a
+            # constructor's initialiser list, then `{`, not `;`) is a definition, and only a static inside
+            # that body belongs to this function.
             for branch, owner_re in (("owner", owner), ("inline", re.compile(rf"\b{func}\s*\("))):
                 for rel in self.candidates(parsed.var, parsed.func, parsed.cls):
-                    fm = owner_re.search(self.files[rel])
-                    if not fm:
-                        continue
-                    for ls, line, a, _b in self.lines_with(rel, var_re, fm.start()):
-                        if re.search(r"\bstatic\b", line[:a]):
-                            yield (branch, *self.where_is(rel, ls, line))
+                    text = self.files[rel]
+                    site = None
+                    for fm in owner_re.finditer(text):
+                        close = skip_balanced(text, fm.end() - 1, "(", ")")
+                        head = DEF_BODY_RE.match(text, close)
+                        if not head:
+                            continue
+                        body_end = skip_balanced(text, head.end() - 1, "{", "}")
+                        for ls, line, a, _b in self.lines_with(rel, var_re, head.end()):
+                            if ls >= body_end:
+                                break
+                            if re.search(r"\bstatic\b", line[:a]):
+                                site = self.where_is(rel, ls, line)
+                                break
+                        if site:
                             break
+                    if site:
+                        yield (branch, *site)
             # Made by a macro (MAKE_STANDARD_MODULE_MACRO's getModuleNameKey, ...): the class's header.
             if parsed.cls:
                 cls_re = re.compile(rf"^[ \t]*(?:class|struct)\s+(?:\w+\s+)?{re.escape(parsed.cls)}\b[^;]*$", re.M)
