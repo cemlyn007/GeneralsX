@@ -613,6 +613,11 @@ public:
 	// empty `dir` or one that cannot be made/used as a directory, instead of silently accepting it (an
 	// empty string used to become the filesystem root). Callers that want a refused boot, rather than one
 	// that silently loses every later write, must check the return value.
+	// GeneralsX @feature cemlyn007 02/10/2026 `dir` is also an input, not only an output location:
+	// GlobalData::parseGameDataDefinition reads <dir>/Options.ini (OptionPreferences) and
+	// GameEngine::init reads <dir>/SagePatch.ini, both overriding GameData, so a host that wants
+	// identical play across engines must seed the directory (as rlgenerals does for its automatic
+	// per-engine ones) or accept that an empty or differently-seeded directory changes gameplay settings.
 	Bool setPath_UserData(const AsciiString &dir);
 
 private:
