@@ -1116,7 +1116,7 @@ GlobalData::GlobalData()
 	// guard, every override construction re-read $XDG_DATA_HOME/$HOME and re-tried to create the
 	// (about-to-be-discarded) default, and printed createUserDataDirectory's "cannot use ... as the
 	// default user data directory" diagnostic on stderr even for an engine whose own explicit
-	// directory setPath_UserData already set -- as if its working setup were failing (117-gx-w1-r3-23).
+	// directory setPath_UserData already set -- as if its working setup were failing.
 	if (this == m_theOriginal)
 	{
 		m_userDataDir = BuildUserDataPathFromRegistry();
@@ -1443,14 +1443,14 @@ UnsignedInt GlobalData::generateExeCRC()
 
 // GeneralsX @refactor cemlyn007 02/10/2026 One place for "make this directory (recursively) and say
 // so on stderr if it cannot be used", instead of the create+stat+fprintf sequence copied at every
-// default-directory branch below plus a near-duplicate in setPath_UserData (117-gx-w1-r3-26).
-// Centralising it also fixes 117-gx-w1-r3-22: create_directories() and is_directory() used to share
+// default-directory branch below plus a near-duplicate in setPath_UserData.
+// Centralising it also fixes a latent bug: create_directories() and is_directory() used to share
 // one std::error_code, so a successful create followed by is_directory()'s own (irrelevant) stat
 // could silently clear a real creation failure, or a creation failure's error_code could be
 // overwritten by is_directory()'s unrelated ENOENT. They are now reported separately, preferring the
 // creation error since it is the more specific cause.
 // GeneralsX @bugfix cemlyn007 02/10/2026 setPath_UserData used std::filesystem unconditionally, but
-// GlobalData.cpp only included <filesystem>/<system_error> on non-Windows (117-gx-w1-r3-19): this
+// GlobalData.cpp only included <filesystem>/<system_error> on non-Windows: this
 // helper exists only when GENERALSX_HAVE_STD_FILESYSTEM is defined (see the includes above), i.e.
 // everywhere except MSVC before 19.14 (in practice VC6, the only such preset still built), which
 // setPath_UserData falls back to the Win32 API for instead.
@@ -1477,14 +1477,14 @@ static Bool createUserDataDirectory(const std::filesystem::path &path, const cha
 // GeneralsX @bugfix cemlyn007 02/10/2026 setPath_UserData's own validation (create_directories plus
 // is_directory, see createUserDataDirectory above) only checked that the directory exists, so an
 // existing directory without write permission -- the motivating read-only-$HOME/sandbox case, when
-// the directory already exists in the image -- passed, and every later write still failed silently
-// (117-gx-w1-r3-21). Probe with an actual write: create and remove a small marker file, which gives
+// the directory already exists in the image -- passed, and every later write still failed silently.
+// Probe with an actual write: create and remove a small marker file, which gives
 // the actual outcome of a write rather than access()'s/_access()'s prediction of it. access()/_access()
 // can disagree with the real write: access() checks the real uid rather than the effective one
 // (irrelevant here, but a trap if this code is ever reused somewhere setuid), root-squashed NFS and
 // some FUSE filesystems can diverge from what an actual open does, and on Windows _access() only looks
 // at the read-only attribute bit, not ACLs, so it can report writable for a directory an ACL-denied
-// write would reject (117-gx-w2-r2-11).
+// write would reject.
 static Bool isUserDataDirectoryWritable(const AsciiString &pathWithSeparator)
 {
 	AsciiString probe = pathWithSeparator;
@@ -1502,7 +1502,7 @@ static Bool isUserDataDirectoryWritable(const AsciiString &pathWithSeparator)
 // still takes this path) has no std::filesystem, so setPath_UserData falls back to the Win32 API
 // here: CreateDirectoryA is not recursive (unlike std::filesystem::create_directories), so each
 // ancestor is created in turn before the leaf.
-// GeneralsX @bugfix cemlyn007 02/10/2026 117-gx-w2-r2-10: VC6's own winbase.h predates
+// GeneralsX @bugfix cemlyn007 02/10/2026 VC6's own winbase.h predates
 // INVALID_FILE_ATTRIBUTES (added in a later Platform SDK), and nothing else in the tree defines it
 // for that preset -- every other VC6-era GetFileAttributes check in this codebase (W3DView
 // GraphicView.cpp, Utils.cpp, WWVegas agg_def.cpp, WorldBuilderDoc.cpp) compares against the literal

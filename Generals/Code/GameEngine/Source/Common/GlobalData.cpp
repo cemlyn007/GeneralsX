@@ -1215,7 +1215,7 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 	// newOverride()), so re-deriving and re-creating it here for an override would discard that copy
 	// and just re-read $XDG_DATA_HOME/$HOME, re-printing createUserDataDirectory's stderr diagnostic on
 	// every map.ini/solo.ini GameData block, even for an engine whose own directory already works
-	// (117-gx-w1-r3-23; GeneralsMD's constructor has the matching guard). One side effect: on Windows,
+	// (GeneralsMD's constructor has the matching guard). One side effect: on Windows,
 	// an override's own UserDataLeafName INI field (parsed into TheWritableGlobalData->m_userDataLeafName
 	// just above by initFromINI) no longer moves that override's user-data directory, because
 	// BuildUserDataPathFromIni (which reads it) is not called for overrides any more.
@@ -1370,13 +1370,13 @@ UnsignedInt GlobalData::generateExeCRC()
 
 // GeneralsX @refactor cemlyn007 02/10/2026 One place for "make this directory (recursively) and say
 // so on stderr if it cannot be used", instead of the create+report sequence copied at both
-// non-Windows branches below (117-gx-w1-r3-26; GeneralsMD's twin of this helper covers its own
+// non-Windows branches below (GeneralsMD's twin of this helper covers its own
 // branches plus setPath_UserData, which Generals does not have).
-// GeneralsX @bugfix cemlyn007 02/10/2026 117-gx-w2-r2-7: only the __APPLE__ and Linux branches below
+// GeneralsX @bugfix cemlyn007 02/10/2026 Only the __APPLE__ and Linux branches below
 // call this, but it was defined unconditionally, with no '#ifndef _WIN32' guard, while this file's
 // '#include <filesystem>' above is itself guarded by '#ifndef _WIN32'. On Windows the helper's
 // std::filesystem::path parameter and body referenced a type this TU never declares, so g_generals
-// stopped compiling on MSVC/mingw -- the exact build break 117-gx-w1-r3-19 had already fixed in
+// stopped compiling on MSVC/mingw -- the same kind of build break already fixed in
 // GeneralsMD's twin of this helper. Guard the whole helper here too, matching the include.
 #ifndef _WIN32
 static Bool createUserDataDirectory(const std::filesystem::path &path)
