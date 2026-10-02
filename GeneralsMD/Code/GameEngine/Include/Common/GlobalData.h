@@ -605,9 +605,11 @@ public:
 	// GeneralsX @feature cemlyn007 28/09/2026 An embedding host's per-engine user data directory (PLAN-023
 	// Phase 5's user-data root): a host with several engines in one process gives each its own, so their
 	// replays, SagePatch.ini and MapCache.ini do not overwrite each other. Set on the original instance
-	// right after the startup parse creates it, before GameEngine::init reads the path; `dir` ends with the
-	// path separator and exists. Nothing upstream calls it, so an engine that is not embedded is unchanged.
-	void setPath_UserData(const AsciiString &dir) { m_userDataDir = dir; }
+	// right after the startup parse creates it, before GameEngine::init reads the path; `dir` need not end
+	// with the path separator or already exist (the setter appends the separator and creates the directory
+	// itself, as the constructor's default does). Nothing upstream calls it, so an engine that is not
+	// embedded is unchanged.
+	void setPath_UserData(const AsciiString &dir);
 
 private:
 
@@ -615,6 +617,10 @@ private:
 
 	static const FieldParse s_GlobalDataFieldParseTable[];
 
+	// GeneralsX @feature cemlyn007 02/10/2026 No longer true upstream: the embedding host's
+	// setPath_UserData (above) replaces this once, on the original instance, before GameEngine::init
+	// reads it, so an engine embedded alongside others does not keep the registry/XDG default. Still only
+	// ever read through getPath_UserData()/setPath_UserData(): nothing else may write it directly.
 	// this is private, since we read the info from Windows and cache it for
 	// future use. No one is allowed to change it, ever. (srj)
 	AsciiString m_userDataDir;

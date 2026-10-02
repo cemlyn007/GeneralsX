@@ -1410,6 +1410,28 @@ UnsignedInt GlobalData::generateExeCRC()
 	return exeCRC.get();
 }
 
+// GeneralsX @feature cemlyn007 02/10/2026 setPath_UserData's out-of-line definition (declared in
+// GlobalData.h): enforces the contract the header documents instead of merely stating it. `dir` is
+// accepted with or without a trailing separator and whether or not it exists yet, mirroring what the
+// constructor's own BuildUserDataPathFromRegistry()/CreateDirectory() do for the registry/XDG default.
+// Only valid on the original instance: GlobalData::reset() (an override pop) would otherwise silently
+// revert the path to whatever the original held, so callers must set it before any override is pushed.
+void GlobalData::setPath_UserData(const AsciiString &dir)
+{
+	DEBUG_ASSERTCRASH(this == m_theOriginal, ("setPath_UserData: must be called on the original GlobalData instance, before any override is loaded"));
+
+	AsciiString path = dir;
+#ifdef _WIN32
+	if (!path.endsWith("\\"))
+		path.concat('\\');
+#else
+	if (!path.endsWith("/"))
+		path.concat('/');
+#endif
+	CreateDirectory(path.str(), nullptr);
+	m_userDataDir = path;
+}
+
 AsciiString GlobalData::BuildUserDataPathFromRegistry()
 {
 	AsciiString userDataDir;
