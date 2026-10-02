@@ -3090,12 +3090,16 @@ Int W3DShaderManager::getShaderPasses(ShaderTypes shader)
 //=============================================================================
 Int W3DShaderManager::setShader(ShaderTypes shader, Int pass)
 {
-	if (shader == m_currentShader && pass == m_currentShaderPass)
+	// GeneralsX @refactor cemlyn007 01/10/2026 Bound once per call: with the engine context each name is a lookup
+	// of the engine's W3DShaderManagerData, and this runs for every shaded draw (PLAN-023 Phase 8, stage RR4).
+	ShaderTypes& currentShader = m_currentShader;
+	Int& currentShaderPass = m_currentShaderPass;
+	if (shader == currentShader && pass == currentShaderPass)
 		return TRUE;	//shader is already set
-	m_currentShader=shader;
-	m_currentShaderPass = pass;
-	if (W3DShaders[shader])
-		return W3DShaders[shader]->set(pass);
+	currentShader=shader;
+	currentShaderPass = pass;
+	if (W3DShaderInterface* shaderObject = W3DShaders[shader])
+		return shaderObject->set(pass);
 	return FALSE;
 }
 
@@ -3107,11 +3111,13 @@ Int W3DShaderManager::setShader(ShaderTypes shader, Int pass)
 //=============================================================================
 void W3DShaderManager::resetShader(ShaderTypes shader)
 {
-	if (m_currentShader == ST_INVALID)
+	// GeneralsX @refactor cemlyn007 01/10/2026 Bound once per call (see setShader).
+	ShaderTypes& currentShader = m_currentShader;
+	if (currentShader == ST_INVALID)
 		return;	//last shader is already reset.
-	if (W3DShaders[shader])
-		W3DShaders[shader]->reset();
-	m_currentShader = ST_INVALID;
+	if (W3DShaderInterface* shaderObject = W3DShaders[shader])
+		shaderObject->reset();
+	currentShader = ST_INVALID;
 }
 // W3DShaderManager::filterPreRender =======================================================
 /** Call to view filter shaders before rendering starts.
@@ -3119,8 +3125,9 @@ void W3DShaderManager::resetShader(ShaderTypes shader)
 //=============================================================================
 Bool W3DShaderManager::filterPreRender(FilterTypes filter, Bool &skipRender, CustomScenePassModes &scenePassMode)
 {
-	if (W3DFilters[filter])
-	{	Bool result=W3DFilters[filter]->preRender(skipRender,scenePassMode);
+	// GeneralsX @refactor cemlyn007 01/10/2026 Bound once per call (see setShader).
+	if (W3DFilterInterface* filterObject = W3DFilters[filter])
+	{	Bool result=filterObject->preRender(skipRender,scenePassMode);
 		if (result)
 			m_currentFilter = filter;
 		return result;
@@ -3134,8 +3141,9 @@ Bool W3DShaderManager::filterPreRender(FilterTypes filter, Bool &skipRender, Cus
 //=============================================================================
 Bool W3DShaderManager::filterPostRender(FilterTypes filter, FilterModes mode, Coord2D &scrollDelta, Bool &doExtraRender)
 {
-	if (W3DFilters[filter])
-		return W3DFilters[filter]->postRender(mode, scrollDelta,doExtraRender);
+	// GeneralsX @refactor cemlyn007 01/10/2026 Bound once per call (see setShader).
+	if (W3DFilterInterface* filterObject = W3DFilters[filter])
+		return filterObject->postRender(mode, scrollDelta,doExtraRender);
 
 	m_currentFilter = FT_NULL_FILTER;
 	return FALSE;
@@ -3148,8 +3156,9 @@ Bool W3DShaderManager::filterPostRender(FilterTypes filter, FilterModes mode, Co
 	static Bool filterSetup(FilterTypes filter, FilterModes mode);
 Bool W3DShaderManager::filterSetup(FilterTypes filter, FilterModes mode)
 {
-	if (W3DFilters[filter])
-		return W3DFilters[filter]->setup(mode);
+	// GeneralsX @refactor cemlyn007 01/10/2026 Bound once per call (see setShader).
+	if (W3DFilterInterface* filterObject = W3DFilters[filter])
+		return filterObject->setup(mode);
 	return FALSE;
 }
 

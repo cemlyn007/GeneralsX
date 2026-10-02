@@ -65,6 +65,11 @@ extern Mouse *TheMouse;
 extern Keyboard *TheKeyboard;
 extern GameWindowManager *TheWindowManager;
 
+// GeneralsX @feature cemlyn007 01/10/2026 The embedding host's event pump lock (Common/ApplicationWindow.h;
+// PLAN-023 Phase 8, stage RR4).
+std::atomic<bool (*)()> ApplicationWindow_TryLockEventPump{nullptr};
+std::atomic<void (*)()> ApplicationWindow_UnlockEventPump{nullptr};
+
 namespace {
 
 Bool DecodeNextUtf8Codepoint(const char* text, size_t length, size_t& offset, UnsignedInt& outCodepoint)
@@ -141,6 +146,9 @@ SDL3GameEngine::SDL3GameEngine()
  */
 SDL3GameEngine::~SDL3GameEngine()
 {
+	// GeneralsX @info cemlyn007 01/10/2026 Not under the embedding host's event pump lock: the engine is destroyed by
+	// its shutdown, which such a host runs under that same lock (Common/ApplicationWindow.h; PLAN-023 Phase 8,
+	// stage RR4).
 	if (m_SDLWindow && m_IsTextInputActive) {
 		SDL_StopTextInput(m_SDLWindow);
 		m_IsTextInputActive = false;
@@ -215,9 +223,14 @@ void SDL3GameEngine::reset(void)
 {
 	fprintf(stderr, "DEBUG: SDL3GameEngine::reset()\n");
 	if (m_SDLWindow && m_IsTextInputActive) {
-		SDL_StopTextInput(m_SDLWindow);
-		m_IsTextInputActive = false;
 		m_TextInputFocusWindow = nullptr;
+		// GeneralsX @feature cemlyn007 01/10/2026 Under the host's event pump lock; when it is busy, the next pump's
+		// updateTextInputState stops text input instead (PLAN-023 Phase 8, stage RR4).
+		const EventPumpLock pumpLock;
+		if (pumpLock.acquired()) {
+			SDL_StopTextInput(m_SDLWindow);
+			m_IsTextInputActive = false;
+		}
 	}
 	GameEngine::reset();
 }
@@ -273,6 +286,13 @@ void SDL3GameEngine::setIsActive(Bool isActive)
 void SDL3GameEngine::pollSDL3Events(void)
 {
 	if (!m_SDLWindow) {
+		return;
+	}
+
+	// GeneralsX @feature cemlyn007 01/10/2026 Under the host's event pump lock, or skipped while another thread
+	// holds it (PLAN-023 Phase 8, stage RR4).
+	const EventPumpLock pumpLock;
+	if (!pumpLock.acquired()) {
 		return;
 	}
 

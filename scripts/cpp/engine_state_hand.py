@@ -233,6 +233,7 @@ HAND = [
     # The runtime probe (engine_state_probe.py) checks this list against the writes a render engine makes.
     (RPROC, "", "re:D3D8Lib|Direct3DCreate8Ptr|DX8Wrapper::Init\\(void\\*, bool\\)::s_d3d8LibOnce", "the D3D8 library and its Direct3DCreate8, loaded once per process under std::call_once and never freed (RR1): a render engine's Shutdown no longer unloads it from under the next device"),
     (RPROC, "", "DX8Wrapper_FinalReleaseHook", "the embedding host's check before a render device's or Direct3D interface's last release (RR1): set once, before any render device"),
+    (RPROC, "", "re:ApplicationWindow_(TryLock|Unlock)EventPump", "the embedding host's lock around its window's SDL event pump (RR4): set once, before the window's engine boots, and only read after that"),
     # RR2a-1 moved DX8Wrapper's device state (its class statics, dx8wrapper.cpp's file statics and globals) and
     # Debug_Statistics' counters (statistics.cpp) into W3DRenderState, one per render engine (EngineContext::w3dRender,
     # heap-allocated by DX8Wrapper::Init, freed by Shutdown); the host's two render switches are EngineContext fields.
