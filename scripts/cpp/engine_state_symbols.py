@@ -590,15 +590,31 @@ def rule_field_parse(sym):
     return None
 
 
-CONST_DECL_RE = re.compile(r"^(?:static\s+)?(?:inline\s+)?(?:const\s+static|const)\b(?!\s*(?:char|unsigned\s+char|wchar_t|WideChar|Char|void|\w+)\s*\*\s*(?!const))")
+CONST_DECL_RE = re.compile(r"^(?:static\s+)?(?:inline\s+)?(?:const\s+static|const)\b")
+# `T* const name`, the only pointer declarator that cannot be reseated; a trailing array bound is allowed
+# (`T* const table[]`), but anything after the name (another declarator, a function parameter list) is not.
+CONST_PTR_DECL_RE = re.compile(r"\*\s*const\s+\w+\s*(?:\[[^\]]*\]\s*)*$")
+# A one-time lookup (`TheX->find(...)`, `someFunc(...)`) that a per-engine cache (ActiveBody's templates,
+# WaveGuideUpdate's particles, ...) would also use to fill its pointer on first call: not a constant
+# expression, even though the pointer slot itself is never written again.
+LOOKUP_INIT_RE = re.compile(r"->|\w+\s*\(")
 
 
 def rule_const_object(sym):
     """A const object (dynamically initialised, so it lands in .data/.bss): never written after its
-    initialisation. A pointer to const without `* const` is not one."""
+    initialisation. A reference is never safe here (it can alias per-engine state at any type). A pointer is
+    safe only when the pointer itself cannot be reseated (`T* const name`, not `const T*`, whatever the
+    pointee type) and its initialiser is not a lookup: a per-engine pointer cache has exactly the `T* const
+    name = TheX->find(...)` shape."""
     for d in declarations(sym):
-        decl = d.split("=")[0]
-        if not (CONST_DECL_RE.match(decl) or re.search(r"\*\s*const\s+\w+\s*(\[|$)", decl)):
+        decl, _, init = d.partition("=")
+        decl = decl.rstrip().rstrip(";").rstrip()
+        if "&" in decl:
+            return None
+        if "*" in decl:
+            if not CONST_PTR_DECL_RE.search(decl) or LOOKUP_INIT_RE.search(init):
+                return None
+        elif not CONST_DECL_RE.match(decl):
             return None
     return CONST, "", "const object: initialised once, never written"
 
