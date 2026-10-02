@@ -1506,8 +1506,17 @@ AsciiString GlobalData::BuildUserDataPathFromRegistry()
 			// sandbox: an engine given its own user-data directory still paid for the shared default being
 			// creatable. The error_code overload lets a host with no write access to the default boot as
 			// long as it (or a later setPath_UserData override) provides a directory that does exist.
+			// GeneralsX @bugfix cemlyn007 02/10/2026 Report a failed creation on stderr: DEBUG_LOG compiles
+			// out of release builds, and silently booting with a user data directory that does not exist
+			// left every later write (Options.ini, replays, SagePatch.ini) failing with nothing to explain
+			// why.
 			std::error_code ec;
 			std::filesystem::create_directories(path, ec);
+			if (ec) {
+				fprintf(stderr, "GlobalData: cannot create user data directory %s: %s\n",
+					path.string().c_str(), ec.message().c_str());
+				fflush(stderr);
+			}
 			userDataDir = path.string().c_str();
 			if (!userDataDir.endsWith("/"))
 				userDataDir.concat('/');
@@ -1534,9 +1543,15 @@ AsciiString GlobalData::BuildUserDataPathFromRegistry()
 
 		path = path / "GeneralsX" / "GeneralsZH";
 		// GeneralsX @bugfix cemlyn007 02/10/2026 As the macOS branch above: do not let an uncreatable
-		// default (a read-only $HOME) throw out of the constructor and fault the whole engine.
+		// default (a read-only $HOME) throw out of the constructor and fault the whole engine; report the
+		// failure on stderr so it is visible in release builds (DEBUG_LOG compiles out of them).
 		std::error_code ec;
 		std::filesystem::create_directories(path, ec);
+		if (ec) {
+			fprintf(stderr, "GlobalData: cannot create user data directory %s: %s\n",
+				path.string().c_str(), ec.message().c_str());
+			fflush(stderr);
+		}
 		userDataDir = path.string().c_str();
 		if (!userDataDir.endsWith("/"))
 			userDataDir.concat('/');
