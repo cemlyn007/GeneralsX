@@ -1378,6 +1378,43 @@ void GameState::iterateSaveFiles( IterateSaveFileCallback callback, void *userDa
 	// the directory on every platform, and a save directory that does not exist yet lists nothing. The listing is
 	// complete before any callback runs, so a callback that throws leaves no directory state behind to restore;
 	// callbacks handle their own errors, as addGameToAvailableList does.
+#ifndef _WIN32
+	// GeneralsX @bugfix cemlyn007 02/10/2026 List the directory directly instead of through
+	// TheLocalFileSystem->getFileListInDirectory. That goes through FilenameList
+	// (std::set<AsciiString, rts::less_than_nocase<AsciiString>>), which collapses two save files
+	// that differ only in case to one entry, and (StdLocalFileSystem's implementation) lists any
+	// non-directory entry, including a FIFO, socket or dangling symlink: opening one of those in
+	// getSaveGameInfoFromFile's XferLoad::open can block forever (a FIFO) or fail per entry (a
+	// dangling symlink). Iterate case-sensitively here and keep only regular files (and symlinks
+	// that resolve to one), matching the old POSIX iterateSaveFiles this replaced.
+	{
+		std::error_code ec;
+		std::filesystem::directory_iterator dirIter( getSaveDirectory().str(), ec );
+		if( !ec )
+		{
+			const std::filesystem::directory_iterator end;
+			for( ; dirIter != end; dirIter.increment( ec ) )
+			{
+				if( ec )
+					break;
+
+				std::error_code statusError;
+				const Bool isRegular = std::filesystem::is_regular_file( dirIter->path(), statusError );
+				if( statusError || !isRegular )
+					continue;
+
+				AsciiString leaf = dirIter->path().filename().string().c_str();
+
+				// Win32 wildcards also match longer extensions through 8.3 short names, so check the extension itself
+				if( leaf.endsWithNoCase( SAVE_GAME_EXTENSION ) == FALSE )
+					continue;
+
+				// the callbacks take the leaf name and resolve it with getSaveGamePathForRead
+				callback( getMapLeafName( leaf ), userData );
+			}
+		}
+	}
+#else
 	FilenameList saveFiles;
 	TheLocalFileSystem->getFileListInDirectory( AsciiString::TheEmptyString, getSaveDirectory(), "*.sav", saveFiles, FALSE );
 
@@ -1392,6 +1429,7 @@ void GameState::iterateSaveFiles( IterateSaveFileCallback callback, void *userDa
 		callback( getMapLeafName( *it ), userData );
 
 	}
+#endif
 
 }
 
