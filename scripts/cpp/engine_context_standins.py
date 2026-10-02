@@ -10,9 +10,14 @@
 # macro instead, as DX8Wrapper's names have: WW3D2/w3drenderstate_names.h).
 #
 # Where it looks, for a stand-in `name` of class `C` declared in `c.h`: `C::name` in every source file, and
-# `name` unqualified in `c.h` and in every file that defines one of `C`'s members (a line matching
-# `C::member(`, found by content, not by file name: a class's members are not always defined in a file
-# named after the class, e.g. MapObject's are in WorldHeightMap.cpp). `sizeof(name[0])`, `&name[i]`,
+# `name` unqualified in `c.h` and in every file that defines one of `C`'s members: a `C::member(` found by
+# content, not by file name (a class's members are not always defined in a file named after the class, e.g.
+# MapObject's are in WorldHeightMap.cpp), whose parameter list's matching close paren is followed (after
+# optional whitespace and any of `const`/`noexcept`/`override`/`final`) by `{` or a constructor
+# initialiser's `:`, not `;`. That excludes a declaration, a bare call statement (`C::member();`) and a
+# call inside a return/case/other statement (`return C::member();`), none of which are `C`'s own code;
+# `*`/`&` may attach to the return type or straight to `C`'s name either way (`T *C::member()`,
+# `T* C::member()`), and the return type may sit on the line above. `sizeof(name[0])`, `&name[i]`,
 # `&name->x` and `&name.x` are allowed: they reach the field itself. `std::addressof(name)` is the same
 # hazard as unary `&` and is caught too. A unary `&` is also recognised after a C-style pointer cast
 # (`(void*)&name`, `(unsigned char*)&name`, `(struct Foo*)&name`) and after `&&` (`a && &name`), not only
@@ -150,6 +155,42 @@ def find_standins(files):
     return found
 
 
+_DEF_TRAILING_KEYWORDS = ("const", "noexcept", "override", "final")
+
+
+def _matching_close_paren(text, open_idx):
+    """The index of the `)` matching the `(` at open_idx, or None if text ends first."""
+    depth, i, n = 0, open_idx, len(text)
+    while i < n:
+        if text[i] == "(":
+            depth += 1
+        elif text[i] == ")":
+            depth -= 1
+            if depth == 0:
+                return i
+        i += 1
+    return None
+
+
+def _looks_like_definition(text, close_idx):
+    """Whether what follows the parameter list's close paren at close_idx is a definition's own shape:
+    `{` or a constructor initialiser's `:`, optionally after whitespace and any of `const`/`noexcept`/
+    `override`/`final` (in any order), rather than a declaration's or a call statement's `;`."""
+    i, n = close_idx + 1, len(text)
+    while True:
+        while i < n and text[i] in " \t\r\n":
+            i += 1
+        for kw in _DEF_TRAILING_KEYWORDS:
+            if text[i : i + len(kw)] == kw and not (
+                text[i + len(kw) : i + len(kw) + 1].isalnum() or text[i + len(kw) : i + len(kw) + 1] == "_"
+            ):
+                i += len(kw)
+                break
+        else:
+            break
+    return i < n and text[i] in "{:"
+
+
 def uses(text, name, qualifier):
     """(line, what) of each `sizeof`, unary `&`, `std::addressof` or bare variadic-argument use of the
     stand-in in the stripped text."""
@@ -282,27 +323,26 @@ def main():
 
     # Files that define at least one member of each class with a stand-in, found by content (a class's
     # members are not always defined in a file named after the class, e.g. MapObject's are in
-    # WorldHeightMap.cpp): a line (after optional leading whitespace and an optional return type) of
-    # `C::member(`, destructors (`C::~member(`) included.
+    # WorldHeightMap.cpp): a `C::member(` whose parameter list's matching close paren is followed by `{`
+    # or a constructor initialiser's `:`, not `;`. That is a definition's own shape; it is not a
+    # declaration (`;`), a bare call statement (`C::member();`) or a call inside some other statement
+    # (`return C::member();`, `case C::member():`), none of which make this `C`'s own file. The return
+    # type, if any, is not inspected at all (and so needs no prefix pattern of its own): it may sit on
+    # the same line, with `*`/`&` attached to either word (`T *C::member()`, `T* C::member()`), or on the
+    # line above.
     owners = {owner for owner, _, _ in standins if owner}
     defines_member = {}
     if owners:
         member_def = re.compile(
-            r"^[ \t]*(?P<prefix>(?:[\w:<>,&*]+[ \t]+)*)(?P<cls>"
-            + "|".join(re.escape(o) for o in sorted(owners))
-            + r")\s*::\s*(?P<member>~?[A-Za-z_]\w*)\s*\(",
-            re.M,
+            r"(?<![\w:])(?P<cls>" + "|".join(re.escape(o) for o in sorted(owners)) + r")"
+            r"\s*::\s*(?P<member>~?[A-Za-z_]\w*)\s*\(",
         )
         for path, text in files.items():
             classes = set()
             for m in member_def.finditer(text):
-                # A bare call statement (`Class::Method();`) matches the same shape as a definition
-                # with no return type; only a constructor or destructor legitimately has none, so
-                # require either a return-type prefix or that the member is one of those.
-                member = m.group("member")
-                cls = m.group("cls")
-                if m.group("prefix").strip() or member == cls or member.startswith("~"):
-                    classes.add(cls)
+                close = _matching_close_paren(text, m.end() - 1)
+                if close is not None and _looks_like_definition(text, close):
+                    classes.add(m.group("cls"))
             if classes:
                 defines_member[path] = classes
 

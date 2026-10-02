@@ -5,8 +5,11 @@
 # multi-word cast (`(unsigned char*)&name`) and the variadic check's false positives on a converted
 # argument (`(int)name`, `static_cast<int>(name)`, `name == 32`, `f(name)`) were both review-fix gaps too.
 # MainTest covers main() end to end: a stand-in whose class's members are defined in a differently named
-# file (the MapObject/WorldHeightMap.cpp gap, found by content now, not by file name) and a violation in
-# an `--extra-dir` tree (a consumer's own C++ outside Core/Generals/GeneralsMD).
+# file (the MapObject/WorldHeightMap.cpp gap, found by content now, not by file name), a violation in an
+# `--extra-dir` tree (a consumer's own C++ outside Core/Generals/GeneralsMD), and the own-file detection's
+# own gaps found by a later re-review (127-gx-w2-r3-16/17/18): a bare call statement and a
+# `return C::member(...)` call must not make a file C's own (they are not definitions), while
+# `T *C::member()`/`T* C::member()` and a return type on the line above must.
 #
 # Usage: python3 engine_context_standins_test.py
 
@@ -196,6 +199,8 @@ class MainTest(unittest.TestCase):
     def test_unqualified_use_outside_own_files_is_not_flagged(self):
         # The same class/stand-in, but the unqualified use sits in a file that neither declares the
         # stand-in nor defines any of the class's members: not flagged (it would not compile either).
+        # Unrelated.cpp carries a REAL unqualified use (not just a stripped comment, the gap the
+        # re-review found: a mutation that treats every file as "own" must fail this test).
         self.write(
             "Core/MapObject.h",
             "class MapObject {\n"
@@ -210,11 +215,104 @@ class MainTest(unittest.TestCase):
         )
         self.write(
             "Core/Unrelated.cpp",
-            "// just a comment mentioning TheMapObjectListPtr by name, for coverage\n"
-            "int x = 0;\n",
+            "MapObject** p = &TheMapObjectListPtr;\n",
         )
         code, out = self.run_main(["--root", self.root])
         self.assertEqual(code, 0, out)
+
+    def test_bare_call_statement_is_not_own_file(self):
+        # A file that only CALLS a member (no definition) does not become that class's own file: the
+        # mutation the re-review found (dropping the prefix/definition-shape guard) must fail this test.
+        self.write(
+            "Core/MapObject.h",
+            "class MapObject {\n"
+            "public:\n"
+            "    static constexpr rts::ContextField<MapObject*, &rts::EngineContext::mapObjectList> "
+            "TheMapObjectListPtr{};\n"
+            "};\n",
+        )
+        self.write(
+            "Core/Caller.cpp",
+            '#include "MapObject.h"\n'
+            "void f() {\n"
+            "    MapObject::fastAssignAllUniqueIDs();\n"
+            "    MapObject** p = &TheMapObjectListPtr;\n"
+            "}\n",
+        )
+        code, out = self.run_main(["--root", self.root])
+        self.assertEqual(code, 0, out)
+
+    def test_return_statement_call_is_not_own_file(self):
+        # `return C::member(...)` has the non-empty prefix `return`, but it is a call, not a
+        # definition: it must not make the file C's own (127-gx-w2-r3-16's dx8wrapper.cpp/ww3d.cpp gap).
+        self.write(
+            "Core/WW3D.h",
+            "class WW3D {\n"
+            "public:\n"
+            "    static constexpr rts::ContextField<unsigned long, &rts::EngineContext::frame> "
+            "FrameCount{};\n"
+            "};\n",
+        )
+        self.write(
+            "Core/dx8wrapper.cpp",
+            '#include "WW3D.h"\n'
+            "#define FrameCount (12345)\n"
+            "unsigned DX8Wrapper::Other()\n"
+            "{\n"
+            "    return WW3D::Get_Frame_Count();\n"
+            "}\n",
+        )
+        code, out = self.run_main(["--root", self.root])
+        self.assertEqual(code, 0, out)
+
+    def test_pointer_attached_to_class_name_is_own_file(self):
+        # `T *C::member()`/`T* C::member()`: the `*`/`&` may attach to either word
+        # (127-gx-w2-r3-17's WorldHeightMap.cpp/ww3d.cpp gap).
+        self.write(
+            "Core/MapObject.h",
+            "class MapObject {\n"
+            "public:\n"
+            "    static constexpr rts::ContextField<MapObject*, &rts::EngineContext::mapObjectList> "
+            "TheMapObjectListPtr{};\n"
+            "};\n",
+        )
+        self.write(
+            "Core/WorldHeightMap.cpp",
+            '#include "MapObject.h"\n'
+            "MapObject *MapObject::duplicate()\n"
+            "{\n"
+            "    MapObject** link = &TheMapObjectListPtr;\n"
+            "    return link ? *link : 0;\n"
+            "}\n",
+        )
+        code, out = self.run_main(["--root", self.root])
+        self.assertEqual(code, 1, out)
+        self.assertIn("WorldHeightMap.cpp", out)
+
+    def test_multiline_return_type_is_own_file(self):
+        # A return type on the line above (the classic Westwood style) leaves an empty prefix on the
+        # `C::member(` line itself (127-gx-w2-r3-17's gap).
+        self.write(
+            "Core/MapObject.h",
+            "class MapObject {\n"
+            "public:\n"
+            "    static constexpr rts::ContextField<MapObject*, &rts::EngineContext::mapObjectList> "
+            "TheMapObjectListPtr{};\n"
+            "};\n",
+        )
+        self.write(
+            "Core/WorldHeightMap.cpp",
+            '#include "MapObject.h"\n'
+            "Bool\n"
+            "MapObject::validate()\n"
+            "{\n"
+            "    MapObject** link = &TheMapObjectListPtr;\n"
+            "    return true;\n"
+            "}\n",
+        )
+        code, out = self.run_main(["--root", self.root])
+        self.assertEqual(code, 1, out)
+        self.assertIn("WorldHeightMap.cpp", out)
 
     def test_extra_dir_violation_is_reported(self):
         # A consumer's own C++ outside the Core/Generals/GeneralsMD layout, found through --extra-dir.
