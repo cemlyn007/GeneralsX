@@ -126,6 +126,16 @@ void DX8Wrapper::Create_Render_State()
 	if (context->w3dRender == nullptr)
 		context->w3dRender = new W3DRenderState();
 }
+
+// GeneralsX @bugfix cemlyn007 02/10/2026 Create_Render_State's inverse, for a caller that allocated this
+// engine's state but never reaches a device: Init's failure returns, and DX8Backend's lite mode (its
+// destructor only calls Shutdown, the other place this runs, when it is not lite).
+void DX8Wrapper::Free_Render_State()
+{
+	::rts::EngineContext* const context = ::rts::ctx();
+	delete context->w3dRender;
+	context->w3dRender = nullptr;
+}
 #else
 static D3DPRESENT_PARAMETERS _PresentParameters;
 #endif
@@ -728,6 +738,11 @@ bool DX8Wrapper::Init(void * hwnd, bool lite)
 
 		});
 		if (D3D8Lib == nullptr || Direct3DCreate8Ptr == nullptr) {
+#if RTS_ENGINE_CONTEXT
+			// GeneralsX @bugfix cemlyn007 02/10/2026 Create_Render_State() above already allocated this
+			// engine's state; nothing else frees it on this failure return (review fix).
+			Free_Render_State();
+#endif
 			return false;	// Return false at this point if init failed
 		}
 
@@ -747,6 +762,11 @@ bool DX8Wrapper::Init(void * hwnd, bool lite)
 		fprintf(stderr, "DEBUG: DX8Wrapper::Init() - Direct3DCreate8 returned: %p\n", (void*)D3DInterface);
 		if (D3DInterface == nullptr) {
 			fprintf(stderr, "ERROR: DX8Wrapper::Init() - Direct3DCreate8 returned NULL (DXVK failed to create D3D8 interface)\n");
+#if RTS_ENGINE_CONTEXT
+			// GeneralsX @bugfix cemlyn007 02/10/2026 Same as the D3D8Lib failure above: free what
+			// Create_Render_State() allocated before this engine gives up on a device (review fix).
+			Free_Render_State();
+#endif
 			return(false);
 		}
 		IsInitted = true;
@@ -807,9 +827,7 @@ void DX8Wrapper::Shutdown()
 #if RTS_ENGINE_CONTEXT
 	// GeneralsX @feature cemlyn007 30/09/2026 The engine's render state goes with its device (PLAN-023 Phase 8,
 	// stage RR2a-1); a later Init starts a fresh one, as a fresh process did.
-	::rts::EngineContext* const context = ::rts::ctx();
-	delete context->w3dRender;
-	context->w3dRender = nullptr;
+	Free_Render_State();
 #endif
 }
 

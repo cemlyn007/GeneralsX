@@ -41,10 +41,19 @@ DX8Backend::DX8Backend(bool lite) : Lite(lite)
 
 DX8Backend::~DX8Backend()
 {
+#if RTS_ENGINE_CONTEXT
+    // GeneralsX @bugfix cemlyn007 02/10/2026 Lite mode never reaches DX8Wrapper::Init's device-creation
+    // branch, but Init's Create_Render_State() runs unconditionally, before the `lite` check: a lite
+    // backend still owns a W3DRenderState, and Shutdown is the only thing that frees it. Shutdown is
+    // self-guarded on D3DDevice/D3DInterface/CurrentCaps, so calling it for a lite backend (which set
+    // none of those) is safe either way (review fix for the leak this skipped).
+    DX8Wrapper::Shutdown();
+#else
     if (!Lite)
     {
         DX8Wrapper::Shutdown();
     }
+#endif
 }
 
 DX8Backend *DX8Backend::Create(void * window, bool lite)

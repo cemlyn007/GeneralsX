@@ -705,6 +705,10 @@ protected:
 
 	// Allocates this engine's W3DRenderState if it has none (Init, Set_Display_Size_Provider).
 	static void Create_Render_State();
+	// GeneralsX @bugfix cemlyn007 02/10/2026 Frees this engine's W3DRenderState if it has one, without
+	// touching any device or interface: Shutdown's own cleanup (review fix for Init's failure returns and
+	// DX8Backend's lite mode, neither of which ever creates a device).
+	static void Free_Render_State();
 #else
 	static DX8_CleanupHook *m_pCleanupHook;
 
