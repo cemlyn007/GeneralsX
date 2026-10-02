@@ -1119,6 +1119,12 @@ GlobalData *GlobalData::newOverride()
 	// copy the data from the latest override (TheWritableGlobalData) to the newly created instance
 	DEBUG_ASSERTCRASH( TheWritableGlobalData, ("GlobalData::newOverride() - no existing data") );
 	*overrideData = *TheWritableGlobalData;
+	// GeneralsX @bugfix cemlyn007 02/10/2026 operator= above is an unimplemented DEBUG_CRASH stub on
+	// VC6 (see GlobalData.h), so it copies nothing there: parseGameDataDefinition's guard (below) relies
+	// on this copy to give every override its user-data directory, since it only derives/creates the
+	// default for the original instance. Set it explicitly so a VC6 override is not left with an empty
+	// m_userDataDir; redundant on compilers where the memberwise copy above already did it.
+	overrideData->m_userDataDir = TheWritableGlobalData->m_userDataDir;
 
 	//
 	// link the override to the previously created one, the link order is important here
@@ -1204,12 +1210,15 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 	ini->initFromINI( TheWritableGlobalData, s_GlobalDataFieldParseTable );
 
 	// GeneralsX @bugfix cemlyn007 02/10/2026 Only the original instance derives and creates the
-	// default: every override is also a fresh GameData parse (INI_LOAD_CREATE_OVERRIDES ->
-	// newOverride(), which immediately overwrites m_userDataDir with a memberwise copy of the
-	// previous TheWritableGlobalData), so re-deriving and re-creating it here for an override just
-	// re-reads $XDG_DATA_HOME/$HOME and re-prints createUserDataDirectory's stderr diagnostic on every
-	// map.ini GameData block, even for an engine whose own directory already works (117-gx-w1-r3-23;
-	// GeneralsMD's constructor has the matching guard).
+	// default: newOverride() above has already copied m_userDataDir from the previous
+	// TheWritableGlobalData into this override (a memberwise copy, not implemented on VC6 -- see
+	// newOverride()), so re-deriving and re-creating it here for an override would discard that copy
+	// and just re-read $XDG_DATA_HOME/$HOME, re-printing createUserDataDirectory's stderr diagnostic on
+	// every map.ini/solo.ini GameData block, even for an engine whose own directory already works
+	// (117-gx-w1-r3-23; GeneralsMD's constructor has the matching guard). One side effect: on Windows,
+	// an override's own UserDataLeafName INI field (parsed into TheWritableGlobalData->m_userDataLeafName
+	// just above by initFromINI) no longer moves that override's user-data directory, because
+	// BuildUserDataPathFromIni (which reads it) is not called for overrides any more.
 	if (TheWritableGlobalData == GlobalData::m_theOriginal)
 	{
 		TheWritableGlobalData->m_userDataDir.clear();
@@ -1447,9 +1456,11 @@ AsciiString GlobalData::BuildUserDataPathFromIni()
 		if (home) {
 			std::filesystem::path path = std::filesystem::path(home) / "Library" / "Application Support" / "GeneralsX" / "Generals";
 			// GeneralsX @bugfix cemlyn007 02/10/2026 Backport of GeneralsMD's fix: the throwing overload
-			// crashed the constructor (and so the whole engine boot) whenever the default could not be
-			// created, e.g. a read-only $HOME. createUserDataDirectory's error_code call lets the game boot
-			// anyway; it reports the failure on stderr, since DEBUG_LOG compiles out of release builds.
+			// crashed parseGameDataDefinition (the GameData INI parse, the only caller of this function --
+			// Generals' constructor never derives the default) whenever the default could not be created,
+			// e.g. a read-only $HOME, faulting the whole engine boot. createUserDataDirectory's error_code
+			// call lets the game boot anyway; it reports the failure on stderr, since DEBUG_LOG compiles out
+			// of release builds.
 			createUserDataDirectory(path);
 			userDataDir = path.string().c_str();
 			if (!userDataDir.endsWith("/"))
@@ -1477,9 +1488,9 @@ AsciiString GlobalData::BuildUserDataPathFromIni()
 
 		path = path / "GeneralsX" / "Generals";
 		// GeneralsX @bugfix cemlyn007 02/10/2026 Backport of GeneralsMD's fix: as the macOS branch above, do
-		// not let an uncreatable default (a read-only $HOME) throw out of the constructor and fault the
-		// whole engine; createUserDataDirectory reports the failure on stderr so it is visible in release
-		// builds.
+		// not let an uncreatable default (a read-only $HOME) throw out of parseGameDataDefinition (the
+		// GameData INI parse -- Generals' constructor never derives the default) and fault the whole engine;
+		// createUserDataDirectory reports the failure on stderr so it is visible in release builds.
 		createUserDataDirectory(path);
 		userDataDir = path.string().c_str();
 		if (!userDataDir.endsWith("/"))

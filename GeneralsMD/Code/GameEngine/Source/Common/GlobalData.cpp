@@ -1183,6 +1183,12 @@ GlobalData *GlobalData::newOverride()
 	// copy the data from the latest override (TheWritableGlobalData) to the newly created instance
 	DEBUG_ASSERTCRASH( TheWritableGlobalData, ("GlobalData::newOverride() - no existing data") );
 	*overrideData = *TheWritableGlobalData;
+	// GeneralsX @bugfix cemlyn007 02/10/2026 operator= above is an unimplemented DEBUG_CRASH stub on
+	// VC6 (see GlobalData.h), so it copies nothing there: the constructor's guard (above) relies on this
+	// copy to give every override its user-data directory, since it only derives/creates the default
+	// for the original instance. Set it explicitly so a VC6 override is not left with an empty
+	// m_userDataDir; redundant on compilers where the memberwise copy above already did it.
+	overrideData->m_userDataDir = TheWritableGlobalData->m_userDataDir;
 
 	//
 	// link the override to the previously created one, the link order is important here
