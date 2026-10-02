@@ -245,7 +245,7 @@ The rows below are the original investigation.
 **Phase 1 deliverable: the `nm` classification.** Snapshot every writable and `STB_GNU_UNIQUE` symbol of `libgeneralsx.so` into a checked-in list, each classified as per-engine, process-global, constant or debug-only. The per-engine entries are the work list for Phases 2-4. Phase 7 turns the same list into the CI gate.
 
 **Acceptance criteria:**
-- Phase 0: with `RTS_ENGINE_CONTEXT=OFF`, retail replays and CRCs are unchanged.
+- Phase 0: with `RTS_ENGINE_CONTEXT=OFF`, retail replays and CRCs are unchanged. **Status (p0-prereqs): pending.** Verified so far: rlgenerals' Zero Hour skirmish `getCRC(CRC_RECALC)` is identical between the real OpenAL device and the device-free manager (3750 frames), and `g_generals` builds and links. Not yet run: the `replay-tests.yml` retail-replay CRC regression (Linux, macOS, Windows) for either game on this branch; `gh pr checks` shows no CI ran. Phase 7's rule ("every change must pass a retail-replay CRC regression ... for both games, before merging") is not met by this stage's evidence alone, so treat this row as outstanding until a later PR in the stack records that run.
 - Phase 0+1: solo parity (per-frame CRC) with the context ON, and sequential create/destroy/create of 2 engines in one process.
 
 ### Phase 2: Simulation statics that must become per-engine
