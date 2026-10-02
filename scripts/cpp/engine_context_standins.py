@@ -12,11 +12,15 @@
 # Where it looks, for a stand-in `name` of class `C` declared in `c.h`: `C::name` in every source file, and
 # `name` unqualified in `c.h` and in the files named `c.cpp`/`c.inl` (any directory, any case), where `C`'s
 # members are defined. `sizeof(name[0])`, `&name[i]`, `&name->x` and `&name.x` are allowed: they reach the
-# field itself. Comments and string literals are ignored.
+# field itself. `std::addressof(name)` is the same hazard as unary `&` and is caught too. A unary `&` is also
+# recognised after a C-style pointer cast (`(void*)&name`, `(char*)&name`) and after `&&` (`a && &name`), not
+# only after the fixed set of operators it is otherwise unambiguous after. `name` passed bare to a known
+# variadic logger (the printf family, `WWDEBUG_SAY`, `DEBUG_LOG`, `DEBUG_ASSERTLOG`) is flagged too: it passes
+# the empty stand-in object instead of the field's value. Comments and string literals are ignored.
 #
 # Usage: engine_context_standins.py [--root GeneralsX] [--list]
-#   exit 0 when no stand-in is used with sizeof or &, 1 (with each use listed) otherwise; --list prints the
-#   stand-ins found.
+#   exit 0 when no stand-in is used with sizeof, &, std::addressof or a variadic logger, 1 (with each use
+#   listed) otherwise; --list prints the stand-ins found.
 import argparse
 import os
 import re
@@ -34,6 +38,15 @@ CLASS = re.compile(r"^\s*(?:class|struct)\s+(?:\w+\s+)*?(?P<name>\w+)\s*(?::[^;{
 REACHES_FIELD = re.compile(r"\s*(?:\[|\.|->|\()")
 # Before a unary `&`: an operator, an opening bracket, a separator or `return`.
 UNARY_BEFORE = re.compile(r"(?:^|[=(,{};?:!<>+\-*/%|^~\[]|\breturn)\s*$")
+# A C-style pointer cast immediately before: `(void*)`, `(char*)`, `(Foo::Bar**)`, ... A cast with no `*`
+# (`(int)&name`) is indistinguishable from `(expr)&mask` (binary `&`), so it is not matched here.
+CAST_BEFORE = re.compile(r"\(\s*(?:const\s+)?[A-Za-z_]\w*(?:\s*::\s*[A-Za-z_]\w*)*(?:\s*[*&])+\s*\)\s*$")
+# `&&` (logical-and) immediately before, with or without a space: the following `&` is always unary.
+DOUBLE_AMP_BEFORE = re.compile(r"&&\s*$")
+# A bare stand-in passed to one of these: a variadic call takes its argument's value by its declared type
+# (`...`), with no user-defined conversion, so an empty stand-in object is passed, not the field's value.
+VARIADIC_FUNCS = ("printf", "fprintf", "sprintf", "snprintf", "WWDEBUG_SAY", "DEBUG_LOG", "DEBUG_ASSERTLOG")
+VARIADIC_CALL = re.compile(r"\b(?:" + "|".join(VARIADIC_FUNCS) + r")\s*\(")
 
 
 def strip_comments_and_strings(text):
@@ -88,7 +101,8 @@ def find_standins(files):
 
 
 def uses(text, name, qualifier):
-    """(line, what) of each `sizeof` or unary `&` of the stand-in in the stripped text."""
+    """(line, what) of each `sizeof`, unary `&`, `std::addressof` or bare variadic-argument use of the
+    stand-in in the stripped text."""
     ident = (re.escape(qualifier) + r"\s*::\s*" if qualifier else r"(?<![\w:.>])") + re.escape(name) + r"\b"
     bad = []
     for m in re.finditer(r"\bsizeof\s*(?:\(\s*)?" + ident, text):
@@ -96,10 +110,39 @@ def uses(text, name, qualifier):
             bad.append((text.count("\n", 0, m.start()) + 1, "sizeof"))
     for m in re.finditer(r"&\s*" + ident, text):
         before = text[max(0, m.start() - 40):m.start()]
-        if before.endswith("&") or not UNARY_BEFORE.search(before):
-            continue  # `&&` or a binary `&`
+        if DOUBLE_AMP_BEFORE.search(before):
+            pass  # `&&` then this unary `&`: always address-of, never a binary `&` of `&&`'s result
+        elif before.endswith("&"):
+            continue  # the no-space `&&name` token: always logical-and, never unary
+        elif CAST_BEFORE.search(before):
+            pass  # a C-style pointer cast, e.g. `(void*)&name`
+        elif not UNARY_BEFORE.search(before):
+            continue  # a binary `&`
         if not REACHES_FIELD.match(text, m.end()):
             bad.append((text.count("\n", 0, m.start()) + 1, "&"))
+    for m in re.finditer(r"\bstd::addressof\s*\(\s*" + ident, text):
+        if not REACHES_FIELD.match(text, m.end()):
+            bad.append((text.count("\n", 0, m.start()) + 1, "std::addressof"))
+    for cm in VARIADIC_CALL.finditer(text):
+        open_paren = cm.end() - 1
+        depth, i, end = 0, open_paren, None
+        while i < len(text):
+            if text[i] == "(":
+                depth += 1
+            elif text[i] == ")":
+                depth -= 1
+                if depth == 0:
+                    end = i
+                    break
+            i += 1
+        if end is None:
+            continue
+        inner = text[open_paren + 1 : end]
+        func = cm.group(0).split("(", 1)[0].strip()
+        for im in re.finditer(ident, inner):
+            if not REACHES_FIELD.match(inner, im.end()):
+                pos = open_paren + 1 + im.start()
+                bad.append((text.count("\n", 0, pos) + 1, f"passed by value to {func}"))
     return bad
 
 
@@ -143,13 +186,13 @@ def main():
         print(v)
     if violations:
         print(
-            f"{len(violations)} use(s) of an EngineContext stand-in with sizeof or &: they give the stand-in's "
-            "size or address, not the field's; use a reference-returning macro for that name instead "
-            "(see EngineContext.h, ContextField)",
+            f"{len(violations)} use(s) of an EngineContext stand-in that give its own size, address or bytes "
+            "instead of the field's (sizeof, &, std::addressof, or passed bare to a variadic logger); use a "
+            "reference-returning macro for that name instead (see EngineContext.h, ContextField)",
             file=sys.stderr,
         )
         return 1
-    print(f"ok: {len(standins)} stand-ins, none used with sizeof or &")
+    print(f"ok: {len(standins)} stand-ins, none used with sizeof, &, std::addressof or a variadic logger")
     return 0
 
 
