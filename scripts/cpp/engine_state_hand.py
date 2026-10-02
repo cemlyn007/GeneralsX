@@ -40,10 +40,12 @@ NET = (
 # InGameUI::init creates the ControlBar and runs ControlBar::init; GameLogic::startNewGame makes and inits a
 # load screen; GameLogic::clearGameData (GameLogicDispatch) calls HideDiplomacy, ResetDiplomacy and
 # ResetInGameChat; ScriptActions reach InGameUI::popupMessage; VictoryConditions calls
-# PopulateInGameDiplomacyPopup; and GameWindowManagerDummy is a GameWindowManager whose winGetWindowFromId hands
-# out a dummy window rather than null, so window pointers are real (per-engine) objects headless too.
+# PopulateInGameDiplomacyPopup; GameClient::update calls TheShell->UPDATE() every frame (Shell::update, which
+# also runs the scheme manager's update), headless included; and GameWindowManagerDummy is a GameWindowManager
+# whose winGetWindowFromId hands out a dummy window rather than null, so window pointers are real (per-engine)
+# objects headless too.
 HEADLESS_GUI = (
-    "ControlBar/|LoadScreen\\.cpp|GameWindowManager\\.cpp|"
+    "ControlBar/|LoadScreen\\.cpp|GameWindowManager\\.cpp|Shell/(Shell|ShellMenuScheme)\\.cpp|"
     "GUICallbacks/(Diplomacy|InGameChat|InGamePopupMessage|ControlBarPopupDescription)\\.cpp"
 )
 W3D_RENDER = "W3D render path (device, shaders, draw lists): only the one rendering engine per process reaches it (PLAN-023 Phase 8)"
@@ -119,6 +121,7 @@ HAND = [
     (PER, 4, "TerrainRoadCollection::m_idCounter", "road type ID counter continued by every engine's Roads.ini parse: TheTerrainRoads member"),
     (PER, 4, "View::m_idNext", "view ID counter: per engine"),
     (PER, 4, "re:InGameUI::update\\(\\)::(lastMoney|lastIncome)|InGameUI::updateFloatingText\\(\\)::lastLogicFrameUpdate", "InGameUI::update runs headless too (GameClient::update): UI state, no simulation effect; InGameUI members"),
+    (PER, 4, "Shell::update()::lastUpdate", "GameClient::update calls TheShell->UPDATE() headless too: a wall-clock throttle shared by every engine's shell screens, so concurrent engines skip each other's scheme-manager updates; Shell member"),
     # GUI statics that a headless engine writes too (see HEADLESS_GUI): the control bar, diplomacy and chat
     # code runs headless against GameWindowManagerDummy's dummy windows, so these point at one engine's
     # objects or are cleared/deleted by another engine's teardown.
