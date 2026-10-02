@@ -1416,9 +1416,22 @@ UnsignedInt GlobalData::generateExeCRC()
 // constructor's own BuildUserDataPathFromRegistry()/CreateDirectory() do for the registry/XDG default.
 // Only valid on the original instance: GlobalData::reset() (an override pop) would otherwise silently
 // revert the path to whatever the original held, so callers must set it before any override is pushed.
-void GlobalData::setPath_UserData(const AsciiString &dir)
+// GeneralsX @bugfix cemlyn007 02/10/2026 Returns Bool and validates instead of accepting anything: an
+// empty `dir` used to become "/" or "\\" (append-a-separator-to-nothing is the filesystem root) and a
+// directory CreateDirectory could not make (it exists as a file, or a Windows nested path whose parent is
+// missing -- CreateDirectory is the non-recursive Win32 API) was accepted anyway, so every later write
+// failed silently. `m_userDataDir` is left unchanged on a refusal, so a caller that ignores the return
+// value keeps whatever directory (the default, or an earlier successful override) it already had.
+Bool GlobalData::setPath_UserData(const AsciiString &dir)
 {
 	DEBUG_ASSERTCRASH(this == m_theOriginal, ("setPath_UserData: must be called on the original GlobalData instance, before any override is loaded"));
+
+	if (dir.isEmpty())
+	{
+		fprintf(stderr, "GlobalData::setPath_UserData: refusing an empty directory (it would resolve to the filesystem root)\n");
+		fflush(stderr);
+		return FALSE;
+	}
 
 	AsciiString path = dir;
 #ifdef _WIN32
@@ -1428,8 +1441,20 @@ void GlobalData::setPath_UserData(const AsciiString &dir)
 	if (!path.endsWith("/"))
 		path.concat('/');
 #endif
-	CreateDirectory(path.str(), nullptr);
+	// std::filesystem::create_directories (not the non-recursive Win32 CreateDirectory) so a nested path
+	// whose parent does not yet exist on Windows is still made, as the header says `dir` "need not ...
+	// already exist".
+	std::error_code ec;
+	std::filesystem::create_directories(path.str(), ec);
+	if (!std::filesystem::is_directory(path.str(), ec))
+	{
+		fprintf(stderr, "GlobalData::setPath_UserData: cannot use \"%s\" as the user data directory%s%s\n",
+			path.str(), ec ? ": " : " (not a directory)", ec ? ec.message().c_str() : "");
+		fflush(stderr);
+		return FALSE;
+	}
 	m_userDataDir = path;
+	return TRUE;
 }
 
 AsciiString GlobalData::BuildUserDataPathFromRegistry()

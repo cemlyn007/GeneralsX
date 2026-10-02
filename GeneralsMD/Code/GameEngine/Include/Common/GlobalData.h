@@ -609,7 +609,11 @@ public:
 	// with the path separator or already exist (the setter appends the separator and creates the directory
 	// itself, as the constructor's default does). Nothing upstream calls it, so an engine that is not
 	// embedded is unchanged.
-	void setPath_UserData(const AsciiString &dir);
+	// GeneralsX @bugfix cemlyn007 02/10/2026 Returns FALSE (and leaves the directory unchanged) for an
+	// empty `dir` or one that cannot be made/used as a directory, instead of silently accepting it (an
+	// empty string used to become the filesystem root). Callers that want a refused boot, rather than one
+	// that silently loses every later write, must check the return value.
+	Bool setPath_UserData(const AsciiString &dir);
 
 private:
 
