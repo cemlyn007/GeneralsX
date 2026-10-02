@@ -535,6 +535,29 @@ class SourceIndexDefinitionTest(unittest.TestCase):
         self.assertEqual(source, "Core/partition.cpp:11")
         self.assertFalse(indented)
 
+    def test_scope_at_sees_the_stack_an_else_restores_before_the_next_brace(self):
+        # `_scope_events` resets `stack` at `#else`/`#elif` to the snapshot taken at the matching `#if`, but
+        # (before this fix) only recorded that as a scope event at the next `{`/`}`: `scope_at` would bisect
+        # to the stack the LAST brace left (the #if branch's own, still "inside a function") for every
+        # offset between the `#else` and that next brace. `s_q` sits in exactly that window, genuinely at
+        # file scope in the branch actually taken, and must still be found as a file static, not skipped as
+        # an unrelated function's local.
+        self.write(
+            "cond.cpp",
+            "#ifdef A\n"
+            "void h() {\n"
+            "  x();\n"
+            "#else\n"
+            "static int s_q = 1;\n"
+            "void h() {\n"
+            "#endif\n"
+            "}\n",
+        )
+        p = m.Parsed("s_q")
+        idx = self.index({"s_q"})
+        sites = idx.find_all(p)
+        self.assertEqual(sites, [("Core/cond.cpp:5", "static int s_q = 1;")])
+
     def test_plain_scope_skips_another_classs_static_member_declaration(self):
         # A file static elsewhere and an unrelated class's own static member of the same bare name must
         # never be merged into one ambiguous name: a class body's own member is the qualified/in-class

@@ -354,6 +354,11 @@ def _scope_events(text):
                 pp_stack.append(list(stack))
             elif kind == "else" and pp_stack:
                 stack = list(pp_stack[-1])
+                # `stack` just changed with no `{`/`}` of its own: record it as a scope event too, or
+                # `scope_at` would bisect to the stack the LAST brace left (inside the branch this #else/
+                # #elif just abandoned) for everything up to the next actual brace.
+                positions.append(i)
+                stacks.append(tuple(stack))
             elif kind == "endif" and pp_stack:
                 pp_stack.pop()
             pp_idx += 1
