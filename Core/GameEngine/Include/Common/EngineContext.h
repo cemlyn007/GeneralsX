@@ -411,9 +411,22 @@ private:
 // operator set over a `T&` the stand-in locates differently): factor that set into this CRTP base, which calls
 // `Derived::get()`, so a later operator (PLAN-023 Phase 8, stage RR2a-1 review) is added once for both instead
 // of being copied and risking the two kinds diverging.
+//
+// GeneralsX @fix cemlyn007 02/10/2026 The deleted copy constructor and unary operator& turn two of the gate's
+// (scripts/cpp/engine_context_standins.py) regex checks into compiler diagnostics instead: copying a stand-in
+// (`auto x = C::name;`, or passing it by value to a variadic logger, which must copy it to place it in `...`)
+// now fails with "use of deleted function", and so does `&name`/`std::addressof` through operator&. This is a
+// backstop, not a replacement for the gate (sizeof(name) is unaffected, and the gate still gives the faster,
+// earlier CI failure with the exact line and reason), kept in step with it rather than letting its own denylist
+// grow to cover every spelling of these two hazards by itself.
 template <typename Derived, typename T>
 struct ContextFieldOps
 {
+	constexpr ContextFieldOps() noexcept = default;
+	ContextFieldOps(const ContextFieldOps&) = delete;
+	ContextFieldOps& operator=(const ContextFieldOps&) = delete;
+	Derived* operator&() const = delete;
+
 	operator T&() const noexcept
 	{
 		return Derived::get();
@@ -500,6 +513,14 @@ struct IndirectContextField
 template <typename S, S* EngineContext::*Pointer, S& Defaults, typename E, std::size_t N, E (S::*Field)[N]>
 struct IndirectContextField<S, Pointer, Defaults, E[N], Field>
 {
+	// Same deleted copy/operator& backstop as ContextFieldOps (this specialisation does not derive from
+	// it: an array field decays to E* rather than converting to E&, so it needs its own operator[]/
+	// operator E*() instead of ContextFieldOps's operator T&()/operator->()).
+	constexpr IndirectContextField() noexcept = default;
+	IndirectContextField(const IndirectContextField&) = delete;
+	IndirectContextField& operator=(const IndirectContextField&) = delete;
+	IndirectContextField* operator&() const = delete;
+
 	static E (&get() noexcept)[N]
 	{
 		return indirectContext<S, Pointer, Defaults>().*Field;
