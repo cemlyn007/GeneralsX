@@ -204,12 +204,15 @@ HAND = [
     # them: they are a PER_ENGINE_STATIC now (PLAN-023 Phase 5b, found by the TSan build), so gone from the
     # library; the slot index is rule:per-engine-static.
     (DEBUG, "", "re:_writeSingleParticleSystem\\(.*\\)::buff[1-4]|_reloadParticleSystemFromINI\\(.*\\)::linebuff|_getParticleSystemName\\(\\)::buff", "particle-editor writer/reader buffers (debug DLL)"),
-    # ScriptEngine::getTeamNamed(AsciiString const&)::warnCount was listed here as debug-only, but every
-    # engine's own script-evaluation thread reads and increments it on the release sim path: it is a
-    # PER_ENGINE_STATIC now (02/10/2026, found in review), so gone from the library as a function-local
-    # static; the slot index is rule:per-engine-static (same treatment as the st_* hooks above).
-    (DEBUG, "", "re:Object::setTriggerAreaFlagsForChangeInPosition\\(\\)::didWarn|PathfindCell::~PathfindCell\\(\\)::warn", "warn-once flag"),
-    (DEBUG, "", "re:s_totalOpen", "open-file counter for a debug assert"),
+    # ScriptEngine::getTeamNamed(AsciiString const&)::warnCount, Object::setTriggerAreaFlagsForChangeInPosition()::
+    # didWarn and PathfindCell::~PathfindCell()::warn were listed here as debug-only "warn-once" flags, but each
+    # is written on a release sim path by every engine's own thread (getTeamNamed's own script-evaluation thread,
+    # the object update that changes trigger-area membership, or the pathfinder freeing its cells): they are
+    # PER_ENGINE_STATICs now (02/10/2026 and the w2-r2-5 audit it prompted, found in review), so gone from the
+    # library as function-local statics; the slot index is rule:per-engine-static (same treatment as the st_*
+    # hooks above). The same audit found LocalFile.cpp's s_totalOpen had no reader but a commented-out
+    # DEBUG_LOG and no debug assert either, so it was deleted rather than reclassified; it is gone from the
+    # library too.
     (DEBUG, "", "re:DebugDisplay::printf\\(.*\\)::text", "debug display text buffer"),
     (DEBUG, "", "re:CommandTranslator::translateGameMessage\\(.*\\)::old\\w+", "debug-command toggles (MSG_META_DEMO_*)"),
     (DEBUG, "", "file:/WWDebug/", "WW memory log"),

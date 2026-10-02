@@ -372,9 +372,14 @@ class SourceIndex:
                 if parsed.cls
                 else rf"\b{func}\s*\("
             )
+            # GeneralsX @bugfix cemlyn007 02/10/2026 A destructor's bare name keeps its leading '~' (needed
+            # in the regexes above), but the word index only ever stores identifier characters, so a
+            # destructor-scoped static's `where` lookup must drop it or every candidates() call below comes
+            # back empty (found while auditing w2-r2-5's new PER_ENGINE_STATICs).
+            func_word = parsed.func.lstrip("~")
             # Defined out of line, then (inline in the class body) anywhere after the function's name.
             for branch, owner_re in (("owner", owner), ("inline", re.compile(rf"\b{func}\s*\("))):
-                for rel in self.candidates(parsed.var, parsed.func, parsed.cls):
+                for rel in self.candidates(parsed.var, func_word, parsed.cls):
                     fm = owner_re.search(self.files[rel])
                     if not fm:
                         continue
