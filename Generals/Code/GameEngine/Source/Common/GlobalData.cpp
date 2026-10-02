@@ -1359,6 +1359,23 @@ UnsignedInt GlobalData::generateExeCRC()
 	return exeCRC.get();
 }
 
+// GeneralsX @refactor cemlyn007 02/10/2026 One place for "make this directory (recursively) and say
+// so on stderr if it cannot be used", instead of the create+report sequence copied at both
+// non-Windows branches below (117-gx-w1-r3-26; GeneralsMD's twin of this helper covers its own
+// branches plus setPath_UserData, which Generals does not have).
+static Bool createUserDataDirectory(const std::filesystem::path &path)
+{
+	std::error_code ec;
+	std::filesystem::create_directories(path, ec);
+	if (ec)
+	{
+		fprintf(stderr, "GlobalData: cannot create user data directory %s: %s\n",
+			path.string().c_str(), ec.message().c_str());
+		fflush(stderr);
+	}
+	return ec ? FALSE : TRUE;
+}
+
 AsciiString GlobalData::BuildUserDataPathFromIni()
 {
 	AsciiString userDataDir;
@@ -1423,15 +1440,9 @@ AsciiString GlobalData::BuildUserDataPathFromIni()
 			std::filesystem::path path = std::filesystem::path(home) / "Library" / "Application Support" / "GeneralsX" / "Generals";
 			// GeneralsX @bugfix cemlyn007 02/10/2026 Backport of GeneralsMD's fix: the throwing overload
 			// crashed the constructor (and so the whole engine boot) whenever the default could not be
-			// created, e.g. a read-only $HOME. The error_code overload lets the game boot anyway; report the
-			// failure on stderr, since DEBUG_LOG compiles out of release builds.
-			std::error_code ec;
-			std::filesystem::create_directories(path, ec);
-			if (ec) {
-				fprintf(stderr, "GlobalData: cannot create user data directory %s: %s\n",
-					path.string().c_str(), ec.message().c_str());
-				fflush(stderr);
-			}
+			// created, e.g. a read-only $HOME. createUserDataDirectory's error_code call lets the game boot
+			// anyway; it reports the failure on stderr, since DEBUG_LOG compiles out of release builds.
+			createUserDataDirectory(path);
 			userDataDir = path.string().c_str();
 			if (!userDataDir.endsWith("/"))
 				userDataDir.concat('/');
@@ -1459,14 +1470,9 @@ AsciiString GlobalData::BuildUserDataPathFromIni()
 		path = path / "GeneralsX" / "Generals";
 		// GeneralsX @bugfix cemlyn007 02/10/2026 Backport of GeneralsMD's fix: as the macOS branch above, do
 		// not let an uncreatable default (a read-only $HOME) throw out of the constructor and fault the
-		// whole engine; report the failure on stderr so it is visible in release builds.
-		std::error_code ec;
-		std::filesystem::create_directories(path, ec);
-		if (ec) {
-			fprintf(stderr, "GlobalData: cannot create user data directory %s: %s\n",
-				path.string().c_str(), ec.message().c_str());
-			fflush(stderr);
-		}
+		// whole engine; createUserDataDirectory reports the failure on stderr so it is visible in release
+		// builds.
+		createUserDataDirectory(path);
 		userDataDir = path.string().c_str();
 		if (!userDataDir.endsWith("/"))
 			userDataDir.concat('/');
