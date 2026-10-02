@@ -1411,7 +1411,17 @@ AsciiString GlobalData::BuildUserDataPathFromIni()
 		const char* home = getenv("HOME");
 		if (home) {
 			std::filesystem::path path = std::filesystem::path(home) / "Library" / "Application Support" / "GeneralsX" / "Generals";
-			std::filesystem::create_directories(path);
+			// GeneralsX @bugfix cemlyn007 02/10/2026 Backport of GeneralsMD's fix: the throwing overload
+			// crashed the constructor (and so the whole engine boot) whenever the default could not be
+			// created, e.g. a read-only $HOME. The error_code overload lets the game boot anyway; report the
+			// failure on stderr, since DEBUG_LOG compiles out of release builds.
+			std::error_code ec;
+			std::filesystem::create_directories(path, ec);
+			if (ec) {
+				fprintf(stderr, "GlobalData: cannot create user data directory %s: %s\n",
+					path.string().c_str(), ec.message().c_str());
+				fflush(stderr);
+			}
 			userDataDir = path.string().c_str();
 			if (!userDataDir.endsWith("/"))
 				userDataDir.concat('/');
@@ -1437,7 +1447,16 @@ AsciiString GlobalData::BuildUserDataPathFromIni()
 		}
 
 		path = path / "GeneralsX" / "Generals";
-		std::filesystem::create_directories(path);
+		// GeneralsX @bugfix cemlyn007 02/10/2026 Backport of GeneralsMD's fix: as the macOS branch above, do
+		// not let an uncreatable default (a read-only $HOME) throw out of the constructor and fault the
+		// whole engine; report the failure on stderr so it is visible in release builds.
+		std::error_code ec;
+		std::filesystem::create_directories(path, ec);
+		if (ec) {
+			fprintf(stderr, "GlobalData: cannot create user data directory %s: %s\n",
+				path.string().c_str(), ec.message().c_str());
+			fflush(stderr);
+		}
 		userDataDir = path.string().c_str();
 		if (!userDataDir.endsWith("/"))
 			userDataDir.concat('/');
