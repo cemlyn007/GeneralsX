@@ -9,13 +9,15 @@
 # either use of any stand-in, so a name used that way is caught at review time (it needs a reference-returning
 # macro instead, as DX8Wrapper's names have: WW3D2/w3drenderstate_names.h).
 #
-# Where it looks, for a stand-in `name` of class `C` declared in `c.h`: `C::name` in every source file, and
-# `name` unqualified in `c.h`, in every file that defines one of `C`'s members, and in every file that
-# defines a member of a class `D` deriving (directly or transitively) from `C` (ordinary unqualified name
-# lookup finds `C`'s static member inside `D`'s own member functions too; `D`'s base clause is found by
-# content across every source file, since `D`'s own header need not mention the stand-in's name, e.g.
-# W3DAssetManager.h does not mention WW3DAssetManager::TheInstance). A member-defining file is found by
-# content, not by file name (a class's members are not always defined in a file named after the class,
+# Where it looks, for a stand-in `name` of class `C` declared in `c.h`: `C::name` in every source file,
+# `D::name` in every source file too for every class `D` deriving (directly or transitively) from `C`
+# (inherited, `D::name` names the same stand-in as `C::name`), and `name` unqualified in `c.h`, in every
+# file that defines one of `C`'s members, and in every file that defines a member of such a `D` (ordinary
+# unqualified name lookup finds `C`'s static member inside `D`'s own member functions too; `D`'s base
+# clause is found by content across every source file, since `D`'s own header need not mention the
+# stand-in's name, e.g. W3DAssetManager.h does not mention WW3DAssetManager::TheInstance). A
+# member-defining file is found by content, not by file name (a class's members are not always defined
+# in a file named after the class,
 # e.g. MapObject's are in WorldHeightMap.cpp): a `C::member(` (or `D::member(`) whose parameter list's
 # matching close paren is followed (after optional whitespace and any of `const`/`noexcept`/`override`/
 # `final`) by `{`, or, only when `member` is a constructor (names the same class), an initialiser's `:`,
@@ -410,6 +412,10 @@ def main():
     # file too, whether or not it also holds an out-of-class `D::member(...) {` definition.
     owners = {owner for owner, _, _ in standins if owner}
     defines_member = {}
+    # descendants_of[C] = every class D (directly or transitively) deriving from C: `D::name` names the
+    # same inherited stand-in as `C::name` (127-gx-w2-r5-30), so the qualified scan must run once per
+    # name of the stand-in, not just its declaring class's own.
+    descendants_of = {}
     if owners:
         children_of = {}
         base_clause_file = {}
@@ -433,6 +439,9 @@ def main():
         for cls, classes in class_owners.items():
             for path in base_clause_file.get(cls, ()):
                 defines_member.setdefault(path, set()).update(classes)
+            for owner in classes:
+                if cls != owner:
+                    descendants_of.setdefault(owner, set()).add(cls)
         member_def = re.compile(
             r"(?<![\w:])(?P<cls>" + "|".join(re.escape(c) for c in sorted(class_owners)) + r")"
             r"\s*::\s*(?P<member>~?[A-Za-z_]\w*)\s*\(",
@@ -449,8 +458,12 @@ def main():
     violations = []
     for owner, name, header in standins:
         own = {header} | {p for p, classes in defines_member.items() if owner in classes}
+        # `D::name` for every D deriving from owner names the same inherited stand-in as `owner::name`.
+        qualifiers = [owner, *sorted(descendants_of.get(owner, ()))] if owner else []
         for path, text in files.items():
-            found = uses(text, name, owner) if owner else []
+            found = []
+            for qualifier in qualifiers:
+                found += uses(text, name, qualifier)
             if path in own:
                 found += uses(text, name, "")
             for line, what in sorted(set(found)):

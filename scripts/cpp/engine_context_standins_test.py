@@ -581,6 +581,35 @@ class MainTest(unittest.TestCase):
         self.assertEqual(code, 1, out)
         self.assertIn("WorldHeightMap.cpp", out)
 
+    def test_qualified_use_through_derived_class_name_is_checked(self):
+        # `&D::name` names the same inherited stand-in as `&C::name` (127-gx-w2-r5-30), but the qualified
+        # scan previously ran `uses(text, name, owner)` only, never `uses(text, name, D)`.
+        self.write(
+            "Core/WWAssetManager.h",
+            "class WWAssetManager {\n"
+            "public:\n"
+            "    static constexpr rts::ContextField<WWAssetManager*, &rts::EngineContext::assetManager> "
+            "TheInstance{};\n"
+            "};\n",
+        )
+        self.write(
+            "Core/W3DAssetManager.h",
+            '#include "WWAssetManager.h"\n'
+            "class W3DAssetManager : public WWAssetManager {\n"
+            "public:\n"
+            "    void Load();\n"
+            "};\n",
+        )
+        self.write(
+            "Core/user.cpp",
+            '#include "W3DAssetManager.h"\n'
+            "WWAssetManager** p = &W3DAssetManager::TheInstance;\n",
+        )
+        code, out = self.run_main(["--root", self.root])
+        self.assertEqual(code, 1, out)
+        self.assertIn("user.cpp", out)
+        self.assertIn("TheInstance", out)
+
     def test_final_owner_class_is_not_skipped(self):
         # `class MapObject final { ... }`: CLASS's lazy prefix must not treat `final` as the class name
         # (127-gx-w2-r5-29). Qualified uses of a stand-in in a `final` class were unchecked before this.
