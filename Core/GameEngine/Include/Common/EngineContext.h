@@ -407,6 +407,47 @@ private:
 	void (*m_initialize)(T& object);
 };
 
+// GeneralsX @refactor cemlyn007 02/10/2026 ContextField and IndirectContextField are the same family (one
+// operator set over a `T&` the stand-in locates differently): factor that set into this CRTP base, which calls
+// `Derived::get()`, so a later operator (PLAN-023 Phase 8, stage RR2a-1 review) is added once for both instead
+// of being copied and risking the two kinds diverging.
+template <typename Derived, typename T>
+struct ContextFieldOps
+{
+	operator T&() const noexcept
+	{
+		return Derived::get();
+	}
+	T operator->() const noexcept
+	{
+		return Derived::get();
+	}
+	const Derived& operator=(T value) const noexcept
+	{
+		Derived::get() = value;
+		return static_cast<const Derived&>(*this);
+	}
+	T& operator++() const noexcept
+	{
+		return ++Derived::get();
+	}
+	T operator++(int) const noexcept
+	{
+		return Derived::get()++;
+	}
+	// Compound assignment needs members: a built-in `+=` takes no user-defined conversion of its left operand.
+	template <typename U>
+	T& operator+=(const U& value) const noexcept
+	{
+		return Derived::get() += value;
+	}
+	template <typename U>
+	T& operator-=(const U& value) const noexcept
+	{
+		return Derived::get() -= value;
+	}
+};
+
 // GeneralsX @feature cemlyn007 28/09/2026 A stand-in for a class's static data member whose value is a
 // direct EngineContext field (PLAN-023 Phase 2), for statics that are also used qualified
 // (`MapObject::TheMapObjectListPtr`), where a macro cannot stand in: declare it as
@@ -414,39 +455,16 @@ private:
 // assignments, `->` and comparisons compile unchanged. Taking its address gives the stand-in's, not the
 // field's, so a static whose address is taken needs a macro instead.
 template <typename T, T EngineContext::*Field>
-struct ContextField
+struct ContextField : ContextFieldOps<ContextField<T, Field>, T>
 {
-	operator T&() const noexcept
+	// A derived class's own operator=, even the implicitly-declared copy assignment, hides every base
+	// class operator= by name; without this, `field = value` stops finding the base's and falls back to
+	// (and fails to match) the implicit one, which takes only a `const ContextField&`.
+	using ContextFieldOps<ContextField<T, Field>, T>::operator=;
+
+	static T& get() noexcept
 	{
 		return ctx()->*Field;
-	}
-	T operator->() const noexcept
-	{
-		return ctx()->*Field;
-	}
-	const ContextField& operator=(T value) const noexcept
-	{
-		ctx()->*Field = value;
-		return *this;
-	}
-	T& operator++() const noexcept
-	{
-		return ++(ctx()->*Field);
-	}
-	T operator++(int) const noexcept
-	{
-		return (ctx()->*Field)++;
-	}
-	// Compound assignment needs members: a built-in `+=` takes no user-defined conversion of its left operand.
-	template <typename U>
-	T& operator+=(const U& value) const noexcept
-	{
-		return ctx()->*Field += value;
-	}
-	template <typename U>
-	T& operator-=(const U& value) const noexcept
-	{
-		return ctx()->*Field -= value;
 	}
 };
 
@@ -468,41 +486,14 @@ inline S& indirectContext() noexcept
 // takes `[]` and decays to a pointer to its first element.
 template <typename S, S* EngineContext::*Pointer, S& Defaults, typename T, T S::*Field>
 struct IndirectContextField
+	: ContextFieldOps<IndirectContextField<S, Pointer, Defaults, T, Field>, T>
 {
+	// See ContextField's same `using`: without it the implicit copy assignment hides the base's operator=.
+	using ContextFieldOps<IndirectContextField<S, Pointer, Defaults, T, Field>, T>::operator=;
+
 	static T& get() noexcept
 	{
 		return indirectContext<S, Pointer, Defaults>().*Field;
-	}
-	operator T&() const noexcept
-	{
-		return get();
-	}
-	T operator->() const noexcept
-	{
-		return get();
-	}
-	const IndirectContextField& operator=(T value) const noexcept
-	{
-		get() = value;
-		return *this;
-	}
-	T& operator++() const noexcept
-	{
-		return ++get();
-	}
-	T operator++(int) const noexcept
-	{
-		return get()++;
-	}
-	template <typename U>
-	T& operator+=(const U& value) const noexcept
-	{
-		return get() += value;
-	}
-	template <typename U>
-	T& operator-=(const U& value) const noexcept
-	{
-		return get() -= value;
 	}
 };
 
