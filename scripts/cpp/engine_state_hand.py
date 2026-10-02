@@ -204,7 +204,10 @@ HAND = [
     # them: they are a PER_ENGINE_STATIC now (PLAN-023 Phase 5b, found by the TSan build), so gone from the
     # library; the slot index is rule:per-engine-static.
     (DEBUG, "", "re:_writeSingleParticleSystem\\(.*\\)::buff[1-4]|_reloadParticleSystemFromINI\\(.*\\)::linebuff|_getParticleSystemName\\(\\)::buff", "particle-editor writer/reader buffers (debug DLL)"),
-    (DEBUG, "", "ScriptEngine::getTeamNamed(AsciiString const&)::warnCount", "debug-message limiter"),
+    # ScriptEngine::getTeamNamed(AsciiString const&)::warnCount was listed here as debug-only, but every
+    # engine's own script-evaluation thread reads and increments it on the release sim path: it is a
+    # PER_ENGINE_STATIC now (02/10/2026, found in review), so gone from the library as a function-local
+    # static; the slot index is rule:per-engine-static (same treatment as the st_* hooks above).
     (DEBUG, "", "re:Object::setTriggerAreaFlagsForChangeInPosition\\(\\)::didWarn|PathfindCell::~PathfindCell\\(\\)::warn", "warn-once flag"),
     (DEBUG, "", "re:s_totalOpen", "open-file counter for a debug assert"),
     (DEBUG, "", "re:DebugDisplay::printf\\(.*\\)::text", "debug display text buffer"),

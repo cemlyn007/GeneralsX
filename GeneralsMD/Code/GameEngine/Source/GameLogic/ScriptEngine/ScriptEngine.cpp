@@ -114,6 +114,7 @@ struct ScriptEngineDebugHooks
 	HMODULE particleDLL;
 	ParticleSystem *particleSystem;
 	Bool particleSystemNeedsStopping; ///< Set along with particleSystem if the particle system has infinite life
+	int getTeamNamedWarnCount; ///< GeneralsX @bugfix cemlyn007 02/10/2026 sim-path writer, not debug-only (see below)
 };
 static rts::PerEngineStatic<ScriptEngineDebugHooks> s_scriptEngineDebugHooks_perEngine;
 #define st_LastCurrentFrame (s_scriptEngineDebugHooks_perEngine.get().lastCurrentFrame)
@@ -124,10 +125,16 @@ static rts::PerEngineStatic<ScriptEngineDebugHooks> s_scriptEngineDebugHooks_per
 #define st_ParticleDLL (s_scriptEngineDebugHooks_perEngine.get().particleDLL)
 #define st_particleSystem (s_scriptEngineDebugHooks_perEngine.get().particleSystem)
 #define st_particleSystemNeedsStopping (s_scriptEngineDebugHooks_perEngine.get().particleSystemNeedsStopping)
+// GeneralsX @bugfix cemlyn007 02/10/2026 getTeamNamed's team-instance warning counter is not debug-only
+// either: it is read and incremented by every engine's own script-evaluation thread on the release sim path
+// (ScriptEngine::getTeamNamed below), the same misclassification RT3 fixed for st_* above.
+#define getTeamNamed_warnCount (s_scriptEngineDebugHooks_perEngine.get().getTeamNamedWarnCount)
 #else
 static HMODULE st_ParticleDLL;
 ParticleSystem *st_particleSystem;
 Bool st_particleSystemNeedsStopping = FALSE; ///< Set along with st_particleSystem if the particle system has infinite life
+static int st_getTeamNamedWarnCount = 0;
+#define getTeamNamed_warnCount st_getTeamNamedWarnCount
 #endif
 #define ARBITRARY_BUFF_SIZE	128
 #define FORMAT_STRING "%.2f"
@@ -6012,10 +6019,12 @@ Team * ScriptEngine::getTeamNamed(const AsciiString& teamName)
 		return nullptr; // team wasn't active.
 	}
 
-	static int warnCount = 0;
+	// GeneralsX @bugfix cemlyn007 02/10/2026 Per-engine, not a function-local static: every engine's own
+	// script-evaluation thread reads and increments this on the release sim path, the same misclassification
+	// RT3 fixed for the debugger-window/particle-editor st_* hooks above (PLAN-023 Phase 5b, TSan).
 	if (theTeamProto->countTeamInstances()>1) {
-		if (warnCount<10) {
-			warnCount++;
+		if (getTeamNamed_warnCount<10) {
+			getTeamNamed_warnCount++;
 			AppendDebugMessage("***Referencing multiple team by unspecific instance:***", false);
 			AppendDebugMessage(teamName, false);
 		}
