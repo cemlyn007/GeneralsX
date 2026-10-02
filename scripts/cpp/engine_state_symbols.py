@@ -865,6 +865,17 @@ def new_symbol_error(sym, recorded):
 def cmd_check(args):
     symbols = load_library(args.root, args.lib, args.vcpkg_lib)
     recorded = read_tsv(os.path.join(args.root, TSV))
+    # A stripped library, or the wrong file, gives `nm` no symbols at all (GNU nm prints "no symbols" and
+    # still exits 0): every recorded row would then land in the harmless-looking "gone from the library"
+    # warning and a non-strict `check` would pass having checked nothing. Fail outright instead, and also
+    # when most of the list has vanished (the same wrong-binary symptom one symbol short of empty).
+    if not symbols:
+        sys.exit(f"{args.lib}: no writable/unique symbols found (stripped library, or the wrong file?)")
+    if recorded and len(symbols) < len(recorded) // 2:
+        sys.exit(
+            f"{args.lib}: only {len(symbols)} of {len(recorded)} recorded symbols found in the library "
+            "(stripped, partial, or the wrong build?)"
+        )
     errors, stale = [], []
     for key, sym in sorted(symbols.items()):
         row = recorded.get(key)
