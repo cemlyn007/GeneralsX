@@ -87,15 +87,25 @@ check_shared_object() {
     defined="$(printf '%s\n' "$dynamic" | awk '$2 ~ /^[TtWwiV]$/ { print $3 }')"
 
     # size_t mangles as m (unsigned long) or j (unsigned int); take the one the NEW forms use.
+    #
+    # GeneralsX @bugfix cemlyn007 02/10/2026 Use a here-string (<<<), not `printf ... | grep -qx`:
+    # grep -q stops reading as soon as it matches, so on a real engine .so (tens of thousands of
+    # dynamic symbols) it closes its stdin while printf is still writing, and printf dies from
+    # SIGPIPE. Under `set -o pipefail` (above) that makes the whole pipeline's exit status
+    # non-zero even though grep found the match, so every "must be exported" check below always
+    # reported FAIL, on every real binary, regardless of whether the engine was actually
+    # correct -- this script was never run against a real build before (see the regression test
+    # this now has, //rlgenerals/generalsx:gamememorynull_exports_test). A here-string has no
+    # producer process to SIGPIPE.
     local s=m
-    if printf '%s\n' "$defined" | grep -qx '_ZnwjPKci'; then
+    if grep -qx '_ZnwjPKci' <<<"$defined"; then
         s=j
     fi
 
     local failures=0
     local name
     for name in "_Znw${s}" "_Zna${s}" _ZdlPv _ZdaPv "_ZdlPv${s}" "_ZdaPv${s}"; do
-        if printf '%s\n' "$defined" | grep -qx "$name"; then
+        if grep -qx "$name" <<<"$defined"; then
             echo "FAIL: ${name} is exported; the replaceable form must be hidden"
             failures=$((failures + 1))
         else
@@ -103,14 +113,14 @@ check_shared_object() {
         fi
     done
     for name in "_Znw${s}PKci" _ZdlPvPKci "_Zna${s}PKci" _ZdaPvPKci; do
-        if printf '%s\n' "$defined" | grep -qx "$name"; then
+        if grep -qx "$name" <<<"$defined"; then
             echo "ok:   ${name} is exported"
         else
             echo "FAIL: ${name} is not exported; NEW and newInstance in host code need it"
             failures=$((failures + 1))
         fi
     done
-    if printf '%s\n' "$dynamic" | grep -Eq ' U dlsym(@|$)'; then
+    if grep -Eq ' U dlsym(@|$)' <<<"$dynamic"; then
         echo "ok:   dlsym is imported for the forwarding"
     else
         echo "FAIL: dlsym is not imported; the hidden operators do not forward to the process's"
