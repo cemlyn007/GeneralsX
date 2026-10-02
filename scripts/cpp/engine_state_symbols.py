@@ -569,16 +569,25 @@ def declarations(sym):
     return sym.decls or [sym.decl]
 
 
-NAMEKEY_DECL_RE = re.compile(r"\b(NameKeyType|StaticNameKey)\b")
+# The variable itself must be a NameKeyType/StaticNameKey (optionally const), not merely mention one
+# somewhere in its type: a container or struct keyed by NameKeyType is not a cache of one. Unless const, it
+# must also be initialised from the shared generator, so it is never reassigned to a different key later.
+NAMEKEY_DECL_RE = re.compile(r"^(?:static\s+)?(const\s+)?(?:NameKeyType|StaticNameKey)\s+\w+\s*(?:\[[^\]]*\])?\s*$")
+NAMEKEY_INIT_RE = re.compile(r"^\s*(?:NAMEKEY\s*\(|TheNameKeyGenerator\s*->\s*nameToKey\b)")
 
 
 def rule_namekey(sym):
     p = sym.parsed
     if sym.key.startswith("TheKey_") or (p.var == "nk" and p.func == "getModuleNameKey"):
         return GLOBAL, "", "cached NameKeyType: process-wide by PLAN-023 Decision 2 (shared immortal generator)"
-    if all(NAMEKEY_DECL_RE.search(d.split("=")[0]) for d in declarations(sym)):
-        return GLOBAL, "", "cached NameKeyType (a name or window ID key): process-wide by PLAN-023 Decision 2"
-    return None
+    for d in declarations(sym):
+        decl, sep, init = d.partition("=")
+        m = NAMEKEY_DECL_RE.match(decl.rstrip().rstrip(";").rstrip())
+        if not m:
+            return None
+        if not m.group(1) and not (sep and NAMEKEY_INIT_RE.search(init)):
+            return None
+    return GLOBAL, "", "cached NameKeyType (a name or window ID key): process-wide by PLAN-023 Decision 2"
 
 
 def rule_field_parse(sym):
