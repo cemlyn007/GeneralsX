@@ -581,6 +581,50 @@ class MainTest(unittest.TestCase):
         self.assertEqual(code, 1, out)
         self.assertIn("WorldHeightMap.cpp", out)
 
+    def test_final_owner_class_is_not_skipped(self):
+        # `class MapObject final { ... }`: CLASS's lazy prefix must not treat `final` as the class name
+        # (127-gx-w2-r5-29). Qualified uses of a stand-in in a `final` class were unchecked before this.
+        self.write(
+            "Core/MapObject.h",
+            "class MapObject final {\n"
+            "public:\n"
+            "    static constexpr rts::ContextField<MapObject*, &rts::EngineContext::mapObjectList> "
+            "TheMapObjectListPtr{};\n"
+            "};\n",
+        )
+        self.write(
+            "Core/user.cpp",
+            '#include "MapObject.h"\n' "auto *p = &MapObject::TheMapObjectListPtr;\n",
+        )
+        code, out = self.run_main(["--root", self.root])
+        self.assertEqual(code, 1, out)
+        self.assertIn("TheMapObjectListPtr", out)
+        self.assertNotIn("final::TheMapObjectListPtr", out)
+
+    def test_final_derived_class_is_not_skipped(self):
+        # `class W3DAssetManager final : public WW3DAssetManager { ... }`: BASE_CLAUSE's lazy prefix has
+        # the same `final`-as-name bug, which drops the derived class out of the closure entirely
+        # (127-gx-w2-r5-29).
+        self.write(
+            "Core/WWAssetManager.h",
+            "class WWAssetManager {\n"
+            "public:\n"
+            "    static constexpr rts::ContextField<WWAssetManager*, &rts::EngineContext::assetManager> "
+            "TheInstance{};\n"
+            "};\n",
+        )
+        self.write(
+            "Core/W3DAssetManager.h",
+            '#include "WWAssetManager.h"\n'
+            "class W3DAssetManager final : public WWAssetManager {\n"
+            "public:\n"
+            "    void Track() { WWAssetManager** link = &TheInstance; }\n"
+            "};\n",
+        )
+        code, out = self.run_main(["--root", self.root])
+        self.assertEqual(code, 1, out)
+        self.assertIn("TheInstance", out)
+
     def test_derived_class_inline_body_is_own_file(self):
         # A derived class's own class body is never treated as the base's own file by member_def alone:
         # an inline member body written directly inside D's class declaration has no `D::` qualifier at

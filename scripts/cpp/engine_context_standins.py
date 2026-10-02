@@ -63,11 +63,17 @@ STANDIN = re.compile(
     r"static\s+constexpr\s+(?:::)?rts::(?:Indirect)?ContextField\s*<(?P<args>.*?)>\s*(?P<name>\w+)\s*\{\s*\}\s*;",
     re.S,
 )
-CLASS = re.compile(r"^\s*(?:class|struct)\s+(?:\w+\s+)*?(?P<name>\w+)\s*(?::[^;{]*)?\{", re.M)
+# An optional `final` between the class name and its base clause/opening brace (`class C final {`,
+# `class D final : public C {`): without it, the lazy `(?:\w+\s+)*?` backtracks into treating the real
+# name as a prefix word and `final` as the name instead, silently dropping a `final` class out of either
+# scan (127-gx-w2-r5-29; the tree already has one, Core/.../W3DSmudge.h's W3DSmudgeManager final).
+CLASS = re.compile(r"^\s*(?:class|struct)\s+(?:\w+\s+)*?(?P<name>\w+)\s*(?:final\s*)?(?::[^;{]*)?\{", re.M)
 # `class D : public C, private E { ... }` / `struct D : C { ... }`: a derived class's direct base list,
 # scanned across every source file (a derived class's own header may never mention a stand-in's name,
 # e.g. W3DAssetManager.h does not mention WW3DAssetManager::TheInstance).
-BASE_CLAUSE = re.compile(r"^[ \t]*(?:class|struct)\s+(?:\w+\s+)*?(?P<name>\w+)\s*:\s*(?P<bases>[^;{]*?)\{", re.M)
+BASE_CLAUSE = re.compile(
+    r"^[ \t]*(?:class|struct)\s+(?:\w+\s+)*?(?P<name>\w+)\s*(?:final\s*)?:\s*(?P<bases>[^;{]*?)\{", re.M
+)
 BASE_ACCESS = re.compile(r"\b(?:public|private|protected|virtual)\b", re.I)
 
 
