@@ -367,15 +367,16 @@ class SourceIndex:
         return "?", "", False
 
     def find_all(self, parsed):
-        """Every definition site (file:line, declaration text), one per file, found the way `find` finds the first: the TUs of
-        a name that several translation units each define (a file static, a function-local static of a
-        same-named function)."""
-        sites, files, first_branch = [], set(), None
-        for branch, source, decl, _indented in self.definitions(parsed):
-            if first_branch is None:
-                first_branch = branch
-            if branch != first_branch:
-                break
+        """Every definition site (file:line, declaration text), one per file, the best-ranked one `find` would
+        take for that file: the TUs of a name that several translation units each define (a file static, a
+        function-local static of a same-named function). `definitions` already yields best first within and
+        across its branches (owner before inline before macro; qualified before in-class; `plain` sites
+        sorted by rank), so the first site seen for a file is its best one; stopping at the first branch
+        change would instead drop every other branch's sites outright (a namespace member defined at file
+        scope in one TU and indented inside a `namespace { ... }` block in another have different `plain`
+        ranks, so only one of the two TUs would ever be recorded)."""
+        sites, files = [], set()
+        for _branch, source, decl, _indented in self.definitions(parsed):
             rel = source.split(":")[0]
             if rel not in files:
                 files.add(rel)
