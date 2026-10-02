@@ -10,14 +10,19 @@
 # macro instead, as DX8Wrapper's names have: WW3D2/w3drenderstate_names.h).
 #
 # Where it looks, for a stand-in `name` of class `C` declared in `c.h`: `C::name` in every source file, and
-# `name` unqualified in `c.h` and in every file that defines one of `C`'s members: a `C::member(` found by
-# content, not by file name (a class's members are not always defined in a file named after the class, e.g.
-# MapObject's are in WorldHeightMap.cpp), whose parameter list's matching close paren is followed (after
-# optional whitespace and any of `const`/`noexcept`/`override`/`final`) by `{` or a constructor
-# initialiser's `:`, not `;`. That excludes a declaration, a bare call statement (`C::member();`) and a
-# call inside a return/case/other statement (`return C::member();`), none of which are `C`'s own code;
-# `*`/`&` may attach to the return type or straight to `C`'s name either way (`T *C::member()`,
-# `T* C::member()`), and the return type may sit on the line above. `sizeof(name[0])`, `&name[i]`,
+# `name` unqualified in `c.h`, in every file that defines one of `C`'s members, and in every file that
+# defines a member of a class `D` deriving (directly or transitively) from `C` (ordinary unqualified name
+# lookup finds `C`'s static member inside `D`'s own member functions too; `D`'s base clause is found by
+# content across every source file, since `D`'s own header need not mention the stand-in's name, e.g.
+# W3DAssetManager.h does not mention WW3DAssetManager::TheInstance). A member-defining file is found by
+# content, not by file name (a class's members are not always defined in a file named after the class,
+# e.g. MapObject's are in WorldHeightMap.cpp): a `C::member(` (or `D::member(`) whose parameter list's
+# matching close paren is followed (after optional whitespace and any of `const`/`noexcept`/`override`/
+# `final`) by `{`, or, only when `member` is a constructor (names the same class), an initialiser's `:`,
+# not `;`. That excludes a declaration, a bare call statement (`C::member();`) and a call inside a return/
+# case/ternary/other statement (`return C::member();`, `case C::member():`, `cond ? C::member() : x`),
+# none of which are `C`'s own code; `*`/`&` may attach to the return type or straight to `C`'s name either
+# way (`T *C::member()`, `T* C::member()`), and the return type may sit on the line above. `sizeof(name[0])`, `&name[i]`,
 # `&name->x` and `&name.x` are allowed: they reach the field itself. `std::addressof(name)` is the same
 # hazard as unary `&` and is caught too. A unary `&` is also recognised after a C-style pointer cast
 # (`(void*)&name`, `(unsigned char*)&name`, `(struct Foo*)&name`) and after `&&` (`a && &name`), not only
@@ -52,6 +57,22 @@ STANDIN = re.compile(
     re.S,
 )
 CLASS = re.compile(r"^\s*(?:class|struct)\s+(?:\w+\s+)*?(?P<name>\w+)\s*(?::[^;{]*)?\{", re.M)
+# `class D : public C, private E { ... }` / `struct D : C { ... }`: a derived class's direct base list,
+# scanned across every source file (a derived class's own header may never mention a stand-in's name,
+# e.g. W3DAssetManager.h does not mention WW3DAssetManager::TheInstance).
+BASE_CLAUSE = re.compile(r"^[ \t]*(?:class|struct)\s+(?:\w+\s+)*?(?P<name>\w+)\s*:\s*(?P<bases>[^;{]*?)\{", re.M)
+BASE_ACCESS = re.compile(r"\b(?:public|private|protected|virtual)\b", re.I)
+
+
+def _direct_bases(bases_text):
+    """The (unqualified, template-stripped) names in a base-clause's comma-separated list."""
+    out = []
+    for part in bases_text.split(","):
+        part = BASE_ACCESS.sub("", part).strip()
+        part = part.split("<", 1)[0].strip()  # drop template arguments, e.g. `Foo<T>` -> `Foo`
+        if part:
+            out.append(part.rsplit("::", 1)[-1])
+    return out
 # After the name: something that reaches the field itself, not the stand-in.
 REACHES_FIELD = re.compile(r"\s*(?:\[|\.|->|\()")
 # Before a unary `&`: an operator, an opening bracket, a separator or `return`.
@@ -188,10 +209,13 @@ def _matching_close_paren(text, open_idx):
     return None
 
 
-def _looks_like_definition(text, close_idx):
+def _looks_like_definition(text, close_idx, cls, member):
     """Whether what follows the parameter list's close paren at close_idx is a definition's own shape:
-    `{` or a constructor initialiser's `:`, optionally after whitespace and any of `const`/`noexcept`/
-    `override`/`final` (in any order), rather than a declaration's or a call statement's `;`."""
+    `{`, or (only for a constructor, where `member` names the same class as `cls`) a constructor
+    initialiser's `:`, optionally after whitespace and any of `const`/`noexcept`/`override`/`final` (in
+    any order), rather than a declaration's or a call statement's `;`. A non-constructor's `:` is never a
+    definition's own shape: it is a ternary's (`cond ? C::f() : x`) or a case label's (`case C::f():`),
+    both of which are calls inside some other statement, not `C`'s own code."""
     i, n = close_idx + 1, len(text)
     while True:
         while i < n and text[i] in " \t\r\n":
@@ -204,7 +228,11 @@ def _looks_like_definition(text, close_idx):
                 break
         else:
             break
-    return i < n and text[i] in "{:"
+    if i >= n:
+        return False
+    if text[i] == "{":
+        return True
+    return text[i] == ":" and member == cls
 
 
 def uses(text, name, qualifier):
@@ -340,25 +368,46 @@ def main():
     # Files that define at least one member of each class with a stand-in, found by content (a class's
     # members are not always defined in a file named after the class, e.g. MapObject's are in
     # WorldHeightMap.cpp): a `C::member(` whose parameter list's matching close paren is followed by `{`
-    # or a constructor initialiser's `:`, not `;`. That is a definition's own shape; it is not a
-    # declaration (`;`), a bare call statement (`C::member();`) or a call inside some other statement
-    # (`return C::member();`, `case C::member():`), none of which make this `C`'s own file. The return
-    # type, if any, is not inspected at all (and so needs no prefix pattern of its own): it may sit on
-    # the same line, with `*`/`&` attached to either word (`T *C::member()`, `T* C::member()`), or on the
-    # line above.
+    # or, only for a constructor, an initialiser's `:`, not `;`. That is a definition's own shape; it is
+    # not a declaration (`;`), a bare call statement (`C::member();`) or a call inside some other
+    # statement (`return C::member();`, `case C::member():`, `cond ? C::member() : x`), none of which
+    # make this `C`'s own file. The return type, if any, is not inspected at all (and so needs no prefix
+    # pattern of its own): it may sit on the same line, with `*`/`&` attached to either word
+    # (`T *C::member()`, `T* C::member()`), or on the line above. A class `D` deriving (directly or
+    # transitively) from `C` can also name `C`'s static member unqualified inside `D`'s own member
+    # functions (ordinary unqualified name lookup finds an inherited member), so a file that defines only
+    # `D`'s members is `C`'s own file too (base classes found by content, across every source file, since
+    # a derived class's own header, e.g. W3DAssetManager.h, need not mention the stand-in's name).
     owners = {owner for owner, _, _ in standins if owner}
     defines_member = {}
     if owners:
+        children_of = {}
+        for raw_text in raw.values():
+            stripped = strip_comments_and_strings(raw_text)
+            for m in BASE_CLAUSE.finditer(stripped):
+                for base in _direct_bases(m.group("bases")):
+                    children_of.setdefault(base, set()).add(m.group("name"))
+        # class_owners[D] = every stand-in owner that D is, or (transitively) derives from.
+        class_owners = {}
+        for owner in owners:
+            stack, seen = [owner], {owner}
+            while stack:
+                cur = stack.pop()
+                class_owners.setdefault(cur, set()).add(owner)
+                for child in children_of.get(cur, ()):
+                    if child not in seen:
+                        seen.add(child)
+                        stack.append(child)
         member_def = re.compile(
-            r"(?<![\w:])(?P<cls>" + "|".join(re.escape(o) for o in sorted(owners)) + r")"
+            r"(?<![\w:])(?P<cls>" + "|".join(re.escape(c) for c in sorted(class_owners)) + r")"
             r"\s*::\s*(?P<member>~?[A-Za-z_]\w*)\s*\(",
         )
         for path, text in files.items():
             classes = set()
             for m in member_def.finditer(text):
                 close = _matching_close_paren(text, m.end() - 1)
-                if close is not None and _looks_like_definition(text, close):
-                    classes.add(m.group("cls"))
+                if close is not None and _looks_like_definition(text, close, m.group("cls"), m.group("member")):
+                    classes.update(class_owners.get(m.group("cls"), ()))
             if classes:
                 defines_member[path] = classes
 

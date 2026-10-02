@@ -10,9 +10,12 @@
 # MainTest covers main() end to end: a stand-in whose class's members are defined in a differently named
 # file (the MapObject/WorldHeightMap.cpp gap, found by content now, not by file name), a violation in an
 # `--extra-dir` tree (a consumer's own C++ outside Core/Generals/GeneralsMD), and the own-file detection's
-# own gaps found by a later re-review (127-gx-w2-r3-16/17/18): a bare call statement and a
-# `return C::member(...)` call must not make a file C's own (they are not definitions), while
-# `T *C::member()`/`T* C::member()` and a return type on the line above must.
+# own gaps found by later re-reviews (127-gx-w2-r3-16/17/18, 127-gx-w2-r4-23/24, 127-gx-w2-r2-12): a bare
+# call statement, a `return C::member(...)` call, a ternary's `cond ? C::member() : x` and a case label's
+# `case C::member():` must not make a file C's own (none of them are definitions, and `:` is a definition's
+# own shape only for a constructor's initialiser list), while `T *C::member()`/`T* C::member()`, a return
+# type on the line above, a constructor's initialiser-list `:` and a trailing `const` must, and so must a
+# file that defines only a member of a class deriving (directly or transitively) from a stand-in's class.
 #
 # Usage: python3 engine_context_standins_test.py
 
@@ -277,6 +280,8 @@ class MainTest(unittest.TestCase):
     def test_return_statement_call_is_not_own_file(self):
         # `return C::member(...)` has the non-empty prefix `return`, but it is a call, not a
         # definition: it must not make the file C's own (127-gx-w2-r3-16's dx8wrapper.cpp/ww3d.cpp gap).
+        # dx8wrapper.cpp carries a REAL flaggable use of the local `FrameCount` macro (127-gx-w2-r4-24's
+        # gap: a file with nothing to flag either way cannot show whether it was treated as WW3D's own).
         self.write(
             "Core/WW3D.h",
             "class WW3D {\n"
@@ -289,9 +294,171 @@ class MainTest(unittest.TestCase):
             "Core/dx8wrapper.cpp",
             '#include "WW3D.h"\n'
             "#define FrameCount (12345)\n"
+            'void DX8Wrapper::Log() { WWDEBUG_SAY(("dx8 frame %lu", FrameCount)); }\n'
             "unsigned DX8Wrapper::Other()\n"
             "{\n"
             "    return WW3D::Get_Frame_Count();\n"
+            "}\n",
+        )
+        code, out = self.run_main(["--root", self.root])
+        self.assertEqual(code, 0, out)
+
+    def test_ternary_call_is_not_own_file(self):
+        # `cond ? C::member() : x` has a `:` after the call's close paren, but it is a ternary, not a
+        # constructor initialiser: it must not make the file C's own (127-gx-w2-r4-23's gap).
+        self.write(
+            "Core/WW3D.h",
+            "class WW3D {\n"
+            "public:\n"
+            "    static constexpr rts::ContextField<unsigned long, &rts::EngineContext::frame> "
+            "FrameCount{};\n"
+            "};\n",
+        )
+        self.write(
+            "Core/dx8wrapper.cpp",
+            '#include "WW3D.h"\n'
+            "#define FrameCount (12345)\n"
+            'void DX8Wrapper::Log() { WWDEBUG_SAY(("dx8 frame %lu", FrameCount)); }\n'
+            "unsigned DX8Wrapper::Other(bool b)\n"
+            "{\n"
+            "    return b ? WW3D::Get_Frame_Count() : 0;\n"
+            "}\n",
+        )
+        code, out = self.run_main(["--root", self.root])
+        self.assertEqual(code, 0, out)
+
+    def test_case_label_call_is_not_own_file(self):
+        # `case C::member():` also has a `:` after the call's close paren, and is also not a definition
+        # (127-gx-w2-r4-23's gap).
+        self.write(
+            "Core/WW3D.h",
+            "class WW3D {\n"
+            "public:\n"
+            "    static constexpr rts::ContextField<unsigned long, &rts::EngineContext::frame> "
+            "FrameCount{};\n"
+            "};\n",
+        )
+        self.write(
+            "Core/dx8wrapper.cpp",
+            '#include "WW3D.h"\n'
+            "#define FrameCount (12345)\n"
+            'void DX8Wrapper::Log() { WWDEBUG_SAY(("dx8 frame %lu", FrameCount)); }\n'
+            "void DX8Wrapper::Other(int b)\n"
+            "{\n"
+            "    switch (b) {\n"
+            "    case WW3D::Get_Frame_Count():\n"
+            "        break;\n"
+            "    }\n"
+            "}\n",
+        )
+        code, out = self.run_main(["--root", self.root])
+        self.assertEqual(code, 0, out)
+
+    def test_constructor_initialiser_is_own_file(self):
+        # `C::C() : m(0) { ... }`: the `:` after the constructor's close paren IS a definition's own
+        # shape (its member name equals the class name), unlike a ternary's or a case label's `:`.
+        self.write(
+            "Core/MapObject.h",
+            "class MapObject {\n"
+            "public:\n"
+            "    static constexpr rts::ContextField<MapObject*, &rts::EngineContext::mapObjectList> "
+            "TheMapObjectListPtr{};\n"
+            "};\n",
+        )
+        self.write(
+            "Core/WorldHeightMap.cpp",
+            '#include "MapObject.h"\n'
+            "MapObject::MapObject() : m_next(0)\n"
+            "{\n"
+            "    MapObject** link = &TheMapObjectListPtr;\n"
+            "}\n",
+        )
+        code, out = self.run_main(["--root", self.root])
+        self.assertEqual(code, 1, out)
+        self.assertIn("WorldHeightMap.cpp", out)
+
+    def test_const_method_is_own_file(self):
+        # `C::member() const { ... }`: a trailing `const` before the `{` is still a definition's own
+        # shape.
+        self.write(
+            "Core/MapObject.h",
+            "class MapObject {\n"
+            "public:\n"
+            "    static constexpr rts::ContextField<MapObject*, &rts::EngineContext::mapObjectList> "
+            "TheMapObjectListPtr{};\n"
+            "};\n",
+        )
+        self.write(
+            "Core/WorldHeightMap.cpp",
+            '#include "MapObject.h"\n'
+            "int MapObject::get() const\n"
+            "{\n"
+            "    MapObject** link = &TheMapObjectListPtr;\n"
+            "    return 0;\n"
+            "}\n",
+        )
+        code, out = self.run_main(["--root", self.root])
+        self.assertEqual(code, 1, out)
+        self.assertIn("WorldHeightMap.cpp", out)
+
+    def test_derived_class_member_file_is_own_file(self):
+        # A file that defines only a member of a class D deriving from C can still name C's static
+        # member unqualified (ordinary unqualified lookup finds an inherited member): it must be C's own
+        # file too (127-gx-w2-r2-12's W3DAssetManager/WW3DAssetManager gap). D's own header
+        # (W3DAssetManager.h) never mentions the stand-in's name, so it is found by its base clause alone.
+        self.write(
+            "Core/WWAssetManager.h",
+            "class WWAssetManager {\n"
+            "public:\n"
+            "    static constexpr rts::ContextField<WWAssetManager*, &rts::EngineContext::assetManager> "
+            "TheInstance{};\n"
+            "};\n",
+        )
+        self.write(
+            "Core/W3DAssetManager.h",
+            '#include "WWAssetManager.h"\n'
+            "class W3DAssetManager : public WWAssetManager {\n"
+            "public:\n"
+            "    void Load();\n"
+            "};\n",
+        )
+        self.write(
+            "Core/W3DAssetManager.cpp",
+            '#include "W3DAssetManager.h"\n'
+            "void W3DAssetManager::Load()\n"
+            "{\n"
+            "    WWAssetManager** link = &TheInstance;\n"
+            "}\n",
+        )
+        code, out = self.run_main(["--root", self.root])
+        self.assertEqual(code, 1, out)
+        self.assertIn("W3DAssetManager.cpp", out)
+        self.assertIn("TheInstance", out)
+
+    def test_unrelated_class_member_file_is_not_own_file(self):
+        # A class that does NOT derive from C must not be treated as C's own, even if it shares no name
+        # with C: the derived-class lookup must not over-match.
+        self.write(
+            "Core/WWAssetManager.h",
+            "class WWAssetManager {\n"
+            "public:\n"
+            "    static constexpr rts::ContextField<WWAssetManager*, &rts::EngineContext::assetManager> "
+            "TheInstance{};\n"
+            "};\n",
+        )
+        self.write(
+            "Core/Unrelated.h",
+            "class Unrelated {\n"
+            "public:\n"
+            "    void Load();\n"
+            "};\n",
+        )
+        self.write(
+            "Core/Unrelated.cpp",
+            '#include "Unrelated.h"\n#include "WWAssetManager.h"\n'
+            "void Unrelated::Load()\n"
+            "{\n"
+            "    WWAssetManager** link = &TheInstance;\n"
             "}\n",
         )
         code, out = self.run_main(["--root", self.root])
