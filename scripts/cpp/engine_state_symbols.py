@@ -853,7 +853,7 @@ GLOBAL_LOOKUP_RE = re.compile(r"->")
 CALL_INIT_RE = re.compile(r"\b(\w+)\s*\(")
 # Pure value constructors used in this codebase to build a by-value const from literals alone: no lookup, no
 # engine-state read, no counter or RNG draw. Nothing outside this list (and the declared type's own name) is
-# accepted as a call initializer.
+# accepted as a call initialiser.
 SAFE_VALUE_CONSTRUCTOR_NAMES = {
     "GameMakeColor",
     "DEG_TO_RAD",
