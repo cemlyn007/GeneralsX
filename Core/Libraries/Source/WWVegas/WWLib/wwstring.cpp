@@ -76,12 +76,11 @@ StringClass::Get_String (int length, bool is_temp)
 	//
 	//	Should we attempt to use a temp buffer for this string?
 	//
-	// GeneralsX @bugfix cemlyn007 29/09/2026 Read ReservedMask only under m_Mutex (PLAN-023 Phase 5b, TSan)
+	// GeneralsX @bugfix cemlyn007 29/09/2026, revised 02/10/2026 (PLAN-023 Phase 5b, TSan; finding w2-r2-7)
 	// Upstream checked ReservedMask against ALL_TEMP_STRINGS_USED_MASK before taking the lock, an
 	// unsynchronised read of a word other threads write under it: a data race once engines run on
-	// several threads.
-	// GeneralsX @bugfix cemlyn007 02/10/2026 Restored as a lock-free early-out (found in review): ReservedMask
-	// is now std::atomic<unsigned>, so this relaxed load is race-free (the authoritative test-and-set below
+	// several threads. ReservedMask is now std::atomic<unsigned>, so this relaxed load is a race-free
+	// early-out (the authoritative test-and-set below
 	// still runs under m_Mutex), and we once again skip taking the process-wide lock when every temp buffer
 	// is in use instead of always locking just to find nothing.
 	if (is_temp && length <= MAX_TEMP_LEN && ReservedMask.load(std::memory_order_relaxed) != ALL_TEMP_STRINGS_USED_MASK) {
