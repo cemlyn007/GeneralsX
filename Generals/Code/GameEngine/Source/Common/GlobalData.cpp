@@ -1203,12 +1203,22 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 	// parse the ini weapon definition
 	ini->initFromINI( TheWritableGlobalData, s_GlobalDataFieldParseTable );
 
-	TheWritableGlobalData->m_userDataDir.clear();
+	// GeneralsX @bugfix cemlyn007 02/10/2026 Only the original instance derives and creates the
+	// default: every override is also a fresh GameData parse (INI_LOAD_CREATE_OVERRIDES ->
+	// newOverride(), which immediately overwrites m_userDataDir with a memberwise copy of the
+	// previous TheWritableGlobalData), so re-deriving and re-creating it here for an override just
+	// re-reads $XDG_DATA_HOME/$HOME and re-prints createUserDataDirectory's stderr diagnostic on every
+	// map.ini GameData block, even for an engine whose own directory already works (117-gx-w1-r3-23;
+	// GeneralsMD's constructor has the matching guard).
+	if (TheWritableGlobalData == GlobalData::m_theOriginal)
+	{
+		TheWritableGlobalData->m_userDataDir.clear();
 
-	// GeneralsX @feature Bender 01/04/2026 Cross-platform user data directory handling
-	// Adopts upstream refactoring with extended cross-platform support
-	TheWritableGlobalData->m_userDataDir = BuildUserDataPathFromIni();
-	CreateDirectory(TheWritableGlobalData->m_userDataDir.str(), nullptr);
+		// GeneralsX @feature Bender 01/04/2026 Cross-platform user data directory handling
+		// Adopts upstream refactoring with extended cross-platform support
+		TheWritableGlobalData->m_userDataDir = BuildUserDataPathFromIni();
+		CreateDirectory(TheWritableGlobalData->m_userDataDir.str(), nullptr);
+	}
 
 	// override INI values with user preferences
 	OptionPreferences optionPref;
