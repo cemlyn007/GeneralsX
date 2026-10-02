@@ -469,7 +469,7 @@ void GameStateMap::clearScratchPadMaps()
 {
 
 	// GeneralsX @bugfix cemlyn007 27/09/2026 Use the save directory cached in init(): ~GameStateMap calls
-	// this at shutdown, after shutdownAll has deleted TheGameState (initialized after TheGameStateMap).
+	// this at shutdown, after shutdownAll has deleted TheGameState (initialised after TheGameStateMap).
 	if( m_saveDirectory.isEmpty() )
 		return;
 
@@ -478,7 +478,7 @@ void GameStateMap::clearScratchPadMaps()
 	// yet (nothing saved so far), so every *.map in the working directory (usually the install directory) was
 	// deleted. The switch also changed the working directory under every other thread. The local file system
 	// lists the directory on every platform, and a save directory that does not exist yet lists nothing.
-	// TheLocalFileSystem is initialized before TheGameStateMap, so it is still alive in ~GameStateMap.
+	// TheLocalFileSystem is initialised before TheGameStateMap, so it is still alive in ~GameStateMap.
 	FilenameList mapFiles;
 	TheLocalFileSystem->getFileListInDirectory( AsciiString::TheEmptyString, m_saveDirectory, "*.map", mapFiles, FALSE );
 
