@@ -581,6 +581,73 @@ class MainTest(unittest.TestCase):
         self.assertEqual(code, 1, out)
         self.assertIn("WorldHeightMap.cpp", out)
 
+    def test_derived_class_inline_body_is_own_file(self):
+        # A derived class's own class body is never treated as the base's own file by member_def alone:
+        # an inline member body written directly inside D's class declaration has no `D::` qualifier at
+        # all (127-gx-w2-r2-12's re-review dispute). D's own header (here ViewerAssetMgr.h-shaped) is
+        # found by its base clause, same as the out-of-class case, and must be scanned too.
+        self.write(
+            "Core/WWAssetManager.h",
+            "class WWAssetManager {\n"
+            "public:\n"
+            "    static constexpr rts::ContextField<WWAssetManager*, &rts::EngineContext::assetManager> "
+            "TheInstance{};\n"
+            "};\n",
+        )
+        self.write(
+            "Core/W3DAssetManager.h",
+            '#include "WWAssetManager.h"\n'
+            "class W3DAssetManager : public WWAssetManager {\n"
+            "public:\n"
+            "    void Track() { WWAssetManager** link = &TheInstance; }\n"
+            "};\n",
+        )
+        code, out = self.run_main(["--root", self.root])
+        self.assertEqual(code, 1, out)
+        self.assertIn("W3DAssetManager.h", out)
+        self.assertIn("TheInstance", out)
+
+    def test_transitive_derived_class_member_file_is_own_file(self):
+        # E : D : C (D itself has no stand-in of its own): the closure must follow more than one level
+        # (127-gx-w2-r5-31's coverage gap — a direct-only regression in the BFS would pass every other
+        # test here but this one).
+        self.write(
+            "Core/WWAssetManager.h",
+            "class WWAssetManager {\n"
+            "public:\n"
+            "    static constexpr rts::ContextField<WWAssetManager*, &rts::EngineContext::assetManager> "
+            "TheInstance{};\n"
+            "};\n",
+        )
+        self.write(
+            "Core/W3DAssetManager.h",
+            '#include "WWAssetManager.h"\n'
+            "class W3DAssetManager : public WWAssetManager {\n"
+            "public:\n"
+            "    void Load();\n"
+            "};\n",
+        )
+        self.write(
+            "Core/DX8AssetManager.h",
+            '#include "W3DAssetManager.h"\n'
+            "class DX8AssetManager : public W3DAssetManager {\n"
+            "public:\n"
+            "    void Reload();\n"
+            "};\n",
+        )
+        self.write(
+            "Core/DX8AssetManager.cpp",
+            '#include "DX8AssetManager.h"\n'
+            "void DX8AssetManager::Reload()\n"
+            "{\n"
+            "    WWAssetManager** link = &TheInstance;\n"
+            "}\n",
+        )
+        code, out = self.run_main(["--root", self.root])
+        self.assertEqual(code, 1, out)
+        self.assertIn("DX8AssetManager.cpp", out)
+        self.assertIn("TheInstance", out)
+
     def test_extra_dir_violation_is_reported(self):
         # A consumer's own C++ outside the Core/Generals/GeneralsMD layout, found through --extra-dir.
         self.write(

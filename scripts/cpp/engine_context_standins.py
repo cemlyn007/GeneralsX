@@ -397,16 +397,22 @@ def main():
     # transitively) from `C` can also name `C`'s static member unqualified inside `D`'s own member
     # functions (ordinary unqualified name lookup finds an inherited member), so a file that defines only
     # `D`'s members is `C`'s own file too (base classes found by content, across every source file, since
-    # a derived class's own header, e.g. W3DAssetManager.h, need not mention the stand-in's name).
+    # a derived class's own header, e.g. W3DAssetManager.h, need not mention the stand-in's name). That
+    # includes an inline member body written directly in `D`'s own class body (`class D : public C { void
+    # f() { ... TheInstance ... } };`), which has no `D::` qualifier for member_def to match at all: the
+    # file holding the base clause that makes `D` derive from `C` (or from another such `D`) is `D`'s own
+    # file too, whether or not it also holds an out-of-class `D::member(...) {` definition.
     owners = {owner for owner, _, _ in standins if owner}
     defines_member = {}
     if owners:
         children_of = {}
-        for raw_text in raw.values():
+        base_clause_file = {}
+        for path, raw_text in raw.items():
             stripped = strip_comments_and_strings(raw_text)
             for m in BASE_CLAUSE.finditer(stripped):
                 for base in _direct_bases(m.group("bases")):
                     children_of.setdefault(base, set()).add(m.group("name"))
+                base_clause_file.setdefault(m.group("name"), set()).add(path)
         # class_owners[D] = every stand-in owner that D is, or (transitively) derives from.
         class_owners = {}
         for owner in owners:
@@ -418,6 +424,9 @@ def main():
                     if child not in seen:
                         seen.add(child)
                         stack.append(child)
+        for cls, classes in class_owners.items():
+            for path in base_clause_file.get(cls, ()):
+                defines_member.setdefault(path, set()).update(classes)
         member_def = re.compile(
             r"(?<![\w:])(?P<cls>" + "|".join(re.escape(c) for c in sorted(class_owners)) + r")"
             r"\s*::\s*(?P<member>~?[A-Za-z_]\w*)\s*\(",
@@ -429,7 +438,7 @@ def main():
                 if close is not None and _looks_like_definition(text, close, m.group("cls"), m.group("member")):
                     classes.update(class_owners.get(m.group("cls"), ()))
             if classes:
-                defines_member[path] = classes
+                defines_member.setdefault(path, set()).update(classes)
 
     violations = []
     for owner, name, header in standins:
