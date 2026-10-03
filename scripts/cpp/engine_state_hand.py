@@ -34,7 +34,7 @@
 #
 # Process-wide state must be written once (at static initialisation or the first boot) and only read after
 # that, or be atomic or locked: engines boot while others step on their threads (PLAN-023 Phase 5b). A note
-# that says "boot/shutdown only, serialised by the host" names state that only boots and teardowns touch,
+# that says "boot/shutdown only, serialized by the host" names state that only boots and teardowns touch,
 # which the host serialises (one process mutex), and that no engine reads while it steps.
 
 PER = "per-engine"
