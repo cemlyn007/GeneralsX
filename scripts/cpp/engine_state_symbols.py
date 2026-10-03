@@ -389,6 +389,7 @@ class SourceIndex:
         self.files = {}
         self._scope_cache = {}
         self._is_class_cache = {}
+        self._is_function_cache = {}
         self.where = collections.defaultdict(set)
         for scan_root in SCAN_ROOTS:
             for dirpath, dirnames, filenames in os.walk(os.path.join(root, scan_root)):
@@ -412,6 +413,30 @@ class SourceIndex:
         found = set.intersection(*sets)
         # Definitions live in source files; headers only for inline functions and class-body statics.
         return sorted(found, key=lambda p: (not p.endswith((".cpp", ".c", ".cc")), p))
+
+    def is_function_name(self, name):
+        """Whether `name` (bare, no `&` and no leading scope) is defined, somewhere in the scanned tree, as
+        a free function or a method (`name(params) {`, optionally `Class::name(params) {`): the only way a
+        bare, `&`-taken or scoped identifier in a by-value const's function-pointer-argument position (see
+        `_is_safe_value_expr`) is told apart from a per-engine variable of the same textual shape. This
+        codebase passes its state-machine callbacks (StateConditionInfo's `test`) by bare name, including
+        from inside the defining class's own member functions (plain unqualified lookup finds a static
+        method there too), never by `&`, so requiring `&`/`Class::`-qualification instead would reject real,
+        safe code; a name is not in `wanted`/`where` here (those only index the symbols being classified,
+        never an arbitrary callback name found inside an initialiser), so this searches every scanned file's
+        text directly rather than `candidates()`'s narrower index, and caches the answer by name since the
+        same callback name recurs across many state tables. A name whose only definition lives outside
+        `SCAN_ROOTS`/`SKIP_DIRS`, or that this regex's single-non-nested-parameter-list shape does not match,
+        is not found: that fails closed (rejected as not provably a function), never the reverse."""
+        cached = self._is_function_cache.get(name)
+        if cached is not None:
+            return cached
+        pattern = re.compile(
+            rf"(?:\b[A-Za-z_]\w*\s*::\s*)?\b{re.escape(name)}\s*\([^;{{}}]*\)\s*(?:const\s*)?\{{"
+        )
+        found = any(pattern.search(text) for text in self.files.values())
+        self._is_function_cache[name] = found
+        return found
 
     def class_bodies(self, rel, cls):
         """(start, end) offsets of the body of every definition of class `cls` in `rel`, braces matched (outside
@@ -767,25 +792,25 @@ HAND = [Hand(e) for e in HAND_ENTRIES]
 TOOLCHAIN = {"__dso_handle", "completed", "__TMC_END__", "_GLOBAL_OFFSET_TABLE_", "_DYNAMIC", "__bss_start", "_edata", "_end"}
 
 
-def rule_toolchain(sym, symbols=None):
+def rule_toolchain(sym, symbols=None, is_function_name=None):
     if sym.key in TOOLCHAIN or sym.key.startswith("DW.ref."):
         return GLOBAL, "", "compiler/linker runtime object (crtstuff, DWARF personality references)"
     return None
 
 
-def rule_libstdcxx(sym, symbols=None):
+def rule_libstdcxx(sym, symbols=None, is_function_name=None):
     if sym.key.startswith(("std::", "__gnu_cxx::", "__cxxabiv1::", "guard variable for std::")):
         return GLOBAL, "", "libstdc++ template static instantiated into the library (library state, not engine state)"
     return None
 
 
-def rule_third_party(sym, symbols=None):
+def rule_third_party(sym, symbols=None, is_function_name=None):
     if sym.library:
         return GLOBAL, "", f"state of the statically linked third-party library `{sym.library}` (vcpkg); not engine state"
     return None
 
 
-def rule_read_only(sym, symbols=None):
+def rule_read_only(sym, symbols=None, is_function_name=None):
     if sym.sections <= {".rodata", ".data.rel.ro"}:
         return CONST, "", "in a read-only (or RELRO) section: nothing can write it after relocation"
     return None
@@ -804,7 +829,7 @@ NAMEKEY_DECL_RE = re.compile(r"^(?:static\s+)?(const\s+)?(?:NameKeyType|StaticNa
 NAMEKEY_INIT_RE = re.compile(r"^\s*(?:NAMEKEY\s*\(|TheNameKeyGenerator\s*->\s*nameToKey\b)")
 
 
-def rule_namekey(sym, symbols=None):
+def rule_namekey(sym, symbols=None, is_function_name=None):
     p = sym.parsed
     if sym.key.startswith("TheKey_") or (p.var == "nk" and p.func == "getModuleNameKey"):
         return GLOBAL, "", "cached NameKeyType: process-wide by PLAN-023 Decision 2 (shared immortal generator)"
@@ -824,7 +849,7 @@ def rule_namekey(sym, symbols=None):
 FIELDPARSE_DECL_RE = re.compile(r"^(?:static\s+)?const\s+FieldParse\s+\w+\s*\[[^\]]*\]\s*$")
 
 
-def rule_field_parse(sym, symbols=None):
+def rule_field_parse(sym, symbols=None, is_function_name=None):
     """INI FieldParse table: built once, never written. By declared type, not by the variable's name alone
     (a variable merely named dataFieldParse/myFieldParse/commonFieldParse is not provably one), and not by
     `FieldParse` merely appearing in the type somewhere (a mutable pointer or container is not a table)."""
@@ -979,19 +1004,29 @@ def _is_writable_name(name, writable_names):
     return name in writable_names
 
 
-def _is_safe_value_expr(expr, type_name, writable_names):
+def _is_safe_value_expr(expr, type_name, writable_names, is_function_name=None):
     """True when `expr` (a whole by-value initialiser, or one brace-list element / call argument of one)
     is provably a pure value: a literal, an ALL_CAPS named constant or enumerator that is not itself a
     writable symbol, `true`/`false`/`nullptr`, a cast of another pure value, a call to an allow-listed pure
     value constructor or to the declared type's own name (each of its arguments checked the same way,
     except that the call's first argument is additionally accepted, when the callee is the declared type's
-    own name, as a lower-case-led function name (bare, `&`-taken or scoped) that does not itself name a
-    writable symbol: a function-pointer field in the type's own constructor, such as StateConditionInfo's
-    `test` callback, never a functional-style cast of a per-engine variable, and never a later argument,
-    such as StateConditionInfo's own `void* userData`, which this codebase never fills from a function
-    name but could fill from an arbitrary per-engine value), or a `{...}` list of pure values.
-    `writable_names` is `_writable_global_names`'s result: every name this initialiser must not be allowed
-    to read, qualified or bare."""
+    own name, as a lower-case-led function name (bare, `&`-taken or scoped) that `is_function_name` (when
+    given) confirms is actually defined as a function somewhere in the scanned tree, and that does not
+    itself name a writable symbol: a function-pointer field in the type's own constructor, such as
+    StateConditionInfo's `test` callback, never a functional-style cast of a per-engine variable (this
+    codebase passes every one of these callbacks by bare, unqualified or `Class::`-qualified name, never
+    by `&`, so FUNC_PTR_ARG_RE's shape alone cannot tell a callback from a same-shaped variable read: only
+    `is_function_name`, a real lookup against the source tree, can), and never a later argument, such as
+    StateConditionInfo's own `void* userData`, which this codebase never fills from a function name but
+    could fill from an arbitrary per-engine value), or a `{...}` list of pure values. `writable_names` is
+    `_writable_global_names`'s result: every name this initialiser must not be allowed to read, qualified
+    or bare. `is_function_name` is `None` only for a direct unit test of this checker in isolation (no
+    source tree to check against: the function-pointer-argument exemption then stays as permissive as the
+    bare FUNC_PTR_ARG_RE/lower-case shape allows, which only narrows what such a test must supply, never
+    what production code accepts); `classify` always supplies a real one, backed by `SourceIndex.
+    is_function_name`, so the exemption is fail-closed there: a name that is not provably a function (a
+    member, a parameter, or a per-engine variable the symbol table happens to miss) is rejected, not
+    assumed to be a callback."""
     expr = expr.strip()
     if not expr:
         return True
@@ -1003,7 +1038,7 @@ def _is_safe_value_expr(expr, type_name, writable_names):
         return not _is_writable_name(expr, writable_names)
     m = _STATIC_CAST_RE.match(expr)
     if m:
-        return _is_safe_value_expr(m.group("rest"), type_name, writable_names)
+        return _is_safe_value_expr(m.group("rest"), type_name, writable_names, is_function_name)
     m = _CAST_RE.match(expr)
     if m and m.group("rest")[:1] != "(":
         # `(name)(args)` is a parenthesised callee (a call through a function pointer, or a macro that
@@ -1012,9 +1047,12 @@ def _is_safe_value_expr(expr, type_name, writable_names):
         # recursing into "(args)" as the cast's operand) leaves this expression to the checks below, all
         # of which require a leading identifier or `{`/`(` that is not this cast-looking prefix, so it is
         # rejected rather than read as a cast of a safe-looking argument list.
-        return _is_safe_value_expr(m.group("rest"), type_name, writable_names)
+        return _is_safe_value_expr(m.group("rest"), type_name, writable_names, is_function_name)
     if expr[0] == "{" and expr[-1] == "}":
-        return all(_is_safe_value_expr(e, type_name, writable_names) for e in _split_top_level_commas(expr[1:-1]))
+        return all(
+            _is_safe_value_expr(e, type_name, writable_names, is_function_name)
+            for e in _split_top_level_commas(expr[1:-1])
+        )
     if expr[0] == "(" and _fully_parenthesized(expr):
         # Direct-initialisation's own `(...)` (`pick(3)`'s initialiser is recorded as `(3)`, `Matrix3D::
         # Identity`'s is `(1.0, 0.0, ..., 0.0)`) or a plain grouping: neither is a call (a call starts with
@@ -1023,13 +1061,13 @@ def _is_safe_value_expr(expr, type_name, writable_names):
         # one); a single one is just a parenthesised expression and is checked the same way either way.
         parts = _split_top_level_commas(expr[1:-1])
         if len(parts) > 1:
-            return all(_is_safe_value_expr(p, type_name, writable_names) for p in parts)
-        return _is_safe_value_expr(expr[1:-1], type_name, writable_names)
+            return all(_is_safe_value_expr(p, type_name, writable_names, is_function_name) for p in parts)
+        return _is_safe_value_expr(expr[1:-1], type_name, writable_names, is_function_name)
     call = re.match(r"^([A-Za-z_]\w*)\s*\((.*)\)$", expr, re.DOTALL)
     if call and (call.group(1) in SAFE_VALUE_CONSTRUCTOR_NAMES or call.group(1) == type_name):
         args = _split_top_level_commas(call.group(2))
         return all(
-            _is_safe_value_expr(a, type_name, writable_names)
+            _is_safe_value_expr(a, type_name, writable_names, is_function_name)
             or (
                 # Only the first argument may be a function-pointer field (StateConditionInfo's `test`):
                 # every other position is a plain value (StateConditionInfo's own `toStateID`/`userData`),
@@ -1041,6 +1079,11 @@ def _is_safe_value_expr(expr, type_name, writable_names):
                 and FUNC_PTR_ARG_RE.match(a)
                 and a.lstrip("&").rsplit("::", 1)[-1][:1].islower()
                 and not _is_writable_name(a.lstrip("&"), writable_names)
+                # FUNC_PTR_ARG_RE's shape (a bare, `&`-taken or scoped identifier) cannot tell a function
+                # name from a same-shaped variable: a real lookup against the source tree is the only way
+                # to fail closed on a per-engine read wrapped this way. Skipped only when no such lookup
+                # is available (a direct unit test of this checker).
+                and (is_function_name is None or is_function_name(a.lstrip("&").rsplit("::", 1)[-1]))
             )
             for i, a in enumerate(args)
         )
@@ -1076,7 +1119,7 @@ def _writable_global_names(symbols):
     return frozenset(names)
 
 
-def _by_value_init_is_safe(init, type_name, writable_names):
+def _by_value_init_is_safe(init, type_name, writable_names, is_function_name=None):
     """True when the whole by-value initialiser is a provably pure value (see `_is_safe_value_expr`):
     literals, named constants, casts and allow-listed/own-type constructor calls, built from each other and
     from nothing else, and none of them a read of a symbol `writable_names` names. A dereference, a
@@ -1084,7 +1127,7 @@ def _by_value_init_is_safe(init, type_name, writable_names):
     call that is not on the allow-list (a one-time lookup, a getter backed by engine globals, an RNG draw
     such as GameLogicRandomValue advancing the per-engine logic RNG, even with literal arguments) is
     rejected."""
-    return _is_safe_value_expr(init, type_name, writable_names)
+    return _is_safe_value_expr(init, type_name, writable_names, is_function_name)
 
 
 # The address of a named value (`&kDefault`), optionally scoped: the only way this codebase's safe pointer
@@ -1205,7 +1248,7 @@ def _split_initializer(decl):
     return declarator, None
 
 
-def rule_const_object(sym, symbols=None):
+def rule_const_object(sym, symbols=None, is_function_name=None):
     """A const object (dynamically initialised, so it lands in .data/.bss): never written after its
     initialisation. A reference is never safe here (it can alias per-engine state at any type). A pointer is
     safe only when the pointer itself cannot be reseated (`T* const name`, not `const T*`, whatever the
@@ -1247,7 +1290,7 @@ def rule_const_object(sym, symbols=None):
         else:
             if not CONST_DECL_RE.match(decl):
                 return None
-            if not _by_value_init_is_safe(init, _declared_type_name(decl), writable_names):
+            if not _by_value_init_is_safe(init, _declared_type_name(decl), writable_names, is_function_name):
                 return None
     return CONST, "", "const object: initialized once, never written"
 
@@ -1272,13 +1315,13 @@ RULES = [
 SAFE_FOR_NEW = {f"rule:{name}" for name, _rule in RULES}
 
 
-def classify(sym, symbols):
+def classify(sym, symbols, is_function_name=None):
     p = sym.parsed
     if p.guarded:
         target = symbols.get(p.guarded)
         if target is not None:
             if not target.cls:
-                classify(target, symbols)
+                classify(target, symbols, is_function_name)
             sym.cls, sym.phase = target.cls, target.phase
             sym.note = f"guard variable of that static: {target.note}" if target.note else "guard variable of that static"
             sym.by = "guard"
@@ -1290,7 +1333,7 @@ def classify(sym, symbols):
             hand.used += 1
             return
     for name, rule in RULES:
-        result = rule(sym, symbols)
+        result = rule(sym, symbols, is_function_name)
         if result:
             sym.cls, sym.phase, sym.note = result
             sym.by = f"rule:{name}"
@@ -1327,9 +1370,9 @@ def load_library(root, lib, vcpkg_lib):
             "third-party symbols will not be recognized",
             file=sys.stderr,
         )
-    resolve_sources(root, symbols, read_third_party(vcpkg_lib))
+    index = resolve_sources(root, symbols, read_third_party(vcpkg_lib))
     for sym in symbols.values():
-        classify(sym, symbols)
+        classify(sym, symbols, index.is_function_name)
     return symbols
 
 

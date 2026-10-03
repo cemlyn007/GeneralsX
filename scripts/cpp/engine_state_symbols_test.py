@@ -32,8 +32,8 @@ def make_symbol(key, decls, count=1, source="x.cpp:1", sections=None):
 class RuleConstObjectTest(unittest.TestCase):
     """rule:const is SAFE_FOR_NEW: it must never pass a reassignable pointer or reference."""
 
-    def assert_const(self, decl, expect, msg=None, symbols=None):
-        got = m.rule_const_object(make_symbol("s", [decl]), symbols) is not None
+    def assert_const(self, decl, expect, msg=None, symbols=None, is_function_name=None):
+        got = m.rule_const_object(make_symbol("s", [decl]), symbols, is_function_name) is not None
         self.assertEqual(got, expect, msg or decl)
 
     def test_plain_const_is_safe(self):
@@ -389,8 +389,10 @@ class RuleConstObjectTest(unittest.TestCase):
         self.assert_const("static const UnsignedInt s_t = UnsignedInt(startTime);", False, symbols=writable)
 
     def test_by_value_const_initialized_from_a_functional_cast_of_an_unknown_name_is_still_safe(self):
-        # Without a symbol table saying otherwise, a lower-case-led argument of the declared type's own
-        # constructor is still accepted as a callback field (the StateConditionInfo shape).
+        # With no `is_function_name` lookup supplied at all (a direct unit test of this checker, never how
+        # `classify` calls it), a lower-case-led argument of the declared type's own constructor is still
+        # accepted as a callback field (the StateConditionInfo shape): see the fail-closed cases below for
+        # what happens once a real lookup is supplied and says the name is not a function.
         self.assert_const("static const Coord3D c = Coord3D(s_lastX, 0.0f, 0.0f);", True)
 
     def test_by_value_const_initialized_from_a_scoped_writable_global_is_not_safe(self):
@@ -435,6 +437,44 @@ class RuleConstObjectTest(unittest.TestCase):
         }
         self.assert_const(
             "static const UnsignedInt s_start = UnsignedInt(lastUpdate);", False, symbols=writable
+        )
+
+    def test_by_value_const_initialized_from_a_functional_cast_of_a_name_not_known_to_be_a_function_is_not_safe(
+        self,
+    ):
+        # The finding this guards against: without a real lookup, a bare, lower-case-led identifier that
+        # is not itself a listed writable symbol (a member, a parameter, or a per-engine variable the
+        # symbol table happens to miss) was waved through as though it had to be a function-pointer field.
+        # With a real `is_function_name` supplied (as `classify` always does) and reporting "not a
+        # function", the exemption must now be refused instead of assumed.
+        self.assert_const(
+            "static const Real s_scale = Real(s_baseScale);", False, is_function_name=lambda name: False
+        )
+        self.assert_const(
+            "static const AsciiString s_name = AsciiString(g_mapBuffer);",
+            False,
+            is_function_name=lambda name: False,
+        )
+
+    def test_by_value_const_initialized_from_its_own_constructor_with_a_real_function_argument_is_safe(
+        self,
+    ):
+        # The StateConditionInfo shape with a real `is_function_name` lookup available: a name it reports
+        # as an actual function (the only thing the lookup can confirm from the source tree) is still
+        # accepted as the callback field.
+        self.assert_const(
+            "static const StateConditionInfo s_info = StateConditionInfo(isConditionTrue, MY_STATE, nullptr);",
+            True,
+            is_function_name=lambda name: name == "isConditionTrue",
+        )
+
+    def test_by_value_const_initialized_from_a_scoped_name_not_known_to_be_a_function_is_not_safe(self):
+        # A `Class::method`-qualified spelling is not automatically trusted either: it must still resolve
+        # through `is_function_name` (on the unqualified name, the only form a definition search can find).
+        self.assert_const(
+            "static const StateConditionInfo s_info = StateConditionInfo(Foo::bar, MY_STATE, nullptr);",
+            False,
+            is_function_name=lambda name: False,
         )
 
 
