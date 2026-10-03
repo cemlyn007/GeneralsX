@@ -601,10 +601,11 @@ void GameStateMap::clearScratchPadMaps()
 	for( std::vector<AsciiString>::const_iterator it = m_scratchPadMaps.begin(); it != m_scratchPadMaps.end(); ++it )
 	{
 
-		// a scratch pad map left behind would be picked up by a later load; only report and retry
-		// one that is genuinely still there under its exact tracked name -- a DeleteFile failure on
-		// one that is definitely already gone (another thread or process beat us to it, or whose
-		// only remaining match is a case-variant name) needs neither
+		// a scratch pad map left behind would be picked up by a later load; a DeleteFile failure is
+		// reported and retried unless scratchPadMapIsDefinitelyGone says the exact tracked path is
+		// definitely already gone (another thread or process beat us to it, or whose only remaining
+		// match is a case-variant name) -- one whose existence could not even be checked is treated
+		// the same as one that is still there, not dropped silently
 		if( DeleteFile( it->str() ) == 0 && !scratchPadMapIsDefinitelyGone( *it ) )
 		{
 			fprintf( stderr, "GameStateMap::clearScratchPadMaps - Unable to delete scratch pad map '%s'\n", it->str() );
