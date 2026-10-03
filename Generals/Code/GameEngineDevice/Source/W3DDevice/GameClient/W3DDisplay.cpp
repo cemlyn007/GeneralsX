@@ -1150,13 +1150,10 @@ const UnsignedInt START_CUMU_FRAME = LOGICFRAMES_PER_SECOND / 2;	// skip first h
 
 void W3DDisplay::updateAverageFPS()
 {
-	constexpr const Int FPS_HISTORY_SIZE = 30;
-
 	// GeneralsX @refactor cemlyn007 30/09/2026 The display's own, not function-local statics (PLAN-023 Phase 8, stage
 	// RR2a-2): each render engine's draw keeps its own FPS history and statistics.
 	Int64& lastUpdateTime64 = m_fpsLastUpdateTime64;
 	Int& historyOffset = m_fpsHistoryOffset;
-	Real (&fpsHistory)[FPS_HISTORY_SIZE] = m_fpsHistory;
 
 	const Int64 freq64 = getPerformanceCounterFrequency();
 	const Int64 time64 = getPerformanceCounter();
@@ -1178,10 +1175,10 @@ void W3DDisplay::updateAverageFPS()
 		historyOffset = 0;
 
 	m_currentFPS = 1.0f/elapsedSeconds;
-	fpsHistory[historyOffset++] = m_currentFPS;
+	m_fpsHistory[historyOffset++] = m_currentFPS;
 
 	// determine average frame rate over our past history.
-	const Real sum = std::accumulate(fpsHistory, fpsHistory + FPS_HISTORY_SIZE, 0.0f);
+	const Real sum = std::accumulate(m_fpsHistory, m_fpsHistory + FPS_HISTORY_SIZE, 0.0f);
 	m_averageFPS = sum / FPS_HISTORY_SIZE;
 
 	lastUpdateTime64 = time64;
@@ -1196,14 +1193,6 @@ ICoord2D TheMousePos;
 //=============================================================================
 void W3DDisplay::gatherDebugStats()
 {
-	// GeneralsX @refactor cemlyn007 30/09/2026 The display's own, not function-local statics (PLAN-023 Phase 8, stage
-	// RR2a-2): each render engine's draw keeps its own FPS history and statistics.
-	UnsignedInt& s_framesRenderedSinceLastUpdate = m_statsFramesRenderedSinceLastUpdate;
-	Int64& s_lastUpdateTime64 = m_statsLastUpdateTime64;
-	double& s_timeSinceLastUpdateInSecs = m_statsTimeSinceLastUpdateInSecs;
-	Int& s_drawCallsSinceLastUpdate = m_statsDrawCallsSinceLastUpdate;
-	Int& s_sortedPolysSinceLastUpdate = m_statsSortedPolysSinceLastUpdate;
-
 	// allocate the display strings if needed
 	if( m_displayStrings[0] == nullptr )
 	{
@@ -1238,14 +1227,14 @@ void W3DDisplay::gatherDebugStats()
 		m_benchmarkDisplayString->setFont( thisFont );
 	}
 
-	++s_framesRenderedSinceLastUpdate;
-  s_drawCallsSinceLastUpdate += Debug_Statistics::Get_Draw_Calls();
-	s_sortedPolysSinceLastUpdate += Debug_Statistics::Get_Sorting_Polygons();
+	++m_statsFramesRenderedSinceLastUpdate;
+  m_statsDrawCallsSinceLastUpdate += Debug_Statistics::Get_Draw_Calls();
+	m_statsSortedPolysSinceLastUpdate += Debug_Statistics::Get_Sorting_Polygons();
 
 	Int64 freq64 = getPerformanceCounterFrequency();
 	Int64 time64 = getPerformanceCounter();
 
-	s_timeSinceLastUpdateInSecs = ((double)(time64 - s_lastUpdateTime64) / (double)(freq64));
+	m_statsTimeSinceLastUpdateInSecs = ((double)(time64 - m_statsLastUpdateTime64) / (double)(freq64));
 
 #ifdef EXTENDED_STATS
 		static FILE *pListFile = nullptr;
@@ -1264,7 +1253,7 @@ void W3DDisplay::gatherDebugStats()
 
 	// we update stats on a delay
 	const Real UPDATE_RATE_SECS = 2.0;
-	if( s_timeSinceLastUpdateInSecs >= UPDATE_RATE_SECS || TheGlobalData->m_constantDebugUpdate )
+	if( m_statsTimeSinceLastUpdateInSecs >= UPDATE_RATE_SECS || TheGlobalData->m_constantDebugUpdate )
 	{
 		UnicodeString unibuffer, unibuffer2;
 		UnicodeString fpsString;
@@ -1273,9 +1262,9 @@ void W3DDisplay::gatherDebugStats()
 		Debug_Statistics::Record_Texture_Mode(Debug_Statistics::RECORD_TEXTURE_SIMPLE/*RECORD_TEXTURE_NONE*/);
 
 		// frames per second
-		double fps = (Real)s_framesRenderedSinceLastUpdate / s_timeSinceLastUpdateInSecs;
-		double drawsPerFrame = Debug_Statistics::Get_Draw_Calls(); //(Real)s_drawCallsSinceLastUpdate / (Real)s_framesRenderedSinceLastUpdate;
-		double sortPolysPerFrame = Debug_Statistics::Get_Sorting_Polygons();  //(Real)s_sortedPolysSinceLastUpdate / (Real)s_framesRenderedSinceLastUpdate;
+		double fps = (Real)m_statsFramesRenderedSinceLastUpdate / m_statsTimeSinceLastUpdateInSecs;
+		double drawsPerFrame = Debug_Statistics::Get_Draw_Calls(); //(Real)m_statsDrawCallsSinceLastUpdate / (Real)m_statsFramesRenderedSinceLastUpdate;
+		double sortPolysPerFrame = Debug_Statistics::Get_Sorting_Polygons();  //(Real)m_statsSortedPolysSinceLastUpdate / (Real)m_statsFramesRenderedSinceLastUpdate;
 		double skinDrawsPerFrame = Debug_Statistics::Get_DX8_Skin_Renders();
 
 		if (fps<0.1) fps = 0.1;
@@ -1484,11 +1473,11 @@ void W3DDisplay::gatherDebugStats()
 		unibuffer.format( L"Video RAM: %d", Debug_Statistics::Get_Record_Texture_Size() - 1376256 );
 		m_displayStrings[VideoRam]->setText( unibuffer );
 
-		s_lastUpdateTime64 = time64;
-		s_timeSinceLastUpdateInSecs = 0.0f;
-		s_framesRenderedSinceLastUpdate = 0;
-		s_drawCallsSinceLastUpdate = 0;
-		s_sortedPolysSinceLastUpdate = 0;
+		m_statsLastUpdateTime64 = time64;
+		m_statsTimeSinceLastUpdateInSecs = 0.0f;
+		m_statsFramesRenderedSinceLastUpdate = 0;
+		m_statsDrawCallsSinceLastUpdate = 0;
+		m_statsSortedPolysSinceLastUpdate = 0;
 
 		// terrain stats
 		unibuffer.format( L"3-Way Blends: %d/%d, Shoreline Blends: %d/%d", TheTerrainRenderObject->getNumExtraBlendTiles(TRUE),
