@@ -70,9 +70,9 @@ protected:
 
 	// GeneralsX @bugfix cemlyn007 02/10/2026 Paths this instance's extractAndSaveMap wrote (xfer,
 	// XFER_LOAD). clearScratchPadMaps deletes only these, not every *.map in m_saveDirectory: two
-	// engines can resolve the same shared user-data Save dir (PLAN-023 R1's per-engine
-	// user_data_dir is a later phase), and deleting the whole directory would remove a scratch-pad
-	// map another live engine's embedInUseMap still needs.
+	// engines can resolve the same shared user-data Save dir (PLAN-023 Phase 5's per-engine
+	// user-data root, via BootConfig, is a later phase), and deleting the whole directory would
+	// remove a scratch-pad map another live engine's embedInUseMap still needs.
 	//
 	// This does not make two engines safe to save or load the *same map leaf* at once: the scratch
 	// path is named after the map leaf alone (getFilePathInSaveDirectory/portableMapPathToRealMapPath,

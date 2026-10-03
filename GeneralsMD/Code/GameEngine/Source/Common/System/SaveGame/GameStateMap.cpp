@@ -507,9 +507,9 @@ void GameStateMap::clearScratchPadMaps()
 	// GeneralsX @bugfix cemlyn007 02/10/2026 Delete only the scratch-pad maps this instance's
 	// extractAndSaveMap wrote (tracked in m_scratchPadMaps), instead of every *.map that happens to
 	// be sitting in m_saveDirectory. m_saveDirectory is the shared, process-wide user-data Save
-	// directory until PLAN-023 R1's per-engine user_data_dir lands, so another live engine can have
-	// its own scratch-pad map in the same directory; listing and deleting the whole directory would
-	// remove that map out from under it (its next embedInUseMap would then fail with
+	// directory until PLAN-023 Phase 5's per-engine user-data root (BootConfig) lands, so another
+	// live engine can have its own scratch-pad map in the same directory; deleting the whole
+	// directory would remove that map out from under it (its next embedInUseMap would then fail with
 	// SC_INVALID_DATA). This also only ever matches exact paths this instance wrote, so it cannot
 	// be fooled by a case-variant name the way a case-insensitive directory listing could.
 	for( std::vector<AsciiString>::const_iterator it = m_scratchPadMaps.begin(); it != m_scratchPadMaps.end(); ++it )
