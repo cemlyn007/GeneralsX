@@ -6,9 +6,10 @@
 # The host thread is given a non-engine floating-point mode (round upward, 53-bit x87 precision, and SSE round
 # upward with flush-to-zero and denormals-are-zero set) and a UTF-8 LC_CTYPE (C.utf8). Between enter and leave the
 # thread must be in the engine's mode (round to nearest, 24-bit x87 precision, no SSE flush or denormals-are-zero,
-# "." as the radix) with the host's LC_CTYPE kept, and afterwards the host's mode and locale must be back. Where
-# the host has a locale with a comma radix (en_DK, de_DE or fr_FR), the host's LC_NUMERIC is that locale too and
-# the radix is checked; only the tests that need a locale of that kind skip without one.
+# "." as the radix) with the host's LC_CTYPE kept, and afterwards the host's mode and locale must be back. The
+# locale is checked by identity (the thread is off the global locale inside a Scope and back on it afterwards),
+# so that needs no particular host locale. Where the host has a locale with a comma radix (en_DK, de_DE or
+# fr_FR), the host's LC_NUMERIC is that locale too and the radix is checked; only the radix test skips without one.
 #
 # Usage:
 #   engine_context_scope_test.py [--library LIB.so]
@@ -17,7 +18,7 @@
 # (bazel-bin/rlgenerals/generalsx/generalsx_foreign_cc/lib/libgeneralsx.so, found upwards from this script).
 # The tests are skipped (exit 0) on a library without the context, and where the host has no C.utf8 locale,
 # unless GENERALSX_REQUIRE_SCOPE_TESTS is set: then each of those skips is a failure (for a run that must exercise
-# them). The skips for a host with no comma-radix locale are not covered by it.
+# them). The radix test's skip for a host with no comma-radix locale is not covered by it.
 
 import argparse
 import ctypes
@@ -43,6 +44,7 @@ LEAVE = "_ZN3rts27leaveEngineThreadInvariantsERKNS_16ThreadInvariantsE"
 LIBRARY = os.path.join("bazel-bin", "rlgenerals", "generalsx", "generalsx_foreign_cc", "lib", "libgeneralsx.so")
 
 PTHREAD_KEYS_MAX = 1024
+LC_GLOBAL_LOCALE = (1 << 64) - 1  # (locale_t)-1, what uselocale(NULL) returns on a thread that has not set one
 
 
 def skip(reason):
@@ -152,10 +154,9 @@ class ScopeInvariants(unittest.TestCase):
         self.assertTrue(utf8_multibyte_works(), f"{where}: LC_CTYPE")
 
     def ascii_locale(self):
-        # A locale of a thread's own with an ASCII LC_CTYPE (the host's is UTF-8), and a comma radix where the host has one.
-        locale = libc.newlocale(LC_CTYPE_MASK, b"C", None)
-        if self.comma:
-            locale = libc.newlocale(LC_NUMERIC_MASK, self.comma, locale)
+        # A freeable locale of a thread's own with an ASCII LC_CTYPE (the host's is UTF-8), and a comma radix where
+        # the host has one. (glibc returns its static C locale only when every category asked for is "C".)
+        locale = libc.newlocale(LC_NUMERIC_MASK, self.comma or b"C.utf8", None)
         self.assertTrue(locale)
         return locale
 
@@ -163,8 +164,10 @@ class ScopeInvariants(unittest.TestCase):
         self.host_mode()
         saved = ctypes.create_string_buffer(64)
         self.check_host_mode("before")
+        host_locale = libc.uselocale(None)
         self.enter(saved)
         try:
+            self.assertNotEqual(libc.uselocale(None), host_locale, "the thread is on the engine's locale")
             self.assertEqual(libm.fegetround(), FE_TONEAREST, "engine rounding")
             self.assertEqual(control_word() & 0x0F00, 0, "engine x87 precision (24 bits) and rounding")
             self.assertEqual(mxcsr_mode(), 0, "engine SSE rounding, flush-to-zero and denormals-are-zero")
@@ -173,6 +176,7 @@ class ScopeInvariants(unittest.TestCase):
             self.assertTrue(utf8_multibyte_works(), "the engine keeps the host's LC_CTYPE")
         finally:
             self.leave(saved)
+        self.assertEqual(libc.uselocale(None), host_locale, "the host's locale is back")
         self.check_host_mode("after")
 
     def test_main_thread(self):
@@ -212,6 +216,7 @@ class ScopeInvariants(unittest.TestCase):
             except BaseException as e:  # reported on the test's thread
                 errors.append(e)
 
+        host_locale = libc.uselocale(None)
         self.enter(saved)
         try:
             other = threading.Thread(target=run)
@@ -222,6 +227,7 @@ class ScopeInvariants(unittest.TestCase):
             self.leave(saved)
         if errors:
             raise errors[0]
+        self.assertEqual(libc.uselocale(None), host_locale, "the host's locale is back")
         self.check_host_mode("after")
 
     def test_a_change_made_inside_a_nested_scope_is_undone(self):
@@ -230,6 +236,7 @@ class ScopeInvariants(unittest.TestCase):
         self.host_mode()
         outer = ctypes.create_string_buffer(64)
         inner = ctypes.create_string_buffer(64)
+        host_locale = libc.uselocale(None)
         self.enter(outer)
         try:
             self.assertEqual(mxcsr_mode(), 0, "engine SSE mode")
@@ -239,11 +246,13 @@ class ScopeInvariants(unittest.TestCase):
                 set_fenv_fields(control_word() | 0x0300, MXCSR_HOST)
             finally:
                 self.leave(inner)
+            self.assertNotEqual(libc.uselocale(None), host_locale, "still on the engine's locale after the nested Scope")
             self.assertEqual(libm.fegetround(), FE_TONEAREST, "x87 rounding after the nested Scope")
             self.assertEqual(control_word() & 0x0F00, 0, "x87 precision and rounding after the nested Scope")
             self.assertEqual(mxcsr_mode(), 0, "SSE mode after the nested Scope")
         finally:
             self.leave(outer)
+        self.assertEqual(libc.uselocale(None), host_locale, "the host's locale is back")
         self.check_host_mode("after")
 
     def run_on_a_thread(self, body):
@@ -282,12 +291,15 @@ class ScopeInvariants(unittest.TestCase):
                     self.assertFalse(utf8_multibyte_works(), "LC_CTYPE of the thread's own locale, not the cached one")
                 finally:
                     self.leave(inner)
+                self.assertEqual(libc.uselocale(None), own, "the thread's own locale back")
                 if self.comma:
                     self.assertFalse(radix_is_dot(), "the thread's own locale back")
                 self.assertTrue(keys_holding(previous), "the outer Scope's locale is still the cached one, unfreed")
             finally:
                 libc.uselocale(previous)
+                self.assertEqual(libc.uselocale(None), previous, "the engine's locale before the outer Scope leaves")
                 self.leave(outer)
+            self.assertEqual(libc.uselocale(None), LC_GLOBAL_LOCALE, "the thread's locale is back to the global one")
             libc.freelocale(own)
             if self.comma:
                 self.assertFalse(radix_is_dot(), "the thread's locale back")
@@ -297,9 +309,6 @@ class ScopeInvariants(unittest.TestCase):
     def test_a_reused_host_locale_address_does_not_keep_a_stale_engine_locale(self):
         # The engine locale is not keyed on the address of a host locale that may since have been freed: a locale
         # with an ASCII LC_CTYPE made at the address of a freed UTF-8 one must give an engine locale that is ASCII.
-        # (glibc returns its static C locale for an all-"C" request, so one that can be freed needs the comma radix.)
-        if not self.comma:
-            raise unittest.SkipTest("the host has no locale with a comma radix (en_DK, de_DE or fr_FR)")
         reused = []
 
         def body():
