@@ -145,6 +145,20 @@ class RuleConstObjectTest(unittest.TestCase):
         )
         self.assertIsNone(m.rule_const_object(sym))
 
+    def test_array_with_a_call_bound_reading_a_global_pointer_is_not_safe(self):
+        # The bound's own `(...)` (ARRAY_SIZE(x)) must never be mistaken for the real `= {...}` initialiser
+        # that follows it: the scan for the initialiser boundary must skip past `[...]` entirely.
+        self.assert_const(
+            "static const Real s_heights[ARRAY_SIZE(s_names)] = { TheGlobalData->m_maxCameraHeight, 1.0f };",
+            False,
+        )
+
+    def test_array_with_a_sizeof_bound_initialized_from_an_rng_call_is_not_safe(self):
+        self.assert_const("static const Int s_picks[sizeof(Int)] = { GameLogicRandomValue(0, 3) };", False)
+
+    def test_array_with_a_call_bound_and_literal_initializer_is_safe(self):
+        self.assert_const("static const Real s_literals[ARRAY_SIZE(s_names)] = { 1.0f, 2.0f };", True)
+
 
 class RuleNamekeyTest(unittest.TestCase):
     """rule:namekey is SAFE_FOR_NEW: the variable itself must be a NameKeyType/StaticNameKey cache, not a

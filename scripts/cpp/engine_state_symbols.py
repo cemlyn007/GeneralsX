@@ -902,9 +902,21 @@ def _split_initializer(decl):
     has none at all (a default-constructed `static const Foo foo;`), and `None` when the recorded line
     (one source line) does not hold it: it ends with a bare `=`, or with an unclosed `(`/`{`, because the
     initialiser starts on the next source line. The caller must treat `None` as not provably safe, never as
-    an empty, trivially-safe one."""
-    i, n = 0, len(decl)
-    while i < n and decl[i] not in "=({":
+    an empty, trivially-safe one.
+
+    The scan for the first `=`, `(` or `{` skips over balanced `[...]` and `<...>` groups (an array bound's
+    own parentheses, `[ARRAY_SIZE(x)]` or `[sizeof(T)]`, and a template argument list), so it lands on the
+    declarator/initialiser boundary after the declared name and its array bounds, never on a `(` that is
+    part of the bound itself."""
+    i, n, depth = 0, len(decl), 0
+    while i < n:
+        c = decl[i]
+        if c in "[<":
+            depth += 1
+        elif c in "]>":
+            depth = max(0, depth - 1)
+        elif depth == 0 and c in "=({":
+            break
         i += 1
     if i == n:
         return decl, ""
