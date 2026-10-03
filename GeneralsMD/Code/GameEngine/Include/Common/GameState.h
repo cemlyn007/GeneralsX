@@ -209,7 +209,7 @@ public:
 
 	AsciiString getMapLeafName(const AsciiString& in) const;
 
-	// GeneralsX @test cemlyn007 03/10/2026 Expose the private iterateSaveFiles for test
+	// GeneralsX @feature cemlyn007 03/10/2026 Expose the private iterateSaveFiles for test
 	// coverage. Production code only reaches it through populateSaveGameListbox (needs a live
 	// GameWindow) and findNextSaveFilename's dead HIGHEST_NUMBER branch, so nothing outside the
 	// Load/Save menu could exercise the non-Windows directory-filtering logic (case
