@@ -642,24 +642,41 @@ class SourceIndexDefinitionTest(unittest.TestCase):
     def test_rule_const_reads_a_global_pointer_read_past_the_old_160_char_cap(self):
         # End to end through resolve_sources and classify: a multi-line initialiser with a `->` read well
         # past the 160th character must still make rule:const refuse it, not stop at a truncated copy of
-        # the declaration that never reaches the unsafe read.
+        # the declaration that never reaches the unsafe read. sections is set to `.bss` (as read_library
+        # would for a dynamically initialised const) so rule:read-only cannot answer first and make the
+        # assertion vacuous (an empty `sections` is a subset of the read-only set too, so it would otherwise
+        # classify the symbol before rule:const ever runs).
         padding = ", ".join(f"{i}.0f" for i in range(1, 29))  # pushes the `->` read past character 160
-        self.write(
-            "longtable.cpp",
-            "static const Real s_longtable[] =\n"
-            "{\n"
-            f"    {padding},\n"
-            "    TheGlobalData->m_maxCameraHeight,\n"
-            "};\n",
-        )
-        sym = m.Symbol("s_longtable")
-        sym.count = 1
-        symbols = {"s_longtable": sym}
-        m.resolve_sources(self.root, symbols, {})
-        self.assertGreater(len(sym.decl), 160)
+
+        def longtable_symbol(name, last_line):
+            self.write(
+                f"{name}.cpp",
+                f"static const Real {name}[] =\n"
+                "{\n"
+                f"    {padding},\n"
+                f"    {last_line}\n"
+                "};\n",
+            )
+            sym = m.Symbol(name)
+            sym.count = 1
+            sym.sections = {".bss"}
+            symbols = {name: sym}
+            m.resolve_sources(self.root, symbols, {})
+            self.assertGreater(len(sym.decl), 160)
+            m.classify(sym, symbols)
+            return sym
+
+        sym = longtable_symbol("s_longtable", "TheGlobalData->m_maxCameraHeight,")
         self.assertIn("->", sym.decl)
-        m.classify(sym, symbols)
-        self.assertNotEqual(sym.by, "rule:const")
+        self.assertEqual(sym.cls, m.UNREVIEWED)
+        self.assertEqual(sym.by, "none")
+
+        # Control: the same shape with the `->` read replaced by a literal must still reach rule:const and
+        # be accepted, proving the first assertion actually exercises rule:const rather than some other
+        # rule or an exception swallowed along the way.
+        control = longtable_symbol("s_longtable_literal", "30.0f,")
+        self.assertNotIn("->", control.decl)
+        self.assertEqual(control.by, "rule:const")
 
     def test_rule_const_fails_closed_on_a_statement_longer_than_the_scan_window(self):
         # A statement longer than _statement_text's own scan window is cut off before reaching its `;`, so
