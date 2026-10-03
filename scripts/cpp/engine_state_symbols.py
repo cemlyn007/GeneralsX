@@ -469,10 +469,11 @@ DEF_PREFIX_RE = re.compile(
     r"(?!\s*(?:return|extern|delete|if|else|case|goto|throw|using|typedef|friend|#|//|/\*|\*)\b)"
     r"(?:\s*(?:[A-Za-z_][\w:]*(?:\s*<[^;()]*>)?[\s*&]+)+"  # a type
     r"(?:[*&]*\s*\w+\s*(?:\[[^\]]*\]\s*)*(?:=[^,;]*)?,\s*)*"  # earlier declarators on the same line
+    r"|\s*(?:[A-Za-z_][\w:]*[\s*&]+)+\(\s*\*+\s*"  # a function pointer: `void (*name)(...)`
     r"|\s*\}\s*"  # the instance after a struct body
     r"|[A-Z_][A-Z_0-9]*\(.*\)\s*)"  # a declaring macro (DECLARE_DEFINITION_FACTORY(...) name;)
 )
-DEF_SUFFIX_RE = re.compile(r"\s*(?:\[[^\]]*\]\s*)*(?:=|;|\{|\(|,|$)")
+DEF_SUFFIX_RE = re.compile(r"\s*(?:\[[^\]]*\]\s*)*(?:=|;|\{|\(|,|$|\)\s*\()")
 
 
 def is_def_prefix(prefix):
