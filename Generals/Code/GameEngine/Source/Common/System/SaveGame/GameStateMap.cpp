@@ -447,10 +447,12 @@ void GameStateMap::xfer( Xfer *xfer )
 		// throw ERROR_OUT_OF_MEMORY before xferUser is ever reached -- either way leaving a
 		// partial file on disk. Recording first means clearScratchPadMaps still deletes that
 		// partial file even though extraction itself never returned to record it the old way. The
-		// std::find guard below is purely defensive: GameState::loadGame clears m_scratchPadMaps
-		// before every xfer, so within one load this vector starts empty and the guard never
-		// actually matches; it only protects against a future caller that xfers more than one map
-		// without that same clear.
+		// GeneralsX @bugfix cemlyn007 03/10/2026 The std::find guard below is load-bearing, not
+		// purely defensive: clearScratchPadMaps keeps a path whose DeleteFile failed while the
+		// file is still on disk (for retry), so this vector can already hold entries when a load
+		// starts. If this load's map leaf matches a kept path, the guard stops it being tracked
+		// twice, which would otherwise print a spurious delete failure for the second entry once
+		// the first DeleteFile of that leaf succeeds.
 		if( std::find( m_scratchPadMaps.begin(), m_scratchPadMaps.end(), saveGameInfo->saveGameMapName )
 		    == m_scratchPadMaps.end() )
 			m_scratchPadMaps.push_back( saveGameInfo->saveGameMapName );
