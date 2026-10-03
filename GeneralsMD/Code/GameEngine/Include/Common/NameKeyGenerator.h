@@ -154,7 +154,8 @@ public:
 	// engine's init fails partway: that leaves process-wide state half built, and ~GameEngine cannot
 	// tear a partly initialised engine down, so the host must leak it (never delete it).
 	//
-	// Every refusal here never returns: FatalEngineError in embedded mode, abort otherwise.
+	// No refusal here returns. The poisoning and frozen-window ones end through ReleaseCrashNoReturn
+	// (FatalEngineError when embedded, otherwise ReleaseCrash's own exit, or abort() if it returned).
 	enum PrimingState
 	{
 		PRIMING_NOT_STARTED,	///< no engine has started GameEngine::init in this process

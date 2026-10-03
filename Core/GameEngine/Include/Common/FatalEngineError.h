@@ -95,7 +95,8 @@ FATAL_ENGINE_ERROR_API bool IsEngineTearingDown();
 // depends on every catch (...) between RELEASE_CRASH and the host having a
 // catch (const FatalEngineError&) { throw; } in front of it. The engine sets this latch before it
 // throws, so something that swallows the exception anyway (a catch (...) added later, upstream or
-// in a merge) still leaves it set. It is also set when the teardown window above makes the error
+// in a merge) still leaves it set. Host-usage refusals (NameKeyGenerator's refuseInit) deliberately
+// do not set it: no engine faulted. It is also set when the teardown window above makes the error
 // return instead of throw. A host that polls HasEngineFaulted() after each call into the engine can
 // therefore detect the fault even when no exception reaches it.
 //

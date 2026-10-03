@@ -170,11 +170,15 @@ void NameKeyGenerator::verifyNameKeyID(UnsignedInt expectedNextID) const
 
 namespace
 {
-[[noreturn]] void failFrozenName(const char* name)
+[[noreturn]] void failFrozenName(const char* name, bool internedAfterPriming)
 {
 	AsciiString reason;
-	reason.format("NameKey '%s' is new to this process while a later engine boots: its data differs from the "
-		"first engine's, so the name keys it shares with it (sciences, upgrades) cannot be trusted", name);
+	if (internedAfterPriming)
+		reason.format("NameKey '%s' was first interned after the priming engine's init (during play), so its key "
+			"differs from a fresh process's while a later engine boots", name);
+	else
+		reason.format("NameKey '%s' is new to this process while a later engine boots: its data differs from the "
+			"first engine's, so the name keys it shares with it (sciences, upgrades) cannot be trusted", name);
 	// Never returns: the name must not be interned (ReleaseCrash alone returns with no TheGlobalData)
 	ReleaseCrashNoReturn(reason.str());
 }
@@ -184,7 +188,7 @@ namespace
 NameKeyType NameKeyGenerator::keyOfExisting(const Bucket* b) const
 {
 	if (b->m_afterPriming && rts::ctx()->nameKeysFrozen)
-		failFrozenName(b->m_nameString.str());
+		failFrozenName(b->m_nameString.str(), true);
 	return b->m_key;
 }
 #else
@@ -283,7 +287,7 @@ NameKeyType NameKeyGenerator::createNameKey(UnsignedInt hash, const AsciiString&
 	// GeneralsX @feature cemlyn007 28/09/2026 A later engine booting from the priming engine's data
 	// interns nothing new before its upgrades are loaded (see PrimingLatch)
 	if (rts::ctx()->nameKeysFrozen)
-		failFrozenName(name.str());
+		failFrozenName(name.str(), false);
 #endif
 
 	// GeneralsX @feature cemlyn007 28/09/2026 Downwards once perturbForTesting asked for it. The keys
@@ -384,8 +388,8 @@ const char* thePrimingFailure = nullptr;
 }
 
 // GeneralsX @bugfix cemlyn007 03/10/2026 A refusal that does not poison the process is a host usage
-// error, not a crash: it must not rotate the crash report, write a new one or hide the window of
-// another engine (ReleaseCrash does all three), so it raises the error directly.
+// error, not a crash: ReleaseCrash would rotate and rewrite the crash report for it, so it raises the
+// error directly. It deliberately does not set the fault latch (FatalEngineError.h): no engine faulted.
 [[noreturn]] static void refuseInit(const char* reason)
 {
 	fprintf(stderr, "GeneralsX: GameEngine::init refused: %s\n", reason);
