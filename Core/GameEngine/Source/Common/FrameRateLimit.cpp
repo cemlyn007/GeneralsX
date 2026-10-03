@@ -126,9 +126,16 @@ Real FrameRateLimit::wait(UnsignedInt maxFps)
 
 void FrameRateLimit::reset()
 {
+#ifdef _WIN32
 	LARGE_INTEGER tick;
 	QueryPerformanceCounter(&tick);
 	m_start = tick.QuadPart;
+#else
+	// Linux: anchor in the same nanosecond unit the constructor and wait() use.
+	struct timespec tick;
+	clock_gettime(CLOCK_MONOTONIC, &tick);
+	m_start = static_cast<Int64>(tick.tv_sec) * 1000000000 + tick.tv_nsec;
+#endif
 }
 
 
