@@ -194,7 +194,12 @@ LogClass BonePosLog("bonePositions.txt");
 //-------------------------------------------------------------------------------------------------
 
 #if defined(RTS_DEBUG) || defined(DEBUG_CRASHING)
+#if RTS_ENGINE_CONTEXT
+extern rts::PerEngineStatic<AsciiString> TheThingTemplateBeingParsedName_perEngine;
+#define TheThingTemplateBeingParsedName (TheThingTemplateBeingParsedName_perEngine.get())
+#else
 extern AsciiString TheThingTemplateBeingParsedName;
+#endif
 #endif
 
 #if defined(RTS_DEBUG)
