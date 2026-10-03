@@ -14,7 +14,8 @@
 #
 # LIB.so is the RTS_ENGINE_CONTEXT=ON library, by default the one rlgenerals' Bazel builds
 # (bazel-bin/rlgenerals/generalsx/generalsx_foreign_cc/lib/libgeneralsx.so, found upwards from this script).
-# The test is skipped (exit 0) on a library without the context, and where the host has no suitable locale.
+# The test is skipped (exit 0) on a library without the context, and where the host has no suitable locale,
+# unless GENERALSX_REQUIRE_SCOPE_TESTS is set: then each of those skips is a failure (for a run that must exercise it).
 
 import argparse
 import ctypes
@@ -39,7 +40,19 @@ ENTER = "_ZN3rts27enterEngineThreadInvariantsERNS_16ThreadInvariantsE"
 LEAVE = "_ZN3rts27leaveEngineThreadInvariantsERKNS_16ThreadInvariantsE"
 LIBRARY = os.path.join("bazel-bin", "rlgenerals", "generalsx", "generalsx_foreign_cc", "lib", "libgeneralsx.so")
 
+PTHREAD_KEYS_MAX = 1024
+
+
+def skip(reason):
+    # A skip is a failure when the run is required to exercise the tests.
+    if os.environ.get("GENERALSX_REQUIRE_SCOPE_TESTS"):
+        raise AssertionError("required, but would be skipped: " + reason)
+    raise unittest.SkipTest(reason)
+
+
 libc = ctypes.CDLL(None)
+libc.pthread_getspecific.restype = ctypes.c_void_p
+libc.pthread_getspecific.argtypes = [ctypes.c_uint]
 libm = ctypes.CDLL(ctypes.util.find_library("m") or "libm.so.6")
 libc.setlocale.restype = ctypes.c_char_p
 libc.strtod.restype = ctypes.c_double
@@ -87,6 +100,11 @@ def utf8_multibyte_works():
     return libc.mbstowcs(None, "café".encode("utf-8"), 0) == 4
 
 
+def keys_holding(value):
+    # The pthread keys whose value on this thread is `value`.
+    return [k for k in range(PTHREAD_KEYS_MAX) if libc.pthread_getspecific(k) == value]
+
+
 class ScopeInvariants(unittest.TestCase):
     library = None
     enter = None
@@ -95,22 +113,22 @@ class ScopeInvariants(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         if not sys.platform.startswith("linux") or not X87:
-            raise unittest.SkipTest("needs x86-64 Linux (glibc fenv_t layout)")
+            skip("needs x86-64 Linux (glibc fenv_t layout)")
         path = os.environ.get("GENERALSX_LIBRARY") or find_library_path()
         if path is None or not os.path.exists(path):
-            raise unittest.SkipTest("no libgeneralsx.so (pass --library)")
+            skip("no libgeneralsx.so (pass --library)")
         cls.library = ctypes.CDLL(path)
         try:
             cls.enter = cls.library[ENTER]
             cls.leave = cls.library[LEAVE]
         except AttributeError:
-            raise unittest.SkipTest("the library is built without RTS_ENGINE_CONTEXT")
+            skip("the library is built without RTS_ENGINE_CONTEXT")
         # The host's locale, set before the first entry (a thread's engine locale is made from the locale it has then): UTF-8
         # characters and a comma radix.
         if libc.setlocale(LC_CTYPE, b"C.utf8") is None or libc.setlocale(LC_NUMERIC, b"en_DK.utf8") is None:
-            raise unittest.SkipTest("the host has no C.utf8 and en_DK.utf8 locales")
+            skip("the host has no C.utf8 and en_DK.utf8 locales")
         if radix_is_dot() or not utf8_multibyte_works():
-            raise unittest.SkipTest("the host locales do not differ from the engine's as expected")
+            skip("the host locales do not differ from the engine's as expected")
         cls.enter.argtypes = [ctypes.c_void_p]
         cls.leave.argtypes = [ctypes.c_void_p]
 
@@ -206,67 +224,98 @@ class ScopeInvariants(unittest.TestCase):
             self.leave(outer)
         self.check_host_mode("after")
 
+    def run_on_a_thread(self, body):
+        errors = []
+
+        def run():
+            try:
+                body()
+            except BaseException as e:  # reported on the test's thread
+                errors.append(e)
+
+        t = threading.Thread(target=run)
+        t.start()
+        t.join()
+        if errors:
+            raise errors[0]
+
     def test_a_locale_of_the_threads_own_taken_after_the_first_entry(self):
         # The thread's cached engine locale is still in use by the outer Scope when the thread switches to a
-        # locale of its own and a nested Scope enters: that one gets a locale for itself alone.
-        errors = []
-
-        def run():
+        # locale of its own and a nested Scope enters: that one gets a locale for itself alone, made from the
+        # thread's own (an ASCII LC_CTYPE here, the cached one's is UTF-8) and the outer's is left alone.
+        def body():
+            outer = ctypes.create_string_buffer(64)
+            inner = ctypes.create_string_buffer(64)
+            self.enter(outer)
+            own = libc.newlocale(LC_NUMERIC_MASK, b"en_DK.utf8", None)  # LC_CTYPE "C", a comma radix
+            self.assertTrue(own)
+            previous = libc.uselocale(own)
             try:
-                outer = ctypes.create_string_buffer(64)
-                inner = ctypes.create_string_buffer(64)
-                self.enter(outer)
-                own = libc.newlocale(LC_CTYPE_MASK | LC_NUMERIC_MASK, b"en_DK.utf8", None)
-                self.assertTrue(own)
-                previous = libc.uselocale(own)
+                self.assertTrue(keys_holding(previous), "the outer Scope's engine locale is cached in a key")
+                self.assertFalse(radix_is_dot(), "the thread's own locale has a comma radix")
+                self.assertFalse(utf8_multibyte_works(), "the thread's own locale has an ASCII LC_CTYPE")
+                self.enter(inner)
                 try:
-                    self.assertFalse(radix_is_dot(), "the thread's own locale has a comma radix")
-                    self.enter(inner)
-                    try:
-                        self.assertTrue(radix_is_dot(), "engine radix over the thread's own locale")
-                        self.assertTrue(utf8_multibyte_works(), "LC_CTYPE of the thread's own locale kept")
-                    finally:
-                        self.leave(inner)
-                    self.assertFalse(radix_is_dot(), "the thread's own locale back")
+                    self.assertTrue(radix_is_dot(), "engine radix over the thread's own locale")
+                    self.assertFalse(utf8_multibyte_works(), "LC_CTYPE of the thread's own locale, not the cached one")
                 finally:
-                    libc.uselocale(previous)
-                    self.leave(outer)
-                libc.freelocale(own)
-                self.assertFalse(radix_is_dot(), "the thread's locale back")
-            except BaseException as e:  # reported on the test's thread
-                errors.append(e)
+                    self.leave(inner)
+                self.assertFalse(radix_is_dot(), "the thread's own locale back")
+                self.assertTrue(keys_holding(previous), "the outer Scope's locale is still the cached one, unfreed")
+            finally:
+                libc.uselocale(previous)
+                self.leave(outer)
+            libc.freelocale(own)
+            self.assertFalse(radix_is_dot(), "the thread's locale back")
 
-        t = threading.Thread(target=run)
-        t.start()
-        t.join()
-        if errors:
-            raise errors[0]
+        self.run_on_a_thread(body)
 
     def test_a_reused_host_locale_address_does_not_keep_a_stale_engine_locale(self):
-        # The engine locale is not keyed on the address of a host locale that may since have been freed.
-        errors = []
+        # The engine locale is not keyed on the address of a host locale that may since have been freed: a locale
+        # with an ASCII LC_CTYPE made at the address of a freed UTF-8 one must give an engine locale that is ASCII.
+        reused = []
 
-        def run():
+        def body():
+            saved = ctypes.create_string_buffer(64)
+            for _ in range(20):
+                utf8 = libc.newlocale(LC_CTYPE_MASK, b"C.utf8", None)
+                previous = libc.uselocale(utf8)
+                self.enter(saved)
+                try:
+                    self.assertTrue(utf8_multibyte_works(), "UTF-8 own locale")
+                finally:
+                    self.leave(saved)
+                libc.uselocale(previous)
+                libc.freelocale(utf8)
+                ascii_locale = libc.newlocale(LC_NUMERIC_MASK, b"en_DK.utf8", None)  # LC_CTYPE "C"
+                previous = libc.uselocale(ascii_locale)
+                if ascii_locale == utf8:
+                    reused.append(True)
+                self.enter(saved)
+                try:
+                    self.assertFalse(utf8_multibyte_works(), "ASCII own locale (address reused: %s)" % (ascii_locale == utf8))
+                    self.assertTrue(radix_is_dot())
+                finally:
+                    self.leave(saved)
+                libc.uselocale(previous)
+                libc.freelocale(ascii_locale)
+
+        self.run_on_a_thread(body)
+        if not reused:
+            skip("the allocator did not reuse a locale address")
+
+    def test_entering_makes_the_pthread_key_that_frees_the_locale(self):
+        # The engine locale is held in a pthread key whose destructor is in the library, made only once the
+        # library is pinned (never unloaded). Without the key, the locale would be made and freed per Scope.
+        def body():
+            saved = ctypes.create_string_buffer(64)
+            self.enter(saved)
             try:
-                saved = ctypes.create_string_buffer(64)
-                for name in (b"en_DK.utf8", b"C.utf8", b"en_DK.utf8"):
-                    own = libc.newlocale(LC_CTYPE_MASK, name, None)
-                    previous = libc.uselocale(own)
-                    self.enter(saved)
-                    try:
-                        self.assertTrue(radix_is_dot())
-                    finally:
-                        self.leave(saved)
-                    libc.uselocale(previous)
-                    libc.freelocale(own)
-            except BaseException as e:  # reported on the test's thread
-                errors.append(e)
+                self.assertTrue(keys_holding(libc.uselocale(None)), "no pthread key holds the engine locale")
+            finally:
+                self.leave(saved)
 
-        t = threading.Thread(target=run)
-        t.start()
-        t.join()
-        if errors:
-            raise errors[0]
+        self.run_on_a_thread(body)
 
     def test_a_thread_exit_frees_its_cached_locale(self):
         # Each thread that enters caches a locale freed by a pthread key's destructor at its exit: many short
@@ -276,7 +325,7 @@ class ScopeInvariants(unittest.TestCase):
                 "arena", "ordblks", "smblks", "hblks", "hblkhd", "usmblks", "fsmblks", "uordblks", "fordblks", "keepcost")]
 
         if not hasattr(libc, "mallinfo2"):
-            self.skipTest("no mallinfo2")
+            skip("no mallinfo2")
         libc.mallinfo2.restype = Mallinfo2
 
         def run():
@@ -297,33 +346,50 @@ class ScopeInvariants(unittest.TestCase):
         self.assertLess(grown, 100 * 1024, f"the heap grew by {grown} bytes over 1000 threads")
 
 
-class LibraryIsPinned(unittest.TestCase):
-    def test_dlclose_leaves_the_library_mapped(self):
-        # Entering from a thread makes the pthread key whose destructor is in the library, which must then
-        # survive a dlclose (a later thread exit calls the destructor).
+SET_ASSET_ROOT = "_ZN18StdLocalFileSystem16setAssetRootPathERK11AsciiString"
+
+
+class AssetRootIsWriteOnce(unittest.TestCase):
+    def run_calls(self, *roots):
+        # A fresh process (the root is process-wide) calls StdLocalFileSystem::setAssetRootPath for each root in
+        # turn (a member function that never uses `this`); "" is an AsciiString with no data, as a boot that resolved no root passes. Returns its stderr.
         path = os.environ.get("GENERALSX_LIBRARY") or find_library_path()
         if path is None or not os.path.exists(path):
-            self.skipTest("no libgeneralsx.so (pass --library)")
+            skip("no libgeneralsx.so (pass --library)")
         code = (
-            "import ctypes, sys, threading\n"
+            "import ctypes, sys\n"
             "lib = ctypes.CDLL(sys.argv[1])\n"
             "try:\n"
-            "    enter = lib[sys.argv[2]]\n"
+            "    f = lib[sys.argv[2]]\n"
             "except AttributeError:\n"
             "    sys.exit(77)\n"
-            "enter.argtypes = [ctypes.c_void_p]\n"
-            "buf = ctypes.create_string_buffer(64)\n"
-            "t = threading.Thread(target=lambda: enter(buf))\n"
-            "t.start(); t.join()\n"
-            "ctypes.CDLL(None).dlclose(ctypes.c_void_p(lib._handle))\n"
-            "import os\n"
-            "sys.exit(0 if os.path.realpath(sys.argv[1]) in open('/proc/self/maps').read() else 1)\n"
+            "f.argtypes = [ctypes.c_void_p, ctypes.c_void_p]\n"
+            "lib['_Z17initMemoryManagerv']()\n"  # the engine's operator new needs it
+            "for root in sys.argv[3:]:\n"
+            "    data = None\n"
+            "    if root:\n"
+            "        data = ctypes.create_string_buffer(b'\\1\\0\\0\\0' + root.encode() + b'\\0')\n"
+            "        ctypes.memmove(ctypes.byref(data, 2), (len(root) + 1).to_bytes(2, 'little'), 2)\n"
+            "    holder = ctypes.c_void_p(ctypes.addressof(data) if data else None)\n"
+            "    f(None, ctypes.byref(holder))\n"  # a member function that does not use `this`
         )
         import subprocess
-        result = subprocess.run([sys.executable, "-c", code, os.path.realpath(path), ENTER])
+        result = subprocess.run([sys.executable, "-c", code, os.path.realpath(path), SET_ASSET_ROOT, *roots],
+                                stderr=subprocess.PIPE, text=True)
         if result.returncode == 77:
-            self.skipTest("the library is built without RTS_ENGINE_CONTEXT")
-        self.assertEqual(result.returncode, 0, "the library was unmapped by dlclose")
+            skip("the library has no StdLocalFileSystem::setAssetRootPath")
+        return result.stderr
+
+    def test_a_root_after_a_first_boot_that_resolved_none_is_refused(self):
+        # The usual first boot finds its BIGs through the current directory and resolves no root. A later boot
+        # that does (an environment variable set in between) must not be the first write of the shared path.
+        self.assertIn("setAssetRootPath - the asset fallback path is process-wide", self.run_calls("", "/some/install"))
+
+    def test_the_same_root_again_is_not_refused(self):
+        self.assertNotIn("refused", self.run_calls("/some/install", "/some/install"))
+
+    def test_another_root_after_a_first_one_is_refused(self):
+        self.assertIn("refused", self.run_calls("/some/install", "/another/install"))
 
 
 def find_library_path():
