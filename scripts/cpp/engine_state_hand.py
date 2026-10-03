@@ -25,12 +25,12 @@
 # replay's playback, a game ended by script victory, and an Env game to the local player's defeat): no
 # symbol classified render-only, constant or debug-only changed but the const objects built on first use.
 #
-# There are no per-engine entries left: PLAN-023 Phases 2-4 moved every one into the engine, and Phase 5b
-# (engines on separate threads) the last 18, the "threads only" scratch that was correct for several engines
-# stepped on ONE thread, into thread_locals, PER_ENGINE_STATICs, locals or (AssetStatusClass::Instance) a
-# lock. A symbol classified per-engine is therefore a regression, and `check` fails on it in every mode. A thread_local is process-global here (per
-# thread by design), and must stay small: the library's TLS is initial-exec, so it comes out of glibc's
-# static TLS surplus for a dlopened library (a few KB at most; Phase 2's 5 KB XferLoad buffers failed to load).
+# There are no per-engine entries left: PLAN-023 Phases 2-4 moved every one into the engine, and Phase 5b (engines on
+# separate threads) the last 18, the "threads only" scratch that was correct for several engines stepped on ONE
+# thread, into thread_locals, PER_ENGINE_STATICs, locals or (AssetStatusClass::Instance) a lock. A symbol classified
+# per-engine is therefore a regression, and `check` fails on it in every mode. A thread_local is process-global here
+# (per thread by design), and must stay small: the library's TLS is initial-exec, so it comes out of glibc's static
+# TLS surplus for a dlopened library (a few KB at most; Phase 2's 5 KB XferLoad buffers failed to load).
 #
 # Process-wide state must be written once (at static initialisation or the first boot) and only read after
 # that, or be atomic or locked: engines boot while others step on their threads (PLAN-023 Phase 5b). A note

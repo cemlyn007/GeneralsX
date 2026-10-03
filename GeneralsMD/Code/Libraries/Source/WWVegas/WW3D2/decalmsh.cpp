@@ -803,7 +803,7 @@ void SkinDecalMeshClass::Render()
 	** Skin decals have to get the deformed vertices of their parent meshes.  For this
 	** reason, decals on skins is not a very good idea...
 	*/
-	// GeneralsX @feature cemlyn007 03/10/2026 Looked up once: with RTS_ENGINE_CONTEXT each use of the name is a slot lookup.
+	// GeneralsX @performance cemlyn007 03/10/2026 Looked up once: with RTS_ENGINE_CONTEXT each use of the name is a slot lookup.
 	SimpleVecClass<Vector3> & temp_vertices = _TempVertexBuffer;
 	SimpleVecClass<Vector3> & temp_normals = _TempNormalBuffer;
 	temp_vertices.Uninitialised_Grow(model->Get_Vertex_Count());
