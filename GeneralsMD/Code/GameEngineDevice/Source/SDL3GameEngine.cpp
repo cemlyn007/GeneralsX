@@ -576,19 +576,34 @@ WebBrowser *SDL3GameEngine::createWebBrowser(void)
  * Factory method: AudioManager
  * Select audio backend based on compile flags
  * GeneralsX @bugfix Copilot 15/04/2026 Match upstream GameEngine pure-virtual signature after sync.
+ * GeneralsX @feature cemlyn007 28/09/2026 Honour dummy (headless) and -noaudio with a device-free
+ * manager, as Win32GameEngine does, so a headless engine opens no audio device and no audio threads
+ * (PLAN-023 Phase 0). m_headlessAudio lets an embedding host keep real audio in headless mode.
  */
 AudioManager *SDL3GameEngine::createAudioManager(Bool dummy)
 {
-	(void)dummy;
 	fprintf(stderr, "INFO: SDL3GameEngine::createAudioManager()\n");
 
+#if defined(SAGE_USE_MINIAUDIO) || defined(SAGE_USE_OPENAL)
+	const Bool deviceFree = (dummy && !TheGlobalData->m_headlessAudio) || !TheGlobalData->m_audioOn;
+#endif
+
 #ifdef SAGE_USE_MINIAUDIO
+	if (deviceFree) {
+		fprintf(stderr, "INFO: Creating device-free MiniAudio audio backend\n");
+		return NEW MiniAudioManagerDummy;
+	}
 	fprintf(stderr, "INFO: Creating MiniAudio audio backend\n");
 	return new MiniAudioManager();
 #elif defined(SAGE_USE_OPENAL)
+	if (deviceFree) {
+		fprintf(stderr, "INFO: Creating device-free OpenAL audio backend\n");
+		return NEW OpenALAudioManagerDummy;
+	}
 	fprintf(stderr, "INFO: Creating OpenAL audio backend\n");
 	return new OpenALAudioManager();
 #else
+	(void)dummy;
 	fprintf(stderr, "INFO: Audio backend not available (SAGE_USE_OPENAL/SAGE_USE_MINIAUDIO not defined)\n");
 	fprintf(stderr, "WARNING: Falls back to parent implementation or silent mode\n");
 	return GameEngine::createAudioManager();  // Call parent (may return stub)

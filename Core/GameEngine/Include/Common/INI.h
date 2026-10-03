@@ -320,19 +320,21 @@ public:
 	static void parseVeterancyLevelFlags(INI* ini, void* instance, void* store, const void* userData);
 	static void parseSoundsList( INI* ini, void *instance, void *store, const void* /*userData*/ );
 
+	// GeneralsX @bugfix cemlyn007 28/09/2026 The token functions are members now: each INI keeps its
+	// own strtok_r save pointer instead of sharing libc strtok's process-wide one (PLAN-023 Phase 0).
 	/**
 		return the next token. if seps is not specified, the standard seps are used.
 
 		this will *never* return null; if there are no more tokens, an exception will be thrown.
 	*/
-	static const char* getNextToken(const char* seps = getSeps());
+	const char* getNextToken(const char* seps = getSeps());
 
 	/**
 		just like getNextToken(), except that null is returned if no more tokens are present
 		(rather than throwing an exception). usually you should call getNextToken(),
 		but for some cases this is handier (ie, parsing a variable-length number of tokens).
 	*/
-	static const char* getNextTokenOrNull(const char* seps = getSeps());
+	const char* getNextTokenOrNull(const char* seps = getSeps());
 
 	/**
 		This is called when the next thing you expect is something like:
@@ -344,7 +346,7 @@ public:
 
 		If "Tag" is not the next token, an error is thrown.
 	*/
-	static const char* getNextSubToken(const char* expected);
+	const char* getNextSubToken(const char* expected);
 
 	/**
 		return the next ascii string. this is usually the same the result of getNextToken(),
@@ -402,6 +404,9 @@ protected:
 	UnsignedInt m_lineNum;										///< current line number that's been read
 	char m_buffer[ INI_MAX_CHARS_PER_LINE+1 ];///< buffer to read file contents into
 	Bool m_endOfFile;													///< TRUE when we've hit EOF
+	// GeneralsX @bugfix cemlyn007 28/09/2026 Per-INI parse state that used to be process-wide (PLAN-023 Phase 0)
+	char* m_tokenSavePtr;											///< strtok_r position within m_buffer
+	Xfer* m_xfer;															///< CRC xfer for the file being loaded, or null
 #ifdef DEBUG_CRASHING
 	char m_curBlockStart[ INI_MAX_CHARS_PER_LINE+1 ];	///< first line of cur block
 #endif
