@@ -154,7 +154,7 @@ TextureBaseClass::~TextureBaseClass()
 static inline bool Thumbnails_Disabled()
 {
 #if RTS_ENGINE_CONTEXT
-	return !WW3D::Get_Thumbnail_Enabled() && DX8Wrapper::Is_Initted();
+	return DX8Wrapper::Is_Initted() && !WW3D::Get_Thumbnail_Enabled();
 #else
 	return !WW3D::Get_Thumbnail_Enabled();
 #endif
