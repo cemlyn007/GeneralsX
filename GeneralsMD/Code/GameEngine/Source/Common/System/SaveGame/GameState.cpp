@@ -1406,30 +1406,41 @@ void GameState::iterateSaveFiles( IterateSaveFileCallback callback, void *userDa
 		}
 		else
 		{
+			// GeneralsX @bugfix cemlyn007 03/10/2026 Advance with increment(ec) and check ec
+			// *before* testing against `end`, not as a for-loop's condition/step pair. Both
+			// libstdc++ and libc++ reset dirIter to the end iterator when increment(ec) fails,
+			// so a `for( ; dirIter != end; dirIter.increment( ec ) )` loop's own condition goes
+			// false on the same call that set ec, and a `if( ec )` in the loop body never runs:
+			// a mid-read failure (permissions dropped, an I/O error) stayed silent despite the
+			// comment above claiming otherwise.
 			const std::filesystem::directory_iterator end;
-			for( ; dirIter != end; dirIter.increment( ec ) )
+			while( dirIter != end )
 			{
-				if( ec )
-				{
-					fprintf( stderr, "GameState::iterateSaveFiles - Error reading directory '%s': %s\n",
-					         getSaveDirectory().str(), ec.message().c_str() );
-					fflush( stderr );
-					break;
-				}
-
 				std::error_code statusError;
 				const Bool isRegular = std::filesystem::is_regular_file( dirIter->path(), statusError );
-				if( statusError || !isRegular )
-					continue;
+				if( !statusError && isRegular )
+				{
+					AsciiString leaf = dirIter->path().filename().string().c_str();
 
-				AsciiString leaf = dirIter->path().filename().string().c_str();
+					// Win32 wildcards also match longer extensions through 8.3 short names, so check the extension itself
+					if( leaf.endsWithNoCase( SAVE_GAME_EXTENSION ) )
+					{
+						// the callbacks take the leaf name and resolve it with getSaveGamePathForRead
+						callback( getMapLeafName( leaf ), userData );
+					}
+				}
 
-				// Win32 wildcards also match longer extensions through 8.3 short names, so check the extension itself
-				if( leaf.endsWithNoCase( SAVE_GAME_EXTENSION ) == FALSE )
-					continue;
-
-				// the callbacks take the leaf name and resolve it with getSaveGamePathForRead
-				callback( getMapLeafName( leaf ), userData );
+				dirIter.increment( ec );
+				if( ec )
+				{
+					if( ec != std::errc::no_such_file_or_directory )
+					{
+						fprintf( stderr, "GameState::iterateSaveFiles - Error reading directory '%s': %s\n",
+						         getSaveDirectory().str(), ec.message().c_str() );
+						fflush( stderr );
+					}
+					break;
+				}
 			}
 		}
 	}
