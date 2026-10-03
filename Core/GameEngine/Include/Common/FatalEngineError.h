@@ -71,10 +71,11 @@ FATAL_ENGINE_ERROR_API bool IsEngineTearingDown();
 
 // GeneralsX @feature cemlyn007 02/10/2026 Sticky fault latch: fault delivery to the host otherwise
 // depends on every catch (...) between RELEASE_CRASH and the host having a
-// catch (const FatalEngineError&) { throw; } in front of it. Something that swallows the
-// exception anyway (a catch (...) added later, upstream or in a merge) still sets this latch
-// first, even when the error is returned instead of thrown (the teardown window above), so a host that polls HasEngineFaulted() after each call into the engine can detect the
-// fault even when the exception itself never reaches it.
+// catch (const FatalEngineError&) { throw; } in front of it. The engine sets this latch before it
+// throws, so something that swallows the exception anyway (a catch (...) added later, upstream or
+// in a merge) still leaves it set. It is also set when the teardown window above makes the error
+// return instead of throw. A host that polls HasEngineFaulted() after each call into the engine can
+// therefore detect the fault even when no exception reaches it.
 //
 // The flag is process-wide, like IsEngineEmbeddedMode() above, and nothing in this engine ever
 // clears it: the engine that set it is corrupt and the host must not call back into it to ask.
