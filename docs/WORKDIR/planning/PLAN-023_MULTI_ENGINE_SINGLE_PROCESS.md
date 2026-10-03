@@ -366,7 +366,7 @@ The two-engine harness (rlgenerals' `multi_engine_test`, 1,500 frames per engine
 
 ### Phase 3: Device-layer state that headless still uses
 
-**Status (Phase 3 PR): the rows below are converted and verified for two engines stepped on one thread; the phase's acceptance (below) is not yet met, and the Phase 3 entries left in the classification (`python3 scripts/cpp/engine_state_symbols.py report`) are threads only**, all with `RTS_ENGINE_CONTEXT` ON only (OFF is unchanged except `AudioEventRTS`'s non-copy constructors, which now set two fields upstream left unset; the CRC below predates that change: rlgenerals' per-frame `crc(recalc=True)` over 3,000 frames of the seeded Hard-vs-Hard skirmish is identical OFF and ON, the same as after Phase 2). Both games are edited alike; Generals still builds OFF.
+**Status (Phase 3 PR): the rows below are converted and verified for two engines stepped on one thread; the phase's acceptance (below) is not yet met, and the Phase 3 entries left in the classification (`python3 scripts/cpp/engine_state_symbols.py report`) are threads only**, all with `RTS_ENGINE_CONTEXT` ON only (OFF is unchanged: rlgenerals' per-frame `crc(recalc=True)` over 3,000 frames of the seeded Hard-vs-Hard skirmish is identical OFF and ON, the same as after Phase 2). Both games are edited alike; Generals still builds OFF.
 
 | Row | Status |
 |---|---|
