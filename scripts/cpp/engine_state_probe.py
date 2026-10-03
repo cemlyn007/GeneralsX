@@ -56,9 +56,9 @@ GUARD = "guard variable for "
 ALLOWLIST = {
     # Written once per process, by the first render boot (the probe's first snapshot follows a headless
     # priming boot, so the render engine's is the process's first device).
-    "D3D8Lib": "the D3D8 library, loaded once per process (std::call_once) and never freed",
+    "D3D8Lib": "the D3D8 library, loaded per process under a mutex and never freed",
     "Direct3DCreate8Ptr": "the D3D8 library's Direct3DCreate8, looked up once per process with it",
-    "DX8Wrapper::Init(void*, bool)::s_d3d8LibOnce": "the std::once_flag that loads the D3D8 library",
+    "DX8Wrapper::Init(void*, bool)::s_d3d8LibMutex": "the mutex that guards the load of the D3D8 library",
     "DX8Wrapper_FinalReleaseHook": "the host's final-release check, set by its first render boot",
     "RTS3DScene::updateFixedLightEnvironments(RenderInfoClass&)::id": "a constant vector, built at first use under the static-init guard",
     "W3DVolumetricShadow::Update()::originCompareVector": "a constant vector, built at first use under the static-init guard",
