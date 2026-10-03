@@ -69,9 +69,16 @@ public:
 	Bucket				*m_nextInSocket;
 	NameKeyType		m_key;
 	AsciiString		m_nameString;
+#if RTS_ENGINE_CONTEXT
+	Bool					m_afterPriming;	///< interned after the priming engine's GameEngine::init completed (see PrimingLatch)
+#endif
 };
 
+#if RTS_ENGINE_CONTEXT
+inline Bucket::Bucket() : m_nextInSocket(nullptr), m_key(NAMEKEY_INVALID), m_afterPriming(FALSE) { }
+#else
 inline Bucket::Bucket() : m_nextInSocket(nullptr), m_key(NAMEKEY_INVALID) { }
+#endif
 inline Bucket::~Bucket() { }
 
 //-------------------------------------------------------------------------------------------------
@@ -140,14 +147,14 @@ public:
 	// GameEngine::init alone. Every later engine boots from the same data, so it finds every boot
 	// name already interned, with the same key, and must intern nothing new until its upgrades are
 	// loaded (the science and upgrade keys are what orders carry): a new name there means different
-	// data, which is a fatal error. If the priming engine fails partway, the generator holds a
+	// data, which is a fatal error. A name the priming engine interned only after its own init
+	// completed (during play) counts as new there too. If the priming engine fails partway, the generator holds a
 	// partial prefix that a retry would extend differently, so the process is poisoned: every later
 	// engine fails in GameEngine::init, and the host has to restart the process. So is it if a later
 	// engine's init fails partway: that leaves process-wide state half built, and ~GameEngine cannot
 	// tear a partly initialised engine down, so the host must leak it (never delete it).
 	//
-	// Every refusal here is a fatal error that never returns (ReleaseCrashNoReturn): FatalEngineError
-	// in embedded mode.
+	// Every refusal here never returns: FatalEngineError in embedded mode, abort otherwise.
 	enum PrimingState
 	{
 		PRIMING_NOT_STARTED,	///< no engine has started GameEngine::init in this process
@@ -188,12 +195,16 @@ private:
 	};
 
 	NameKeyType createNameKey(UnsignedInt hash, const AsciiString& name);
+#if RTS_ENGINE_CONTEXT
+	NameKeyType keyOfExisting(const Bucket* b) const;
+	bool m_primed;	///< the priming engine's GameEngine::init completed; guarded by m_insertMutex
+#endif
 
 	void freeSockets();
 
 #if RTS_ENGINE_CONTEXT
 	// GeneralsX @feature cemlyn007 28/09/2026 Thread-safe with several engines (see PrimingLatch)
-	std::atomic<Bucket*>	m_sockets[SOCKET_COUNT];	///< Catalog of all Buckets already generated; a bucket is immutable once published
+	std::atomic<Bucket*>	m_sockets[SOCKET_COUNT];	///< Catalogue of all Buckets already generated; a bucket is immutable once published
 	UnsignedInt		m_nextID;											///< Next available ID; guarded by m_insertMutex
 	UnsignedInt		m_descendingID;								///< Next ID handed out downwards, or 0 (perturbForTesting); guarded by m_insertMutex
 	std::mutex		m_insertMutex;								///< Held by every insert
