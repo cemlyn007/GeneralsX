@@ -62,8 +62,9 @@ EngineContext::~EngineContext()
 	if (m_slots == nullptr)
 		return;
 
-	// A slot object's destructor may read another slot (or create one), so destroy them newest first and
-	// clear each before its destructor runs.
+	// A slot object's destructor may read another slot (or create one), so destroy them inside this
+	// context's own Scope, newest first, clearing each before its destructor runs.
+	Scope scope(this);
 	while (!m_slots->inCreationOrder.empty())
 	{
 		EngineSlotTable::Owned owned = m_slots->inCreationOrder.back();
@@ -74,6 +75,11 @@ EngineContext::~EngineContext()
 	}
 	delete m_slots;
 	m_slots = nullptr;
+}
+
+bool EngineContext::hasSlots() const
+{
+	return m_slots != nullptr && !m_slots->inCreationOrder.empty();
 }
 
 void* EngineContext::getSlot(std::size_t index) const
@@ -110,7 +116,7 @@ std::size_t EngineContext::countLiveSingletons() const
 
 bool noEngineIsPristine()
 {
-	return g_noEngine.countLiveSingletons() == 0 && !g_noEngine.engineTearingDown;
+	return g_noEngine.countLiveSingletons() == 0 && !g_noEngine.hasSlots() && !g_noEngine.engineTearingDown;
 }
 
 } // namespace rts
