@@ -32,8 +32,8 @@ def make_symbol(key, decls, count=1, source="x.cpp:1", sections=None):
 class RuleConstObjectTest(unittest.TestCase):
     """rule:const is SAFE_FOR_NEW: it must never pass a reassignable pointer or reference."""
 
-    def assert_const(self, decl, expect, msg=None):
-        got = m.rule_const_object(make_symbol("s", [decl])) is not None
+    def assert_const(self, decl, expect, msg=None, symbols=None):
+        got = m.rule_const_object(make_symbol("s", [decl]), symbols) is not None
         self.assertEqual(got, expect, msg or decl)
 
     def test_plain_const_is_safe(self):
@@ -299,6 +299,31 @@ class RuleConstObjectTest(unittest.TestCase):
 
     def test_by_value_const_initialized_from_a_constructor_with_float_literal_arguments_is_safe(self):
         self.assert_const("static const Vector3 v = Vector3(0.f, 1.f, 0.f);", True)
+
+    def test_by_value_const_initialized_from_an_all_caps_writable_global_is_not_safe(self):
+        # REPLAY_CRC_INTERVAL is ALL_CAPS but is a writable global (rewritten by replay playback), not a
+        # named constant: the ALL_CAPS allow-list must not treat every such name as safe.
+        writable = {"REPLAY_CRC_INTERVAL": make_symbol("REPLAY_CRC_INTERVAL", [], sections={".data"})}
+        self.assert_const("static const Int s = REPLAY_CRC_INTERVAL;", False, symbols=writable)
+
+    def test_by_value_const_initialized_from_a_cast_of_a_writable_global_is_not_safe(self):
+        writable = {"REPLAY_CRC_INTERVAL": make_symbol("REPLAY_CRC_INTERVAL", [], sections={".data"})}
+        self.assert_const(
+            "static const Int s = static_cast<Int>(REPLAY_CRC_INTERVAL);", False, symbols=writable
+        )
+
+    def test_by_value_const_initialized_from_a_functional_cast_of_a_writable_global_is_not_safe(self):
+        # `UnsignedInt(startTime)` matches the function-pointer-argument exemption's own regex (a bare,
+        # lower-case-led identifier as a direct argument of the declared type's own constructor), but it is
+        # a read of a per-engine variable, not a callback field: the exemption must not accept a name that
+        # is itself a writable symbol.
+        writable = {"startTime": make_symbol("startTime", [], sections={".bss"})}
+        self.assert_const("static const UnsignedInt s_t = UnsignedInt(startTime);", False, symbols=writable)
+
+    def test_by_value_const_initialized_from_a_functional_cast_of_an_unknown_name_is_still_safe(self):
+        # Without a symbol table saying otherwise, a lower-case-led argument of the declared type's own
+        # constructor is still accepted as a callback field (the StateConditionInfo shape).
+        self.assert_const("static const Coord3D c = Coord3D(s_lastX, 0.0f, 0.0f);", True)
 
 
 class RuleNamekeyTest(unittest.TestCase):

@@ -759,30 +759,33 @@ from engine_state_hand import HAND as HAND_ENTRIES  # noqa: E402
 HAND = [Hand(e) for e in HAND_ENTRIES]
 
 
-# The rules: (name, function(sym) -> (class, phase, note) or None). Sound for the whole family they match.
+# The rules: (name, function(sym, symbols) -> (class, phase, note) or None). `symbols` is every symbol in
+# the library being classified (rule:const uses it to recognise a read of a writable one by name; the
+# others ignore it), `None` when a rule is exercised directly by a unit test that classifies no library.
+# Sound for the whole family they match.
 
 TOOLCHAIN = {"__dso_handle", "completed", "__TMC_END__", "_GLOBAL_OFFSET_TABLE_", "_DYNAMIC", "__bss_start", "_edata", "_end"}
 
 
-def rule_toolchain(sym):
+def rule_toolchain(sym, symbols=None):
     if sym.key in TOOLCHAIN or sym.key.startswith("DW.ref."):
         return GLOBAL, "", "compiler/linker runtime object (crtstuff, DWARF personality references)"
     return None
 
 
-def rule_libstdcxx(sym):
+def rule_libstdcxx(sym, symbols=None):
     if sym.key.startswith(("std::", "__gnu_cxx::", "__cxxabiv1::", "guard variable for std::")):
         return GLOBAL, "", "libstdc++ template static instantiated into the library (library state, not engine state)"
     return None
 
 
-def rule_third_party(sym):
+def rule_third_party(sym, symbols=None):
     if sym.library:
         return GLOBAL, "", f"state of the statically linked third-party library `{sym.library}` (vcpkg); not engine state"
     return None
 
 
-def rule_read_only(sym):
+def rule_read_only(sym, symbols=None):
     if sym.sections <= {".rodata", ".data.rel.ro"}:
         return CONST, "", "in a read-only (or RELRO) section: nothing can write it after relocation"
     return None
@@ -801,7 +804,7 @@ NAMEKEY_DECL_RE = re.compile(r"^(?:static\s+)?(const\s+)?(?:NameKeyType|StaticNa
 NAMEKEY_INIT_RE = re.compile(r"^\s*(?:NAMEKEY\s*\(|TheNameKeyGenerator\s*->\s*nameToKey\b)")
 
 
-def rule_namekey(sym):
+def rule_namekey(sym, symbols=None):
     p = sym.parsed
     if sym.key.startswith("TheKey_") or (p.var == "nk" and p.func == "getModuleNameKey"):
         return GLOBAL, "", "cached NameKeyType: process-wide by PLAN-023 Decision 2 (shared immortal generator)"
@@ -821,7 +824,7 @@ def rule_namekey(sym):
 FIELDPARSE_DECL_RE = re.compile(r"^(?:static\s+)?const\s+FieldParse\s+\w+\s*\[[^\]]*\]\s*$")
 
 
-def rule_field_parse(sym):
+def rule_field_parse(sym, symbols=None):
     """INI FieldParse table: built once, never written. By declared type, not by the variable's name alone
     (a variable merely named dataFieldParse/myFieldParse/commonFieldParse is not provably one), and not by
     `FieldParse` merely appearing in the type somewhere (a mutable pointer or container is not a table)."""
@@ -844,7 +847,8 @@ CONST_PTR_DECL_RE = re.compile(r"\*\s*const\s+\w+\s*(?:\[[^\]]*\]\s*)*$")
 GLOBAL_LOOKUP_RE = re.compile(r"->")
 # Pure value constructors used in this codebase to build a by-value const from literals alone: no lookup, no
 # engine-state read, no counter or RNG draw. Nothing outside this list (and the declared type's own name) is
-# accepted as a call initialiser.
+# accepted as a call initialiser, and even a call to one of these is still rejected if an argument itself
+# names a writable symbol (see `_writable_global_names`).
 SAFE_VALUE_CONSTRUCTOR_NAMES = {
     "GameMakeColor",
     "DEG_TO_RAD",
@@ -890,8 +894,10 @@ ASSIGN_RE = re.compile(r"(?<![=!<>])=(?!=)")
 _NUMBER_RE = r"[+-]?(?:0[xX][0-9a-fA-F]+|\d+\.?\d*(?:[eE][+-]?\d+)?)[uUlLfF]*"
 LITERAL_RE = re.compile(rf"^(?:{_NUMBER_RE}|\"(?:[^\"\\]|\\.)*\"|'(?:[^'\\]|\\.)*')$")
 # An ALL_CAPS identifier or enumerator, optionally `::`-qualified (`NAMEKEY_INVALID`, `Foo::BAR`, the scope
-# itself in whatever case the class/namespace uses): a named constant, never a per-engine read. The caller
-# still checks that the final (unqualified) segment is upper case.
+# itself in whatever case the class/namespace uses): a named constant, never a per-engine read, UNLESS it
+# is itself a writable symbol: this codebase also spells some mutable globals ALL_CAPS (REPLAY_CRC_INTERVAL,
+# NET_CRC_INTERVAL, MIN_RUNAHEAD, ...), so the caller also checks the name against `_writable_global_names`.
+# The caller still checks that the final (unqualified) segment is upper case.
 ALL_CAPS_RE = re.compile(r"^[A-Za-z_]\w*(?:::[A-Za-z_]\w*)*$")
 # A C-style or functional cast (`(Int)expr`, `static_cast<Int>(expr)`) ahead of a value this rule still
 # checks underneath: the cast itself reads nothing, so only the expression it casts need be a pure value.
@@ -901,8 +907,11 @@ _STATIC_CAST_RE = re.compile(
 )
 # A function (pointer) name, bare or `&`-taken, possibly scoped (`isConditionTrue`, `&foo`,
 # `DeliverPayloadStateMachine::isOffMap`): accepted only as a direct argument of the declared type's own
-# constructor (a callback field, such as StateConditionInfo's), never as a value on its own, and never when
-# it ends in an ALL_CAPS segment (that is an enumerator, already accepted above as a plain value).
+# constructor (a callback field, such as StateConditionInfo's), never as a value on its own, never when it
+# ends in an ALL_CAPS segment (that is an enumerator, already accepted above as a plain value), and never
+# when it (after stripping a leading `&`) names a writable symbol: a functional cast of a per-engine
+# variable (`UnsignedInt(startTime)`) matches this regex just as a callback's name does, so the caller also
+# checks the (`&`-stripped) name against `_writable_global_names` before accepting it.
 FUNC_PTR_ARG_RE = re.compile(r"^&?[A-Za-z_]\w*(?:::[A-Za-z_]\w*)*$")
 
 
@@ -959,13 +968,16 @@ def _has_unsafe_operator(expr):
     return False
 
 
-def _is_safe_value_expr(expr, type_name):
+def _is_safe_value_expr(expr, type_name, writable_names):
     """True when `expr` (a whole by-value initialiser, or one brace-list element / call argument of one)
-    is provably a pure value: a literal, an ALL_CAPS named constant or enumerator, `true`/`false`/`nullptr`,
-    a cast of another pure value, a call to an allow-listed pure value constructor or to the declared type's
-    own name (each of its arguments checked the same way, except a lower-case-led function name, bare,
-    `&`-taken or scoped, is accepted as a direct argument of the type's own constructor: a function-pointer
-    field, such as StateConditionInfo's callback members, not a read), or a `{...}` list of pure values."""
+    is provably a pure value: a literal, an ALL_CAPS named constant or enumerator that is not itself a
+    writable symbol, `true`/`false`/`nullptr`, a cast of another pure value, a call to an allow-listed pure
+    value constructor or to the declared type's own name (each of its arguments checked the same way,
+    except a lower-case-led function name, bare, `&`-taken or scoped, is accepted as a direct argument of
+    the type's own constructor only when it does not itself name a writable symbol: a function-pointer
+    field, such as StateConditionInfo's callback members, not a functional-style cast of a per-engine
+    variable), or a `{...}` list of pure values. `writable_names` is `_writable_global_names`'s result: every
+    name this initialiser must not be allowed to read, however it is spelled."""
     expr = expr.strip()
     if not expr:
         return True
@@ -974,10 +986,10 @@ def _is_safe_value_expr(expr, type_name):
     if LITERAL_RE.match(expr) or expr in ("true", "false", "nullptr", "NULL"):
         return True
     if ALL_CAPS_RE.match(expr) and expr.rsplit("::", 1)[-1].isupper():
-        return True
+        return expr not in writable_names and expr.rsplit("::", 1)[-1] not in writable_names
     m = _STATIC_CAST_RE.match(expr)
     if m:
-        return _is_safe_value_expr(m.group("rest"), type_name)
+        return _is_safe_value_expr(m.group("rest"), type_name, writable_names)
     m = _CAST_RE.match(expr)
     if m and m.group("rest")[:1] != "(":
         # `(name)(args)` is a parenthesised callee (a call through a function pointer, or a macro that
@@ -986,9 +998,9 @@ def _is_safe_value_expr(expr, type_name):
         # recursing into "(args)" as the cast's operand) leaves this expression to the checks below, all
         # of which require a leading identifier or `{`/`(` that is not this cast-looking prefix, so it is
         # rejected rather than read as a cast of a safe-looking argument list.
-        return _is_safe_value_expr(m.group("rest"), type_name)
+        return _is_safe_value_expr(m.group("rest"), type_name, writable_names)
     if expr[0] == "{" and expr[-1] == "}":
-        return all(_is_safe_value_expr(e, type_name) for e in _split_top_level_commas(expr[1:-1]))
+        return all(_is_safe_value_expr(e, type_name, writable_names) for e in _split_top_level_commas(expr[1:-1]))
     if expr[0] == "(" and _fully_parenthesized(expr):
         # Direct-initialisation's own `(...)` (`pick(3)`'s initialiser is recorded as `(3)`, `Matrix3D::
         # Identity`'s is `(1.0, 0.0, ..., 0.0)`) or a plain grouping: neither is a call (a call starts with
@@ -997,31 +1009,61 @@ def _is_safe_value_expr(expr, type_name):
         # one); a single one is just a parenthesised expression and is checked the same way either way.
         parts = _split_top_level_commas(expr[1:-1])
         if len(parts) > 1:
-            return all(_is_safe_value_expr(p, type_name) for p in parts)
-        return _is_safe_value_expr(expr[1:-1], type_name)
+            return all(_is_safe_value_expr(p, type_name, writable_names) for p in parts)
+        return _is_safe_value_expr(expr[1:-1], type_name, writable_names)
     call = re.match(r"^([A-Za-z_]\w*)\s*\((.*)\)$", expr, re.DOTALL)
     if call and (call.group(1) in SAFE_VALUE_CONSTRUCTOR_NAMES or call.group(1) == type_name):
         args = _split_top_level_commas(call.group(2))
         return all(
-            _is_safe_value_expr(a, type_name)
+            _is_safe_value_expr(a, type_name, writable_names)
             or (
                 call.group(1) == type_name
                 and FUNC_PTR_ARG_RE.match(a)
                 and a.lstrip("&").rsplit("::", 1)[-1][:1].islower()
+                and a.lstrip("&") not in writable_names
+                and a.lstrip("&").rsplit("::", 1)[-1] not in writable_names
             )
             for a in args
         )
     return False
 
 
-def _by_value_init_is_safe(init, type_name):
+_writable_names_cache = {}
+
+
+def _writable_global_names(symbols):
+    """Every writable symbol's own key (a global, namespaced global or function-local static, in
+    `.bss`/`.data`/`.tbss`/`.tdata`): every name a by-value const's initialiser must not be allowed to
+    read, however it is spelled. This codebase is not consistent about reserving ALL_CAPS for named
+    constants (REPLAY_CRC_INTERVAL, NET_CRC_INTERVAL and MIN_RUNAHEAD are all writable globals) or about
+    camelCase always meaning a function (a function-pointer argument's own exemption, read literally, also
+    accepts a functional-style cast of a plain variable such as `UnsignedInt(startTime)`), so this rule's
+    by-value allow-list checks every name it would otherwise accept against this set. Matching is by exact
+    key, with no scope resolution: a textual rule has no way to tell, from the initialiser text alone,
+    which of several same-named symbols in different scopes it means, so an unrelated same-named local is
+    (harmlessly) excluded too. `symbols` may be `None` or empty (a direct unit test of the expression
+    checker, which classifies no library): that never counts as a writable name, so it only narrows what a
+    test must supply to exercise this check, never what production code (which always classifies from a
+    real symbol table) accepts."""
+    if not symbols:
+        return frozenset()
+    cached = _writable_names_cache.get(id(symbols))
+    if cached is not None and cached[0] == len(symbols):
+        return cached[1]
+    names = frozenset(key for key, sym in symbols.items() if sym.sections & WRITABLE_SECTIONS)
+    _writable_names_cache[id(symbols)] = (len(symbols), names)
+    return names
+
+
+def _by_value_init_is_safe(init, type_name, writable_names):
     """True when the whole by-value initialiser is a provably pure value (see `_is_safe_value_expr`):
     literals, named constants, casts and allow-listed/own-type constructor calls, built from each other and
-    from nothing else. A dereference, a subscript, a member access, `.`/`[...]` on anything but a brace
-    list, `++`/`--`, an assignment, or a call that is not on the allow-list (a one-time lookup, a getter
-    backed by engine globals, an RNG draw such as GameLogicRandomValue advancing the per-engine logic RNG,
-    even with literal arguments) is rejected."""
-    return _is_safe_value_expr(init, type_name)
+    from nothing else, and none of them a read of a symbol `writable_names` names. A dereference, a
+    subscript, a member access, `.`/`[...]` on anything but a brace list, `++`/`--`, an assignment, or a
+    call that is not on the allow-list (a one-time lookup, a getter backed by engine globals, an RNG draw
+    such as GameLogicRandomValue advancing the per-engine logic RNG, even with literal arguments) is
+    rejected."""
+    return _is_safe_value_expr(init, type_name, writable_names)
 
 
 # The address of a named value (`&kDefault`), optionally scoped: the only way this codebase's safe pointer
@@ -1129,7 +1171,7 @@ def _split_initializer(decl):
     return declarator, None
 
 
-def rule_const_object(sym):
+def rule_const_object(sym, symbols=None):
     """A const object (dynamically initialised, so it lands in .data/.bss): never written after its
     initialisation. A reference is never safe here (it can alias per-engine state at any type). A pointer is
     safe only when the pointer itself cannot be reseated (`T* const name`, not `const T*`, whatever the
@@ -1139,16 +1181,20 @@ def rule_const_object(sym):
     bare copy of another per-engine global pointer (`T* const name = TheGlobalData`), and both are
     rejected. A by-value const must have its whole initialiser provably built from pure
     values and nothing else (`_by_value_init_is_safe`'s allow-list: literals, named constants, casts and
-    allow-listed/own-type constructor calls): any way of reading or changing per-engine state is rejected,
-    whether a `->` read (`static const Real r = TheGlobalData->m_maxCameraHeight;`), a dereference or
-    subscript (`*TheGlobalData`, `theGameLogicSeed[0]`), a member access on either (`(*TheGlobalData).m`,
+    allow-listed/own-type constructor calls, none of them a read of a symbol `_writable_global_names`
+    reports as writable): any way of reading or changing per-engine state is rejected, whether a `->` read
+    (`static const Real r = TheGlobalData->m_maxCameraHeight;`), a dereference or subscript
+    (`*TheGlobalData`, `theGameLogicSeed[0]`), a member access on either (`(*TheGlobalData).m`,
     `TheGlobalData[0].m`), a call that is not on the allow-list (`static const Int pick =
-    GameLogicRandomValue(0, 3);` advances the per-engine logic RNG despite its literal arguments), or
-    `++`/`--`/an assignment. Every one of these captures whichever engine ran first, or diverges per engine,
-    the same first-engine-wins defect as the pointer case. This holds whichever syntax initialises it (copy,
-    direct `name(expr)` or brace `name{expr}`); a declaration whose recorded line ends before its initialiser
-    does (a continuation onto the next source line, or a statement longer than the caller's scan window, so
-    the text we have simply stops without reaching the statement's own `;`) is never assumed safe."""
+    GameLogicRandomValue(0, 3);` advances the per-engine logic RNG despite its literal arguments), an
+    ALL_CAPS or function-pointer-argument read of a writable global (`REPLAY_CRC_INTERVAL`, a functional
+    cast such as `UnsignedInt(startTime)`), or `++`/`--`/an assignment. Every one of these captures
+    whichever engine ran first, or diverges per engine, the same first-engine-wins defect as the pointer
+    case. This holds whichever syntax initialises it (copy, direct `name(expr)` or brace `name{expr}`); a
+    declaration whose recorded line ends before its initialiser does (a continuation onto the next source
+    line, or a statement longer than the caller's scan window, so the text we have simply stops without
+    reaching the statement's own `;`) is never assumed safe."""
+    writable_names = _writable_global_names(symbols)
     for d in declarations(sym):
         if not d.rstrip().endswith(";"):
             return None
@@ -1166,7 +1212,7 @@ def rule_const_object(sym):
         else:
             if not CONST_DECL_RE.match(decl):
                 return None
-            if not _by_value_init_is_safe(init, _declared_type_name(decl)):
+            if not _by_value_init_is_safe(init, _declared_type_name(decl), writable_names):
                 return None
     return CONST, "", "const object: initialized once, never written"
 
@@ -1209,7 +1255,7 @@ def classify(sym, symbols):
             hand.used += 1
             return
     for name, rule in RULES:
-        result = rule(sym)
+        result = rule(sym, symbols)
         if result:
             sym.cls, sym.phase, sym.note = result
             sym.by = f"rule:{name}"
