@@ -72,7 +72,7 @@
 #if RTS_ENGINE_CONTEXT
 // GeneralsX @feature cemlyn007 28/09/2026 Per engine (PLAN-023 Phase 2): the map-parse scratch that
 // ScriptList::ParseScriptsDataChunk fills and getReadScripts hands over, and the xfer recovery objects
-// (still leaked, as upstream leaks them, but one per engine).
+// (upstream leaks them; here they are freed with the engine's slot).
 namespace
 {
 struct ScriptsPerEngine
