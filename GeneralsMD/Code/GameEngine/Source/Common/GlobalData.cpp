@@ -1684,10 +1684,11 @@ AsciiString GlobalData::BuildUserDataPathFromRegistry()
 			// GeneralsX @bugfix cemlyn007 02/10/2026 create_directories with an error_code
 			// (createUserDataDirectory above), not the throwing overload: the throwing overload turns an
 			// uncreatable default -- e.g. a read-only $HOME in a sandbox -- into an uncaught exception that
-			// crashes the constructor and the whole engine boot. A host with no write access to the default
-			// can still boot this way, as long as it (or a later setPath_UserData override) provides a
-			// directory that does exist; createUserDataDirectory reports the failure on stderr so it is
-			// visible in release builds (DEBUG_LOG compiles out of them).
+			// crashes the constructor and the whole engine boot. The error_code overload lets the engine
+			// boot anyway even when the default cannot be created (writes to it then fail);
+			// createUserDataDirectory reports the failure on stderr so it is visible in release builds
+			// (DEBUG_LOG compiles out of them). A host that needs working writes supplies its own
+			// directory through setPath_UserData.
 			createUserDataDirectory(path, "the default user data directory");
 			userDataDir = path.string().c_str();
 			if (!userDataDir.endsWith("/"))
