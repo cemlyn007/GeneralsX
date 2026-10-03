@@ -61,8 +61,10 @@ const unsigned int ParticleBufferClass::PermutationArray[16] = {
 // Maximum size of randomizer tables
 const static unsigned int MAX_RANDOM_ENTRIES = 32;	// MUST be power of two!
 
-// Total Active Particle Buffer Count
-unsigned int ParticleBufferClass::TotalActiveCount = 0;
+// GeneralsX @bugfix cemlyn007 02/10/2026 Removed TotalActiveCount: a process-wide counter every engine's
+// own thread wrote on its own construction/copy-construction/destruction path, with no reader left but
+// Get_Total_Active_Count, which nothing called. Nothing needs it; deleting it removes the race instead of
+// synchronising it, the same choice LocalFile's s_totalOpen made.
 
 // Static array of screen-size clamps for the 17 possible LOD levels a particle buffer can have.
 // We can change these from being global to being per-buffer later if we wish. Default is
@@ -323,9 +325,6 @@ ParticleBufferClass::ParticleBufferClass
 
 	// Ensure lod is no less than minimum allowed
 	if (Get_LOD_Level() < minlod) Set_LOD_Level(minlod);
-
-	// Update Global Count
-	TotalActiveCount++;
 
 	//lorenzen
 	// If the render mode is W3D_EMITTER_RENDER_MODE_LINE and we are supplied with
@@ -716,9 +715,6 @@ ParticleBufferClass::ParticleBufferClass(const ParticleBufferClass & src) :
 
 	// Ensure lod is no less than minimum allowed
 	if (Get_LOD_Level() < minlod) Set_LOD_Level(minlod);
-
-	// Update Global Count
-	TotalActiveCount++;
 }
 
 
@@ -798,9 +794,6 @@ ParticleBufferClass::~ParticleBufferClass()
 		// Emitter->Release_Ref();
 		Emitter = nullptr;
 	}
-
-	// Update Global Count
-	TotalActiveCount--;
 }
 
 
