@@ -160,12 +160,12 @@ static void embedInUseMap( AsciiString map, Xfer *xfer )
 	// rewind file back to start
 	fseek( fp, 0, SEEK_SET );
 
-	// GeneralsX @bugfix cemlyn007 03/10/2026 Close fp (and free buffer) on every throw path below,
-	// the same defect extractAndSaveMap had: an open handle on this tracked scratch-pad map fails
-	// a later DeleteFile of it on Windows, and leaks one file descriptor per failed save otherwise,
-	// in a long-lived embedded host. xfer->xferUser below can throw XFER_WRITE_ERROR (for example
-	// on a full disk) with both fp and buffer still live, so both need the same catch-and-rethrow
-	// the allocation and read failures below already got.
+	// GeneralsX @bugfix cemlyn007 03/10/2026 Close fp (and free buffer) on every throw path below:
+	// the allocation failure, the fread failure, and xfer->xferUser/endBlock's XFER_WRITE_ERROR
+	// (for example on a full disk) all now share this one catch, which closes fp and frees buffer
+	// before rethrowing. Before this change none of them did; an open handle on this tracked
+	// scratch-pad map fails a later DeleteFile of it on Windows, and leaks one file descriptor per
+	// failed save otherwise, in a long-lived embedded host.
 	char *buffer = nullptr;
 	try
 	{
