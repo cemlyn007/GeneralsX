@@ -661,6 +661,29 @@ class SourceIndexDefinitionTest(unittest.TestCase):
         m.classify(sym, symbols)
         self.assertNotEqual(sym.by, "rule:const")
 
+    def test_rule_const_fails_closed_on_a_statement_longer_than_the_scan_window(self):
+        # A statement longer than _statement_text's own scan window is cut off before reaching its `;`, so
+        # the recorded declaration can never show the real `->` read or RNG call: rule:const must refuse a
+        # symbol whose text it holds does not end in `;` rather than treat the missing trailing `;` as "no
+        # initialiser" (trivially safe) or let a bracket-free truncation slip through as a literal.
+        rows = ", ".join(f"{i}.0f" for i in range(1, 1100))  # comfortably longer than the 4000-char window
+        self.write(
+            "huge.cpp",
+            "static const Real s_huge[] =\n{\n"
+            f"    {rows},\n"
+            "    TheGlobalData->m_maxCameraHeight,\n"
+            "};\n",
+        )
+        sym = m.Symbol("s_huge")
+        sym.count = 1
+        sym.sections = {".bss"}
+        symbols = {"s_huge": sym}
+        m.resolve_sources(self.root, symbols, {})
+        self.assertFalse(sym.decl.rstrip().endswith(";"))  # confirms the probe really is truncated
+        m.classify(sym, symbols)
+        self.assertEqual(sym.by, "none")
+        self.assertEqual(sym.cls, m.UNREVIEWED)
+
     def test_find_does_not_extend_a_statement_that_already_ends_on_its_own_line(self):
         # The common, already-correct case must not be touched: a declaration complete on one line keeps
         # exactly that line (nothing from the next statement bleeds in).

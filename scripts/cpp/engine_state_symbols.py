@@ -896,6 +896,21 @@ def _by_value_init_is_safe(init, type_name):
     return True
 
 
+def _is_balanced(text):
+    """True when every `(`/`[`/`{` in `text` closes before the text ends, and nothing closes early. A copy
+    (`= expr`) initialiser that fails this was cut off mid-expression (the recorded text ran out before the
+    statement did), not a complete expression that merely contains brackets."""
+    depth = 0
+    for c in text:
+        if c in "({[":
+            depth += 1
+        elif c in ")}]":
+            depth -= 1
+            if depth < 0:
+                return False
+    return depth == 0
+
+
 def _split_initializer(decl):
     """(declarator, initialiser text) for a recorded declaration line, however it initialises: copy
     (`= expr`), direct (`name(expr)`) or brace (`name{expr}`). The initialiser is `""` when the declarator
@@ -931,6 +946,11 @@ def _split_initializer(decl):
     declarator = decl[:i].rstrip()
     if decl[i] == "=":
         init = decl[i + 1 :].strip()
+        if init and not _is_balanced(init):
+            # The recorded text ran out mid-expression (the statement is longer than the caller's scan
+            # window): treat this the same as an unclosed `(`/`{` initialiser below, never as a complete,
+            # literal-looking one.
+            return declarator, None
         return declarator, (init or None)
     open_c, close_c = decl[i], (")" if decl[i] == "(" else "}")
     depth, j = 0, i
@@ -956,8 +976,12 @@ def rule_const_object(sym):
     the per-engine logic RNG despite its literal arguments): both capture whichever engine ran first, or
     diverge per engine, the same first-engine-wins defect as the pointer case. This holds whichever syntax
     initialises it (copy, direct `name(expr)` or brace `name{expr}`); a declaration whose recorded line ends
-    before its initialiser does (a continuation onto the next source line) is never assumed safe."""
+    before its initialiser does (a continuation onto the next source line, or a statement longer than the
+    caller's scan window, so the text we have simply stops without reaching the statement's own `;`) is
+    never assumed safe."""
     for d in declarations(sym):
+        if not d.rstrip().endswith(";"):
+            return None
         d = d.rstrip().rstrip(";").rstrip()
         decl, init = _split_initializer(d)
         if init is None:
