@@ -1209,6 +1209,10 @@ void W3DDisplay::reset()
 		// the list node the iterator stands on to the process-wide node pool, and Next() then read its link
 		// from freed memory, which another engine's thread may by then have taken from the pool and
 		// overwritten (PLAN-023 Phase 8, stage RR4: engines draw on several threads at once).
+		// Removing the object the iterator has just stepped past is safe: RTS3DScene does not override
+		// Remove_Render_Object, and SimpleSceneClass::Remove_Render_Object (scene.cpp) takes only robj's
+		// own node out of RenderList (Notify_Removed touches the update and light lists, never
+		// RenderList), so the node the iterator now stands on, the next object's, stays in the list.
 		SceneIterator *sceneIter = m_3DScene->Create_Iterator();
 		sceneIter->First();
 		while(!sceneIter->Is_Done()) {
