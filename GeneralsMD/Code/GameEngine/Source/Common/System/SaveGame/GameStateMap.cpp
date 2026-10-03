@@ -452,7 +452,8 @@ void GameStateMap::xfer( Xfer *xfer )
 		// corrupt (as opposed to merely truncated) size can instead make the allocation itself
 		// throw ERROR_OUT_OF_MEMORY before xferUser is ever reached -- either way leaving a
 		// partial file on disk. Recording first means clearScratchPadMaps still deletes that
-		// partial file even though extraction itself never returned to record it the old way. The
+		// partial file even though extraction itself never returned to record it the old way.
+		//
 		// GeneralsX @bugfix cemlyn007 03/10/2026 The std::find guard below is load-bearing, not
 		// purely defensive: clearScratchPadMaps keeps a path whose DeleteFile failed while the
 		// file is still on disk (for retry), so this vector can already hold entries when a load
