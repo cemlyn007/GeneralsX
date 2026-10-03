@@ -81,6 +81,11 @@ struct ScriptsPerEngine
 	Int numInReadList;
 	Script *mtScript;
 	ScriptGroup *mtGroup;
+	~ScriptsPerEngine()
+	{
+		if (mtScript) deleteInstance(mtScript);
+		if (mtGroup) deleteInstance(mtGroup);
+	}
 };
 rts::PerEngineStatic<ScriptsPerEngine> s_scriptsPerEngine;
 }

@@ -277,6 +277,10 @@ void GameLogic::clearGameData( Bool showScoreScreen )
 
 	setClearingGameData( TRUE );
 
+	// A path build left open must not leave its subjects dangling into the next game.
+	theBuildPlan = false;
+	thePlanSubjectCount = 0;
+
 //	m_background = TheWindowManager->winCreateLayout("Menus/BlankWindow.wnd");
 //	DEBUG_ASSERTCRASH(m_background,("We Couldn't Load Menus/BlankWindow.wnd"));
 //	m_background->hide(FALSE);
