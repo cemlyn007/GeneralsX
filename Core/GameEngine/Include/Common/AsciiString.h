@@ -96,7 +96,8 @@ private:
 		// TheAsciiStringCriticalSection. The count makes a buffer shared between distinct AsciiString copies
 		// safe without a lock; it does not make one AsciiString object safe to write from more than one
 		// thread. An AsciiString object shared across engine threads, such as a process-global static, must
-		// stay immutable after boot instead (PLAN-023 Phase 5b item 2). The copy constructor and set() add a
+		// not be assigned or mutated after the first engine's boot (priming) instead, as a later boot runs
+		// while other engines step (PLAN-023 Phase 5b item 2). The copy constructor and set() add a
 		// reference with a relaxed increment, releaseBuffer() drops one with an acq_rel decrement and frees
 		// on 1 -> 0, and every copy-on-write uniqueness test loads the count with acquire. Same size and
 		// layout as the plain unsigned short.

@@ -108,7 +108,8 @@ class ScopedCriticalSection
 // GeneralsX @performance cemlyn007 29/09/2026 AsciiString's and UnicodeString's buffer reference counts
 // are atomic, so a buffer shared between distinct string copies is safe to free without either section.
 // That does not extend to one string object written by more than one thread: a process-global static
-// AsciiString/UnicodeString must stay immutable after boot instead (PLAN-023 Phase 5b item 2).
+// AsciiString/UnicodeString must not be assigned or mutated after the first engine's boot (priming) instead
+// (PLAN-023 Phase 5b item 2).
 extern CriticalSection *TheAsciiStringCriticalSection;
 extern CriticalSection *TheUnicodeStringCriticalSection;
 extern CriticalSection *TheDmaCriticalSection;

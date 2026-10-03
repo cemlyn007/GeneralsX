@@ -231,7 +231,7 @@ void UnicodeString::ensureUniqueBufferOfSize(int numCharsNeeded, Bool preserveDa
 	// written in place only when this string holds the sole reference. That count protects a buffer shared
 	// between distinct UnicodeString copies only. The old global lock also made concurrent assignment to one
 	// UnicodeString object refcount-safe, which is gone: any write to an object another thread reads or writes is
-	// unsafe, so a process-global string is never written after boot (PLAN-023 Phase 5b item 2). The acquire
+	// unsafe, so a process-global string is never written after priming (PLAN-023 Phase 5b item 2). The acquire
 	// load pairs with the acq_rel decrement in releaseBuffer(), so every read the last other holder made of
 	// this buffer happens before our in-place write.
 	if (m_data &&
