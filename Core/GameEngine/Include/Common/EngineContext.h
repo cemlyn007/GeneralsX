@@ -463,8 +463,9 @@ struct ContextFieldOps
 // direct EngineContext field (PLAN-023 Phase 2), for statics that are also used qualified
 // (`MapObject::TheMapObjectListPtr`), where a macro cannot stand in: declare it as
 // `static constexpr rts::ContextField<T, &rts::EngineContext::field> name{};` and the upstream reads,
-// assignments, `->` and comparisons compile unchanged. Taking its address gives the stand-in's, not the
-// field's, so a static whose address is taken needs a macro instead.
+// assignments, `->` and comparisons compile unchanged. Its copy constructor and unary `operator&` are deleted
+// (see ContextFieldOps), but `sizeof` and `std::addressof` give the stand-in's, not the field's, so a static
+// used with either needs a macro instead.
 template <typename T, T EngineContext::*Field>
 struct ContextField : ContextFieldOps<ContextField<T, Field>, T>
 {
@@ -492,8 +493,8 @@ inline S& indirectContext() noexcept
 // A stand-in for a class's static data member that moved into such a struct (member `Field`), declared as
 // `static constexpr rts::IndirectContextField<S, &rts::EngineContext::p, S::Defaults, T, &S::name> name{};`.
 // Like ContextField: the upstream reads, assignments, `->` and comparisons compile unchanged, but `sizeof` and
-// `&` give the stand-in's size and address, not the field's (scripts/cpp/engine_context_standins.py fails on
-// those), so a name used that way, or with `.`, needs a reference-returning macro instead. An array field also
+// `std::addressof` give the stand-in's size and address, not the field's (scripts/cpp/engine_context_standins.py
+// fails on those), so a name used that way, or with `.`, needs a reference-returning macro instead. An array field also
 // takes `[]` and decays to a pointer to its first element.
 template <typename S, S* EngineContext::*Pointer, S& Defaults, typename T, T S::*Field>
 struct IndirectContextField
@@ -532,6 +533,21 @@ struct IndirectContextField<S, Pointer, Defaults, E[N], Field>
 		return get()[index];
 	}
 };
+
+// True when a stand-in type cannot be copied or have its address taken with unary `&`: the compile-time half
+// of what scripts/cpp/engine_context_standins.py checks. A static_assert on it where a stand-in is declared
+// keeps those two deleted operations from being dropped.
+template <typename Field, typename = void>
+struct HasUnaryAddressOf : std::false_type
+{
+};
+template <typename Field>
+struct HasUnaryAddressOf<Field, std::void_t<decltype(&std::declval<const Field&>())>> : std::true_type
+{
+};
+template <typename Field>
+inline constexpr bool isStandInGuarded =
+	!std::is_copy_constructible_v<std::remove_cv_t<Field>> && !HasUnaryAddressOf<std::remove_cv_t<Field>>::value;
 
 // A callable that runs `function` inside a Scope for the context that was current when it was made. For
 // thread functions: see withCurrentEngine.

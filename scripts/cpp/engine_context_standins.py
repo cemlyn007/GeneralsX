@@ -4,10 +4,12 @@
 # With RTS_ENGINE_CONTEXT, a class's static data member can become a stand-in for a per-engine field:
 # `static constexpr rts::ContextField<T, &rts::EngineContext::field> name{};` or its indirect variant,
 # `rts::IndirectContextField<...>` (Core/GameEngine/Include/Common/EngineContext.h). A stand-in is an empty
-# object that converts to the field, so reads, assignments and comparisons compile unchanged, and so do
-# `sizeof(name)` and `&name`, which then give the stand-in's size and address, not the field's. This fails on
-# either use of any stand-in, so a name used that way is caught at review time (it needs a reference-returning
-# macro instead, as DX8Wrapper's names have: WW3D2/w3drenderstate_names.h).
+# object that converts to the field, so reads, assignments and comparisons compile unchanged. Copying one and
+# `&name` are compile errors (its copy constructor and unary `operator&` are deleted), but `sizeof(name)` and
+# `std::addressof(name)` still compile and give the stand-in's size and address, not the field's. This fails
+# on those uses, and on `&name` too (for a stand-in whose operator& is not deleted), so a name used that way
+# is caught at review time (it needs a reference-returning macro instead, as DX8Wrapper's names have:
+# WW3D2/w3drenderstate_names.h).
 #
 # Where it looks, for a stand-in `name` of class `C` declared in `c.h`: `C::name` in every source file,
 # `D::name` in every source file too for every class `D` deriving (directly or transitively) from `C`

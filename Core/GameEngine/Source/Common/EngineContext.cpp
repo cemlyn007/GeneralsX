@@ -378,6 +378,9 @@ void leaveEngineThreadInvariants(const ThreadInvariants& saved) noexcept
 #endif
 }
 
+static_assert(isStandInGuarded<ContextField<::W3DRenderState*, &EngineContext::w3dRender>>,
+	"a ContextField must not be copyable or have unary operator& (ContextFieldOps)");
+
 bool noEngineIsPristine()
 {
 	return g_noEngine.countLiveSingletons() == 0 && !g_noEngine.engineTearingDown && !g_noEngine.nameKeysFrozen

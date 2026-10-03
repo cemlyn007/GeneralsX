@@ -695,6 +695,8 @@ protected:
 	// RR2a-1): macros (w3drenderstate_names.h), except these two, which are also members of other classes used here.
 	static constexpr rts::IndirectContextField<W3DRenderState, &rts::EngineContext::w3dRender, W3DRenderState::Defaults, int, &W3DRenderState::BitDepth> BitDepth{};
 	static constexpr rts::IndirectContextField<W3DRenderState, &rts::EngineContext::w3dRender, W3DRenderState::Defaults, IDirect3DBaseTexture8*[MAX_TEXTURE_STAGES], &W3DRenderState::Textures> Textures{};
+	static_assert(rts::isStandInGuarded<decltype(BitDepth)> && rts::isStandInGuarded<decltype(Textures)>,
+		"an IndirectContextField must not be copyable or have unary operator&");
 
 	// Declared upstream, never defined or used.
 	static void *							Hwnd;
