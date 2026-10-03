@@ -610,7 +610,7 @@ Goal: N engines in one process, each stepped on its own thread at the same time,
    - `GameSpyColor` (every boot's INI parse);
    - the `.wnd` parser's scratch strings (every `~GameWindowManager`).
 
-   Walk every process-global entry whose note says a boot, a map load or a teardown writes it. Make each write-once (`std::call_once`, or skipped once primed), atomic or per engine, and say which in its note. The same rule covers the process-global `AsciiString`s listed in Phase 4: the string lock covers the refcount, not an in-place write through `ensureUniqueBufferOfSize`.
+   Walk every process-global entry whose note says a boot, a map load or a teardown writes it. Make each write-once (`std::call_once`, or skipped once primed), atomic or per engine, and say which in its note. The same rule covers the process-global `AsciiString`s listed in Phase 4: the atomic count covers copies only, so after priming neither assignment to nor in-place mutation of a shared process-global string is allowed. The `RTS_DEBUG`-only ones (`theObjName`, `TheThingTemplateBeingParsedName`, `g_saveDebugCRCPerFrameDir`) are per engine under `RTS_ENGINE_CONTEXT`.
 3. **`Scope` restores the per-thread invariants** (this part of Phase 5 comes forward).
    - **When:** only when a `Scope` changes `t_engine` to a different context. Nested scopes on the same engine do nothing, so the cost stays at the outermost call.
    - **On entry:** save the thread's floating-point environment and locale, then call `setFPMode()` and `uselocale` a C locale created once under `std::call_once`.
