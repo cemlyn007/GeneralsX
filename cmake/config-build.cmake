@@ -33,6 +33,16 @@ option(SAGE_USE_MOLTENVK "Use MoltenVK for Vulkan on macOS (Phase 5 macOS port)"
 # that is loaded via DYLD_INSERT_LIBRARIES (macOS) / LD_PRELOAD (Linux) at runtime.
 option(RTS_BUILD_OPTION_SAGE_PATCH "Build SagePatch QoL extras (macOS/Linux, requires SDL3)" ON)
 
+# GeneralsX @bugfix cemlyn007 03/10/2026 RTS_ENGINE_CONTEXT builds Zero Hour only (see its block below). Decided
+# here, before the game selection and the feature summary read these two options.
+if(RTS_ENGINE_CONTEXT)
+    if(RTS_BUILD_GENERALS)
+        message(STATUS "RTS_ENGINE_CONTEXT: not building Generals (its singletons are not guarded yet); Zero Hour only")
+    endif()
+    set(RTS_BUILD_GENERALS OFF)
+    set(RTS_BUILD_ZEROHOUR ON)
+endif()
+
 if(NOT RTS_BUILD_ZEROHOUR AND NOT RTS_BUILD_GENERALS)
     set(RTS_BUILD_ZEROHOUR TRUE)
     message("You must select one project to build, building Zero Hour by default.")
@@ -173,10 +183,6 @@ endif()
 if(RTS_ENGINE_CONTEXT)
     if(IS_VS6_BUILD)
         message(FATAL_ERROR "RTS_ENGINE_CONTEXT requires C++20 and cannot be used with VC6")
-    endif()
-    if(RTS_BUILD_GENERALS)
-        message(STATUS "RTS_ENGINE_CONTEXT: not building Generals (its singletons are not guarded yet); Zero Hour only")
-        set(RTS_BUILD_GENERALS OFF)
     endif()
     foreach(_rts_tools_option
             RTS_BUILD_ZEROHOUR_TOOLS RTS_BUILD_ZEROHOUR_EXTRAS RTS_BUILD_GENERALS_TOOLS RTS_BUILD_GENERALS_EXTRAS
