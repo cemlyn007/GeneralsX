@@ -2359,9 +2359,9 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 
 	// GeneralsX @bugfix cemlyn007 03/10/2026 An embed host never calls TheFramePacer->update() again, so
 	// whatever step the pacer holds scales the draw path's per-frame adjustments (camera zoom, pivot
-	// easing) for the rest of the game. Set the nominal logic step, so the scaling ratios are exactly 1
-	// and do not depend on load, the fps limit or which game the engine played before. Applies to save
-	// loads too.
+	// easing) for the rest of the game. Set the nominal logic step, so the logic time-scale ratio is exactly 1
+	// (it is clamped) and the base-over-update ratio is 1 to within float rounding, independent of load, the fps
+	// limit or which game the engine played before. Applies to save loads too.
 	if (TheGlobalData->m_headless)
 		TheFramePacer->resetToStep(SECONDS_PER_LOGICFRAME_REAL);
 
