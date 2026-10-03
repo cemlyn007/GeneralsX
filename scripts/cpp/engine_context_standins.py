@@ -515,9 +515,11 @@ def main():
         print(v)
     if violations:
         print(
-            f"{len(violations)} use(s) of an EngineContext stand-in that give its own size, address or bytes "
-            "instead of the field's (sizeof, &, std::addressof, or passed bare to a variadic logger); use a "
-            "reference-returning macro for that name instead (see EngineContext.h, ContextField)",
+            f"{len(violations)} use(s) of an EngineContext stand-in that give its own size or address instead "
+            "of the field's (sizeof, std::addressof, &), or pass it bare to a variadic logger (a bare pass "
+            "does not compile where the call is compiled in, and is a backstop where it compiles out; convert "
+            "it, e.g. `(int)name`); use a reference-returning macro for that name instead (see "
+            "EngineContext.h, ContextField)",
             file=sys.stderr,
         )
         return 1
