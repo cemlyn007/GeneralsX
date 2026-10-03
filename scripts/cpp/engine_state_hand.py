@@ -243,7 +243,7 @@ HAND = [
     # state (CurrentShader, ShaderDirty, _PolygonCullMode) into W3DRenderState; the 22 preset shaders are const
     # (constant-initialised, so read-only data); TheSDL3Window and ApplicationHWnd are EngineContext fields; and
     # W3DDisplay's FPS history and debug statistics are its members.
-    (RCONST, "", "WW3DState::Defaults", "the WW3D state an engine without one reads (RR2a-2): every field at its upstream initial value, built at static initialisation and never written (a host makes its pages read-only, W3D_Protect_Render_Defaults)"),
+    (RCONST, "", "WW3DState::Defaults", "the WW3D state an engine without one reads (RR2a-2): every field at its upstream initial value, constant-initialised and never written (a host makes its pages read-only, W3D_Protect_Render_Defaults)"),
     (RPROC, "", "W3D_Protect_Render_Defaults(bool)::s_exitHandlerOnce", "registers, once per process, the exit handler that makes the render defaults writable again for their static destructors (RR2a-2)"),
     (DEBUG, "", "file:WW3D2/dx8rendererdebugger\\.cpp", "WW3D renderer debugger (DX8RendererDebugger::Enabled is never set)"),
     (RCONST, "", "VertexMaterialClass::Apply_Null()::default_settings", "the null material's settings, constant data"),
