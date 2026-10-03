@@ -1047,9 +1047,6 @@ def _is_safe_value_expr(expr, type_name, writable_names):
     return False
 
 
-_writable_names_cache = {}
-
-
 def _writable_global_names(symbols):
     """Every writable symbol's own key (a global, namespaced global or function-local static, in
     `.bss`/`.data`/`.tbss`/`.tdata`), together with that key's own bare, unqualified last `::` segment: the
@@ -1071,17 +1068,12 @@ def _writable_global_names(symbols):
     classifies from a real symbol table) accepts."""
     if not symbols:
         return frozenset()
-    cached = _writable_names_cache.get(id(symbols))
-    if cached is not None and cached[0] == len(symbols):
-        return cached[1]
     names = set()
     for key, sym in symbols.items():
         if sym.sections & WRITABLE_SECTIONS:
             names.add(key)
             names.add(key.rsplit("::", 1)[-1])
-    names = frozenset(names)
-    _writable_names_cache[id(symbols)] = (len(symbols), names)
-    return names
+    return frozenset(names)
 
 
 def _by_value_init_is_safe(init, type_name, writable_names):

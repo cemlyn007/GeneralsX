@@ -389,6 +389,19 @@ class RuleConstObjectTest(unittest.TestCase):
             "static const UnsignedInt s_firstId = UnsignedInt(m_idNext);", False, symbols=writable
         )
 
+    def test_writable_global_names_does_not_confuse_two_same_length_tables_in_a_row(self):
+        # _writable_global_names must never cache its answer keyed on the symbol table's identity alone:
+        # two different, same-length tables classified back to back (as two libraries would be in one
+        # process, or as two single-entry dicts naturally are across many unit tests) must each get their
+        # own, independent answer.
+        first = {"REPLAY_CRC_INTERVAL": make_symbol("REPLAY_CRC_INTERVAL", [], sections={".data"})}
+        second = {"startTime": make_symbol("startTime", [], sections={".bss"})}
+        self.assertEqual(m._writable_global_names(first), frozenset({"REPLAY_CRC_INTERVAL"}))
+        self.assertEqual(m._writable_global_names(second), frozenset({"startTime"}))
+        # Re-querying the first table after the second must still give the first table's own answer, not
+        # the second table's: nothing about the second call may leak into the first table's result.
+        self.assertEqual(m._writable_global_names(first), frozenset({"REPLAY_CRC_INTERVAL"}))
+
     def test_by_value_const_initialized_from_an_unqualified_reference_to_a_writable_function_local_static_is_not_safe(
         self,
     ):
