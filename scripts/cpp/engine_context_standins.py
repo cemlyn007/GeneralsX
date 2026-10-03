@@ -73,7 +73,7 @@ STANDIN = re.compile(
 # An optional `final` between the class name and its base clause/opening brace (`class C final {`,
 # `class D final : public C {`): without it, the lazy `(?:\w+\s+)*?` backtracks into treating the real
 # name as a prefix word and `final` as the name instead, silently dropping a `final` class out of either
-# scan (127-gx-w2-r5-29; the tree already has one, Core/.../W3DSmudge.h's W3DSmudgeManager final).
+# scan (the tree already has one, Core/.../W3DSmudge.h's W3DSmudgeManager final).
 CLASS = re.compile(r"^\s*(?:class|struct)\s+(?:\w+\s+)*?(?P<name>\w+)\s*(?:final\s*)?(?::[^;{]*)?\{", re.M)
 # `class D : public C, private E { ... }` / `struct D : C { ... }`: a derived class's direct base list,
 # scanned across every source file (a derived class's own header may never mention a stand-in's name,
@@ -136,33 +136,28 @@ VARIADIC_CALL = re.compile(r"\b(?:" + "|".join(VARIADIC_FUNCS) + r")\s*\(")
 _DOUBLED_PAREN_OPEN = re.compile(r"(?P<prev>[(,])\s*(?P<open>\()")
 
 
+# A `//` comment, a `/* */` comment (to the end of the text when unterminated), or a string/char literal
+# (a backslash escapes the next character, even a newline; it ends at its closing quote, or, unterminated,
+# at the line's end).
+_STRIP_TOKEN = re.compile(
+    r"""//[^\n]*|/\*.*?(?:\*/|\Z)|(?P<quote>["'])(?:\\.|(?!(?P=quote))[^\n\\])*(?P<close>(?P=quote))?""", re.S
+)
+_NOT_NEWLINE = re.compile(r"[^\n]")
+
+
+def _blank(m):
+    token = m.group()
+    quote = m.group("quote")
+    if quote is None:
+        return _NOT_NEWLINE.sub(" ", token)
+    if m.group("close") is None:
+        return _NOT_NEWLINE.sub(" ", token)
+    return quote + _NOT_NEWLINE.sub(" ", token[1:-1]) + quote
+
+
 def strip_comments_and_strings(text):
     """The text with comments and string/char literals blanked (newlines kept, so lines still count)."""
-    out = []
-    i, n = 0, len(text)
-    while i < n:
-        c = text[i]
-        if text.startswith("//", i):
-            j = text.find("\n", i)
-            j = n if j < 0 else j
-            out.append(" " * (j - i))
-            i = j
-        elif text.startswith("/*", i):
-            j = text.find("*/", i + 2)
-            j = n if j < 0 else j + 2
-            out.append("".join(ch if ch == "\n" else " " for ch in text[i:j]))
-            i = j
-        elif c in "\"'":
-            j = i + 1
-            while j < n and text[j] != c and text[j] != "\n":
-                j += 2 if text[j] == "\\" else 1
-            j = min(j + 1, n)
-            out.append(c + " " * (j - i - 2) + (c if j - i >= 2 else ""))
-            i = j
-        else:
-            out.append(c)
-            i += 1
-    return "".join(out)
+    return _STRIP_TOKEN.sub(_blank, text)
 
 
 def source_files(root, extra_dirs=()):
@@ -185,7 +180,7 @@ def source_files(root, extra_dirs=()):
 def _game_of(path, root):
     """'Generals' or 'GeneralsMD' for a source file under that game's top-level directory of root, or
     None for a Core file, an --extra-dir file (outside root entirely) or anything else: a bare class name
-    is not unique across the two games' own trees (127-gx-w2-r5-28; GeneralsMD's ScriptList and
+    is not unique across the two games' own trees (GeneralsMD's ScriptList and
     Generals' own, unrelated ScriptList are the textbook case), so a stand-in's search must tell them
     apart. None means "not scoped to either game": always in scope."""
     rel = os.path.relpath(path, root)
@@ -431,12 +426,12 @@ def main():
     owners = {owner for owner, _, _ in standins if owner}
     defines_member = {}
     # descendants_of[C] = every class D (directly or transitively) deriving from C: `D::name` names the
-    # same inherited stand-in as `C::name` (127-gx-w2-r5-30), so the qualified scan must run once per
+    # same inherited stand-in as `C::name`, so the qualified scan must run once per
     # name of the stand-in, not just its declaring class's own.
     descendants_of = {}
     # A stand-in declared under Generals/ or GeneralsMD/ is scoped to that game's own tree plus Core (and
     # any --extra-dir file, outside the layout entirely); one declared under Core/ is engine-wide, as
-    # before. 127-gx-w2-r5-28: a bare class name is not unique across the two games' own trees, so the
+    # before. A bare class name is not unique across the two games' own trees, so the
     # base-clause/member-definition scan that builds class_owners/defines_member must be run once per
     # game, each blind to the other game's files, not once globally keyed by name alone.
     owner_game = {}
@@ -445,8 +440,8 @@ def main():
             owner_game.setdefault(owner, _game_of(header, args.root))
     if owners:
         # Only a file whose raw (unstripped) text could plausibly hold a base clause pays the
-        # per-character strip_comments_and_strings cost (127-gx-w2-r5-32: that cost had run for every
-        # one of ~4,173 files, not just the handful with one). A comment that happens to look like a
+        # per-character strip_comments_and_strings cost (rather than for every source file, when only a handful
+        # have one). A comment that happens to look like a
         # base clause only widens the raw pre-filter, never narrows it (BASE_CLAUSE still runs again on
         # the stripped text below, which is what is actually used), and this is computed once, shared by
         # every game group, rather than redone per group.
@@ -509,7 +504,7 @@ def main():
         for path, text in files.items():
             # A qualified or unqualified text match of `owner`'s name is meaningless in the other game's
             # own tree: the class it resolves to there, if any, is not this stand-in's class at all
-            # (127-gx-w2-r5-28). Core and --extra-dir files are always in scope.
+            # Core and --extra-dir files are always in scope.
             if other_game is not None and _game_of(path, args.root) == other_game:
                 continue
             found = []

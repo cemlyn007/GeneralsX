@@ -409,16 +409,14 @@ private:
 
 // GeneralsX @refactor cemlyn007 02/10/2026 ContextField and IndirectContextField are the same family (one
 // operator set over a `T&` the stand-in locates differently): factor that set into this CRTP base, which calls
-// `Derived::get()`, so a later operator (PLAN-023 Phase 8, stage RR2a-1 review) is added once for both instead
+// `Derived::get()`, so a later operator (PLAN-023 Phase 8, stage RR2a-1) is added once for both instead
 // of being copied and risking the two kinds diverging.
 //
 // GeneralsX @fix cemlyn007 02/10/2026 The deleted copy constructor and unary operator& turn two of the gate's
 // (scripts/cpp/engine_context_standins.py) regex checks into compiler diagnostics instead: copying a stand-in
 // (`auto x = C::name;`, or passing it by value to a variadic logger, which must copy it to place it in `...`)
-// now fails with "use of deleted function", and so does `&name`/`std::addressof` through operator&. This is a
-// backstop, not a replacement for the gate (sizeof(name) is unaffected, and the gate still gives the faster,
-// earlier CI failure with the exact line and reason), kept in step with it rather than letting its own denylist
-// grow to cover every spelling of these two hazards by itself.
+// now fails with "use of deleted function", and so does `&name` (operator&). `sizeof(name)` and
+// `std::addressof(name)` still compile, so the gate keeps checking those.
 template <typename Derived, typename T>
 struct ContextFieldOps
 {

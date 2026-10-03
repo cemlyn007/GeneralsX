@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-# GeneralsX @feature cemlyn007 02/10/2026 Tests for engine_context_standins.py's uses() (review fix for PLAN-023
-# Phase 8, stage RR2a-1: the sizeof/& gate missed a cast before unary `&`, `&&` before unary `&`,
+# GeneralsX @feature cemlyn007 02/10/2026 Tests for engine_context_standins.py's uses() (PLAN-023 Phase 8, stage
+# RR2a-1: the sizeof/& gate must catch a cast before unary `&`, `&&` before unary `&`,
 # `std::addressof`, and a stand-in passed bare through a variadic logger). cemlyn007 02/10/2026: a
 # multi-word cast (`(unsigned char*)&name`) and the variadic check's false positives on a converted
-# argument (`(int)name`, `static_cast<int>(name)`, `name == 32`, `f(name)`) were both review-fix gaps too.
+# argument (`(int)name`, `static_cast<int>(name)`, `name == 32`, `f(name)`) are covered too.
 # A later pass widened the variadic-logger list to DEBUG_LOG_RAW, DEBUG_LOG_LEVEL_RAW, WWRELEASE_SAY,
 # WWDEBUG_ERROR and CRCDEBUG_LOG, and added Format/format (StringClass::Format and AsciiString::format/
 # UnicodeString::format are printf-style variadics too, matched by method name alone). A further pass
@@ -15,7 +15,7 @@
 # MainTest covers main() end to end: a stand-in whose class's members are defined in a differently named
 # file (the MapObject/WorldHeightMap.cpp gap, found by content now, not by file name), a violation in an
 # `--extra-dir` tree (a consumer's own C++ outside Core/Generals/GeneralsMD), and the own-file detection's
-# own gaps found by later re-reviews (127-gx-w2-r3-16/17/18, 127-gx-w2-r4-23/24, 127-gx-w2-r2-12): a bare
+# own edge cases: a bare
 # call statement, a `return C::member(...)` call, a ternary's `cond ? C::member() : x` and a case label's
 # `case C::member():` must not make a file C's own (none of them are definitions, and `:` is a definition's
 # own shape only for a constructor's initialiser list), while `T *C::member()`/`T* C::member()`, a return
@@ -58,7 +58,7 @@ class UsesTest(unittest.TestCase):
         self.assert_clean("&BitDepth[0]")
         self.assert_clean("&BitDepth->x")
 
-    # A C-style pointer cast before unary `&`: the gap this review found.
+    # A C-style pointer cast before unary `&`.
     def test_cast_before_ampersand(self):
         self.assert_flagged("(void*)&BitDepth")
         self.assert_flagged("(char*)&Textures", name="Textures")
@@ -68,8 +68,8 @@ class UsesTest(unittest.TestCase):
         # Indistinguishable from `(expr)&mask`, a binary `&` of a parenthesised expression.
         self.assert_clean("(int)&BitDepth")
 
-    # A multi-word C-style pointer cast before unary `&`: the re-review's gap (the usual
-    # memset/memcmp/byte-view idioms, which the single-identifier CAST_BEFORE missed entirely).
+    # A multi-word C-style pointer cast before unary `&` (the usual
+    # memset/memcmp/byte-view idioms, which the single-identifier cast form misses).
     def test_multiword_cast_before_ampersand(self):
         self.assert_flagged("(unsigned char*)&BitDepth")
         self.assert_flagged("(const unsigned char *)&BitDepth")
@@ -77,7 +77,7 @@ class UsesTest(unittest.TestCase):
         self.assert_flagged("(void const*)&BitDepth")
         self.assert_flagged("(long long*)&BitDepth")
 
-    # `&&` before unary `&`: also missed before this review.
+    # `&&` before unary `&`.
     def test_double_ampersand_then_unary_ampersand(self):
         self.assert_flagged("a && &BitDepth")
         self.assert_flagged("a&& &BitDepth")
@@ -87,7 +87,7 @@ class UsesTest(unittest.TestCase):
         self.assert_clean("a &&BitDepth")
         self.assert_clean("a && BitDepth")
 
-    # std::addressof: the same hazard as unary `&`, not covered at all before this review.
+    # std::addressof: the same hazard as unary `&`.
     def test_std_addressof(self):
         self.assert_flagged("std::addressof(BitDepth)")
         self.assert_flagged("std::addressof( BitDepth )")
@@ -95,7 +95,7 @@ class UsesTest(unittest.TestCase):
     def test_std_addressof_reaching_the_field_is_not_flagged(self):
         self.assert_clean("std::addressof(BitDepth.x)")
 
-    # A stand-in passed bare through a variadic logger: not covered at all before this review.
+    # A stand-in passed bare through a variadic logger.
     def test_variadic_logger(self):
         self.assert_flagged('WWDEBUG_SAY(("bits %d", BitDepth))')
         self.assert_flagged('DEBUG_LOG(("bits %d", BitDepth))')
@@ -105,8 +105,7 @@ class UsesTest(unittest.TestCase):
         self.assert_clean('WWDEBUG_SAY(("bits %d", BitDepth.x))')
 
     # A converted stand-in passed to a variadic logger is correct code, not the hazard the gate exists
-    # for: it must be flagged only when the name is itself a whole top-level argument (the re-review's
-    # false-positive gap).
+    # for: it must be flagged only when the name is itself a whole top-level argument.
     def test_variadic_logger_converted_argument_is_not_flagged(self):
         self.assert_clean('WWDEBUG_SAY(("%d", (int)BitDepth))')
         self.assert_clean('DEBUG_LOG(("%d", static_cast<int>(BitDepth)))')
@@ -119,7 +118,7 @@ class UsesTest(unittest.TestCase):
     # DEBUG_ASSERTLOG(c, m) is two macro arguments (Debug.h), not one doubled-paren argument: its
     # message (the second argument) must still be unwrapped and checked, and its condition (the first
     # argument) must never be flagged, since it reaches the field through the stand-in's own conversion
-    # operator (`!(c)`), not through `...`. The 530ad166b regression this review found.
+    # operator (`!(c)`), not through `...`.
     def test_debug_assertlog_message_is_checked(self):
         self.assert_flagged('DEBUG_ASSERTLOG(x, ("bits %d", BitDepth))')
 
@@ -130,7 +129,7 @@ class UsesTest(unittest.TestCase):
         self.assert_clean('DEBUG_ASSERTLOG(x, ("%d", (int)BitDepth))')
 
     # The same two-macro-argument shape applies to DEBUG_ASSERTCRASH(c, m) and DEBUG_LOG_LEVEL(l, m)
-    # (Debug.h): printf-style loggers the gate left uncovered before this review.
+    # (Debug.h): printf-style loggers too.
     def test_debug_assertcrash_message_is_checked(self):
         self.assert_flagged('DEBUG_ASSERTCRASH(x, ("bits %d", BitDepth))')
 
@@ -191,7 +190,7 @@ class UsesTest(unittest.TestCase):
     # (Core/Libraries/Source/WWVegas/WW3D2/ww3d.h), WWRELEASE_WARNING/WWRELEASE_ERROR (wwdebug.h, right
     # beside WWRELEASE_SAY) and SHATTER_DEBUG_SAY/SLOTLIST_DEBUG_LOG (shattersystem.cpp,
     # WOLGameSetupMenu.cpp) all share WWDEBUG_SAY's doubled-parens shape and are among the loggers this
-    # closed (127-gx-4's second dispute: f70b11fed's enumerated list still missed all of these).
+    # closed (an enumerated macro-name list would have missed all of these).
     def test_snapshot_say_message_is_checked(self):
         self.assert_flagged('SNAPSHOT_SAY(("bits %d", BitDepth))')
 
@@ -248,6 +247,26 @@ class UsesTest(unittest.TestCase):
         self.assert_clean('DEBUG_LOG_LEVEL(BitDepth, ("bits %d", 1))')
 
 
+class StripTest(unittest.TestCase):
+    def test_comments_and_literals_are_blanked_keeping_length_and_lines(self):
+        text = 'a // x\nb /* y\nz */ c "s\\"q" \'d\' e\n'
+        out = ecs.strip_comments_and_strings(text)
+        self.assertEqual(len(out), len(text))
+        self.assertEqual(out.count("\n"), text.count("\n"))
+        for blanked in ("x", "y", "z", "s", "q", "d"):
+            self.assertNotIn(blanked, out.replace("a", "").replace("b", ""))
+
+    def test_backslash_newline_inside_a_string_keeps_the_newline(self):
+        text = '"ab\\\ncd" e\n'
+        out = ecs.strip_comments_and_strings(text)
+        self.assertEqual(out.count("\n"), text.count("\n"))
+        self.assertTrue(out.rstrip().endswith("e"))
+
+    def test_unterminated_literal_ends_at_the_line_end(self):
+        out = ecs.strip_comments_and_strings("#error don't\nint x;\n")
+        self.assertEqual(out.splitlines()[1], "int x;")
+
+
 class MainTest(unittest.TestCase):
     """End-to-end tests of main(), against a temporary GeneralsX-shaped tree."""
 
@@ -302,8 +321,8 @@ class MainTest(unittest.TestCase):
     def test_unqualified_use_outside_own_files_is_not_flagged(self):
         # The same class/stand-in, but the unqualified use sits in a file that neither declares the
         # stand-in nor defines any of the class's members: not flagged (it would not compile either).
-        # Unrelated.cpp carries a REAL unqualified use (not just a stripped comment, the gap the
-        # re-review found: a mutation that treats every file as "own" must fail this test).
+        # Unrelated.cpp carries a REAL unqualified use (not just a stripped comment), so a gate that
+        # treats every file as "own" fails this test.
         self.write(
             "Core/MapObject.h",
             "class MapObject {\n"
@@ -324,8 +343,8 @@ class MainTest(unittest.TestCase):
         self.assertEqual(code, 0, out)
 
     def test_bare_call_statement_is_not_own_file(self):
-        # A file that only CALLS a member (no definition) does not become that class's own file: the
-        # mutation the re-review found (dropping the prefix/definition-shape guard) must fail this test.
+        # A file that only CALLS a member (no definition) does not become that class's own file: a
+        # gate that drops the prefix/definition-shape guard fails this test.
         self.write(
             "Core/MapObject.h",
             "class MapObject {\n"
@@ -347,9 +366,9 @@ class MainTest(unittest.TestCase):
 
     def test_return_statement_call_is_not_own_file(self):
         # `return C::member(...)` has the non-empty prefix `return`, but it is a call, not a
-        # definition: it must not make the file C's own (127-gx-w2-r3-16's dx8wrapper.cpp/ww3d.cpp gap).
-        # dx8wrapper.cpp carries a REAL flaggable use of the local `FrameCount` macro (127-gx-w2-r4-24's
-        # gap: a file with nothing to flag either way cannot show whether it was treated as WW3D's own).
+        # definition: it must not make the file C's own (dx8wrapper.cpp/ww3d.cpp-shaped).
+        # dx8wrapper.cpp carries a REAL flaggable use of the local `FrameCount` macro (a file with
+        # nothing to flag either way cannot show whether it was treated as WW3D's own).
         self.write(
             "Core/WW3D.h",
             "class WW3D {\n"
@@ -373,7 +392,7 @@ class MainTest(unittest.TestCase):
 
     def test_ternary_call_is_not_own_file(self):
         # `cond ? C::member() : x` has a `:` after the call's close paren, but it is a ternary, not a
-        # constructor initialiser: it must not make the file C's own (127-gx-w2-r4-23's gap).
+        # constructor initialiser: it must not make the file C's own.
         self.write(
             "Core/WW3D.h",
             "class WW3D {\n"
@@ -396,8 +415,7 @@ class MainTest(unittest.TestCase):
         self.assertEqual(code, 0, out)
 
     def test_case_label_call_is_not_own_file(self):
-        # `case C::member():` also has a `:` after the call's close paren, and is also not a definition
-        # (127-gx-w2-r4-23's gap).
+        # `case C::member():` also has a `:` after the call's close paren, and is also not a definition.
         self.write(
             "Core/WW3D.h",
             "class WW3D {\n"
@@ -472,7 +490,7 @@ class MainTest(unittest.TestCase):
     def test_derived_class_member_file_is_own_file(self):
         # A file that defines only a member of a class D deriving from C can still name C's static
         # member unqualified (ordinary unqualified lookup finds an inherited member): it must be C's own
-        # file too (127-gx-w2-r2-12's W3DAssetManager/WW3DAssetManager gap). D's own header
+        # file too (W3DAssetManager/WW3DAssetManager-shaped). D's own header
         # (W3DAssetManager.h) never mentions the stand-in's name, so it is found by its base clause alone.
         self.write(
             "Core/WWAssetManager.h",
@@ -533,8 +551,7 @@ class MainTest(unittest.TestCase):
         self.assertEqual(code, 0, out)
 
     def test_pointer_attached_to_class_name_is_own_file(self):
-        # `T *C::member()`/`T* C::member()`: the `*`/`&` may attach to either word
-        # (127-gx-w2-r3-17's WorldHeightMap.cpp/ww3d.cpp gap).
+        # `T *C::member()`/`T* C::member()`: the `*`/`&` may attach to either word.
         self.write(
             "Core/MapObject.h",
             "class MapObject {\n"
@@ -558,7 +575,7 @@ class MainTest(unittest.TestCase):
 
     def test_multiline_return_type_is_own_file(self):
         # A return type on the line above (the classic Westwood style) leaves an empty prefix on the
-        # `C::member(` line itself (127-gx-w2-r3-17's gap).
+        # `C::member(` line itself.
         self.write(
             "Core/MapObject.h",
             "class MapObject {\n"
@@ -582,7 +599,7 @@ class MainTest(unittest.TestCase):
         self.assertIn("WorldHeightMap.cpp", out)
 
     def test_other_game_tree_with_same_class_name_is_not_flagged(self):
-        # A bare class name is not unique across the two games' own trees (127-gx-w2-r5-28): GeneralsMD's
+        # A bare class name is not unique across the two games' own trees: GeneralsMD's
         # ScriptList has a stand-in for m_curId, but Generals has its own, unrelated ScriptList with a
         # real static of the same name. Correct Generals code using its own static must stay clean.
         self.write(
@@ -638,8 +655,8 @@ class MainTest(unittest.TestCase):
         self.assertIn("m_curId", out)
 
     def test_qualified_use_through_derived_class_name_is_checked(self):
-        # `&D::name` names the same inherited stand-in as `&C::name` (127-gx-w2-r5-30), but the qualified
-        # scan previously ran `uses(text, name, owner)` only, never `uses(text, name, D)`.
+        # `&D::name` names the same inherited stand-in as `&C::name`, so the qualified
+        # scan must run for D's name too, not only C's.
         self.write(
             "Core/WWAssetManager.h",
             "class WWAssetManager {\n"
@@ -667,8 +684,7 @@ class MainTest(unittest.TestCase):
         self.assertIn("TheInstance", out)
 
     def test_final_owner_class_is_not_skipped(self):
-        # `class MapObject final { ... }`: CLASS's lazy prefix must not treat `final` as the class name
-        # (127-gx-w2-r5-29). Qualified uses of a stand-in in a `final` class were unchecked before this.
+        # `class MapObject final { ... }`: CLASS's lazy prefix must not treat `final` as the class name.
         self.write(
             "Core/MapObject.h",
             "class MapObject final {\n"
@@ -689,7 +705,7 @@ class MainTest(unittest.TestCase):
     def test_final_derived_class_is_not_skipped(self):
         # `class W3DAssetManager final : public WW3DAssetManager { ... }`: BASE_CLAUSE's lazy prefix has
         # the same `final`-as-name bug, which drops the derived class out of the closure entirely
-        # (127-gx-w2-r5-29).
+        # 
         self.write(
             "Core/WWAssetManager.h",
             "class WWAssetManager {\n"
@@ -711,9 +727,8 @@ class MainTest(unittest.TestCase):
         self.assertIn("TheInstance", out)
 
     def test_derived_class_inline_body_is_own_file(self):
-        # A derived class's own class body is never treated as the base's own file by member_def alone:
-        # an inline member body written directly inside D's class declaration has no `D::` qualifier at
-        # all (127-gx-w2-r2-12's re-review dispute). D's own header (here ViewerAssetMgr.h-shaped) is
+        # A derived class's own class body is the base's own file too: an inline member body written directly inside D's class declaration has no `D::` qualifier at
+        # all. D's own header (here ViewerAssetMgr.h-shaped) is
         # found by its base clause, same as the out-of-class case, and must be scanned too.
         self.write(
             "Core/WWAssetManager.h",
@@ -738,8 +753,7 @@ class MainTest(unittest.TestCase):
 
     def test_transitive_derived_class_member_file_is_own_file(self):
         # E : D : C (D itself has no stand-in of its own): the closure must follow more than one level
-        # (127-gx-w2-r5-31's coverage gap — a direct-only regression in the BFS would pass every other
-        # test here but this one).
+        # (a direct-only closure would pass every other test here but this one).
         self.write(
             "Core/WWAssetManager.h",
             "class WWAssetManager {\n"
