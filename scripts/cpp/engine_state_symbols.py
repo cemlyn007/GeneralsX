@@ -714,16 +714,23 @@ class SourceIndex:
             # A static data member defined in the class body (inline or constexpr): only inside that class's
             # own body, so that another class's member of the same name is never taken for it. Only a
             # fallback: when some TU has the qualified out-of-line definition, the in-class line is its
-            # declaration, not a second definition site.
+            # declaration, not a second definition site. A bare declaration (`static const T name;`) is not
+            # a definition either: its real one is out of line where the qualified search could not see it
+            # (a template's `Cls<T>::name`, a header or `.inl`, a type on the line before), so the symbol
+            # stays `?` and every rule that reads declarations fails closed.
             if not found_qualified:
                 for rel in self.candidates(parsed.var, parsed.cls):
                     for body_start, body_end in self.class_bodies(rel, parsed.cls):
                         site = None
-                        for ls, line, a, _b in self.lines_with(rel, var_re, body_start):
+                        for ls, line, a, b in self.lines_with(rel, var_re, body_start):
                             if ls + a >= body_end:
                                 break
                             prefix = line[:a]
-                            if re.search(r"\bstatic\b", prefix) and "(" not in prefix:
+                            if (
+                                re.search(r"\bstatic\b", prefix)
+                                and "(" not in prefix
+                                and (re.search(r"\b(?:inline|constexpr)\b", prefix) or IN_CLASS_INIT_RE.match(line[b:]))
+                            ):
                                 site = self.where_is(rel, ls, line)
                                 break
                         if site:
@@ -780,6 +787,9 @@ DEF_PREFIX_RE = re.compile(
     r"|[A-Z_][A-Z_0-9]*\(.*\)\s*)"  # a declaring macro (DECLARE_DEFINITION_FACTORY(...) name;)
 )
 DEF_SUFFIX_RE = re.compile(r"\s*(?:\[[^\]]*\]\s*)*(?:=|;|\{|\(|,|$)")
+# What follows a class-body static's name when the line itself initialises it (`= 5`, `{5}`): a bare
+# `;` or `,` is only a declaration.
+IN_CLASS_INIT_RE = re.compile(r"\s*(?:\[[^\]]*\]\s*)*(?:=|\{)")
 
 
 def is_def_prefix(prefix):
@@ -913,12 +923,11 @@ def declarations(sym):
 # The variable itself must be a NameKeyType/StaticNameKey (optionally const), not merely mention one
 # somewhere in its type: a container or struct keyed by NameKeyType is not a cache of one. Decision 2
 # shares the generator, not the strings fed to it, so the cached key is process-wide only when every
-# engine computes the same key: whenever there is an initialiser (const or not), it must be exactly a
+# engine computes the same key: the declaration must carry an initialiser that is exactly a
 # NAMEKEY(...) or TheNameKeyGenerator->nameToKey(...) call on a string literal, never on an
 # engine-dependent expression (`NAMEKEY(TheGlobalData->m_mapName)`, `NAMEKEY(m_templateName)`), a bare
 # copy of another cache (`= s_lastKey`), or anything with a trailing operation (`NAMEKEY("x") + s_offset`).
-# A const declaration with no initialiser at all can still pass (it is filled in later by a reviewed call);
-# a non-const one with no initialiser cannot, since nothing here proves what it is ever reassigned to.
+# A declaration with no initialiser at all (const or not) does not pass: nothing here sees what fills it.
 NAMEKEY_DECL_RE = re.compile(r"^(?:static\s+)?(const\s+)?(?:NameKeyType|StaticNameKey)\s+\w+\s*(?:\[[^\]]*\])?\s*$")
 _NAMEKEY_STRING_LITERAL_RE = r'"(?:[^"\\]|\\.)*"'
 NAMEKEY_INIT_RE = re.compile(
@@ -936,10 +945,7 @@ def rule_namekey(sym, symbols=None, is_function_name=None):
         m = NAMEKEY_DECL_RE.match(decl.rstrip().rstrip(";").rstrip())
         if not m:
             return None
-        if sep:
-            if not NAMEKEY_INIT_RE.match(init):
-                return None
-        elif not m.group(1):
+        if not sep or not NAMEKEY_INIT_RE.match(init):
             return None
     return GLOBAL, "", "cached NameKeyType (a name or window ID key): process-wide by PLAN-023 Decision 2"
 

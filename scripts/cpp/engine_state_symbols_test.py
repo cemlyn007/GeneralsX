@@ -937,8 +937,11 @@ class RuleNamekeyTest(unittest.TestCase):
     def test_namekey_from_macro_is_safe(self):
         self.assert_namekey('static NameKeyType s_key = NAMEKEY("Foo");', True)
 
-    def test_const_namekey_with_no_initializer_is_safe(self):
-        self.assert_namekey("static const NameKeyType s_key", True)
+    def test_namekey_with_no_initializer_is_not_safe(self):
+        # Nothing here sees what fills it: a const one's value comes from an out-of-line definition no
+        # rule has read, a non-const one's from any later assignment.
+        self.assert_namekey("static const NameKeyType s_key", False)
+        self.assert_namekey("static NameKeyType s_key", False)
 
     def test_namekey_from_generator_call_is_safe(self):
         self.assert_namekey('static NameKeyType s_key = TheNameKeyGenerator->nameToKey("Foo");', True)
@@ -1130,6 +1133,55 @@ class SourceIndexDefinitionTest(unittest.TestCase):
         m.resolve_sources(self.root, symbols, {})
         self.assertEqual(sym.source, "Core/dx8wrapper.cpp:1")
         self.assertEqual(sym.decls, [])
+
+    def classify_class_static(self, key):
+        sym = m.Symbol(key)
+        sym.count = 1
+        sym.sections = {".bss"}
+        symbols = {key: sym}
+        index = m.resolve_sources(self.root, symbols, {})
+        m.classify(sym, symbols, m.FunctionLookup(index))
+        return sym
+
+    def test_class_static_declaration_whose_definition_is_out_of_sight_is_not_a_definition(self):
+        # The in-class line `static const T name;` carries no initialiser, so reading it as the definition
+        # would make rule:const and rule:namekey accept whatever the real, out-of-line definition computes.
+        # Each of these definitions is one the qualified search cannot see: a template's, one in a header,
+        # one whose type is on the line before `Cls::name`.
+        self.write(
+            "pool.h",
+            "template<class T> class Pool {\n"
+            "    static const Int s_size;\n"
+            "    static const NameKeyType s_key;\n"
+            "};\n"
+            "template<class T> const Int Pool<T>::s_size = TheGlobalData->m_someInt;\n"
+            "template<class T> const NameKeyType Pool<T>::s_key = NAMEKEY(TheGlobalData->m_mapName);\n",
+        )
+        self.write(
+            "bar.h",
+            "class Bar {\n    static const Int s_split;\n    static const Real s_inl;\n};\n"
+            "const Real Bar::s_inl = TheGlobalData->m_maxCameraHeight;\n",
+        )
+        self.write("bar.cpp", "const Int\nBar::s_split = TheGlobalData->m_someInt;\n")
+        for key in ("Pool<int>::s_size", "Pool<int>::s_key", "Bar::s_split", "Bar::s_inl"):
+            sym = self.classify_class_static(key)
+            self.assertEqual(sym.source, "?", key)
+            self.assertEqual(sym.cls, m.UNREVIEWED, key)
+
+    def test_class_static_initialised_in_the_class_body_is_still_a_definition(self):
+        self.write(
+            "inl.h",
+            "class Inl {\n"
+            "    static const Int s_plain = 5;\n"
+            "    static constexpr Int s_cexpr = 6;\n"
+            "    static inline Int s_inline;\n"
+            "    static const Int s_declared;\n"
+            "};\n",
+        )
+        for var, line in (("s_plain", 2), ("s_cexpr", 3), ("s_inline", 4), ("s_declared", None)):
+            sym = m.Symbol(f"Inl::{var}")
+            m.resolve_sources(self.root, {sym.key: sym}, {})
+            self.assertEqual(sym.source, f"Core/inl.h:{line}" if line else "?", var)
 
     def test_member_function_static_does_not_gain_header_class_line(self):
         # The member function has a real out-of-line body with the static inside it: the class-line macro
