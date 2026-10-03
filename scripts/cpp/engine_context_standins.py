@@ -35,8 +35,9 @@
 # `WWDebug_Printf`, `WWDebug_Printf_Warning`, `WWDebug_Printf_Error`) or to a `Format`/`format` call
 # (`StringClass::Format`, `WideStringClass::Format`, `AsciiString::format`, `UnicodeString::format`,
 # `Debug::Format`: every `Format`/`format` declared in the tree is a printf-style variadic, matched on the
-# method name alone so a call through any instance is caught) is flagged too: it passes the empty
-# stand-in object instead of the field's value. So is `name` passed as a whole element of the
+# method name alone so a call through any instance is caught) is flagged too. Passing to `...` copies the
+# stand-in, which its deleted copy constructor already rejects, so this check is a backstop for a logger
+# whose arguments are not compiled (a macro that compiles out). So is `name` passed as a whole element of the
 # doubled-parens message list that every logging macro built on Debug.h's shape takes (`WWDEBUG_SAY`,
 # `WWRELEASE_SAY`, `DEBUG_LOG`, `SNAPSHOT_SAY`, `SHATTER_DEBUG_SAY`, ... and any later one, however it is
 # named): a comma inside the list survives the macro's own argument split only because the list is
@@ -108,9 +109,10 @@ _CAST_WORD = r"(?:const|volatile|unsigned|signed|long|short|struct|class|enum|[A
 CAST_BEFORE = re.compile(r"\(\s*" + _CAST_WORD + r"(?:\s+" + _CAST_WORD + r")*(?:\s*[*&])+\s*\)\s*$")
 # `&&` (logical-and) immediately before, with or without a space: the following `&` is always unary.
 DOUBLE_AMP_BEFORE = re.compile(r"&&\s*$")
-# A bare stand-in passed to one of these: a direct variadic call takes its argument's value by its
-# declared type (`...`), with no user-defined conversion, so an empty stand-in object is passed, not the
-# field's value. These take their format string and values directly as ordinary comma-separated
+# A bare stand-in passed to one of these: a direct variadic call takes its argument by value (`...`), with
+# no user-defined conversion, so it would copy the stand-in, not read the field. The deleted copy
+# constructor already rejects that wherever the call compiles; this is a backstop for a logging call that
+# compiles out. These take their format string and values directly as ordinary comma-separated
 # arguments, with no doubled-parens wrapping (contrast the macros `_doubled_paren_message_lists` finds
 # generically, by shape, below).
 VARIADIC_FUNCS = (
