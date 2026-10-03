@@ -1284,6 +1284,12 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 	TheWritableGlobalData->m_loadScreenRender = TRUE;	///< mark it so only a few select things are rendered during load
 	TheWritableGlobalData->m_TiVOFastMode = FALSE;	//always disable the TIVO fast-forward mode at the start of a new game.
 
+	// GeneralsX @bugfix cemlyn007 03/10/2026 View::init leaves the height adjustment off until the game has
+	// started, but nothing clears it at the end of a game. An engine's later games would otherwise ease the
+	// camera's zoom by wall-clock steps in every draw of the load and the start fade.
+	if (TheGlobalData->m_headless)
+		TheTacticalView->setOkToAdjustHeight(FALSE);
+
 	Campaign* currentCampaign = TheCampaignManager->getCurrentCampaign();
 	Bool isChallengeCampaign = m_gameMode == GAME_SINGLE_PLAYER && currentCampaign && currentCampaign->m_isChallengeCampaign;
 
