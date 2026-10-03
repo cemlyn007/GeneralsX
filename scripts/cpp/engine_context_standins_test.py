@@ -649,6 +649,75 @@ class MainTest(unittest.TestCase):
         self.assertIn("GeneralsMD", out)
         self.assertIn("m_curId", out)
 
+    def _declare_in_both_games(self):
+        # The same class's stand-in is declared in both games' own trees (W3DDisplay's are, in the real tree).
+        for game in ("Generals", "GeneralsMD"):
+            self.write(
+                game + "/W3DDisplay.h",
+                "class W3DDisplay {\n"
+                "public:\n"
+                "    static constexpr rts::ContextField<int*, &rts::EngineContext::w3dDisplay3DScene> "
+                "m_3DScene{};\n"
+                "    void reset();\n"
+                "};\n",
+            )
+
+    def test_stand_in_declared_in_both_games_is_checked_in_generalsmd(self):
+        self._declare_in_both_games()
+        self.write(
+            "GeneralsMD/W3DDisplay.cpp",
+            '#include "W3DDisplay.h"\n'
+            "void W3DDisplay::reset()\n"
+            "{\n"
+            "    unsigned long n = sizeof(m_3DScene);\n"
+            "}\n",
+        )
+        code, out = self.run_main(["--root", self.root])
+        self.assertEqual(code, 1, out)
+        self.assertIn("GeneralsMD/W3DDisplay.cpp", out)
+
+    def test_stand_in_declared_in_both_games_is_checked_in_generals(self):
+        self._declare_in_both_games()
+        self.write(
+            "Generals/W3DDisplay.cpp",
+            '#include "W3DDisplay.h"\n'
+            "void W3DDisplay::reset()\n"
+            "{\n"
+            "    unsigned long n = sizeof(m_3DScene);\n"
+            "}\n",
+        )
+        code, out = self.run_main(["--root", self.root])
+        self.assertEqual(code, 1, out)
+        self.assertIn("Generals/W3DDisplay.cpp", out)
+
+    def test_stand_in_declared_in_both_games_derived_class_is_checked_in_generalsmd(self):
+        # GeneralsMD's own derived class, found through its own game's base clauses only.
+        self._declare_in_both_games()
+        self.write(
+            "GeneralsMD/W3DDisplayEx.h",
+            '#include "W3DDisplay.h"\n'
+            "class W3DDisplayEx : public W3DDisplay {\n"
+            "};\n",
+        )
+        self.write("GeneralsMD/user.cpp", "int** p = &W3DDisplayEx::m_3DScene;\n")
+        code, out = self.run_main(["--root", self.root])
+        self.assertEqual(code, 1, out)
+        self.assertIn("GeneralsMD/user.cpp", out)
+
+    def test_stand_in_declared_in_both_games_does_not_leak_a_derived_class_across(self):
+        # Generals' W3DDisplayEx is unrelated to GeneralsMD's W3DDisplay: only GeneralsMD's derives from it.
+        self._declare_in_both_games()
+        self.write(
+            "GeneralsMD/W3DDisplayEx.h",
+            '#include "W3DDisplay.h"\n'
+            "class W3DDisplayEx : public W3DDisplay {\n"
+            "};\n",
+        )
+        self.write("Generals/W3DDisplayEx.h", "class W3DDisplayEx {\npublic:\n    static int m_3DScene;\n};\n")
+        self.write("Generals/user.cpp", "int* p = &W3DDisplayEx::m_3DScene;\n")
+        code, out = self.run_main(["--root", self.root])
+        self.assertEqual(code, 0, out)
+
     def test_qualified_use_through_derived_class_name_is_checked(self):
         # `&D::name` names the same inherited stand-in as `&C::name`, so the qualified
         # scan must run for D's name too, not only C's.
@@ -698,9 +767,11 @@ class MainTest(unittest.TestCase):
         self.assertNotIn("final::TheMapObjectListPtr", out)
 
     def test_final_derived_class_is_not_skipped(self):
-        # `class W3DAssetManager final : public WW3DAssetManager { ... }`: BASE_CLAUSE's lazy prefix has
-        # the same `final`-as-name bug, which drops the derived class out of the closure entirely
-        # 
+        # `class W3DAssetManager final : public WWAssetManager { ... }`: BASE_CLAUSE's lazy prefix has the
+        # same `final`-as-name bug, which records the derived class under the name `final` instead of its
+        # own, so neither a qualified use through its name nor an unqualified use in a file that defines
+        # one of its members would be found. Its header has no use of its own, so only the derived class's
+        # real name can find the two uses below.
         self.write(
             "Core/WWAssetManager.h",
             "class WWAssetManager {\n"
@@ -714,12 +785,55 @@ class MainTest(unittest.TestCase):
             '#include "WWAssetManager.h"\n'
             "class W3DAssetManager final : public WWAssetManager {\n"
             "public:\n"
-            "    void Track() { WWAssetManager** link = &TheInstance; }\n"
+            "    void Load();\n"
             "};\n",
+        )
+        self.write(
+            "Core/W3DAssetManager.cpp",
+            '#include "W3DAssetManager.h"\n'
+            "void W3DAssetManager::Load() {\n"
+            "    WWAssetManager** link = &TheInstance;\n"
+            "}\n",
+        )
+        self.write(
+            "Core/user.cpp",
+            '#include "W3DAssetManager.h"\n'
+            "WWAssetManager** p = &W3DAssetManager::TheInstance;\n",
         )
         code, out = self.run_main(["--root", self.root])
         self.assertEqual(code, 1, out)
-        self.assertIn("TheInstance", out)
+        self.assertIn("W3DAssetManager.cpp", out)
+        self.assertIn("user.cpp", out)
+
+    def test_base_clause_with_semicolon_in_trailing_comment_is_found(self):
+        # A `;` inside a comment between the base list and the `{` must not hide the derived class: comments
+        # are blanked before the base clause is matched.
+        self.write(
+            "Core/WWAssetManager.h",
+            "class WWAssetManager {\n"
+            "public:\n"
+            "    static constexpr rts::ContextField<WWAssetManager*, &rts::EngineContext::assetManager> "
+            "TheInstance{};\n"
+            "};\n",
+        )
+        self.write(
+            "Core/W3DAssetManager.h",
+            '#include "WWAssetManager.h"\n'
+            "class W3DAssetManager : public WWAssetManager // owns the prototypes; see assetmgr.h\n"
+            "{\n"
+            "public:\n"
+            "    void Track() { WWAssetManager** link = &TheInstance; }\n"
+            "};\n",
+        )
+        self.write(
+            "Core/user.cpp",
+            '#include "W3DAssetManager.h"\n'
+            "WWAssetManager** p = &W3DAssetManager::TheInstance;\n",
+        )
+        code, out = self.run_main(["--root", self.root])
+        self.assertEqual(code, 1, out)
+        self.assertIn("W3DAssetManager.h", out)
+        self.assertIn("user.cpp", out)
 
     def test_derived_class_inline_body_is_own_file(self):
         # A derived class's own class body is the base's own file too: an inline member body written directly inside D's class declaration has no `D::` qualifier at
