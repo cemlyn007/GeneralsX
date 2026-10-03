@@ -555,20 +555,29 @@ void GameStateMap::clearScratchPadMaps()
 	// set GameStateMap.h documents for killed or faulted engines, except now a live engine that
 	// never crashed can land it there too. A later clearScratchPadMaps call, or this instance's
 	// own destructor, retries whatever is left in m_scratchPadMaps.
+	//
+	// GeneralsX @bugfix cemlyn007 03/10/2026 The "is it still there" check below must stay
+	// exact-case, like DeleteFile itself (std::filesystem::remove), not go through
+	// TheLocalFileSystem->doesFileExist: on a case-sensitive filesystem that falls back to a
+	// case-insensitive directory scan (StdLocalFileSystem::fixFilenameFromWindowsPath) once the
+	// exact path is gone, which would keep retrying -- and printing the message below for -- a
+	// path that no longer exists under its tracked name, just because some unrelated case-variant
+	// happens to share the directory. That would also undermine the exact-path claim in the
+	// comment above: this cleanup would no longer be unfoolable by a case-variant name.
+	// GetFileAttributes (stat() on non-Windows) answers only for the exact path.
 	std::vector<AsciiString> stillPending;
 	for( std::vector<AsciiString>::const_iterator it = m_scratchPadMaps.begin(); it != m_scratchPadMaps.end(); ++it )
 	{
 
-		// a scratch pad map left behind would be picked up by a later load, so say when one cannot be deleted
-		if( DeleteFile( it->str() ) == 0 )
+		// a scratch pad map left behind would be picked up by a later load; only report and retry
+		// one that is genuinely still there under its exact tracked name -- a DeleteFile failure on
+		// one that is already gone (another thread or process beat us to it, or whose only
+		// remaining match is a case-variant name) needs neither
+		if( DeleteFile( it->str() ) == 0 && GetFileAttributes( it->str() ) != 0xFFFFFFFF )
 		{
 			fprintf( stderr, "GameStateMap::clearScratchPadMaps - Unable to delete scratch pad map '%s'\n", it->str() );
 			fflush( stderr );
-
-			// only retry a path that is genuinely still there; a DeleteFile failure on one that is
-			// already gone (another thread or process beat us to it) needs no retry
-			if( TheLocalFileSystem != nullptr && TheLocalFileSystem->doesFileExist( it->str() ) )
-				stillPending.push_back( *it );
+			stillPending.push_back( *it );
 		}
 
 	}
