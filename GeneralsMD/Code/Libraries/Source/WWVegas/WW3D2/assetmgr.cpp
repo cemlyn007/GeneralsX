@@ -819,6 +819,7 @@ RenderObjClass * WW3DAssetManager::Create_Render_Obj(const char * name)
 	}
 
 	if (proto == nullptr) {
+		// GeneralsX @feature cemlyn007 03/10/2026 Atomic: any engine's thread may count a missing asset (PLAN-023 Phase 5b).
 		static std::atomic<int> warning_count(0);
 		// Note - objects named "#..." are scaled cached objects, so don't warn...
 		if (name[0] != '#') {
