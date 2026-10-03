@@ -2030,7 +2030,7 @@ void InGameUI::update()
 					// lets make a sound
 #if RTS_ENGINE_CONTEXT
 					// GeneralsX @feature cemlyn007 28/09/2026 Per engine: the event keeps this engine's event info and sound rotation (PLAN-023 Phase 4).
-					static rts::PerEngineStatic<AudioEventRTS> click_perEngine([](AudioEventRTS& event) { event = AudioEventRTS("MilitarySubtitlesTyping"); });
+					static rts::PerEngineStatic<AudioEventRTS> click_perEngine([](AudioEventRTS& event) { event.setEventName("MilitarySubtitlesTyping"); });
 					AudioEventRTS& click = click_perEngine.get();
 #else
 					static AudioEventRTS click("MilitarySubtitlesTyping");

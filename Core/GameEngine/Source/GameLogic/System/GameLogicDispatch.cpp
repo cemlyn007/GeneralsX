@@ -180,7 +180,7 @@ static void doSetRallyPoint( Object *obj, const Coord3D& pos )
 			// play the no can do sound
 #if RTS_ENGINE_CONTEXT
 			// GeneralsX @feature cemlyn007 28/09/2026 Per engine: the event keeps this engine's event info and sound rotation (PLAN-023 Phase 4).
-			static rts::PerEngineStatic<AudioEventRTS> rallyNotSet_perEngine([](AudioEventRTS& event) { event = AudioEventRTS("UnableToSetRallyPoint"); });
+			static rts::PerEngineStatic<AudioEventRTS> rallyNotSet_perEngine([](AudioEventRTS& event) { event.setEventName("UnableToSetRallyPoint"); });
 			AudioEventRTS& rallyNotSet = rallyNotSet_perEngine.get();
 #else
 			static AudioEventRTS rallyNotSet("UnableToSetRallyPoint");
@@ -208,7 +208,7 @@ static void doSetRallyPoint( Object *obj, const Coord3D& pos )
 		// play a sound for setting the rally point
 #if RTS_ENGINE_CONTEXT
 		// GeneralsX @feature cemlyn007 28/09/2026 Per engine: the event keeps this engine's event info and sound rotation (PLAN-023 Phase 4).
-		static rts::PerEngineStatic<AudioEventRTS> rallyPointSet_perEngine([](AudioEventRTS& event) { event = AudioEventRTS("RallyPointSet"); });
+		static rts::PerEngineStatic<AudioEventRTS> rallyPointSet_perEngine([](AudioEventRTS& event) { event.setEventName("RallyPointSet"); });
 		AudioEventRTS& rallyPointSet = rallyPointSet_perEngine.get();
 #else
 		static AudioEventRTS rallyPointSet("RallyPointSet");
@@ -1988,7 +1988,7 @@ bool GameLogic::onDozerConstruct(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &curr
 
 #if RTS_ENGINE_CONTEXT
 	// GeneralsX @feature cemlyn007 28/09/2026 Per engine: the event keeps this engine's event info and sound rotation (PLAN-023 Phase 4).
-	static rts::PerEngineStatic<AudioEventRTS> placeBuilding_perEngine([](AudioEventRTS& event) { event = AudioEventRTS("PlaceBuilding"); });
+	static rts::PerEngineStatic<AudioEventRTS> placeBuilding_perEngine([](AudioEventRTS& event) { event.setEventName("PlaceBuilding"); });
 	AudioEventRTS& placeBuilding = placeBuilding_perEngine.get();
 #else
 	static AudioEventRTS placeBuilding("PlaceBuilding");
@@ -2173,7 +2173,7 @@ bool GameLogic::onPlaceBeacon(MAYBE_UNUSED GameMessage *msg)
 				// play a sound
 #if RTS_ENGINE_CONTEXT
 				// GeneralsX @feature cemlyn007 28/09/2026 Per engine: the event keeps this engine's event info and sound rotation (PLAN-023 Phase 4).
-				static rts::PerEngineStatic<AudioEventRTS> aSound_perEngine([](AudioEventRTS& event) { event = AudioEventRTS("BeaconPlacementFailed"); });
+				static rts::PerEngineStatic<AudioEventRTS> aSound_perEngine([](AudioEventRTS& event) { event.setEventName("BeaconPlacementFailed"); });
 				AudioEventRTS& aSound = aSound_perEngine.get();
 #else
 				static AudioEventRTS aSound("BeaconPlacementFailed");
@@ -2199,7 +2199,7 @@ bool GameLogic::onPlaceBeacon(MAYBE_UNUSED GameMessage *msg)
 			// play a sound
 #if RTS_ENGINE_CONTEXT
 			// GeneralsX @feature cemlyn007 28/09/2026 Per engine: the event keeps this engine's event info and sound rotation (PLAN-023 Phase 4).
-			static rts::PerEngineStatic<AudioEventRTS> aSound_perEngine([](AudioEventRTS& event) { event = AudioEventRTS("BeaconPlaced"); });
+			static rts::PerEngineStatic<AudioEventRTS> aSound_perEngine([](AudioEventRTS& event) { event.setEventName("BeaconPlaced"); });
 			AudioEventRTS& aSound = aSound_perEngine.get();
 #else
 			static AudioEventRTS aSound("BeaconPlaced");
@@ -2247,7 +2247,7 @@ bool GameLogic::onPlaceBeacon(MAYBE_UNUSED GameMessage *msg)
 		// play a sound
 #if RTS_ENGINE_CONTEXT
 		// GeneralsX @feature cemlyn007 28/09/2026 Per engine: the event keeps this engine's event info and sound rotation (PLAN-023 Phase 4).
-		static rts::PerEngineStatic<AudioEventRTS> aSound_perEngine([](AudioEventRTS& event) { event = AudioEventRTS("BeaconPlacementFailed"); });
+		static rts::PerEngineStatic<AudioEventRTS> aSound_perEngine([](AudioEventRTS& event) { event.setEventName("BeaconPlacementFailed"); });
 		AudioEventRTS& aSound = aSound_perEngine.get();
 #else
 		static AudioEventRTS aSound("BeaconPlacementFailed");
