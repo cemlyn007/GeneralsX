@@ -201,9 +201,9 @@ ReplaySimulation::s_replayIndex	class	global	.bss	1	4	Core/GameEngine/Source/Com
 ReplaySimulation::s_replayCount	class	global	.bss	1	4	Core/GameEngine/Source/Common/ReplaySimulation.cpp:43	process-global		the game executable's multi-replay simulation driver (-simReplay); an embedded engine never runs it	hand
 AsciiString::TheEmptyString	class	global	.bss	1	8	Core/GameEngine/Source/Common/System/AsciiString.cpp:53	constant		const object: initialised once, never written	rule:const
 TheCurrentIgnoreCrashPtr	namespace	global	.bss	1	8	Core/GameEngine/Source/Common/System/Debug.cpp:140	debug-only		debug	hand
-theReleaseCrashLogFile	namespace	local	.bss	1	8	Core/GameEngine/Source/Common/System/Debug.cpp:740	process-global		embedding host's fatal-error mode / release-crash log (PLAN-023 Phase 5 moves the log to per-engine output paths)	hand
-theEngineEmbeddedMode	namespace	local	.bss	1	1	Core/GameEngine/Source/Common/System/Debug.cpp:768	process-global		embedding host's fatal-error mode / release-crash log (PLAN-023 Phase 5 moves the log to per-engine output paths)	hand
-theInReleaseCrashNoReturn	namespace	local	.tbss	1	1	Core/GameEngine/Source/Common/System/Debug.cpp:813	process-global		thread_local re-entry guard of ReleaseCrashNoReturn: per thread by design	hand
+theReleaseCrashLogFile	namespace	local	.tbss	1	8	Core/GameEngine/Source/Common/System/Debug.cpp:742	process-global		thread_local handle of the release-crash log being written: per thread by design (PLAN-023 Phase 5 moves the log to per-engine output paths)	hand
+theEngineEmbeddedMode	namespace	local	.bss	1	1	Core/GameEngine/Source/Common/System/Debug.cpp:770	process-global		embedding host's fatal-error mode: atomic (PLAN-023 Phase 5 moves the release-crash log to per-engine output paths)	hand
+theInReleaseCrashNoReturn	namespace	local	.tbss	1	1	Core/GameEngine/Source/Common/System/Debug.cpp:815	process-global		thread_local re-entry guard of ReleaseCrashNoReturn: per thread by design	hand
 theMainInitFlag	namespace	local	.bss	1	1	Core/GameEngine/Source/Common/System/GameMemory.cpp:200	process-global		refcounted process-wide memory manager (PLAN-023 Phase 1b, Decision 3)	hand
 theMemoryManagerUsersMutex	namespace	local	.bss	1	40	Core/GameEngine/Source/Common/System/GameMemory.cpp:3543	process-global		refcounted process-wide memory manager (PLAN-023 Phase 1b, Decision 3)	hand
 theMemoryManagerUsers	namespace	local	.bss	1	4	Core/GameEngine/Source/Common/System/GameMemory.cpp:3544	process-global		refcounted process-wide memory manager (PLAN-023 Phase 1b, Decision 3)	hand

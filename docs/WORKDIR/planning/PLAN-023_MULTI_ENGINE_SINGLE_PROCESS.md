@@ -494,7 +494,7 @@ Still not done, so still needed even for engines stepped on one thread: `SagePat
   - Locals (unconditional): `CollisionContext`/`IntersectContext`, made on the stack by `CollisionMath::Collide`/`Intersection_Test` and passed to the helpers; `InheritedWorldSpaceEmitterVel`, now an argument of `Initialize_Particle`; the four quoted-printable `dest` buffers.
   - Dropped: `meshmdl.cpp`'s unused pair.
   - A lock: `AssetStatusClass::Instance` stays one process-wide report, and `Add_To_Report` takes a mutex.
-  - The library's static TLS grew from 58 to 122 bytes.
+  - The library's static TLS grew from 58 to 122 bytes (item 2's release-crash log handle then took it to 138).
 - **Item 2 (RT1).** Every process-global entry whose note said a boot, a map load, a teardown or every call writes it:
   - `DX8Wrapper_IsWindowed`: a `std::atomic<bool>`, declared so in all five places, both games included.
   - `GameSpyColor`: a `PER_ENGINE_STATIC` (ON), made from the defaults in `Chat.cpp`.
@@ -503,6 +503,7 @@ Still not done, so still needed even for engines stepped on one thread: `SagePat
   - Constants: `ScoreKeeper`'s `scoringBuilding*Mask`, built at static initialisation rather than by every `reset`. `ModuleInfo::clearCopiedFromDefaultEntries`'s two masks are locals.
   - `Object::Object`'s eight helper `ModuleData`s are made and tagged once, under the static-initialisation guard (`taggedHelperModuleData<T>`); every `Object` used to write the tag again.
   - The asset managers' `warning_count`s (`W3DAssetManager`, `WW3DAssetManager`) are atomic.
+  - `theReleaseCrashLogFile` (the handle `ReleaseCrash` and `ReleaseCrashLocalized` open, write and close) is `thread_local`, so engines that fault on different threads do not close each other's file.
   - Boot/shutdown only, serialised by the host, and read by no stepping engine: `__argc`/`__argv`, `rts::WorkingDirectory` and the memory manager's and `WWMath`'s counts (already under their mutexes).
   - The NGMP instance: with `RTS_ENGINE_CONTEXT` only a non-headless engine calls `getInstance()` (`GameEngine::init`, every update, its menus and teardown), and a process has at most one, so no other engine touches it.
   - Phase 4's process-global strings are unchanged: each is written once before any engine steps.
