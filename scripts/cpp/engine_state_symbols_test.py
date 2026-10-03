@@ -184,6 +184,70 @@ class RuleConstObjectTest(unittest.TestCase):
             False,
         )
 
+    def test_by_value_const_initialized_from_a_parenthesized_global_pointer_dereference_is_not_safe(self):
+        # A member access on a dereferenced global pointer reads the same per-engine state as `->`, just
+        # spelled without it.
+        self.assert_const("static const Real s_h = (*TheGlobalData).m_maxCameraHeight;", False)
+
+    def test_by_value_const_initialized_from_a_subscripted_global_pointer_member_is_not_safe(self):
+        self.assert_const("static const Real s_h = TheGlobalData[0].m_maxCameraHeight;", False)
+
+    def test_by_value_const_initialized_from_a_dereferenced_global_pointer_is_not_safe(self):
+        self.assert_const("static const GlobalData s_h = *TheGlobalData;", False)
+
+    def test_by_value_const_initialized_from_a_subscripted_global_is_not_safe(self):
+        self.assert_const("static const UnsignedInt s_h = theGameLogicSeed[0];", False)
+
+    def test_by_value_const_initialized_from_a_post_increment_is_not_safe(self):
+        self.assert_const("static const Int s_h = new_counter++;", False)
+
+    def test_by_value_const_initialized_from_an_assignment_is_not_safe(self):
+        self.assert_const("static const Int s_h = a = b;", False)
+
+    def test_by_value_const_direct_initialized_with_a_parenthesized_literal_is_safe(self):
+        # Direct-initialisation's recorded initialiser keeps its own enclosing parentheses (`pick(3)`'s
+        # initialiser is `(3)`, not `3`): that extra wrapping must not itself be mistaken for a call.
+        self.assert_const("static const Int pick(3);", True)
+
+    def test_by_value_const_initialized_from_a_cast_literal_is_safe(self):
+        self.assert_const("static const Int x = (Int)5;", True)
+
+    def test_by_value_const_initialized_from_a_static_cast_literal_is_safe(self):
+        self.assert_const("static const Int x = static_cast<Int>(5);", True)
+
+    def test_by_value_const_initialized_from_a_qualified_enumerator_is_safe(self):
+        # The scope prefix (a class/namespace name) need not itself be upper case; only the final,
+        # unqualified segment must be.
+        self.assert_const("static const Int x = Foo::BAR;", True)
+
+    def test_by_value_const_initialized_from_its_own_constructor_with_a_function_pointer_argument_is_safe(
+        self,
+    ):
+        # The StateConditionInfo shape: a bare lower-case identifier is accepted only as a direct argument
+        # of the declared type's own constructor (a function-pointer field), never as a read on its own.
+        self.assert_const(
+            "static const StateConditionInfo s_info = StateConditionInfo(isConditionTrue, someLowerFunc);",
+            True,
+        )
+
+    def test_by_value_const_initialized_from_a_bare_lowercase_identifier_is_not_safe(self):
+        self.assert_const("static const Int x = foo;", False)
+
+    def test_direct_initialized_table_with_several_literal_arguments_is_safe(self):
+        # The Matrix3D::Identity/RotateX90/... shape: direct-initialisation with several comma-separated
+        # arguments and no leading call name (the type/variable name is already stripped into the
+        # declarator). Each argument is still checked as its own pure value.
+        self.assert_const(
+            "const Matrix3D Matrix3D::Identity ( 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0 );",
+            True,
+        )
+
+    def test_direct_initialized_table_with_an_unsafe_argument_is_not_safe(self):
+        self.assert_const(
+            "const Matrix3D Matrix3D::Identity ( 1.0, TheGlobalData->m_maxCameraHeight, 0.0, 0.0 );",
+            False,
+        )
+
 
 class RuleNamekeyTest(unittest.TestCase):
     """rule:namekey is SAFE_FOR_NEW: the variable itself must be a NameKeyType/StaticNameKey cache, not a

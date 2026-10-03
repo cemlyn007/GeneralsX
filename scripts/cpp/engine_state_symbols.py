@@ -840,17 +840,12 @@ CONST_PTR_DECL_RE = re.compile(r"\*\s*const\s+\w+\s*(?:\[[^\]]*\]\s*)*$")
 # WaveGuideUpdate's particles, ...) would also use to fill its pointer on first call: not a constant
 # expression, even though the pointer slot itself is never written again.
 LOOKUP_INIT_RE = re.compile(r"->|\w+\s*\(")
-# A read through a global pointer (`TheGlobalData->m_mapName`, `TheWriterSomething->field`): per-engine or
-# INI/map-dependent state captured by the first engine to run, whether the static itself is a pointer or a
-# by-value object.
+# A `->` read through a global pointer (`TheGlobalData->m_mapName`, `TheWriterSomething->field`): per-engine
+# or INI/map-dependent state captured by the first engine to run, whether the static itself is a pointer or
+# a by-value object. This is only the arrow form; a by-value initialiser's other ways of reading the same
+# kind of state (`(*TheGlobalData).m_mapName`, `TheGlobalData[0].m_mapName`, `*TheGlobalData`, a subscript,
+# `++`/`--`, an assignment) are caught by `_by_value_init_is_safe`'s allow-list instead, not by this regex.
 GLOBAL_LOOKUP_RE = re.compile(r"->")
-# Any identifier immediately followed by `(`: a call. By value, this is safe only when it is a pure value
-# constructor: the declared type's own name (`WaypointMap()`, a default-constructed value, never a read)
-# or one on the allow-list below; everything else (a one-time lookup, a getter backed by engine globals, an
-# RNG draw such as GameLogicRandomValue advancing the per-engine logic RNG) is rejected, even when its own
-# arguments are literals: literal-ness of the arguments says nothing about what the called function itself
-# reads or advances.
-CALL_INIT_RE = re.compile(r"\b(\w+)\s*\(")
 # Pure value constructors used in this codebase to build a by-value const from literals alone: no lookup, no
 # engine-state read, no counter or RNG draw. Nothing outside this list (and the declared type's own name) is
 # accepted as a call initialiser.
@@ -876,6 +871,40 @@ SAFE_VALUE_CONSTRUCTOR_NAMES = {
 # Storage/qualifier keywords that are never the declared type or the variable name, skipped when reading
 # a declaration's last two identifiers off (the variable name, then its type).
 DECL_KEYWORDS = {"static", "const", "inline"}
+# Characters after which a `*` is a prefix (dereference) rather than multiplication: the start of the
+# initialiser, an opening bracket, a comma (the next constructor argument), or another operator. A `*`
+# after an identifier, a literal or a closing bracket is always multiplication.
+_STAR_PREFIX_CHARS = set("([{,=&|!<>+-*/%^~:")
+# A subscript on anything (`theGameLogicSeed[0]`, `TheGlobalData[0]`): none of this codebase's safe,
+# literal-only initialisers index into an array, so any `name[` is rejected outright.
+SUBSCRIPT_RE = re.compile(r"\w\s*\[")
+# A member access (`.field`) on an identifier or a parenthesised expression (`(*TheGlobalData).field`):
+# never a pure value. The lookbehind rules out a floating-point literal's own `.` (`1.0f`), which is never
+# preceded by a letter.
+MEMBER_ACCESS_RE = re.compile(r"(?<=[A-Za-z_0-9)\]])\s*\.\s*[A-Za-z_]")
+# `++`/`--`: a counter, never a pure value.
+INC_DEC_RE = re.compile(r"\+\+|--")
+# A bare assignment inside the initialiser (not `==`, `!=`, `<=`, `>=`): never a pure value.
+ASSIGN_RE = re.compile(r"(?<![=!<>])=(?!=)")
+# A numeric literal: optionally signed, decimal or hex, with an optional fractional/exponent part and a
+# trailing type suffix (`f`, `u`, `l`, `ll`, in any case/combination).
+_NUMBER_RE = r"[+-]?(?:0[xX][0-9a-fA-F]+|\d+\.?\d*(?:[eE][+-]?\d+)?)[uUlLfF]*"
+LITERAL_RE = re.compile(rf"^(?:{_NUMBER_RE}|\"(?:[^\"\\]|\\.)*\"|'(?:[^'\\]|\\.)*')$")
+# An ALL_CAPS identifier or enumerator, optionally `::`-qualified (`NAMEKEY_INVALID`, `Foo::BAR`, the scope
+# itself in whatever case the class/namespace uses): a named constant, never a per-engine read. The caller
+# still checks that the final (unqualified) segment is upper case.
+ALL_CAPS_RE = re.compile(r"^[A-Za-z_]\w*(?:::[A-Za-z_]\w*)*$")
+# A C-style or functional cast (`(Int)expr`, `static_cast<Int>(expr)`) ahead of a value this rule still
+# checks underneath: the cast itself reads nothing, so only the expression it casts need be a pure value.
+_CAST_RE = re.compile(r"^\(\s*(?:const\s+)?[A-Za-z_][\w:]*\s*(?:[*&]\s*)?\)\s*(?P<rest>\S.*)$", re.DOTALL)
+_STATIC_CAST_RE = re.compile(
+    r"^(?:static|const|reinterpret)_cast\s*<[^<>]*>\s*\((?P<rest>.*)\)$", re.DOTALL
+)
+# A function (pointer) name, bare or `&`-taken, possibly scoped (`isConditionTrue`, `&foo`,
+# `DeliverPayloadStateMachine::isOffMap`): accepted only as a direct argument of the declared type's own
+# constructor (a callback field, such as StateConditionInfo's), never as a value on its own, and never when
+# it ends in an ALL_CAPS segment (that is an enumerator, already accepted above as a plain value).
+FUNC_PTR_ARG_RE = re.compile(r"^&?[A-Za-z_]\w*(?:::[A-Za-z_]\w*)*$")
 
 
 def _declared_type_name(decl):
@@ -885,15 +914,101 @@ def _declared_type_name(decl):
     return tokens[-2] if len(tokens) >= 2 else ""
 
 
-def _by_value_init_is_safe(init, type_name):
-    """True unless `init` contains a call that is neither an allow-listed pure value constructor nor a call
-    to the declared type's own name (nested calls, such as an allow-listed constructor's own arguments, are
-    each checked too)."""
-    for call in CALL_INIT_RE.finditer(init):
-        if call.group(1) in SAFE_VALUE_CONSTRUCTOR_NAMES or call.group(1) == type_name:
-            continue
+def _split_top_level_commas(text):
+    """`text` split on its top-level commas (inside no bracket of its own): the arguments of a call, or the
+    elements of a brace list."""
+    parts, depth, start = [], 0, 0
+    for i, c in enumerate(text):
+        if c in "({[":
+            depth += 1
+        elif c in ")}]":
+            depth -= 1
+        elif c == "," and depth == 0:
+            parts.append(text[start:i])
+            start = i + 1
+    parts.append(text[start:])
+    return [p.strip() for p in parts if p.strip()]
+
+
+def _fully_parenthesized(expr):
+    """True when `expr`'s leading `(` closes only at its very last character, so the whole expression is one
+    parenthesised group (`(3)`, `(a + b)`), not a call whose own `(...)` is followed by more text."""
+    depth = 0
+    for i, c in enumerate(expr):
+        if c == "(":
+            depth += 1
+        elif c == ")":
+            depth -= 1
+            if depth == 0:
+                return i == len(expr) - 1
+    return False
+
+
+def _has_unsafe_operator(expr):
+    """True when `expr` contains a dereference, a subscript, a member access, `++`/`--` or a bare
+    assignment: none of this rule's pure value shapes (a literal, a named constant, a cast or an
+    allow-listed/own-type constructor call) ever needs any of these."""
+    if SUBSCRIPT_RE.search(expr) or MEMBER_ACCESS_RE.search(expr) or INC_DEC_RE.search(expr) or ASSIGN_RE.search(expr):
+        return True
+    prev = None
+    for c in expr:
+        if c == "*" and (prev is None or prev in _STAR_PREFIX_CHARS):
+            return True
+        if not c.isspace():
+            prev = c
+    return False
+
+
+def _is_safe_value_expr(expr, type_name):
+    """True when `expr` (a whole by-value initialiser, or one brace-list element / call argument of one)
+    is provably a pure value: a literal, an ALL_CAPS named constant or enumerator, `true`/`false`/`nullptr`,
+    a cast of another pure value, a call to an allow-listed pure value constructor or to the declared type's
+    own name (each of its arguments checked the same way, except a lower-case-led function name, bare,
+    `&`-taken or scoped, is accepted as a direct argument of the type's own constructor: a function-pointer
+    field, such as StateConditionInfo's callback members, not a read), or a `{...}` list of pure values."""
+    expr = expr.strip()
+    if not expr:
+        return True
+    if _has_unsafe_operator(expr):
         return False
-    return True
+    if LITERAL_RE.match(expr) or expr in ("true", "false", "nullptr", "NULL"):
+        return True
+    if ALL_CAPS_RE.match(expr) and expr.rsplit("::", 1)[-1].isupper():
+        return True
+    m = _STATIC_CAST_RE.match(expr) or _CAST_RE.match(expr)
+    if m:
+        return _is_safe_value_expr(m.group("rest"), type_name)
+    if expr[0] == "{" and expr[-1] == "}":
+        return all(_is_safe_value_expr(e, type_name) for e in _split_top_level_commas(expr[1:-1]))
+    if expr[0] == "(" and _fully_parenthesized(expr):
+        # Direct-initialisation's own `(...)` (`pick(3)`'s initialiser is recorded as `(3)`, `Matrix3D::
+        # Identity`'s is `(1.0, 0.0, ..., 0.0)`) or a plain grouping: neither is a call (a call starts with
+        # the callee's name, not `(`), so unwrap one layer. Several top-level, comma-separated arguments
+        # are the declared type's own constructor args (direct-init has no other way to pass more than
+        # one); a single one is just a parenthesised expression and is checked the same way either way.
+        parts = _split_top_level_commas(expr[1:-1])
+        if len(parts) > 1:
+            return all(_is_safe_value_expr(p, type_name) for p in parts)
+        return _is_safe_value_expr(expr[1:-1], type_name)
+    call = re.match(r"^([A-Za-z_]\w*)\s*\((.*)\)$", expr, re.DOTALL)
+    if call and (call.group(1) in SAFE_VALUE_CONSTRUCTOR_NAMES or call.group(1) == type_name):
+        args = _split_top_level_commas(call.group(2))
+        return all(
+            _is_safe_value_expr(a, type_name)
+            or (call.group(1) == type_name and FUNC_PTR_ARG_RE.match(a) and a.rsplit("::", 1)[-1][:1].islower())
+            for a in args
+        )
+    return False
+
+
+def _by_value_init_is_safe(init, type_name):
+    """True when the whole by-value initialiser is a provably pure value (see `_is_safe_value_expr`):
+    literals, named constants, casts and allow-listed/own-type constructor calls, built from each other and
+    from nothing else. A dereference, a subscript, a member access, `.`/`[...]` on anything but a brace
+    list, `++`/`--`, an assignment, or a call that is not on the allow-list (a one-time lookup, a getter
+    backed by engine globals, an RNG draw such as GameLogicRandomValue advancing the per-engine logic RNG,
+    even with literal arguments) is rejected."""
+    return _is_safe_value_expr(init, type_name)
 
 
 def _is_balanced(text):
@@ -970,15 +1085,18 @@ def rule_const_object(sym):
     initialisation. A reference is never safe here (it can alias per-engine state at any type). A pointer is
     safe only when the pointer itself cannot be reseated (`T* const name`, not `const T*`, whatever the
     pointee type) and its initialiser is not a lookup: a per-engine pointer cache has exactly the `T* const
-    name = TheX->find(...)` shape. A by-value const is unsafe too when its initialiser reads through a
-    global pointer (`static const Real r = TheGlobalData->m_maxCameraHeight;`) or calls anything other than
-    an allow-listed pure value constructor (`static const Int pick = GameLogicRandomValue(0, 3);` advances
-    the per-engine logic RNG despite its literal arguments): both capture whichever engine ran first, or
-    diverge per engine, the same first-engine-wins defect as the pointer case. This holds whichever syntax
-    initialises it (copy, direct `name(expr)` or brace `name{expr}`); a declaration whose recorded line ends
-    before its initialiser does (a continuation onto the next source line, or a statement longer than the
-    caller's scan window, so the text we have simply stops without reaching the statement's own `;`) is
-    never assumed safe."""
+    name = TheX->find(...)` shape. A by-value const must have its whole initialiser provably built from pure
+    values and nothing else (`_by_value_init_is_safe`'s allow-list: literals, named constants, casts and
+    allow-listed/own-type constructor calls): any way of reading or changing per-engine state is rejected,
+    whether a `->` read (`static const Real r = TheGlobalData->m_maxCameraHeight;`), a dereference or
+    subscript (`*TheGlobalData`, `theGameLogicSeed[0]`), a member access on either (`(*TheGlobalData).m`,
+    `TheGlobalData[0].m`), a call that is not on the allow-list (`static const Int pick =
+    GameLogicRandomValue(0, 3);` advances the per-engine logic RNG despite its literal arguments), or
+    `++`/`--`/an assignment. Every one of these captures whichever engine ran first, or diverges per engine,
+    the same first-engine-wins defect as the pointer case. This holds whichever syntax initialises it (copy,
+    direct `name(expr)` or brace `name{expr}`); a declaration whose recorded line ends before its initialiser
+    does (a continuation onto the next source line, or a statement longer than the caller's scan window, so
+    the text we have simply stops without reaching the statement's own `;`) is never assumed safe."""
     for d in declarations(sym):
         if not d.rstrip().endswith(";"):
             return None
