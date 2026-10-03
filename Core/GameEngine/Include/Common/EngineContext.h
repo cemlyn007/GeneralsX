@@ -456,6 +456,12 @@ struct ContextFieldOps
 	{
 		return Derived::get();
 	}
+	// An explicit cast to an enum type (`(SomeEnum)name`, for an integer field) casts the field's value.
+	template <typename E, typename = std::enable_if_t<std::is_enum_v<E> && std::is_integral_v<T>>>
+	explicit operator E() const noexcept
+	{
+		return static_cast<E>(Derived::get());
+	}
 	T operator->() const noexcept
 	{
 		return Derived::get();
@@ -575,60 +581,6 @@ struct HasUnaryAddressOf<Field, std::void_t<decltype(&std::declval<const Field&>
 template <typename Field>
 inline constexpr bool isStandInGuarded =
 	!std::is_copy_constructible_v<std::remove_cv_t<Field>> && !HasUnaryAddressOf<std::remove_cv_t<Field>>::value;
-
-// GeneralsX @feature cemlyn007 30/09/2026 A stand-in whose field is whatever `Get` returns (PLAN-023 Phase 8,
-// stage RR2a-2), for a class whose per-engine state struct cannot be complete where the stand-ins are declared
-// (WW3D's, which holds WW3D's own nested enum types): the class declares `static T& name_State() noexcept;`,
-// defines it once the struct is complete, and declares
-// `static constexpr rts::AccessorContextField<T, &C::name_State> name{};`. The same operators as ContextField,
-// and the same limits: `sizeof` gives the stand-in's (scripts/cpp/engine_context_standins.py fails on it, and on
-// `&`), and its copy constructor and unary `operator&` are deleted.
-template <typename T, T& (*Get)() noexcept>
-struct AccessorContextField
-{
-	constexpr AccessorContextField() noexcept = default;
-	AccessorContextField(const AccessorContextField&) = delete;
-	AccessorContextField& operator=(const AccessorContextField&) = delete;
-	AccessorContextField* operator&() const = delete;
-
-	operator T&() const noexcept
-	{
-		return Get();
-	}
-	T operator->() const noexcept
-	{
-		return Get();
-	}
-	// An explicit cast to an enum type (`(SomeEnum)name`, for an int field) casts the field's value.
-	template <typename E, typename = std::enable_if_t<std::is_enum_v<E>>>
-	explicit operator E() const noexcept
-	{
-		return static_cast<E>(Get());
-	}
-	const AccessorContextField& operator=(T value) const noexcept
-	{
-		Get() = value;
-		return *this;
-	}
-	T& operator++() const noexcept
-	{
-		return ++Get();
-	}
-	T operator++(int) const noexcept
-	{
-		return Get()++;
-	}
-	template <typename U>
-	T& operator+=(const U& value) const noexcept
-	{
-		return Get() += value;
-	}
-	template <typename U>
-	T& operator-=(const U& value) const noexcept
-	{
-		return Get() -= value;
-	}
-};
 
 // A callable that runs `function` inside a Scope for the context that was current when it was made. For
 // thread functions: see withCurrentEngine.

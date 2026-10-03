@@ -126,38 +126,6 @@
 
 const char* DAZZLE_INI_FILENAME="DAZZLE.INI";
 
-#define DEFAULT_DEBUG_SHADER_BITS	(		SHADE_CNST(\
-												ShaderClass::PASS_LEQUAL,\
-												ShaderClass::DEPTH_WRITE_ENABLE,\
-												ShaderClass::COLOR_WRITE_ENABLE,\
-												ShaderClass::SRCBLEND_ONE,\
-												ShaderClass::DSTBLEND_ZERO,\
-												ShaderClass::FOG_DISABLE,\
-												ShaderClass::GRADIENT_MODULATE,\
-												ShaderClass::SECONDARY_GRADIENT_DISABLE,\
-												ShaderClass::TEXTURING_DISABLE,\
-												ShaderClass::ALPHATEST_DISABLE,\
-												ShaderClass::CULL_MODE_ENABLE, \
-												ShaderClass::DETAILCOLOR_DISABLE,\
-												ShaderClass::DETAILALPHA_DISABLE) )
-
-#define LIGHTMAP_DEBUG_SHADER_BITS	(		SHADE_CNST(\
-												ShaderClass::PASS_LEQUAL,\
-												ShaderClass::DEPTH_WRITE_ENABLE,\
-												ShaderClass::COLOR_WRITE_ENABLE,\
-												ShaderClass::SRCBLEND_ONE,\
-												ShaderClass::DSTBLEND_ZERO,\
-												ShaderClass::FOG_DISABLE,\
-												ShaderClass::GRADIENT_DISABLE,\
-												ShaderClass::SECONDARY_GRADIENT_DISABLE,\
-												ShaderClass::TEXTURING_ENABLE,\
-												ShaderClass::ALPHATEST_DISABLE,\
-												ShaderClass::CULL_MODE_ENABLE, \
-												ShaderClass::DETAILCOLOR_DISABLE,\
-												ShaderClass::DETAILALPHA_DISABLE) )
-
-
-
 /**********************************************************************************
 **
 **  WW3D Static Globals
@@ -172,16 +140,11 @@ unsigned int											WW3D::PreviousSyncTime = 0;
 #endif
 #if RTS_ENGINE_CONTEXT
 // GeneralsX @feature cemlyn007 30/09/2026 WW3D's statics are the current engine's WW3DState fields (ww3d.h; PLAN-023
-// Phase 8, stage RR2a-2), with the upstream initial values below.
-WW3DState WW3DState::Defaults;
+// Phase 8, stage RR2a-2), with the upstream initial values there.
+constinit WW3DState WW3DState::Defaults;
 
-WW3DState::WW3DState()
-	: DefaultDebugShader(DEFAULT_DEBUG_SHADER_BITS),
-	  LightmapDebugShader(LIGHTMAP_DEBUG_SHADER_BITS),
-	  TextureFilter(TextureFilterClass::TextureFilterMode::TEXTURE_FILTER_BILINEAR),
-	  AnisotropyLevel(TextureFilterClass::AnisotropicFilterMode::TEXTURE_FILTER_ANISOTROPIC_2X)
-{
-}
+static_assert(TextureFilterClass::TEXTURE_FILTER_BILINEAR == 2 && TextureFilterClass::TEXTURE_FILTER_ANISOTROPIC_2X == 2,
+	"WW3DState's TextureFilter and AnisotropyLevel defaults (ww3d.h)");
 
 // The file statics, as the engine's fields.
 #define _Hwnd (reinterpret_cast<HWND&>(WW3D_State()._Hwnd))
