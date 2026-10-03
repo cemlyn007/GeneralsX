@@ -480,7 +480,9 @@ class SourceIndex:
         a `static const` here at all, and a brace-initialised aggregate with a callback field (a
         `FieldParse` table's rows, for instance) never reaches this call-shaped check in the first place,
         so restricting the exemption to `StateConditionInfo` costs nothing here, though it does not mean
-        `StateConditionInfo` is the only type in the codebase whose constructor ever takes one)."""
+        `StateConditionInfo` is the only type in the codebase whose constructor ever takes one).
+        `_fieldparse_init_is_safe` likewise applies this answer to a `FieldParse` row's parse-callback
+        field alone."""
         cached = self._is_function_cache.get(name)
         if cached is not None:
             return cached
@@ -1006,14 +1008,20 @@ FIELDPARSE_DECL_RE = re.compile(r"^(?:static\s+)?const\s+FieldParse\s+\w+\s*\[[^
 # A table that lands in .data rather than a read-only section does so because some row is computed at run
 # time. Every call in its rows must be one of these (a field offset, a size, a bit-name list of a flags
 # type: the same names on every engine). Outside the argument lists of `offsetof`/`sizeof` (type and member
-# names, never evaluated) a row may name only literals, `_FIELDPARSE_PLAIN_NAMES`, ALL_CAPS names that are
-# neither writable nor object-like macros (under RTS_ENGINE_CONTEXT most per-engine state is a macro over
-# the engine context, so never a symbol) and names a source-tree lookup confirms are functions (parser
-# callbacks); a member, a parameter or a local is none of these. No call may hide behind a template-id, a
-# parenthesised or subscripted callee, or a lambda.
+# names, never evaluated) a row may name only literals, `_FIELDPARSE_PLAIN_NAMES` and ALL_CAPS names that
+# are neither writable nor object-like macros (under RTS_ENGINE_CONTEXT most per-engine state is a macro
+# over the engine context, so never a symbol); only the second field (the parse callback) may also name a
+# function a source-tree lookup confirms, and only the third (the user data) may call `getBitNames`. No
+# call may hide behind a template-id, a parenthesised or subscripted callee or a lambda, and no name may be
+# followed by a brace (a temporary `T{...}` runs a constructor).
 FIELDPARSE_PURE_CALL_RE = re.compile(r"^(?:offsetof|sizeof|(?:\w+::)*\w+::getBitNames)$")
 _CALL_RE = re.compile(r"([A-Za-z_][\w:]*)\s*\(")
 _INDIRECT_CALL_RE = re.compile(r"[>)\]}]\s*\(")
+_BRACE_INIT_RE = re.compile(r"[\w>)\]]\s*\{")
+# The FieldParse fields (token, parse callback, user data, offset) that may hold a function name and a
+# `getBitNames` call.
+_FIELDPARSE_CALLBACK_FIELD = 1
+_FIELDPARSE_USER_DATA_FIELD = 2
 _UNEVALUATED_RE = re.compile(r"\b(?:offsetof|sizeof)\s*\(")
 _BIT_NAMES_CALLEE_RE = re.compile(r"(?:\w+::)*\w+::getBitNames\s*\(")
 _FIELDPARSE_NUMBER_RE = re.compile(r"(?<![\w.])\d[\w.]*")
@@ -1033,19 +1041,20 @@ def _drop_unevaluated_arguments(text):
 
 
 def _fieldparse_init_is_safe(init, writable_names, is_function_name=None):
-    """True when a FieldParse table's whole initialiser is a brace list with no `->` read, `++`/`--` or
-    assignment, no call outside `FIELDPARSE_PURE_CALL_RE` (a template-id, parenthesised or subscripted
-    callee, or lambda counts as one) and, outside `offsetof`/`sizeof` argument lists, no identifier but the
-    allow-listed kinds named at `FIELDPARSE_PURE_CALL_RE`: no writable name (qualified or by its last
-    segment), no object-like macro (each `::` segment, as the preprocessor sees them), and, when a
-    source-tree lookup is given, no lower-case or mixed-case name it does not confirm is a function. Like
+    """True when a FieldParse table's whole initialiser is a brace list of brace-list rows with no `->`
+    read, `++`/`--` or assignment, no call outside `FIELDPARSE_PURE_CALL_RE` (a template-id, parenthesised
+    or subscripted callee, or lambda counts as one), no brace-initialised temporary and, outside
+    `offsetof`/`sizeof` argument lists, no identifier but the allow-listed kinds named at
+    `FIELDPARSE_PURE_CALL_RE`: no writable name (qualified or by its last segment), no object-like macro
+    (each `::` segment, as the preprocessor sees them) and, when a source-tree lookup is given, no
+    lower-case or mixed-case name other than a function it confirms in a row's second field. Like
     `_is_safe_value_expr`, a textual allow-list over the rows, not a proof over the whole language."""
     init = _LITERAL_TEXT_RE.sub('""', init.strip())
-    if not init.startswith("{") or not _is_balanced(init):
+    if not init.startswith("{") or skip_balanced(init, 0, "{", "}") != len(init):
         return False
     if GLOBAL_LOOKUP_RE.search(init) or INC_DEC_RE.search(init) or ASSIGN_RE.search(init):
         return False
-    if _INDIRECT_CALL_RE.search(init):
+    if _INDIRECT_CALL_RE.search(init) or _BRACE_INIT_RE.search(init):
         return False
     if not all(FIELDPARSE_PURE_CALL_RE.match(call) for call in _CALL_RE.findall(init)):
         return False
@@ -1054,18 +1063,24 @@ def _fieldparse_init_is_safe(init, writable_names, is_function_name=None):
             "is_function_name must be None or expose is_macro_name (FunctionLookup does); a plain "
             "callable would silently disable the object-like-macro check"
         )
-    named = _FIELDPARSE_NUMBER_RE.sub("0", _BIT_NAMES_CALLEE_RE.sub("(", _drop_unevaluated_arguments(init)))
-    for name in _IDENTIFIER_RE.findall(named):
-        if name in _FIELDPARSE_PLAIN_NAMES:
-            continue
-        last = name.rsplit("::", 1)[-1]
-        if name in writable_names or last in writable_names:
+    for row in _split_top_level_commas(init[1:-1]):
+        if not (row.startswith("{") and row.endswith("}")):
             return False
-        if is_function_name is not None:
-            if any(is_function_name.is_macro_name(part) for part in name.split("::")):
+        for index, field in enumerate(_split_top_level_commas(row[1:-1])):
+            if index != _FIELDPARSE_USER_DATA_FIELD and _BIT_NAMES_CALLEE_RE.search(field):
                 return False
-            if not (last.isupper() or is_function_name(last)):
-                return False
+            named = _FIELDPARSE_NUMBER_RE.sub("0", _BIT_NAMES_CALLEE_RE.sub("(", _drop_unevaluated_arguments(field)))
+            for name in _IDENTIFIER_RE.findall(named):
+                if name in _FIELDPARSE_PLAIN_NAMES:
+                    continue
+                last = name.rsplit("::", 1)[-1]
+                if name in writable_names or last in writable_names:
+                    return False
+                if is_function_name is not None:
+                    if any(is_function_name.is_macro_name(part) for part in name.split("::")):
+                        return False
+                    if not (last.isupper() or (index == _FIELDPARSE_CALLBACK_FIELD and is_function_name(last))):
+                        return False
     return True
 
 

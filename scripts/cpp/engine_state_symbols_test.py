@@ -1072,7 +1072,27 @@ class RuleFieldParseTest(unittest.TestCase):
         ):
             self.assert_fieldparse(row, False, functions=())
         self.assert_fieldparse('{ "A", INI::parseInt, nullptr, helperOffset }', False, functions=())
-        self.assert_fieldparse('{ "A", INI::parseInt, nullptr, helperOffset }', True, functions=["helperOffset"])
+        # A function confirmed by the lookup is a parser callback only in the second field: anywhere else
+        # the same name may be a member, parameter or local that merely shares a function's name.
+        self.assert_fieldparse('{ "A", INI::parseInt, nullptr, helperOffset }', False, functions=["helperOffset"])
+        self.assert_fieldparse('{ "A", INI::parseInt, helperData, 0 }', False, functions=["helperData"])
+        self.assert_fieldparse('{ helperToken, INI::parseInt, nullptr, 0 }', False, functions=["helperToken"])
+        self.assert_fieldparse('{ "A", helperParse, nullptr, 0 }', True, functions=["helperParse"])
+        self.assert_fieldparse('{ "A", Foo::helperParse, nullptr, 0 }', True, functions=["helperParse"])
+
+    def test_get_bit_names_call_is_safe_only_in_the_user_data_field(self):
+        names = "ModelConditionFlags::getBitNames()"
+        self.assert_fieldparse('{ "A", INI::parseIndexList, %s, 0 }' % names, True)
+        self.assert_fieldparse('{ "A", INI::parseIndexList, nullptr, %s }' % names, False)
+        self.assert_fieldparse('{ %s, INI::parseIndexList, nullptr, 0 }' % names, False)
+
+    def test_table_that_is_not_a_list_of_brace_rows_is_not_safe(self):
+        decl = "static const FieldParse s_table[] = %s;"
+        for init in ('{ "A", INI::parseInt, nullptr, 0 }', '{ { "A", INI::parseInt, nullptr, 0 } } , { }', "{}{}"):
+            sym = make_symbol("s", [decl % init])
+            self.assertIsNone(m.rule_field_parse(sym, {}, FakeLookup(functions=self.CALLBACKS)), init)
+        sym = make_symbol("s", [decl % "{}"])
+        self.assertIsNotNone(m.rule_field_parse(sym, {}, FakeLookup(functions=self.CALLBACKS)))
 
     def test_table_row_numbers_and_unevaluated_arguments_are_not_names(self):
         self.assert_fieldparse(
@@ -1118,6 +1138,18 @@ class RuleFieldParseTest(unittest.TestCase):
             '{ "A", INI::parseInt, nullptr, []{ return 0; }() }',
         ):
             self.assert_fieldparse(row, False)
+
+    def test_table_row_with_a_brace_initialized_temporary_is_not_safe(self):
+        # `T{...}` runs a constructor (and a conversion operator for an Int field) without any `(`.
+        for row in (
+            '{ "A", INI::parseInt, nullptr, ENGINE_OFFSET{} }',
+            '{ "A", INI::parseInt, nullptr, ENGINE_OFFSET{ 3 } }',
+            '{ "A", INI::parseInt, nullptr, EngineOffset{ 3 } }',
+            '{ "A", INI::parseInt, nullptr, Foo::EngineOffset{} }',
+            '{ "A", INI::parseInt, nullptr, EngineOffset<Data>{} }',
+        ):
+            self.assert_fieldparse(row, False, functions=("EngineOffset",))
+        self.assert_fieldparse('{ "A", INI::parseInt, nullptr, ENGINE_OFFSET( 3 ) }', False)
 
     def test_table_without_an_initializer_is_not_safe(self):
         self.assertIsNone(m.rule_field_parse(make_symbol("s", ["static const FieldParse s_table[16];"])))
@@ -1371,8 +1403,17 @@ class SourceIndexDefinitionTest(unittest.TestCase):
             self.assertEqual(self.classify_static(key).cls, cls, key)
 
     def test_fieldparse_row_reading_a_member_parameter_or_local_is_not_a_safe_table(self):
-        # None of these is a symbol or a macro, so only the allow-list over the row's names rejects them.
+        # None of these is a symbol or a macro, so only the allow-list over the row's names rejects them,
+        # even when a function (or a constructor) elsewhere in the tree has the same name.
         self.write("ini.cpp", "void INI::parseInt( INI* ini )\n{\n}\n")
+        self.write(
+            "same_names.h",
+            "class Msg {\n"
+            "    const void* data() const { return m_p; }\n"
+            "    int size() const { return m_n; }\n"
+            "};\n"
+            "EngineOffset::EngineOffset()\n{\n}\n",
+        )
         row = '{ "A", INI::parseInt, %s, %s }, { nullptr, nullptr, nullptr, 0 }'
         self.write(
             "tables.cpp",
@@ -1386,11 +1427,24 @@ class SourceIndexDefinitionTest(unittest.TestCase):
             "    const void* names = TheThingFactory;\n"
             "    static const FieldParse t[] = { " + row % ("names", "0") + " };\n"
             "}\n"
+            "void sameNamedLocal() {\n"
+            "    const void* data = TheThingFactory;\n"
+            "    static const FieldParse t[] = { " + row % ("data", "0") + " };\n"
+            "}\n"
+            "void Thing::sameNamedMember() {\n"
+            "    static const FieldParse t[] = { " + row % ("nullptr", "size") + " };\n"
+            "}\n"
+            "void temporary() {\n"
+            "    static const FieldParse t[] = { " + row % ("nullptr", "EngineOffset{}") + " };\n"
+            "}\n"
             "void pure() {\n"
             "    static const FieldParse t[] = { " + row % ("nullptr", "0") + " };\n"
             "}\n",
         )
         expect = {
+            "sameNamedLocal()::t": m.UNREVIEWED,
+            "Thing::sameNamedMember()::t": m.UNREVIEWED,
+            "temporary()::t": m.UNREVIEWED,
             "Thing::parseSelf()::t": m.UNREVIEWED,
             "Mod::buildFieldParse(MultiIniFieldParse&)::t": m.UNREVIEWED,
             "local()::t": m.UNREVIEWED,
