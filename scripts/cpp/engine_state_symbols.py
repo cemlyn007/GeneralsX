@@ -1254,9 +1254,10 @@ def _is_safe_value_expr(expr, type_name, writable_names, is_function_name=None):
     """True when `expr` (a whole by-value initialiser, or one brace-list element / call argument of one)
     is provably a pure value: a literal, an ALL_CAPS named constant or enumerator that is neither itself a
     writable symbol nor an object-like macro (see below), `true`/`false`/`nullptr`, a cast of another pure
-    value to a target type that is itself reviewed-pure or a pointer/reference (`_cast_target_is_safe`,
-    below: a cast's target is not inert when it is a bare class type, since the cast can run that class's
-    own converting constructor), a call to an allow-listed pure value constructor or to the declared type's
+    value to a target type that is itself reviewed-pure, a pointer, or a reference to a reviewed-pure type
+    (`_cast_target_is_safe`, below: a cast's target is not inert when it is a class type, or a reference to
+    one, since the cast can run that class's own converting constructor or conversion operator), a call to
+    an allow-listed pure value constructor or to the declared type's
     own name (each of its arguments checked the same way, except that, when the declared type is
     `StateConditionInfo` (the only type that this classified library's own `static const` initialisers
     ever build, by calling the declared type's own name, with a function-pointer field in that call: other
