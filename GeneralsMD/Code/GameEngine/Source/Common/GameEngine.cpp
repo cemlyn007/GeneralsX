@@ -385,9 +385,9 @@ void GameEngine::init()
 		// from outside init(), e.g. a host's own unsafe test hook, never passes through this catch
 		// block). Gated on IsEngineEmbeddedMode(), not just the env var: a retail or stock build
 		// never calls SetEngineEmbeddedMode(true), so this is unreachable there regardless of
-		// environment. Checked once per init() call, not cached, since embedded-mode hosts only
-		// ever call init() once per process (one engine per process; see rlgenerals'
-		// MULTI_ENGINE_CONSUMER.md stage R1).
+		// environment. Checked once per init() call, not cached, since it is an uncached getenv
+		// like any other and init() itself may run more than once per process (rlgenerals'
+		// MULTI_ENGINE_CONSUMER.md stage R1 calls create/destroy/create in one process).
 		if (IsEngineEmbeddedMode() && std::getenv("GENERALSX_TEST_FAULT_IN_INIT"))
 			RELEASE_CRASH("test fault inside GameEngine::init (GENERALSX_TEST_FAULT_IN_INIT)");
 
