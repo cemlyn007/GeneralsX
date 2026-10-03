@@ -179,17 +179,24 @@ class RuleConstObjectTest(unittest.TestCase):
         self.assert_const('static const Lit c = "z";', False)
 
     def test_by_value_const_cast_initialized_from_an_unreviewed_class_type_is_not_safe(self):
-        # A C-style cast to the declared type (`(AudioEventRTS)"GUIClick"`) recurses into the cast's own
-        # operand without ever consulting `type_name`: the operand alone (a string literal) looks pure,
-        # so without gating the declared type up front this still runs AudioEventRTS's own
-        # AsciiString(const char*)-converting constructor unreviewed.
+        # A C-style cast to the declared type itself (`(AudioEventRTS)"GUIClick"`) now fails
+        # `_cast_target_is_safe`'s own check of the cast target (AudioEventRTS is unreviewed), as well as
+        # the declared-type gate above it: either one alone would already reject this, but both now agree.
         self.assert_const('static const AudioEventRTS s_click = (AudioEventRTS)"GUIClick";', False)
 
     def test_by_value_const_static_cast_initialized_from_an_unreviewed_class_type_is_not_safe(self):
-        # The same gap as the C-style cast above, spelled as a functional-style static_cast.
+        # The same cast-target and declared-type overlap as the C-style cast above, spelled as a
+        # functional-style static_cast.
         self.assert_const(
             'static const AudioEventRTS s_click = static_cast<AudioEventRTS>("GUIClick");', False
         )
+
+    def test_by_value_const_cast_of_a_reviewed_value_to_an_unreviewed_declared_type_is_not_safe(self):
+        # `(Int)5` casts to a reviewed-pure target, so `_cast_target_is_safe` and the recursive
+        # `_is_safe_value_expr` check on the operand both pass it. The result still copy-initialises the
+        # unreviewed declared type `Lit`, which only the declared-type gate above catches: this is the one
+        # shape that gate alone guards, since the cast-target check never sees the unreviewed type.
+        self.assert_const('static const Lit c = (Int)5;', False)
 
     def test_by_value_const_initialized_from_an_unreviewed_template_id_is_not_safe(self):
         # `_declared_type_name` must not read the last template argument (`Int`) as the declared type: it

@@ -1622,14 +1622,18 @@ def rule_const_object(sym, symbols=None, is_function_name=None):
                 # (copy, direct, brace, or a cast of any of these): `_is_safe_value_expr`'s own by-value
                 # branches (default-construction, `{...}`, direct-init's `(...)`, a call to the declared
                 # type's own name) already re-check this same `type_name` before trusting an all-literal
-                # argument list as proof of a pure constructor, but copy-initialisation
-                # (`static const Lit c = "z";`, a class with a non-explicit `const char*` constructor) and
-                # a cast of a literal to the declared type (`(AudioEventRTS)"GUIClick"`,
-                # `static_cast<AudioEventRTS>("GUIClick")`) never reach any of those branches: a literal
-                # alone satisfies `_is_safe_value_expr` regardless of `type_name`, so without this gate an
-                # unreviewed class type's own converting constructor could run unexamined through either
-                # spelling. Checking it here instead closes both gaps in one place, for the declared type
-                # alone, rather than threading the same check into every syntactic form that could skip it.
+                # argument list as proof of a pure constructor, and its cast branches reject an unreviewed
+                # cast target of their own through `_cast_target_is_safe`. Copy-initialisation
+                # (`static const Lit c = "z";`, a class with a non-explicit `const char*` constructor)
+                # never reaches any of those branches at all: a literal alone satisfies
+                # `_is_safe_value_expr` regardless of `type_name`, so without this gate an unreviewed class
+                # type's own converting constructor could run unexamined through it. A cast of a value that
+                # is itself pure under a reviewed type to an unreviewed declared type
+                # (`static const Lit c = (Int)5;`) reaches `_is_safe_value_expr`'s cast branch, which
+                # passes it (`Int` is reviewed-pure), and then copy-initialises `Lit` the same unreviewed
+                # way: this gate is what still catches it. Checking the declared type here instead closes
+                # both gaps in one place, rather than threading the same check into every syntactic form
+                # that could skip it.
                 return None
             if not _by_value_init_is_safe(init, type_name, writable_names, is_function_name):
                 return None
