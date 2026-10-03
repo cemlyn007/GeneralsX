@@ -29,6 +29,21 @@ def make_symbol(key, decls, count=1, source="x.cpp:1", sections=None):
     return sym
 
 
+class FakeLookup:
+    """A minimal stand-in for `FunctionLookup` (callable for `is_function_name`, plus `is_macro_name`),
+    for tests that need to control the macro answer without building a real `SourceIndex`."""
+
+    def __init__(self, functions=(), macros=()):
+        self._functions = set(functions)
+        self._macros = set(macros)
+
+    def __call__(self, name):
+        return name in self._functions
+
+    def is_macro_name(self, name):
+        return name in self._macros
+
+
 class RuleConstObjectTest(unittest.TestCase):
     """rule:const is SAFE_FOR_NEW: it must never pass a reassignable pointer or reference."""
 
@@ -63,8 +78,12 @@ class RuleConstObjectTest(unittest.TestCase):
     def test_reseatable_pointer_with_literal_initializer_is_not_safe(self):
         self.assert_const("static Foo* p = nullptr;", False)
 
-    def test_const_pointer_with_literal_initializer_is_safe(self):
-        self.assert_const("static Foo* const p = &kDefault;", True)
+    def test_const_pointer_with_address_of_a_name_the_symbol_table_does_not_list_is_not_safe(self):
+        # `&name`'s safety used to depend on what `name` is (rejected only for a writable symbol or an
+        # engine-singleton macro); taking a reseatable pointer's address off that allow-list means a
+        # per-engine member, local or context-scoped macro the symbol table has no entry for is no longer
+        # waved through just because it is absent from `writable_names`.
+        self.assert_const("static Foo* const p = &kDefault;", False)
 
     def test_const_pointer_with_address_of_an_engine_singleton_is_not_safe(self):
         # Every EngineSingletonMacros.h macro (`The[A-Z]...`) expands to a read through the current
@@ -373,6 +392,29 @@ class RuleConstObjectTest(unittest.TestCase):
         # named constant: the ALL_CAPS allow-list must not treat every such name as safe.
         writable = {"REPLAY_CRC_INTERVAL": make_symbol("REPLAY_CRC_INTERVAL", [], sections={".data"})}
         self.assert_const("static const Int s = REPLAY_CRC_INTERVAL;", False, symbols=writable)
+
+    def test_by_value_const_initialized_from_an_all_caps_object_like_macro_is_not_safe(self):
+        # IS_FRAME_OK_TO_LOG (CRCDebug.cpp) is an ALL_CAPS object-like macro that expands to a per-engine
+        # read and never appears in the symbol table at all, so `_writable_global_names` alone cannot
+        # catch it: a real lookup reporting the name as a macro must reject it too, whatever it expands to.
+        lookup = FakeLookup(macros={"IS_FRAME_OK_TO_LOG"})
+        self.assert_const(
+            "static const Bool s_ok = IS_FRAME_OK_TO_LOG;", False, is_function_name=lookup
+        )
+
+    def test_by_value_const_initialized_from_an_all_caps_name_a_real_lookup_says_is_not_a_macro_is_safe(self):
+        # A real lookup is supplied but reports this particular ALL_CAPS name as neither writable nor a
+        # macro: still accepted, the same as any other named constant/enumerator.
+        lookup = FakeLookup(macros={"SOME_OTHER_MACRO"})
+        self.assert_const(
+            "static const Int s = NAMEKEY_INVALID;", True, is_function_name=lookup
+        )
+
+    def test_by_value_const_initialized_from_an_all_caps_name_is_still_safe_without_a_macro_lookup(self):
+        # No lookup at all (a direct unit test of this checker, never how `classify` calls it): the
+        # ALL_CAPS branch has nothing to check the macro table against, so it stays as permissive as the
+        # writable-symbol check alone allows.
+        self.assert_const("static const Int s = SOME_MACRO_OR_CONSTANT;", True)
 
     def test_by_value_const_initialized_from_a_cast_of_a_writable_global_is_not_safe(self):
         writable = {"REPLAY_CRC_INTERVAL": make_symbol("REPLAY_CRC_INTERVAL", [], sections={".data"})}
@@ -1084,6 +1126,59 @@ class SourceIndexIsFunctionNameTest(unittest.TestCase):
             "}\n",
         )
         self.assertTrue(self.index().is_function_name("isBuildMostImportant"))
+
+    def test_an_object_like_macro_is_an_object_like_macro(self):
+        self.write(
+            "crcdebug.cpp",
+            '#define IS_FRAME_OK_TO_LOG TheGameLogic->isInGame() && !TheGameLogic->isInShellGame()\n',
+        )
+        self.assertTrue(self.index().is_object_like_macro_name("IS_FRAME_OK_TO_LOG"))
+
+    def test_an_object_like_macro_with_a_space_before_its_parenthesized_value_is_still_object_like(self):
+        # The space between the name and `(` is what makes this object-like, not function-like: the C
+        # preprocessor only treats an UNSPACED `(` as opening a parameter list.
+        self.write(
+            "crcdebug.h",
+            "#define REPLAY_CRC_INTERVAL (::rts::ctx()->replayCrcInterval)\n",
+        )
+        self.assertTrue(self.index().is_object_like_macro_name("REPLAY_CRC_INTERVAL"))
+
+    def test_a_function_like_macro_is_not_an_object_like_macro(self):
+        self.write("mathutil.h", "#define DEG_TO_RAD(x) ((x) * 3.14159f / 180.0f)\n")
+        self.assertFalse(self.index().is_object_like_macro_name("DEG_TO_RAD"))
+
+    def test_an_undefined_name_is_not_an_object_like_macro(self):
+        self.write("empty.cpp", "static const int x = 5;\n")
+        self.assertFalse(self.index().is_object_like_macro_name("NOT_A_MACRO"))
+
+
+class FunctionLookupTest(unittest.TestCase):
+    """FunctionLookup threads both real source-tree lookups `classify` needs through `rule_const_object`'s
+    single extra parameter: callable for `is_function_name`, plus `is_macro_name`."""
+
+    def test_is_callable_for_is_function_name(self):
+        class _StubIndex:
+            def is_function_name(self, name):
+                return name == "realFunc"
+
+            def is_object_like_macro_name(self, name):
+                raise AssertionError("not called")
+
+        lookup = m.FunctionLookup(_StubIndex())
+        self.assertTrue(lookup("realFunc"))
+        self.assertFalse(lookup("notAFunc"))
+
+    def test_is_macro_name_delegates_to_the_index(self):
+        class _StubIndex:
+            def is_function_name(self, name):
+                raise AssertionError("not called")
+
+            def is_object_like_macro_name(self, name):
+                return name == "SOME_MACRO"
+
+        lookup = m.FunctionLookup(_StubIndex())
+        self.assertTrue(lookup.is_macro_name("SOME_MACRO"))
+        self.assertFalse(lookup.is_macro_name("NOT_A_MACRO"))
 
 
 class CompareTest(unittest.TestCase):

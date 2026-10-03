@@ -333,6 +333,13 @@ PP_IF_RE = re.compile(r"^[ \t]*#\s*(?:if|ifdef|ifndef)\b", re.M)
 PP_ELSE_RE = re.compile(r"^[ \t]*#\s*(?:elif|else)\b", re.M)
 PP_ENDIF_RE = re.compile(r"^[ \t]*#\s*endif\b", re.M)
 
+# A macro definition's own name, and (group 2) whichever single character immediately follows it: `(` with
+# no space before it means a function-like macro (`#define FOO(x) ...`), anything else (a space, a tab, or
+# nothing at all before the line ends) means an object-like one (`#define FOO x`, `#define FOO`), per the C
+# preprocessor's own rule that only an UNSPACED `(` opens a parameter list. Only the object-like form can
+# ever appear bare in an initialiser the way a named constant or writable global would.
+MACRO_DEFINE_RE = re.compile(r"^[ \t]*#[ \t]*define[ \t]+([A-Za-z_]\w*)(\(|[ \t]|$)", re.M)
+
 
 def _scope_events(text):
     """Every `{`/`}` in `text`, as two parallel lists: positions (strictly increasing, each one past the
@@ -390,6 +397,7 @@ class SourceIndex:
         self._scope_cache = {}
         self._is_class_cache = {}
         self._is_function_cache = {}
+        self._object_like_macros = set()
         self.where = collections.defaultdict(set)
         for scan_root in SCAN_ROOTS:
             for dirpath, dirnames, filenames in os.walk(os.path.join(root, scan_root)):
@@ -405,6 +413,13 @@ class SourceIndex:
                     self.files[rel] = code_only(text)
                     for word in set(re.findall(r"[A-Za-z_]\w*", text)) & wanted:
                         self.where[word].add(rel)
+                    for mo in MACRO_DEFINE_RE.finditer(text):
+                        if mo.group(2) != "(":
+                            # Object-like (no parameter list): used bare, so an ALL_CAPS one can read as a
+                            # named constant while actually expanding to a per-engine read. A function-like
+                            # macro (`#define FOO(x) ...`) is never invoked bare, so it cannot be mistaken
+                            # for a by-value const's named-constant shape and is left out of this set.
+                            self._object_like_macros.add(mo.group(1))
 
     def candidates(self, *words):
         sets = [self.where.get(w, set()) for w in words if w]
@@ -467,6 +482,19 @@ class SourceIndex:
                 break
         self._is_function_cache[name] = found
         return found
+
+    def is_object_like_macro_name(self, name):
+        """Whether `name` (bare, no `::`) is defined anywhere in the scanned tree as an object-like macro
+        (`#define NAME ...`, no parameter list): the gap an ALL_CAPS named-constant check cannot see on its
+        own, because this codebase does not reserve ALL_CAPS for enumerators and named constants (it also
+        spells some per-engine globals that way directly, which `_writable_global_names` already catches)
+        and, separately, some per-engine reads are reached only through an object-like macro over the
+        current engine context (`IS_FRAME_OK_TO_LOG`, and, once moved behind `RTS_ENGINE_CONTEXT`,
+        `REPLAY_CRC_INTERVAL`'s own kind), which never appears in the symbol table at all. Built once, from
+        every `#define` in the scanned tree, so an unrelated same-named macro in a file that never reaches
+        the initialiser being checked is (harmlessly) treated the same as one that does: a textual rule has
+        no `#include` graph to resolve which macro table a given initialiser actually sees."""
+        return name in self._object_like_macros
 
     def class_bodies(self, rel, cls):
         """(start, end) offsets of the body of every definition of class `cls` in `rel`, braces matched (outside
@@ -950,9 +978,12 @@ _NUMBER_RE = r"[+-]?(?:0[xX][0-9a-fA-F]+|\d+\.?\d*(?:[eE][+-]?\d+)?)[uUlLfF]*"
 LITERAL_RE = re.compile(rf"^(?:{_NUMBER_RE}|\"(?:[^\"\\]|\\.)*\"|'(?:[^'\\]|\\.)*')$")
 # An ALL_CAPS identifier or enumerator, optionally `::`-qualified (`NAMEKEY_INVALID`, `Foo::BAR`, the scope
 # itself in whatever case the class/namespace uses): a named constant, never a per-engine read, UNLESS it
-# is itself a writable symbol: this codebase also spells some mutable globals ALL_CAPS (REPLAY_CRC_INTERVAL,
-# NET_CRC_INTERVAL, MIN_RUNAHEAD, ...), so the caller also checks the name against `_writable_global_names`.
-# The caller still checks that the final (unqualified) segment is upper case.
+# is itself a writable symbol (this codebase also spells some mutable globals ALL_CAPS: REPLAY_CRC_INTERVAL,
+# NET_CRC_INTERVAL, MIN_RUNAHEAD, ...) or an object-like macro that expands to one (IS_FRAME_OK_TO_LOG, and,
+# once moved behind RTS_ENGINE_CONTEXT, REPLAY_CRC_INTERVAL's own kind, which then leaves the symbol table
+# entirely): the caller checks an unqualified name against both `_writable_global_names` and, when a real
+# source-tree lookup is available, `SourceIndex.is_object_like_macro_name`, and also checks that the final
+# (unqualified) segment is upper case.
 ALL_CAPS_RE = re.compile(r"^[A-Za-z_]\w*(?:::[A-Za-z_]\w*)*$")
 # A C-style or functional cast (`(Int)expr`, `static_cast<Int>(expr)`) ahead of a value this rule still
 # checks underneath: the cast itself reads nothing, so only the expression it casts need be a pure value.
@@ -1036,27 +1067,29 @@ def _is_writable_name(name, writable_names):
 
 def _is_safe_value_expr(expr, type_name, writable_names, is_function_name=None):
     """True when `expr` (a whole by-value initialiser, or one brace-list element / call argument of one)
-    is provably a pure value: a literal, an ALL_CAPS named constant or enumerator that is not itself a
-    writable symbol, `true`/`false`/`nullptr`, a cast of another pure value, a call to an allow-listed pure
-    value constructor or to the declared type's own name (each of its arguments checked the same way,
-    except that the call's first argument is additionally accepted, when the callee is the declared type's
-    own name, as a lower-case-led function name (bare, `&`-taken or scoped) that `is_function_name` (when
-    given) confirms is actually defined as a function somewhere in the scanned tree, and that does not
-    itself name a writable symbol: a function-pointer field in the type's own constructor, such as
-    StateConditionInfo's `test` callback, never a functional-style cast of a per-engine variable (this
-    codebase passes every one of these callbacks by bare, unqualified or `Class::`-qualified name, never
-    by `&`, so FUNC_PTR_ARG_RE's shape alone cannot tell a callback from a same-shaped variable read: only
-    `is_function_name`, a real lookup against the source tree, can), and never a later argument, such as
-    StateConditionInfo's own `void* userData`, which this codebase never fills from a function name but
-    could fill from an arbitrary per-engine value), or a `{...}` list of pure values. `writable_names` is
-    `_writable_global_names`'s result: every name this initialiser must not be allowed to read, qualified
-    or bare. `is_function_name` is `None` only for a direct unit test of this checker in isolation (no
-    source tree to check against: the function-pointer-argument exemption then stays as permissive as the
-    bare FUNC_PTR_ARG_RE/lower-case shape allows, which only narrows what such a test must supply, never
-    what production code accepts); `classify` always supplies a real one, backed by `SourceIndex.
-    is_function_name`, so the exemption is fail-closed there: a name that is not provably a function (a
-    member, a parameter, or a per-engine variable the symbol table happens to miss) is rejected, not
-    assumed to be a callback."""
+    is provably a pure value: a literal, an ALL_CAPS named constant or enumerator that is neither itself a
+    writable symbol nor an object-like macro (see below), `true`/`false`/`nullptr`, a cast of another pure
+    value, a call to an allow-listed pure value constructor or to the declared type's own name (each of its
+    arguments checked the same way, except that the call's first argument is additionally accepted, when
+    the callee is the declared type's own name, as a lower-case-led function name (bare, `&`-taken or
+    scoped) that `is_function_name` (when given) confirms is actually defined as a function somewhere in
+    the scanned tree, and that does not itself name a writable symbol: a function-pointer field in the
+    type's own constructor, such as StateConditionInfo's `test` callback, never a functional-style cast of
+    a per-engine variable (this codebase passes every one of these callbacks by bare, unqualified or
+    `Class::`-qualified name, never by `&`, so FUNC_PTR_ARG_RE's shape alone cannot tell a callback from a
+    same-shaped variable read: only `is_function_name`, a real lookup against the source tree, can), and
+    never a later argument, such as StateConditionInfo's own `void* userData`, which this codebase never
+    fills from a function name but could fill from an arbitrary per-engine value), or a `{...}` list of
+    pure values. `writable_names` is `_writable_global_names`'s result: every name this initialiser must
+    not be allowed to read, qualified or bare. `is_function_name` is `None` only for a direct unit test of
+    this checker in isolation (no source tree to check against: the function-pointer-argument exemption
+    then stays as permissive as the bare FUNC_PTR_ARG_RE/lower-case shape allows, and the ALL_CAPS branch
+    cannot see an object-like macro either, which only narrows what such a test must supply, never what
+    production code accepts); `classify` always supplies `FunctionLookup(index)`, a callable wrapping
+    `SourceIndex` that is also used for the macro check, so both exemptions are fail-closed there: a name
+    that is not provably a function (a member, a parameter, or a per-engine variable the symbol table
+    happens to miss) is rejected, not assumed to be a callback, and an ALL_CAPS name that is defined as an
+    object-like macro is rejected too, not assumed to be a named constant, however its expansion reads."""
     expr = expr.strip()
     if not expr:
         return True
@@ -1065,7 +1098,12 @@ def _is_safe_value_expr(expr, type_name, writable_names, is_function_name=None):
     if LITERAL_RE.match(expr) or expr in ("true", "false", "nullptr", "NULL"):
         return True
     if ALL_CAPS_RE.match(expr) and expr.rsplit("::", 1)[-1].isupper():
-        return not _is_writable_name(expr, writable_names)
+        if _is_writable_name(expr, writable_names):
+            return False
+        is_macro_name = getattr(is_function_name, "is_macro_name", None)
+        if is_macro_name is not None and "::" not in expr and is_macro_name(expr):
+            return False
+        return True
     m = _STATIC_CAST_RE.match(expr)
     if m:
         return _is_safe_value_expr(m.group("rest"), type_name, writable_names, is_function_name)
@@ -1134,8 +1172,12 @@ def _writable_global_names(symbols):
     rule's by-value allow-list checks every name it would otherwise accept against this set. Matching an
     unqualified name is still by bare key only, with no scope resolution: a textual rule has no way to
     tell, from the initialiser text alone, which of several same-named symbols in different scopes it
-    means, so an unrelated same-named local is (harmlessly) excluded too, as is a same-named object-like
-    macro (this rule has no macro table to consult). `symbols` may be `None` or empty (a direct unit test
+    means, so an unrelated same-named local is (harmlessly) excluded too. This set holds only linker
+    symbols, never macros: an ALL_CAPS name that is instead an object-like macro expanding to a per-engine
+    read (this codebase is not consistent about reserving ALL_CAPS for named constants either way) never
+    appears here, because a macro is never a linker symbol; `_is_safe_value_expr` checks such a name
+    against `SourceIndex.is_object_like_macro_name` separately, not against this set. `symbols` may be
+    `None` or empty (a direct unit test
     of the expression checker, which classifies no library): that never counts as a writable name, so it
     only narrows what a test must supply to exercise this check, never what production code (which always
     classifies from a real symbol table) accepts."""
@@ -1160,46 +1202,33 @@ def _by_value_init_is_safe(init, type_name, writable_names, is_function_name=Non
     return _is_safe_value_expr(init, type_name, writable_names, is_function_name)
 
 
-# The address of a named value (`&kDefault`), optionally scoped: the only way this codebase's safe pointer
-# initialisers take an address, as opposed to copying another pointer.
-POINTER_ADDR_RE = re.compile(r"^&([A-Za-z_]\w*(?:::[A-Za-z_]\w*)*)$")
-# An engine-singleton macro's own name (`TheGlobalData`, `TheThingFactory`, ...): every one of
-# EngineSingletonMacros.h's macros expands to a read through the current RTS_ENGINE_CONTEXT, so its
-# address is always a per-engine slot's address, never a fixed one, whatever symbol table is at hand to
-# check it against (these are preprocessor macros, never themselves linker symbols).
-ENGINE_SINGLETON_RE = re.compile(r"^The[A-Z]\w*$")
-
-
-def _pointer_init_is_safe(init, writable_names):
+def _pointer_init_is_safe(init):
     """True when a `T* const` pointer's by-value initialiser is provably never a per-engine read: an
     allow-list, not a deny-list of only `->` and a call (which a bare copy of a per-engine global pointer,
     `static ThingFactory* const s_factory = TheThingFactory;`, matches neither of, and so would pass).
     Only nullptr/NULL, a literal (a null pointer's own `0`, or a string literal for a `const char* const`),
-    the address of a named value that is not itself a writable symbol or an engine-singleton macro
-    (`&TheGlobalData` is the same first-engine-wins pointer cache as a bare copy, just spelled with `&`),
     and a cast of one of these are safe; a bare identifier (a copy of another pointer, per-engine or not),
-    a subscript and any call are rejected, the same per-engine pointer-cache defect as a reassignable
-    pointer's own `TheX->find(...)` shape."""
+    the address of a named value (`&name`), a subscript and any call are all rejected, the same per-engine
+    pointer-cache defect as a reassignable pointer's own `TheX->find(...)` shape. `&name` is rejected
+    outright rather than allow-listed by what `name` is: a member, a local, or a per-engine global reached
+    through an object-like macro the symbol table has no entry for (this codebase's context-scoped
+    statics, such as `s_infoArray`/`s_currentID`/`REPLAY_CRC_INTERVAL` once they move behind
+    `RTS_ENGINE_CONTEXT`) is every bit as unsafe to take the address of as a writable symbol or an
+    engine-singleton macro (`The*`) by name, and a textual rule has no way to prove a name is none of
+    these from the initialiser text alone. No current rule:const row is a pointer, so this never narrows
+    what the checked-in list accepts."""
     init = init.strip()
     if init[:1] == "(" and init[-1:] == ")" and _fully_parenthesized(init):
-        return _pointer_init_is_safe(init[1:-1], writable_names)
+        return _pointer_init_is_safe(init[1:-1])
     m = _CAST_RE.match(init)
     if m and m.group("rest")[:1] != "(":
-        return _pointer_init_is_safe(m.group("rest"), writable_names)
+        return _pointer_init_is_safe(m.group("rest"))
     m = _STATIC_CAST_RE.match(init)
     if m:
-        return _pointer_init_is_safe(m.group("rest"), writable_names)
+        return _pointer_init_is_safe(m.group("rest"))
     if init in ("nullptr", "NULL"):
         return True
-    if LITERAL_RE.match(init):
-        return True
-    m = POINTER_ADDR_RE.match(init)
-    if not m:
-        return False
-    name = m.group(1)
-    if _is_writable_name(name, writable_names) or ENGINE_SINGLETON_RE.match(name.rsplit("::", 1)[-1]):
-        return False
-    return True
+    return bool(LITERAL_RE.match(init))
 
 
 def _is_balanced(text):
@@ -1282,26 +1311,29 @@ def rule_const_object(sym, symbols=None, is_function_name=None):
     """A const object (dynamically initialised, so it lands in .data/.bss): never written after its
     initialisation. A reference is never safe here (it can alias per-engine state at any type). A pointer is
     safe only when the pointer itself cannot be reseated (`T* const name`, not `const T*`, whatever the
-    pointee type) and its initialiser is provably built from nothing but nullptr/NULL, a literal, the
-    address of a named value that is not itself a writable symbol or an engine-singleton macro, and casts
-    of these (`_pointer_init_is_safe`'s allow-list): a per-engine pointer cache can fill the slot from a
-    one-time lookup (`T* const name = TheX->find(...)`), a bare copy of another per-engine global pointer
-    (`T* const name = TheGlobalData`), or the address of one (`T* const name = &TheGlobalData`), and all
-    three are rejected. A by-value const must have its whole initialiser provably built from pure
-    values and nothing else (`_by_value_init_is_safe`'s allow-list: literals, named constants, casts and
-    allow-listed/own-type constructor calls, none of them a read of a symbol `_writable_global_names`
-    reports as writable): any way of reading or changing per-engine state is rejected, whether a `->` read
+    pointee type) and its initialiser is provably built from nothing but nullptr/NULL, a literal, and casts
+    of these (`_pointer_init_is_safe`'s allow-list, which does not include `&name` at all: see that
+    function's own docstring): a per-engine pointer cache can fill the slot from a one-time lookup (`T*
+    const name = TheX->find(...)`), a bare copy of another per-engine global pointer (`T* const name =
+    TheGlobalData`), or the address of one or of a member/local (`T* const name = &TheGlobalData`, `&
+    m_count`), and all are rejected. A by-value const must have its whole initialiser provably built from
+    pure values and nothing else (`_by_value_init_is_safe`'s allow-list: literals, named constants, casts
+    and allow-listed/own-type constructor calls, none of them a read of a symbol `_writable_global_names`
+    reports as writable or, for an ALL_CAPS name, that a real source-tree lookup reports as an object-like
+    macro): every shape this allow-list's checks were written against is rejected, among them a `->` read
     (`static const Real r = TheGlobalData->m_maxCameraHeight;`), a dereference or subscript
     (`*TheGlobalData`, `theGameLogicSeed[0]`), a member access on either (`(*TheGlobalData).m`,
     `TheGlobalData[0].m`), a call that is not on the allow-list (`static const Int pick =
     GameLogicRandomValue(0, 3);` advances the per-engine logic RNG despite its literal arguments), an
     ALL_CAPS or function-pointer-argument read of a writable global (`REPLAY_CRC_INTERVAL`, a functional
-    cast such as `UnsignedInt(startTime)`), or `++`/`--`/an assignment. Every one of these captures
-    whichever engine ran first, or diverges per engine, the same first-engine-wins defect as the pointer
-    case. This holds whichever syntax initialises it (copy, direct `name(expr)` or brace `name{expr}`); a
-    declaration whose recorded line ends before its initialiser does (a continuation onto the next source
-    line, or a statement longer than the caller's scan window, so the text we have simply stops without
-    reaching the statement's own `;`) is never assumed safe."""
+    cast such as `UnsignedInt(startTime)`), or `++`/`--`/an assignment; this is still a textual rule over
+    an allow-list, not a proof over the whole language, so a shape no current declaration uses and no test
+    probes for is not guaranteed caught. Every one of the shapes above captures whichever engine ran
+    first, or diverges per engine, the same first-engine-wins defect as the pointer case. This holds
+    whichever syntax initialises it (copy, direct `name(expr)` or brace `name{expr}`); a declaration whose
+    recorded line ends before its initialiser does (a continuation onto the next source line, or a
+    statement longer than the caller's scan window, so the text we have simply stops without reaching the
+    statement's own `;`) is never assumed safe."""
     writable_names = _writable_global_names(symbols)
     for d in declarations(sym):
         if not d.rstrip().endswith(";"):
@@ -1315,7 +1347,7 @@ def rule_const_object(sym, symbols=None, is_function_name=None):
         if GLOBAL_LOOKUP_RE.search(init):
             return None
         if "*" in decl:
-            if not CONST_PTR_DECL_RE.search(decl) or not _pointer_init_is_safe(init, writable_names):
+            if not CONST_PTR_DECL_RE.search(decl) or not _pointer_init_is_safe(init):
                 return None
         else:
             if not CONST_DECL_RE.match(decl):
@@ -1389,6 +1421,22 @@ TSV_HEADER = (
 )
 
 
+class FunctionLookup:
+    """Callable function-name lookup (`is_function_name(name)`, delegating to `SourceIndex.
+    is_function_name`) that also exposes `is_macro_name`, so `classify`'s single extra rule parameter
+    carries both real source-tree lookups `rule_const_object`/`_is_safe_value_expr` need without changing
+    every rule function's signature to take a second one."""
+
+    def __init__(self, index):
+        self._index = index
+
+    def __call__(self, name):
+        return self._index.is_function_name(name)
+
+    def is_macro_name(self, name):
+        return self._index.is_object_like_macro_name(name)
+
+
 def load_library(root, lib, vcpkg_lib):
     if not os.path.isfile(lib):
         sys.exit(f"{lib}: no such file")
@@ -1401,8 +1449,9 @@ def load_library(root, lib, vcpkg_lib):
             file=sys.stderr,
         )
     index = resolve_sources(root, symbols, read_third_party(vcpkg_lib))
+    lookup = FunctionLookup(index)
     for sym in symbols.values():
-        classify(sym, symbols, index.is_function_name)
+        classify(sym, symbols, lookup)
     return symbols
 
 
