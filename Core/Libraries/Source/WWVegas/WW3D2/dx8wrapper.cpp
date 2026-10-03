@@ -180,9 +180,9 @@ bool W3D_Protect_Render_Defaults(bool readOnly)
 		static std::once_flag s_exitHandlerOnce;
 		std::call_once(s_exitHandlerOnce, [] { std::atexit(Unprotect_Render_Defaults_At_Exit); });
 	}
-	// GeneralsX @bugfix cemlyn007 30/09/2026 A failed call changes neither: protecting puts back only the pages
-	// this call made read-only, and making them writable again goes on past a failure, since leaving a page
-	// read-only is what the exit handler is there to undo (PLAN-023 Phase 8, stage RR2b).
+	// GeneralsX @bugfix cemlyn007 30/09/2026 A failed protect changes neither: it puts back only the pages this
+	// call made read-only. Making them writable goes on past a failure (leaving a page read-only is what the exit
+	// handler is there to undo), so a failed unprotect may leave one page writable (PLAN-023 Phase 8, stage RR2b).
 	void* const objects[2] = {&W3DRenderState::Defaults, &WW3DState::Defaults};
 	const std::size_t sizes[2] = {sizeof(W3DRenderState), sizeof(WW3DState)};
 	static bool s_readOnly[2] = {false, false};
