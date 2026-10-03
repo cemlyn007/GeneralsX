@@ -203,7 +203,8 @@ class AudioManager : public SubsystemInterface
 		// isCurrentlyPlaying, DO NOT USE THIS FOR GAMELOGIC PURPOSES.
 		virtual Bool canPlaySounds() const { return TRUE; }
 
-		// How many audio handles allocateNewHandle() has handed out since the last reset.
+		// GeneralsX @feature cemlyn007 03/10/2026 Test hook: the number of audio handles allocated, so rlgenerals' fault_test can pin Drawable::updateDrawable's headless ambient-restart skip (PLAN-023 Phase 5b, perf2).
+		// How many audio handles allocateNewHandle() has handed out since this manager was constructed (reset() does not reset the pool).
 		AudioHandle getHandlesAllocated() const;
 
 		// Device Dependent open and close functions

@@ -1089,6 +1089,7 @@ AudioHandle AudioManager::allocateNewHandle()
 }
 
 //-------------------------------------------------------------------------------------------------
+// GeneralsX @feature cemlyn007 03/10/2026 Test hook for rlgenerals' fault_test (see GameAudio.h).
 AudioHandle AudioManager::getHandlesAllocated() const
 {
 	return theAudioHandlePool - AHSV_FirstHandle;
