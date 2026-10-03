@@ -157,6 +157,14 @@ struct RTS_ENGINE_CONTEXT_API EngineContext
 	::PathfindCellInfo* pathfindCellInfoArray = nullptr;
 	::PathfindCellInfo* pathfindCellInfoFirstFree = nullptr;
 
+	// AIPathfind.cpp's RETAIL_COMPATIBLE_PATHFINDING s_useFixedPathfinding/s_forceCleanCells: set when
+	// this engine's own cell-info pool (above) runs out, so a RETAIL_COMPATIBLE_PATHFINDING build's
+	// pool-exhaustion fallback stays this engine's own and never force-cleans another engine's healthy
+	// pool. Unused outside that build option, but kept unconditional (two bools) rather than guarded on
+	// it, since this header is not where RETAIL_COMPATIBLE_PATHFINDING is defined.
+	bool pathfindUseFixedPathfinding = false;
+	bool pathfindForceCleanCells = false;
+
 	// PolygonTrigger::ThePolygonTriggerListPtr/s_currentID: the map's trigger areas, walked on every
 	// object's cell change, and the next trigger ID.
 	::PolygonTrigger* polygonTriggerList = nullptr;
