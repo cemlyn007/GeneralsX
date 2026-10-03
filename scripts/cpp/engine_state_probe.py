@@ -9,11 +9,12 @@
 #
 # A written symbol is judged by name, never by its class alone:
 #
-#   worklist     classified render-per-engine or render-scratch: state known to change as an
-#                engine draws, which PLAN-023 Phase 8 moves into the engine (the row's phase says when);
+#   worklist     classified render-per-engine or render-scratch, or render-const with a phase (still
+#                rewritten at every render boot until that stage builds it once): state known to change
+#                as an engine draws, which PLAN-023 Phase 8 moves into the engine (the row's phase says when);
 #   allowed      named in the explicit allowlist (ALLOWLIST below, or the caller's), each with its reason: a
 #                process-wide counter, pool or cache that is written on purpose and safe to share;
-#   unexpected   anything else: a symbol the list calls constant, render-const, render-process, debug-only,
+#   unexpected   anything else: a symbol the list calls constant, render-const without a phase, render-process, debug-only,
 #                process-global or render-only (UI) that the engine wrote all the same. Either the list is
 #                wrong (classify it again) or the write is a bug.
 #
@@ -58,7 +59,6 @@ ALLOWLIST = {
     # priming boot, so the render engine's is the process's first device).
     "D3D8Lib": "the D3D8 library, loaded per process under a mutex and never freed",
     "Direct3DCreate8Ptr": "the D3D8 library's Direct3DCreate8, looked up once per process with it",
-    "DX8Wrapper::Init(void*, bool)::s_d3d8LibMutex": "the mutex that guards the load of the D3D8 library",
     "DX8Wrapper_FinalReleaseHook": "the host's final-release check, set by its first render boot",
     "RTS3DScene::updateFixedLightEnvironments(RenderInfoClass&)::id": "a constant vector, built at first use under the static-init guard",
     "W3DVolumetricShadow::Update()::originCompareVector": "a constant vector, built at first use under the static-init guard",
