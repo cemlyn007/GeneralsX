@@ -193,7 +193,8 @@ protected:
 	// function-local statics: every render engine's draw updates its own (PLAN-023 Phase 8, stage RR2a-2).
 	Int64 m_fpsLastUpdateTime64 = 0;
 	Int m_fpsHistoryOffset = 0;
-	Real m_fpsHistory[30] = {};
+	static constexpr Int FPS_HISTORY_SIZE = 30;
+	Real m_fpsHistory[FPS_HISTORY_SIZE] = {};
 	UnsignedInt m_statsFramesRenderedSinceLastUpdate = 0;
 	Int64 m_statsLastUpdateTime64 = 0;
 	double m_statsTimeSinceLastUpdateInSecs = 0.0;

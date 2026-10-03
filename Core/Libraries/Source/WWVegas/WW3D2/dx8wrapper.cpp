@@ -200,6 +200,15 @@ void DX8Wrapper::Destroy_Render_State()
 	delete context->ww3dState;
 	context->ww3dState = nullptr;
 }
+
+// GeneralsX @bugfix cemlyn007 02/10/2026 Frees this engine's W3DRenderState for Init's failure returns, which
+// never reach a device (WW3D::Shutdown's Destroy_Render_State frees it otherwise).
+void DX8Wrapper::Free_Render_State()
+{
+	::rts::EngineContext* const context = ::rts::ctx();
+	delete context->w3dRender;
+	context->w3dRender = nullptr;
+}
 #else
 static D3DPRESENT_PARAMETERS _PresentParameters;
 #endif
@@ -714,8 +723,8 @@ void MoveRectIntoOtherRect(const RECT& inner, const RECT& outer, int* x, int* y)
 bool DX8Wrapper::Init(void * hwnd, bool lite)
 {
 #if RTS_ENGINE_CONTEXT
-	// GeneralsX @feature cemlyn007 30/09/2026 This engine's render state, freed by Shutdown (PLAN-023 Phase 8, stage
-	// RR2a-1).
+	// GeneralsX @feature cemlyn007 30/09/2026 This engine's render state, freed by Destroy_Render_State at the end of
+	// WW3D::Shutdown (PLAN-023 Phase 8, stages RR2a-1, RR2a-2).
 	Create_Render_State();
 #endif
 	WWASSERT(!IsInitted);
@@ -802,6 +811,11 @@ bool DX8Wrapper::Init(void * hwnd, bool lite)
 
 		});
 		if (D3D8Lib == nullptr || Direct3DCreate8Ptr == nullptr) {
+#if RTS_ENGINE_CONTEXT
+			// GeneralsX @bugfix cemlyn007 02/10/2026 Create_Render_State() above already allocated this
+			// engine's state; nothing else frees it on this failure return.
+			Free_Render_State();
+#endif
 			return false;	// Return false at this point if init failed
 		}
 
@@ -821,6 +835,11 @@ bool DX8Wrapper::Init(void * hwnd, bool lite)
 		fprintf(stderr, "DEBUG: DX8Wrapper::Init() - Direct3DCreate8 returned: %p\n", (void*)D3DInterface);
 		if (D3DInterface == nullptr) {
 			fprintf(stderr, "ERROR: DX8Wrapper::Init() - Direct3DCreate8 returned NULL (DXVK failed to create D3D8 interface)\n");
+#if RTS_ENGINE_CONTEXT
+			// GeneralsX @bugfix cemlyn007 02/10/2026 Same as the D3D8Lib failure above: free what
+			// Create_Render_State() allocated before this engine gives up on a device.
+			Free_Render_State();
+#endif
 			return(false);
 		}
 		IsInitted = true;
