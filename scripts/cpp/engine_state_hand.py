@@ -295,8 +295,9 @@ HAND = [
     (RPROC, "", "re:AnimatedSoundMgrClass::\\w+", "W3D animated sounds (WWAudio), never initialised by the game (not used by its audio)"),
     (RPER, "RR2b", "Vector3Randomizer::Randomizer", "the RNG of the W3D particle emitters' randomizers: per engine with an identical seed (the render engines have no particles today: ParticleSystemManagerDummy while m_headless)"),
     # The terrain, tree, bib, bridge, road, status-circle, water and player-colour shaders (detailOpaqueShader,
-    # detailAlphaShader, zFillAlphaShader, PlayerColorShader; one per TU, only read) left the writable data at
-    # RR2a-2: ShaderClass's constructor from bits is constexpr, so they are constant-initialised read-only data.
+    # detailAlphaShader, zFillAlphaShader, PlayerColorShader; one per TU) left the writable data at RR2a-2: they
+    # are `static const`, and ShaderClass's constructor from bits is constexpr, so they are constant-initialised
+    # read-only data.
     (RPER, "RR3", "re:FlatHeightMapRenderObjClass::updateCenter\\(.*\\)::prev\\w+|visM(in|ax)[XY]|HeightMapRenderObjClass::renderExtraBlendTiles\\(\\)::maxBlendTiles", "terrain draw state kept between frames: members of the height map"),
     (RPER, "RR3", "re:W3DFilters|W3DShaders|W3DShadersPassCount|W3DShaderManager::\\w+|screen(Default|BW|BWFilterDOT3|CrossFade|MotionBlur)Filter\\w*|Screen(BW|CrossFade|MotionBlur)Filter::\\w+|(shroud|flatShroud|mask|cloud)TextureShader|(terrain|flatTerrain|road)Shader(2Stage|8Stage|PixelShader)", "W3DShaderManager: its shader and filter tables, the chosen chipset, the render-to-texture surfaces, and the shader and filter objects (some holding D3D pixel shaders and textures; the screen filters' fade and motion-blur state is script-driven): one per-engine struct made by init and freed by shutdown"),
     (RCONST, "RR3", "re:\\w+(Shader|Filter)List", "tables of pointers to the shader and filter objects above, never written: they move with them"),
