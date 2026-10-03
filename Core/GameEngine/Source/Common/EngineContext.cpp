@@ -208,7 +208,7 @@ namespace
 // and MXCSR, as setFPMode() leaves them. The same for every thread, so the first Scope learns them (after its
 // setFPMode()) and later ones load them directly: fnstcw/stmxcsr to save, fldcw/ldmxcsr to set and restore, in
 // place of fegetenv, setFPMode()'s fesetenv(FE_DFL_ENV) and friends, and fesetenv. A thread already in the mode
-// skips even that. Neither exception flags (masked, so they change no result) nor the empty x87 stack (empty at
+// loads nothing at entry (its exit reloads only if the Scope changed it). Neither exception flags (masked, so they change no result) nor the empty x87 stack (empty at
 // every call) are part of the mode.
 constexpr unsigned int kMxcsrExceptionFlags = 0x3F;
 // (x87 control word << 32) | MXCSR less its exception flags, with bit 63 set once learnt.

@@ -560,7 +560,7 @@ Goal: N engines in one process, each stepped on its own thread at the same time,
 **Threading contract (the host enforces it; the engine relies on it).**
 - **One thread inside an engine at a time.** The host claims an engine for a thread in its outermost scope on that engine, and refuses a second thread while it is claimed.
 - **An engine may move between threads between calls.** The host closes engines from its main thread (`atexit`, garbage collection). The engine's per-thread state allows this: `checkfortransitionsnum` and `inCRCGen` return to their initial values after every call tree, and the `thread_local` scratch values are consumed within one call.
-- **The process locale is set before the first boot and not changed while any engine steps.** Every thread that steps engines has the same `LC_CTYPE`: a thread's engine locale is made from its own locale at its first entry.
+- **The process locale is set before the first boot and not changed while any engine steps.** Every thread that steps engines has the same `LC_CTYPE`: a thread on the global locale keeps the one it had at its first entry, and one on a locale of its own gets an engine locale made from it at every outermost entry.
 - **Boots and shutdowns are serialised by the host** (one process mutex). A boot or shutdown still touches process-wide state:
   - the `.wnd` parser's libc `strtok` (`GameWindowManagerScript.cpp`);
   - the host's `chdir`;

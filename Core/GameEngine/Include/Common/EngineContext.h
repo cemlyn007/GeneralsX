@@ -246,7 +246,8 @@ RTS_ENGINE_CONTEXT_API bool noEngineIsPristine();
 // changed them; elsewhere the whole fenv_t (with the x87 control word on i386). Only LC_NUMERIC is switched (to "C"), so that the engine sees
 // the thread's other categories (LC_CTYPE for towlower, iswspace, mbstowcs) as it does without the engine context.
 // GeneralsX @bugfix cemlyn007 29/09/2026 The locale is switched on every entry, to one cached per thread (the
-// thread's own locale, as at its first entry, with LC_NUMERIC "C"), never left as the process's global locale:
+// thread's own locale with LC_NUMERIC "C": made at the first entry for a thread on the global locale, at every
+// outermost entry for one on a locale of its own), never left as the process's global locale:
 // see enterEngineThreadInvariants. The host must still not call setlocale() while any engine steps (glibc's
 // locale functions are not safe against it), and must set the process locale before the first entry: a thread on
 // the global locale keeps the LC_CTYPE it had at its first entry, so every thread that steps engines needs the
@@ -260,7 +261,9 @@ struct ThreadInvariants
 	void* engineLocale;
 	unsigned int mxcsr;
 	unsigned short x87ControlWord;
-	// Whether the fields above hold the thread's floating-point state to restore.
+	// Whether the thread entered outside the engine's mode, so the fields above hold its own state to reload on
+	// exit. When false they hold the engine's mode as at entry, reloaded on exit only if something inside the
+	// Scope changed it.
 	bool floatingPointSaved;
 };
 
