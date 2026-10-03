@@ -626,10 +626,12 @@ private:
 
 	static const FieldParse s_GlobalDataFieldParseTable[];
 
-	// GeneralsX @feature cemlyn007 02/10/2026 No longer true upstream: the embedding host's
-	// setPath_UserData (above) replaces this once, on the original instance, before GameEngine::init
-	// reads it, so an engine embedded alongside others does not keep the registry/XDG default. Still only
-	// ever read through getPath_UserData()/setPath_UserData(): nothing else may write it directly.
+	// GeneralsX @feature cemlyn007 02/10/2026 No longer true upstream: an embedding host may replace
+	// it once, on the original instance, through setPath_UserData (above) before GameEngine::init
+	// reads it (rlgenerals does so for every engine that does not hold the process default; one that
+	// does keeps the registry/XDG default instead). Apart from GlobalData's own constructor and
+	// newOverride()'s copy of the current directory onto a new override, only setPath_UserData writes
+	// it.
 	// this is private, since we read the info from Windows and cache it for
 	// future use. No one is allowed to change it, ever. (srj)
 	AsciiString m_userDataDir;
