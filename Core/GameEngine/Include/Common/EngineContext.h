@@ -211,7 +211,7 @@ struct RTS_ENGINE_CONTEXT_API EngineContext
 	// (set by DX8Wrapper::Init, cleared by DX8Wrapper::Shutdown). DX8Wrapper's device state is still
 	// process-wide, so DX8Wrapper::Is_Initted, _Get_D3D_Device8 and Get_Current_Caps answer false/null
 	// for every other engine, as in a headless solo run: a headless engine beside the renderer must not
-	// reach its device or its caps (MissingTexture's lazy texture, the texture format choices; PLAN-023
+	// reach its device or its caps (MissingTexture's lazy texture, the caps readers; PLAN-023
 	// Phase 8, stage RR0a).
 	bool ownsRenderDevice = false;
 
