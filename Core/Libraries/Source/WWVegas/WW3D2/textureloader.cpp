@@ -223,6 +223,11 @@ static FastCriticalSectionClass					_BackgroundCriticalSection;
 // Lists
 
 #if RTS_ENGINE_CONTEXT
+#if !defined(_UNIX)
+// The queues below are reached through the current engine's slot table, which the loader thread would read while
+// the owning engine's thread can grow it; and that thread serves only the engine that started it.
+#error "RTS_ENGINE_CONTEXT needs a platform where ThreadClass::Execute starts no loader thread (see TextureLoaderState)."
+#endif
 // GeneralsX @feature cemlyn007 30/09/2026 Per engine (PLAN-023 Phase 8, stage RR2b): the load queues, the free lists
 // of load tasks, and the suspend switch and inactive-texture time, so that each engine loads, recycles and retires
 // only its own textures and one engine's TextureLoader::Deinit (Delete_Free_Pool) cannot free another's tasks. The
@@ -243,19 +248,31 @@ struct TextureLoaderState
 	bool TextureLoadSuspended = false;
 	int TextureInactiveOverrideTime = 0;
 
-	// A headless engine's texture constructors may make load tasks too, but only a render engine's
-	// TextureLoader::Deinit frees the free lists: free what is left with the engine.
+	// A headless engine's texture constructors may make load tasks too, which only a render engine's
+	// TextureLoader::Deinit would otherwise retire: free what is left with the engine. A task that has begun
+	// loading holds a device texture and surfaces that need the device to release, so it is only unlinked.
 	~TextureLoaderState()
 	{
 		Delete_Load_Tasks(_TexLoadFreeList);
 		Delete_Load_Tasks(_CubeTexLoadFreeList);
 		Delete_Load_Tasks(_VolTexLoadFreeList);
+		Delete_Queued_Tasks(_ForegroundQueue);
+		Delete_Queued_Tasks(_BackgroundQueue);
 	}
 
 	static void Delete_Load_Tasks(TextureLoadTaskListClass& list)
 	{
 		while (TextureLoadTaskClass* task = list.Pop_Front()) {
 			delete task;
+		}
+	}
+
+	static void Delete_Queued_Tasks(TextureLoadTaskListClass& list)
+	{
+		while (TextureLoadTaskClass* task = list.Pop_Front()) {
+			if (task->Get_State() == TextureLoadTaskClass::STATE_NONE) {
+				delete task;
+			}
 		}
 	}
 };
