@@ -473,7 +473,11 @@ class SourceIndex:
         checked, is actually an unrelated member, parameter or local of the same name (`value`, `scale`,
         `width`, ... each collide with some real function in this codebase). `_is_safe_value_expr` does not
         rely on this function alone to rule that out; it also restricts the call site this function's
-        answer can affect to the one type that ever actually has a function-pointer field."""
+        answer can affect to the one type (`StateConditionInfo`) that any `static const` initialiser in
+        this classified library ever constructs with a function-pointer field (other callback-taking
+        types, such as `StateMachine::TransitionInfo` or `DLINK_ITERATOR`, are never built that way, so
+        restricting the exemption to `StateConditionInfo` costs nothing here, though it does not mean
+        `StateConditionInfo` is the only type in the codebase whose constructor ever takes one)."""
         cached = self._is_function_cache.get(name)
         if cached is not None:
             return cached
@@ -1094,7 +1098,9 @@ def _is_safe_value_expr(expr, type_name, writable_names, is_function_name=None):
     writable symbol nor an object-like macro (see below), `true`/`false`/`nullptr`, a cast of another pure
     value, a call to an allow-listed pure value constructor or to the declared type's own name (each of its
     arguments checked the same way, except that, when the declared type is `StateConditionInfo` (the only
-    type in this codebase whose constructor ever takes a function-pointer field) and the callee is that
+    callback-taking type that any `static const` initialiser in this classified library constructs: other
+    callback-taking types, such as `StateMachine::TransitionInfo` or `DLINK_ITERATOR`, are deliberately
+    left out and fail closed until someone reviews them and adds them) and the callee is that
     same name, the call's first argument is additionally accepted as a lower-case-led function name (bare,
     `&`-taken or scoped) that `is_function_name` (when given) confirms is actually defined as a function
     somewhere in the scanned tree, and that does not itself name a writable symbol: a function-pointer
@@ -1104,7 +1110,8 @@ def _is_safe_value_expr(expr, type_name, writable_names, is_function_name=None):
     a same-shaped variable read: only `is_function_name`, a real lookup against the source tree, can; and
     that lookup is a tree-wide, scope-blind text search, so it alone cannot tell a real callback from an
     unrelated same-named function elsewhere in the tree either, which is why the exemption is also
-    restricted to the one type that is ever actually a function-pointer field), and never a later argument,
+    restricted to the one type that any such initialiser here ever builds with a function-pointer field),
+    and never a later argument,
     such as StateConditionInfo's own `void* userData`, which this codebase never fills from a function name
     but could fill from an arbitrary per-engine value), or a `{...}` list of pure values. `writable_names`
     is `_writable_global_names`'s result: every name this initialiser must not be allowed to read,
@@ -1128,9 +1135,18 @@ def _is_safe_value_expr(expr, type_name, writable_names, is_function_name=None):
     if ALL_CAPS_RE.match(expr) and expr.rsplit("::", 1)[-1].isupper():
         if _is_writable_name(expr, writable_names):
             return False
-        is_macro_name = getattr(is_function_name, "is_macro_name", None)
-        if is_macro_name is not None and "::" not in expr and is_macro_name(expr):
-            return False
+        if is_function_name is not None:
+            # A lookup object (anything other than the documented `None` test-only case below) must carry
+            # `is_macro_name`: `getattr(..., None)` here would silently skip the whole macro check for a
+            # plain callable (what `load_library` passed one commit before it started wrapping it in
+            # `FunctionLookup`), with no test or production run ever noticing. Fail loudly instead of
+            # silently narrowing what this branch checks.
+            assert hasattr(is_function_name, "is_macro_name"), (
+                "is_function_name must be None or expose is_macro_name (FunctionLookup does); a plain "
+                "callable would silently disable the object-like-macro check"
+            )
+            if "::" not in expr and is_function_name.is_macro_name(expr):
+                return False
         return True
     m = _STATIC_CAST_RE.match(expr)
     if m:
@@ -1165,13 +1181,14 @@ def _is_safe_value_expr(expr, type_name, writable_names, is_function_name=None):
         return all(
             _is_safe_value_expr(a, type_name, writable_names, is_function_name)
             or (
-                # Only the first argument may be a function-pointer field, and only StateConditionInfo
-                # actually has one (`test`): every other type that reaches this branch (`Real`, `AsciiString`,
-                # ...) takes no callback at all, so a same-shaped lower-case-led identifier there is always a
-                # value, never a function, whatever `is_function_name` (a tree-wide, scope-blind text search:
-                # see its own docstring) says about some unrelated same-named function elsewhere in the tree.
-                # Restricting this branch to the one type that is ever actually a function-pointer field
-                # closes that gap without needing `is_function_name` to prove scope, which it cannot.
+                # Only the first argument may be a function-pointer field, and of the types that reach this
+                # branch (built by calling the declared type's own name), only StateConditionInfo actually
+                # has one (`test`): every other such type (`Real`, `AsciiString`, ...) takes no callback at
+                # all, so a same-shaped lower-case-led identifier there is always a value, never a function,
+                # whatever `is_function_name` (a tree-wide, scope-blind text search: see its own docstring)
+                # says about some unrelated same-named function elsewhere in the tree. Restricting this
+                # branch to the one type that any such initialiser here ever builds with a function-pointer
+                # field closes that gap without needing `is_function_name` to prove scope, which it cannot.
                 # StateConditionInfo's own later positions (`toStateID`/`userData`) are plain values too, so
                 # letting any lower-case-led, non-writable identifier through there would also accept a
                 # per-engine value threaded through as a constructor argument, not a callback.
@@ -1201,9 +1218,11 @@ def _writable_global_names(symbols):
     unqualified from inside its own scope, so a reference naming only the final segment is at least as
     common as one naming the full key. This codebase is also not consistent about reserving ALL_CAPS for
     named constants (REPLAY_CRC_INTERVAL, NET_CRC_INTERVAL and MIN_RUNAHEAD are all writable globals) or
-    about camelCase always meaning a function (a function-pointer argument's own exemption, read literally,
-    also accepts a functional-style cast of a plain variable such as `UnsignedInt(startTime)`), so this
-    rule's by-value allow-list checks every name it would otherwise accept against this set. Matching an
+    about camelCase always meaning a function (the function-pointer argument exemption, gated to
+    `StateConditionInfo`'s own first constructor argument, would otherwise accept a plain per-engine
+    variable threaded through that one position just as readily as a real callback name, such as
+    `StateConditionInfo(startTime, ...)`), so this rule's by-value allow-list checks every name it would
+    otherwise accept against this set. Matching an
     unqualified name is still by bare key only, with no scope resolution: a textual rule has no way to
     tell, from the initialiser text alone, which of several same-named symbols in different scopes it
     means, so an unrelated same-named local is (harmlessly) excluded too. This set holds only linker

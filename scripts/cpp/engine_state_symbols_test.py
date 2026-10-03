@@ -425,7 +425,7 @@ class RuleConstObjectTest(unittest.TestCase):
         )
 
     def test_by_value_const_initialized_from_an_all_caps_name_is_still_safe_without_a_macro_lookup(self):
-        # No lookup at all (a direct unit test of this checker, never how `classify` calls it): the
+        # No lookup at all (a direct unit test of this checker, never how `load_library` calls it): the
         # ALL_CAPS branch has nothing to check the macro table against, so it stays as permissive as the
         # writable-symbol check alone allows.
         self.assert_const("static const Int s = SOME_MACRO_OR_CONSTANT;", True)
@@ -437,16 +437,35 @@ class RuleConstObjectTest(unittest.TestCase):
         )
 
     def test_by_value_const_initialized_from_a_functional_cast_of_a_writable_global_is_not_safe(self):
-        # `UnsignedInt(startTime)` matches the function-pointer-argument exemption's own regex (a bare,
-        # lower-case-led identifier as a direct argument of the declared type's own constructor), but it is
-        # a read of a per-engine variable, not a callback field: the exemption must not accept a name that
-        # is itself a writable symbol.
+        # `startTime` matches the function-pointer-argument exemption's own regex (a bare, lower-case-led
+        # identifier as the declared type's first constructor argument), but it is a read of a per-engine
+        # variable, not a callback field: the exemption must not accept a name that is itself a writable
+        # symbol. `is_function_name` answers True for every name here (`StateConditionInfo` is the only
+        # type the exemption can reach at all: see the gate test below), so only the writable-name clause
+        # itself can be the thing rejecting this.
         writable = {"startTime": make_symbol("startTime", [], sections={".bss"})}
-        self.assert_const("static const UnsignedInt s_t = UnsignedInt(startTime);", False, symbols=writable)
+        self.assert_const(
+            "static const StateConditionInfo s = StateConditionInfo(startTime, MY_STATE, nullptr);",
+            False,
+            symbols=writable,
+            is_function_name=lambda name: True,
+        )
+
+    def test_by_value_const_initialized_from_an_ampersand_taken_writable_global_is_not_safe(self):
+        # FUNC_PTR_ARG_RE accepts a `&`-taken identifier too (see test_by_value_const_initialized_from_an_
+        # ampersand_taken_function_pointer_is_safe): the writable-name clause must strip the `&` before
+        # matching, not treat an address-of form as exempt from it.
+        writable = {"startTime": make_symbol("startTime", [], sections={".bss"})}
+        self.assert_const(
+            "static const StateConditionInfo s = StateConditionInfo(&startTime, MY_STATE, nullptr);",
+            False,
+            symbols=writable,
+            is_function_name=lambda name: True,
+        )
 
     def test_by_value_const_initialized_from_a_functional_cast_of_an_unknown_name_is_still_safe(self):
         # With no `is_function_name` lookup supplied at all (a direct unit test of this checker, never how
-        # `classify` calls it), a lower-case-led first argument of a `StateConditionInfo` initialiser is
+        # `load_library` calls it), a lower-case-led first argument of a `StateConditionInfo` initialiser is
         # still accepted as a callback field: see the fail-closed cases below for what happens once a real
         # lookup is supplied and says the name is not a function.
         self.assert_const(
@@ -457,9 +476,11 @@ class RuleConstObjectTest(unittest.TestCase):
     def test_by_value_const_initialized_from_a_functional_cast_of_an_unknown_name_on_another_type_is_not_safe(
         self,
     ):
-        # The function-pointer-argument exemption is restricted to `StateConditionInfo`, the only type in
-        # this codebase whose constructor ever takes a callback: every other type's own-constructor call
-        # (`Coord3D`, `Real`, `AsciiString`, ...) never gets it, with or without a real `is_function_name`
+        # The function-pointer-argument exemption is restricted to `StateConditionInfo`, the only type
+        # that any `static const` initialiser in this classified library ever constructs with a callback
+        # (other callback-taking types, such as `StateMachine::TransitionInfo` or `DLINK_ITERATOR`, are
+        # deliberately left out and fail closed): every other type's own-constructor call (`Coord3D`,
+        # `Real`, `AsciiString`, ...) never gets it, with or without a real `is_function_name`
         # lookup, because `is_function_name` is a tree-wide, scope-blind text search (see its own
         # docstring) that cannot tell a real callback apart from an unrelated same-named function, member
         # or parameter elsewhere in the tree; restricting the exemption to the one type that can actually
@@ -468,10 +489,15 @@ class RuleConstObjectTest(unittest.TestCase):
 
     def test_by_value_const_initialized_from_a_scoped_writable_global_is_not_safe(self):
         # The writable key itself is `::`-scoped (a namespaced global, not a top-level one): the exact-key
-        # match must still catch a reference that spells the same scope.
+        # match must still catch a reference that spells the same scope, even as the exemption's own first
+        # (callback) argument. `is_function_name` answers True for every name here, so only the
+        # writable-name clause itself can be the thing rejecting this.
         writable = {"View::m_idNext": make_symbol("View::m_idNext", [], sections={".bss"})}
         self.assert_const(
-            "static const UnsignedInt s_firstId = UnsignedInt(View::m_idNext);", False, symbols=writable
+            "static const StateConditionInfo s = StateConditionInfo(View::m_idNext, MY_STATE, nullptr);",
+            False,
+            symbols=writable,
+            is_function_name=lambda name: True,
         )
 
     def test_by_value_const_initialized_from_an_unqualified_reference_to_a_scoped_writable_global_is_not_safe(
@@ -479,10 +505,14 @@ class RuleConstObjectTest(unittest.TestCase):
     ):
         # A class or anonymous-namespace static is routinely referenced unqualified from inside its own
         # scope: the initialiser text has no way to spell the writable key's own scope back, so the bare,
-        # unqualified name must be rejected too, not just the fully qualified form.
+        # unqualified name must be rejected too, not just the fully qualified form, even as the exemption's
+        # own first argument.
         writable = {"View::m_idNext": make_symbol("View::m_idNext", [], sections={".bss"})}
         self.assert_const(
-            "static const UnsignedInt s_firstId = UnsignedInt(m_idNext);", False, symbols=writable
+            "static const StateConditionInfo s = StateConditionInfo(m_idNext, MY_STATE, nullptr);",
+            False,
+            symbols=writable,
+            is_function_name=lambda name: True,
         )
 
     def test_writable_global_names_does_not_confuse_two_same_length_tables_in_a_row(self):
@@ -516,12 +546,17 @@ class RuleConstObjectTest(unittest.TestCase):
         self,
     ):
         # A function-local static's writable key is scoped as `func(args)::name`: source code can never
-        # spell that scope back, so only the bare, unqualified name can ever match it.
+        # spell that scope back, so only the bare, unqualified name can ever match it, even as the
+        # exemption's own first argument. `is_function_name` answers True for every name here, so only the
+        # writable-name clause itself can be the thing rejecting this.
         writable = {
             "Shell::update()::lastUpdate": make_symbol("Shell::update()::lastUpdate", [], sections={".bss"})
         }
         self.assert_const(
-            "static const UnsignedInt s_start = UnsignedInt(lastUpdate);", False, symbols=writable
+            "static const StateConditionInfo s = StateConditionInfo(lastUpdate, MY_STATE, nullptr);",
+            False,
+            symbols=writable,
+            is_function_name=lambda name: True,
         )
 
     def test_by_value_const_initialized_from_a_functional_cast_of_a_name_not_known_to_be_a_function_is_not_safe(
@@ -531,13 +566,17 @@ class RuleConstObjectTest(unittest.TestCase):
         # parameter, or a per-engine variable the symbol table happens to miss) must not be accepted as a
         # callback once a real `is_function_name` lookup says it is not a function: with no such lookup
         # supplied, the shape alone would otherwise wave it through as though it had to be a
-        # function-pointer field. With a real `is_function_name` supplied (as `classify` always does) and
-        # reporting "not a function", the exemption must be refused instead of assumed.
+        # function-pointer field. With a real `is_function_name` supplied (as `load_library` always does)
+        # and reporting "not a function", the exemption must be refused instead of assumed. StateConditionInfo
+        # is the only type the exemption can reach at all (see the gate test above), so both cases below
+        # declare one, not an unrelated type the gate would reject before the lookup clause ever ran.
         self.assert_const(
-            "static const Real s_scale = Real(s_baseScale);", False, is_function_name=lambda name: False
+            "static const StateConditionInfo s = StateConditionInfo(s_baseScale, MY_STATE, nullptr);",
+            False,
+            is_function_name=lambda name: False,
         )
         self.assert_const(
-            "static const AsciiString s_name = AsciiString(g_mapBuffer);",
+            "static const StateConditionInfo s = StateConditionInfo(g_mapBuffer, MY_STATE, nullptr);",
             False,
             is_function_name=lambda name: False,
         )
@@ -549,8 +588,8 @@ class RuleConstObjectTest(unittest.TestCase):
         # as a function ANYWHERE in the tree, including one that collides with this declaration's own
         # member/parameter/local of the same name (`value`, `scale`, `width`, ... each collide with a real
         # function somewhere in the real engine tree). Even a lookup that says "yes, this is a function"
-        # must not accept the exemption on a type other than StateConditionInfo, since no other type's
-        # constructor ever has a function-pointer field to fill.
+        # must not accept the exemption on a type other than StateConditionInfo, since no other type any
+        # `static const` initialiser here ever constructs has a function-pointer field to fill.
         self.assert_const(
             "static const Real s_v = Real(value);", False, is_function_name=lambda name: True
         )
@@ -558,13 +597,15 @@ class RuleConstObjectTest(unittest.TestCase):
     def test_by_value_const_initialized_from_its_own_constructor_with_a_real_function_argument_is_safe(
         self,
     ):
-        # The StateConditionInfo shape with a real `is_function_name` lookup available: a name it reports
-        # as an actual function (the only thing the lookup can confirm from the source tree) is still
-        # accepted as the callback field.
+        # The StateConditionInfo shape with a real lookup available (FakeLookup, not a bare callable: a
+        # real `FunctionLookup` always exposes `is_macro_name` too, and `MY_STATE` must still clear that
+        # check, not just the function-name one, for the whole declaration to come out safe): a name the
+        # lookup reports as an actual function (the only thing it can confirm from the source tree) is
+        # still accepted as the callback field.
         self.assert_const(
             "static const StateConditionInfo s_info = StateConditionInfo(isConditionTrue, MY_STATE, nullptr);",
             True,
-            is_function_name=lambda name: name == "isConditionTrue",
+            is_function_name=FakeLookup(functions={"isConditionTrue"}),
         )
 
     def test_by_value_const_initialized_from_a_scoped_name_not_known_to_be_a_function_is_not_safe(self):
@@ -1071,14 +1112,14 @@ class SourceIndexDefinitionTest(unittest.TestCase):
         self.assertEqual(control.by, "rule:const")
 
     def test_classify_with_a_real_function_lookup_rejects_an_all_caps_macro_reading_a_global(self):
-        # End to end through resolve_sources, FunctionLookup and classify, the way `load_library` actually
-        # calls them (not a FakeLookup handed directly to rule_const_object, and not classify() called with
-        # no lookup at all, as every other classify() test in this file does): an object-like macro that
-        # expands to a per-engine read must still make rule:const refuse it once a real `SourceIndex`-backed
-        # lookup is threaded all the way through. A plain callable in `load_library`'s place (`index.
-        # is_function_name` instead of `FunctionLookup(index)`) would pass this symbol as constant, because
-        # `_is_safe_value_expr` finds the macro check via `getattr(lookup, "is_macro_name", None)` and a
-        # plain callable has no such attribute.
+        # End to end through resolve_sources, FunctionLookup and classify (not a FakeLookup handed directly
+        # to rule_const_object, and not classify() called with no lookup at all, as every other classify()
+        # test in this file does): an object-like macro that expands to a per-engine read must still make
+        # rule:const refuse it once a real `SourceIndex`-backed lookup is threaded all the way through
+        # classify. This builds the `FunctionLookup(index)` itself, so it does not exercise `load_library`'s
+        # own wiring of that lookup (see test_load_library_wires_a_real_function_lookup_through_to_classify
+        # below for that): it only confirms classify's own forwarding is correct once a real lookup is
+        # supplied.
         self.write("crcdebug.cpp", "#define FOO TheX->y\n")
         self.write("flag.cpp", "static const Bool s = FOO;\n")
         sym = m.Symbol("s")
@@ -1089,6 +1130,33 @@ class SourceIndexDefinitionTest(unittest.TestCase):
         m.classify(sym, symbols, m.FunctionLookup(index))
         self.assertEqual(sym.cls, m.UNREVIEWED)
         self.assertEqual(sym.by, "none")
+
+    def test_load_library_wires_a_real_function_lookup_through_to_classify(self):
+        # Exercises `load_library`'s own wiring (`lookup = FunctionLookup(index); classify(sym, symbols,
+        # lookup)`), not a copy of it built by the test (the test above builds `FunctionLookup(index)`
+        # itself and calls classify directly, which cannot catch a regression in load_library itself).
+        # read_library and read_third_party are patched so this runs over a temporary source tree with no
+        # real .so/vcpkg_installed on disk; resolve_sources, FunctionLookup and classify all run for real.
+        # Reverting load_library to pass a plain callable (`index.is_function_name`) in place of
+        # `FunctionLookup(index)` makes this test fail: `_is_safe_value_expr`'s ALL_CAPS branch would then
+        # either skip the macro check silently (the original defect) or, since that branch now asserts
+        # `hasattr(is_function_name, "is_macro_name")` whenever a lookup is given, raise instead of
+        # returning a classification at all.
+        self.write("crcdebug.cpp", "#define FOO TheX->y\n")
+        self.write("flag.cpp", "static const Bool s = FOO;\n")
+        sym = m.Symbol("s")
+        sym.count = 1
+        sym.sections = {".bss"}
+        lib_path = os.path.join(self.root, "libgeneralsx.so")
+        with open(lib_path, "w", encoding="utf-8"):
+            pass
+        with (
+            mock.patch.object(m, "read_library", return_value={"s": sym}),
+            mock.patch.object(m, "read_third_party", return_value={}),
+        ):
+            result = m.load_library(self.root, lib_path, "unused-vcpkg-lib")
+        self.assertEqual(result["s"].cls, m.UNREVIEWED)
+        self.assertEqual(result["s"].by, "none")
 
     def test_rule_const_fails_closed_on_a_statement_longer_than_the_scan_window(self):
         # A statement longer than _statement_text's own scan window is cut off before reaching its `;`, so
