@@ -40,6 +40,7 @@ jobs:
               - 'Core/**'
               - 'Dependencies/**'
               - 'cmake/**'
+              - 'scripts/cpp/engine_context_guards.py'
               - 'CMakeLists.txt'
               - 'CMakePresets.json'
               - '.github/workflows/build-*.yml'
