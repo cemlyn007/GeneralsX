@@ -647,10 +647,10 @@ PER_ENGINE_STATIC_DECL_RE = re.compile(r"\brts::PerEngineStatic\s*<")
 
 def rule_per_engine_static(sym):
     """A PER_ENGINE_STATIC (rts::PerEngineStatic<T>, EngineContext.h): the static holds only a slot index,
-    allocated once at static initialisation; the object it stands for lives in each engine's context. It
+    allocated at static initialisation (file or class scope) or at the first call (function-local); the object it stands for lives in each engine's context. It
     is checked before the hand list, since what it is does not depend on the file it is in."""
     if all(PER_ENGINE_STATIC_DECL_RE.search(d.split("=")[0]) for d in declarations(sym)):
-        return GLOBAL, "", "PER_ENGINE_STATIC slot index, written once at static initialisation; the object lives in each engine's EngineContext"
+        return GLOBAL, "", "PER_ENGINE_STATIC slot index, allocated at static initialisation (file or class scope) or at the first call (function-local); the object lives in each engine's EngineContext"
     return None
 
 
