@@ -3,10 +3,11 @@
 # (PLAN-023 Phase 5b, item 3), by calling the library's exported enterEngineThreadInvariants and
 # leaveEngineThreadInvariants through ctypes, on the main thread and on another thread.
 #
-# The host thread is given a non-engine floating-point mode (round upward, 53-bit x87 precision) and a locale
-# whose LC_NUMERIC is not "C". Between enter and leave the thread must be in the engine's mode (round to
-# nearest, 24-bit x87 precision, "." as the radix) with the host's LC_CTYPE (UTF-8) kept, and afterwards the
-# host's mode and locale must be back.
+# The host thread is given a non-engine floating-point mode (round upward, 53-bit x87 precision, and SSE round
+# upward with flush-to-zero and denormals-are-zero set) and a locale whose LC_NUMERIC is not "C". Between enter
+# and leave the thread must be in the engine's mode (round to nearest, 24-bit x87 precision, no SSE flush or
+# denormals-are-zero, "." as the radix) with the host's LC_CTYPE (UTF-8) kept, and afterwards the host's mode and
+# locale must be back.
 #
 # Usage:
 #   engine_context_scope_test.py [--library LIB.so]
@@ -30,6 +31,9 @@ LC_CTYPE = 0
 LC_NUMERIC = 1
 FE_TONEAREST = 0
 FE_UPWARD = 0x800
+MXCSR_OFFSET = 28  # in glibc's x86-64 fenv_t
+MXCSR_MODE = 0xE040  # the SSE rounding bits, flush-to-zero and denormals-are-zero
+MXCSR_HOST = 0x4000 | 0x8000 | 0x0040  # round upward, flush-to-zero, denormals-are-zero
 
 ENTER = "_ZN3rts27enterEngineThreadInvariantsERNS_16ThreadInvariantsE"
 LEAVE = "_ZN3rts27leaveEngineThreadInvariantsERKNS_16ThreadInvariantsE"
@@ -55,11 +59,19 @@ def control_word():
     return int.from_bytes(env.raw[0:2], "little")
 
 
-def set_control_word(value):
+def mxcsr_mode():
+    env = ctypes.create_string_buffer(32)
+    libm.fegetenv(env)
+    return int.from_bytes(env.raw[MXCSR_OFFSET:MXCSR_OFFSET + 4], "little") & MXCSR_MODE
+
+
+def set_fenv_fields(control_word, mxcsr_mode_bits):
     env = ctypes.create_string_buffer(32)
     libm.fegetenv(env)
     raw = bytearray(env.raw)
-    raw[0:2] = value.to_bytes(2, "little")
+    raw[0:2] = control_word.to_bytes(2, "little")
+    mxcsr = int.from_bytes(raw[MXCSR_OFFSET:MXCSR_OFFSET + 4], "little")
+    raw[MXCSR_OFFSET:MXCSR_OFFSET + 4] = ((mxcsr & ~MXCSR_MODE) | mxcsr_mode_bits).to_bytes(4, "little")
     ctypes.memmove(env, bytes(raw), 32)
     libm.fesetenv(env)
 
@@ -101,11 +113,12 @@ class ScopeInvariants(unittest.TestCase):
 
     def host_mode(self):
         libm.fesetround(FE_UPWARD)
-        set_control_word((control_word() & ~0x0300) | 0x0200)
+        set_fenv_fields((control_word() & ~0x0300) | 0x0200, MXCSR_HOST)
 
     def check_host_mode(self, where):
         self.assertEqual(libm.fegetround(), FE_UPWARD, f"{where}: rounding")
         self.assertEqual(control_word() & 0x0F00, 0x0200 | 0x0800, f"{where}: x87 precision and rounding")
+        self.assertEqual(mxcsr_mode(), MXCSR_HOST, f"{where}: SSE rounding, flush-to-zero and denormals-are-zero")
         self.assertFalse(radix_is_dot(), f"{where}: LC_NUMERIC")
         self.assertTrue(utf8_multibyte_works(), f"{where}: LC_CTYPE")
 
@@ -117,6 +130,7 @@ class ScopeInvariants(unittest.TestCase):
         try:
             self.assertEqual(libm.fegetround(), FE_TONEAREST, "engine rounding")
             self.assertEqual(control_word() & 0x0F00, 0, "engine x87 precision (24 bits) and rounding")
+            self.assertEqual(mxcsr_mode(), 0, "engine SSE rounding, flush-to-zero and denormals-are-zero")
             self.assertTrue(radix_is_dot(), "engine radix")
             self.assertEqual(libc.strtod(b"0,5", None), 0.0, "engine radix is not a comma")
             self.assertTrue(utf8_multibyte_works(), "the engine keeps the host's LC_CTYPE")
