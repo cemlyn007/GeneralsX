@@ -180,14 +180,40 @@ bool W3D_Protect_Render_Defaults(bool readOnly)
 		static std::once_flag s_exitHandlerOnce;
 		std::call_once(s_exitHandlerOnce, [] { std::atexit(Unprotect_Render_Defaults_At_Exit); });
 	}
-	// GeneralsX @bugfix cemlyn007 30/09/2026 All or nothing: when the second fails, the first is put back, so a
-	// failed call leaves both as they were (PLAN-023 Phase 8, stage RR2b).
-	if (!Protect_Pages(&W3DRenderState::Defaults, sizeof(W3DRenderState), readOnly))
-		return false;
-	if (!Protect_Pages(&WW3DState::Defaults, sizeof(WW3DState), readOnly))
+	// GeneralsX @bugfix cemlyn007 30/09/2026 A failed call changes neither: protecting puts back only the pages
+	// this call made read-only, and making them writable again goes on past a failure, since leaving a page
+	// read-only is what the exit handler is there to undo (PLAN-023 Phase 8, stage RR2b).
+	void* const objects[2] = {&W3DRenderState::Defaults, &WW3DState::Defaults};
+	const std::size_t sizes[2] = {sizeof(W3DRenderState), sizeof(WW3DState)};
+	static bool s_readOnly[2] = {false, false};
+	if (!readOnly)
 	{
-		Protect_Pages(&W3DRenderState::Defaults, sizeof(W3DRenderState), !readOnly);
-		return false;
+		bool allWritable = true;
+		for (int i = 0; i < 2; ++i)
+		{
+			if (Protect_Pages(objects[i], sizes[i], false))
+				s_readOnly[i] = false;
+			else
+				allWritable = false;
+		}
+		return allWritable;
+	}
+	bool changed[2] = {false, false};
+	for (int i = 0; i < 2; ++i)
+	{
+		if (s_readOnly[i])
+			continue;
+		if (!Protect_Pages(objects[i], sizes[i], true))
+		{
+			for (int j = 0; j < i; ++j)
+			{
+				if (changed[j] && Protect_Pages(objects[j], sizes[j], false))
+					s_readOnly[j] = false;
+			}
+			return false;
+		}
+		s_readOnly[i] = true;
+		changed[i] = true;
 	}
 	return true;
 }
