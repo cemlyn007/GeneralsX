@@ -484,8 +484,8 @@ W3DDisplay::~W3DDisplay()
 
 	// GeneralsX @bugfix cemlyn007 30/09/2026 Only an engine that renders tears down the process-wide render
 	// state (the render statistics' string, the predictive LOD arrays that WW3D::Shutdown frees, the shader
-	// manager): a headless engine's teardown freed them under the rendering engine beside it (PLAN-023
-	// Phase 8, stage RR0a; found by ThreadSanitizer).
+	// manager). A headless engine's teardown used to free the statistics string and the LOD arrays under the
+	// rendering engine beside it (PLAN-023 Phase 8, stage RR0a; found by ThreadSanitizer).
 	const Bool renders = !TheGlobalData->m_headless || TheGlobalData->m_headlessRender;
 
 	// shutdown
