@@ -39,7 +39,9 @@
 
 
 // GLOBAL /////////////////////////////////////////////////////////////////////////////////////////
+#if !RTS_ENGINE_CONTEXT
 SpecialPowerStore *TheSpecialPowerStore = nullptr;
+#endif
 
 #define DEFAULT_DEFECTION_DETECTION_PROTECTION_TIME_LIMIT (LOGICFRAMES_PER_SECOND * 10)
 

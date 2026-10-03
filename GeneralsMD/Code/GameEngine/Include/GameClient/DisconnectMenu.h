@@ -74,4 +74,6 @@ protected:
 	static const char *const m_textDisplayControlName;	///< name of the text display listbox control window.
 };
 
+#if !RTS_ENGINE_CONTEXT
 extern DisconnectMenu *TheDisconnectMenu;
+#endif

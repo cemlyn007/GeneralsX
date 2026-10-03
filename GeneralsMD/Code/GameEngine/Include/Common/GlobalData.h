@@ -629,10 +629,15 @@ private:
 };
 
 // singleton
+#if !RTS_ENGINE_CONTEXT
 extern GlobalData* TheWritableGlobalData;
+#endif
 
 // use TheGlobalData for all read-only accesses
-#if __cplusplus >= 201703L
+// GeneralsX @bugfix cemlyn007 28/09/2026 With RTS_ENGINE_CONTEXT, TheWritableGlobalData is a macro over the
+// current engine context, and the reference below would bind once, during static initialisation, to the
+// no-engine context's field: it would compile and silently read the wrong engine. Use the macro instead.
+#if __cplusplus >= 201703L && !RTS_ENGINE_CONTEXT
 inline const GlobalData* const& TheGlobalData = TheWritableGlobalData;
 #else
 #define TheGlobalData ((const GlobalData*)TheWritableGlobalData)

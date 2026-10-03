@@ -427,4 +427,6 @@ public:
 };
 
 // EXTERNALS //////////////////////////////////////////////////////////////////////////////////////
+#if !RTS_ENGINE_CONTEXT
 extern View *TheTacticalView;		///< the main tactical interface to the game world
+#endif

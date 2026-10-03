@@ -71,7 +71,9 @@
 #include "WWDownload/Registry.h"
 
 
+#if !RTS_ENGINE_CONTEXT
 SkirmishGameInfo *TheSkirmishGameInfo = nullptr;
+#endif
 
 // window ids ------------------------------------------------------------------------------
 static NameKeyType parentSkirmishGameOptionsID = NAMEKEY_INVALID;

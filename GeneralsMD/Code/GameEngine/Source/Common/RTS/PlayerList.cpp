@@ -63,7 +63,9 @@
 #include <algorithm>
 
 //-----------------------------------------------------------------------------
+#if !RTS_ENGINE_CONTEXT
 /*extern*/ PlayerList *ThePlayerList = nullptr;
+#endif
 
 //-----------------------------------------------------------------------------
 PlayerList::PlayerList() :

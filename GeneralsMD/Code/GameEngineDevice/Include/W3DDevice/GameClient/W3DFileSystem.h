@@ -95,4 +95,6 @@ private:
 	static void reprioritizeTexturesBySize(ArchivedDirectoryInfo& dirInfo);
 };
 
+#if !RTS_ENGINE_CONTEXT
 extern W3DFileSystem *TheW3DFileSystem;
+#endif

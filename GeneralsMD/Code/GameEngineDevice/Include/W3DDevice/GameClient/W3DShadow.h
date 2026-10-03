@@ -67,4 +67,6 @@ protected:
 		Int m_stencilShadowMask;
 };
 
+#if !RTS_ENGINE_CONTEXT
 extern W3DShadowManager *TheW3DShadowManager;
+#endif

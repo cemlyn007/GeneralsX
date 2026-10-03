@@ -166,7 +166,9 @@ static inline DWORD F2DW( FLOAT f ) { return *((DWORD*)&f); }
 static ShaderClass zFillAlphaShader(SC_ZFILL_BLEND3);
 static ShaderClass blendStagesShader(SC_DETAIL_BLEND);
 
+#if !RTS_ENGINE_CONTEXT
 WaterRenderObjClass *TheWaterRenderObj=nullptr; ///<global water rendering object
+#endif
 
 static Int getRiverVertexDiffuse(W3DShroud *shroud, Real x, Real y, Real shadeR, Real shadeG, Real shadeB, Int diffuse)
 {

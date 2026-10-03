@@ -93,7 +93,9 @@ namespace rts
 };
 
 // GLOBALS ////////////////////////////////////////////////////////////////////////////////////////
+#if !RTS_ENGINE_CONTEXT
 ScriptConditionsInterface *TheScriptConditions = nullptr;
+#endif
 
 class TransportStatus : public MemoryPoolObject
 {

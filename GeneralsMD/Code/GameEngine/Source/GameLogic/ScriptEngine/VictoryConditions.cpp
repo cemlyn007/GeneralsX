@@ -58,7 +58,9 @@
 #define ISSET(x) (m_victoryConditions & VICTORY_##x)
 
 //-------------------------------------------------------------------------------------------------
+#if !RTS_ENGINE_CONTEXT
 VictoryConditionsInterface *TheVictoryConditions = nullptr;
+#endif
 
 //-------------------------------------------------------------------------------------------------
 inline static Bool areAllies(const Player *p1, const Player *p2)

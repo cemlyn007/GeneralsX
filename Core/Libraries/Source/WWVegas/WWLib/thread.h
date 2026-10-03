@@ -93,4 +93,9 @@ private:
 	static void __cdecl Internal_Thread_Function(void*);
 	volatile unsigned long handle;
 	int thread_priority;
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 28/09/2026 The engine context current at Execute(), entered by the
+	// thread (PLAN-023; see Common/EngineContext.h, force-included)
+	::rts::EngineContext* engine_context = nullptr;
+#endif
 };

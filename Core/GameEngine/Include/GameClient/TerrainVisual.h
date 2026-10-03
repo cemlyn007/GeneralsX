@@ -301,4 +301,6 @@ protected:
 };
 
 // EXTERNALS //////////////////////////////////////////////////////////////////////////////////////
+#if !RTS_ENGINE_CONTEXT
 extern TerrainVisual *TheTerrainVisual;  ///< singleton extern
+#endif

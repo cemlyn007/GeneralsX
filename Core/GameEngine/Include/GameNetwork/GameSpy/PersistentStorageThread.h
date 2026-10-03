@@ -185,4 +185,6 @@ public:
 	static PSPlayerStats parsePlayerKVPairs( std::string kvPairs );
 };
 
+#if !RTS_ENGINE_CONTEXT
 extern GameSpyPSMessageQueueInterface *TheGameSpyPSMessageQueue;
+#endif

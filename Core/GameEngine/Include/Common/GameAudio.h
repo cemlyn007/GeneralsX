@@ -379,4 +379,6 @@ class AudioManager : public SubsystemInterface
 		Bool m_disallowSpeech			: 1;
 };
 
+#if !RTS_ENGINE_CONTEXT
 extern AudioManager *TheAudio;
+#endif

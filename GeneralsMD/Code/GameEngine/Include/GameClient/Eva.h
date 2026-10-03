@@ -212,4 +212,6 @@ class Eva : public SubsystemInterface
 
 };
 
+#if !RTS_ENGINE_CONTEXT
 extern Eva *TheEva;
+#endif

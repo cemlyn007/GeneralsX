@@ -383,4 +383,6 @@ public:
 	static GameSpyPeerMessageQueueInterface* createNewMessageQueue();
 };
 
+#if !RTS_ENGINE_CONTEXT
 extern GameSpyPeerMessageQueueInterface *TheGameSpyPeerMessageQueue;
+#endif

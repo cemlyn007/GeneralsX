@@ -69,4 +69,6 @@ private:
 
 };
 
+#if !RTS_ENGINE_CONTEXT
 extern CaveSystem *TheCaveSystem;
+#endif

@@ -37,8 +37,10 @@
 #include "GameLogic/GameLogic.h"
 
 /// The singleton message stream for messages going to TheGameLogic
+#if !RTS_ENGINE_CONTEXT
 MessageStream *TheMessageStream = nullptr;
 CommandList *TheCommandList = nullptr;
+#endif
 
 
 

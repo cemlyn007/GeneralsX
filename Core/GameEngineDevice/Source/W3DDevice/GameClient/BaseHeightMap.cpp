@@ -97,8 +97,10 @@
 #include "W3DDevice/GameClient/W3DSnow.h"
 
 
+#if !RTS_ENGINE_CONTEXT
 extern FlatHeightMapRenderObjClass *TheFlatHeightMap;
 extern HeightMapRenderObjClass *TheHeightMap;
+#endif
 
 //-----------------------------------------------------------------------------
 //         Private Data
@@ -113,7 +115,9 @@ static ShaderClass detailOpaqueShader(SC_DETAIL_BLEND);
 //         Global Functions & Data
 //-----------------------------------------------------------------------------
 /// The one-of for the terrain rendering object.
+#if !RTS_ENGINE_CONTEXT
 BaseHeightMapRenderObjClass *TheTerrainRenderObject=nullptr;
+#endif
 
 /** Entry point so that trees can be drawn at the appropriate point in the rendering pipe for
     transparent objects. */

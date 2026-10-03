@@ -84,7 +84,9 @@ GameSpyBuddyMessageQueueInterface* GameSpyBuddyMessageQueueInterface::createNewM
 	return NEW GameSpyBuddyMessageQueue;
 }
 
+#if !RTS_ENGINE_CONTEXT
 GameSpyBuddyMessageQueueInterface *TheGameSpyBuddyMessageQueue;
+#endif
 #define MESSAGE_QUEUE ((GameSpyBuddyMessageQueue *)TheGameSpyBuddyMessageQueue)
 
 //-------------------------------------------------------------------------

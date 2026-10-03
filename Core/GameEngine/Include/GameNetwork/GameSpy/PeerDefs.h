@@ -278,7 +278,9 @@ public:
 	virtual void updateAdditionalGameSpyDisconnections(Int count) = 0;
 };
 
+#if !RTS_ENGINE_CONTEXT
 extern GameSpyInfoInterface *TheGameSpyInfo;
+#endif
 
 void WOLDisplayGameOptions();
 void WOLDisplaySlotList();

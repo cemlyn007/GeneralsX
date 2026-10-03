@@ -168,4 +168,6 @@ public:
 	static GameSpyBuddyMessageQueueInterface* createNewMessageQueue();
 };
 
+#if !RTS_ENGINE_CONTEXT
 extern GameSpyBuddyMessageQueueInterface *TheGameSpyBuddyMessageQueue;
+#endif

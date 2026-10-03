@@ -741,7 +741,9 @@ private:
 
 };
 
+#if !RTS_ENGINE_CONTEXT
 extern TeamFactory *TheTeamFactory;
+#endif
 
 
 // inline function ------------------------------------------------------------------------

@@ -139,4 +139,6 @@ private:
 };
 
 // singleton
+#if !RTS_ENGINE_CONTEXT
 extern MultiplayerSettings *TheMultiplayerSettings;
+#endif

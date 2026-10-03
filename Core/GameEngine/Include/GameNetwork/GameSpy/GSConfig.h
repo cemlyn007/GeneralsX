@@ -74,4 +74,6 @@ public:
 	static GameSpyConfigInterface* create(AsciiString config);
 };
 
+#if !RTS_ENGINE_CONTEXT
 extern GameSpyConfigInterface *TheGameSpyConfig;
+#endif

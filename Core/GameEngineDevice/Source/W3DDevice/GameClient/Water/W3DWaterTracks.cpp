@@ -73,7 +73,9 @@
 //#define DEFAULT_FINAL_WAVE_HEIGHT	18.0f
 //#define DEFAULT_SECOND_WAVE_TIME_OFFSET 6267	//should always be half of totalMs
 
+#if !RTS_ENGINE_CONTEXT
 WaterTracksRenderSystem *TheWaterTracksRenderSystem=nullptr;	///< singleton for track drawing system.
+#endif
 
 static Bool pauseWaves=FALSE;
 

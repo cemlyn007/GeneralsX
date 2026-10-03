@@ -291,4 +291,6 @@ inline Bool WaterRenderObjClass::worldToGridSpace(Real worldX, Real worldY, Real
 	return TRUE;
 }
 
+#if !RTS_ENGINE_CONTEXT
 extern WaterRenderObjClass *TheWaterRenderObj; ///<global water rendering object
+#endif

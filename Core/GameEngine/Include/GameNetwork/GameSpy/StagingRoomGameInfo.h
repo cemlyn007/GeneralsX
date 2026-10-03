@@ -153,4 +153,6 @@ public:
 	void setLocalName( AsciiString name ) { m_localName = name; }
 };
 
+#if !RTS_ENGINE_CONTEXT
 extern GameSpyStagingRoom *TheGameSpyGame;
+#endif

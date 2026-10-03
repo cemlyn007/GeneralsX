@@ -153,4 +153,6 @@ protected:
 
 };
 
+#if !RTS_ENGINE_CONTEXT
 extern NAT *TheNAT;
+#endif

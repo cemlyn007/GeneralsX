@@ -34,7 +34,9 @@
 #include "GameLogic/CrateSystem.h"
 #include "Common/BitFlagsIO.h"
 
+#if !RTS_ENGINE_CONTEXT
 CrateSystem *TheCrateSystem = nullptr;
+#endif
 
 CrateSystem::CrateSystem()
 {

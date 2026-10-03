@@ -40,7 +40,9 @@
 #include "GameClient/MapUtil.h"
 
 
+#if !RTS_ENGINE_CONTEXT
 LadderList *TheLadderList = nullptr;
+#endif
 
 LadderInfo::LadderInfo()
 {

@@ -74,7 +74,9 @@
 //         Public Data
 //----------------------------------------------------------------------------
 
+#if !RTS_ENGINE_CONTEXT
 IMEManagerInterface *TheIMEManager = nullptr;
+#endif
 
 // GeneralsX @build BenderAI 12/02/2026 Windows-specific IME (Input Method Editor) for CJK text input
 // Linux handles IME via system-level services (ibus, fcitx) through SDL text input APIs

@@ -136,7 +136,9 @@ static const Int FRAMES_TO_FADE_IN_AT_START = 33;
 //#include "Common/PerfTimer.h"
 
 // GLOBALS ////////////////////////////////////////////////////////////////////////////////////////
+#if !RTS_ENGINE_CONTEXT
 ScriptEngine *TheScriptEngine = nullptr;
+#endif
 
 /// Local classes
 /// AttackPriorityInfo class

@@ -83,7 +83,9 @@ protected:
 		W3DShadowGeometryManager *m_W3DShadowGeometryManager;
 };
 
+#if !RTS_ENGINE_CONTEXT
 extern W3DVolumetricShadowManager *TheW3DVolumetricShadowManager;
+#endif
 
 // W3DVolumetricShadow ---------------------------------------------------------------------
 class W3DVolumetricShadow	: public Shadow

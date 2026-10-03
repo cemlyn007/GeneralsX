@@ -28,7 +28,9 @@
 #include "GameNetwork/NetworkInterface.h"
 
 
+#if !RTS_ENGINE_CONTEXT
 FramePacer* TheFramePacer = nullptr;
+#endif
 
 FramePacer::FramePacer()
 {

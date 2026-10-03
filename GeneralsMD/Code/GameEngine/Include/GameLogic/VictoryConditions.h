@@ -75,4 +75,6 @@ protected:
 
 VictoryConditionsInterface * createVictoryConditions();
 
+#if !RTS_ENGINE_CONTEXT
 extern VictoryConditionsInterface *TheVictoryConditions;
+#endif

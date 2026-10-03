@@ -99,7 +99,9 @@ class GameTextInterface : public SubsystemInterface
 };
 
 
+#if !RTS_ENGINE_CONTEXT
 extern GameTextInterface *TheGameText;
+#endif
 extern GameTextInterface* CreateGameTextInterface();
 
 //----------------------------------------------------------------------------
