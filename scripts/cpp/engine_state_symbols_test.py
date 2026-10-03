@@ -247,13 +247,24 @@ class RuleConstObjectTest(unittest.TestCase):
         # exemption (see the fixed `_is_safe_value_expr` brace-branch comment).
         self.assert_const('static const Lit arr[2] = { "x", "y" };', False)
 
-    def test_cast_target_is_safe_treats_a_pointer_or_reference_target_as_always_safe(self):
-        # Casting TO a pointer or reference type is a pointer conversion or a reference binding, never a
-        # constructor call, whatever class the pointee/referent is named: `Lit` is not on any allow-list,
-        # but `Lit*`/`Lit&` must still pass.
+    def test_cast_target_is_safe_treats_a_pointer_target_as_always_safe(self):
+        # Casting TO a pointer type is a pointer conversion, never a constructor call, whatever class the
+        # pointee is named: `Lit` is not on any allow-list, but `Lit*` (and a reference-to-pointer,
+        # `Lit*&`) must still pass.
         self.assertTrue(m._cast_target_is_safe("void*"))
         self.assertTrue(m._cast_target_is_safe("Lit*"))
-        self.assertTrue(m._cast_target_is_safe("Lit &"))
+        self.assertTrue(m._cast_target_is_safe("Lit*&"))
+
+    def test_cast_target_is_safe_checks_a_reference_target_the_same_as_a_declared_type(self):
+        # A reference target is NOT exempt the way a pointer target is: `(const T&)expr` is valid exactly
+        # when `const T t(expr)` is, which runs T's own converting constructor. So a reference target
+        # (bare, `const`-qualified, or an rvalue reference) is checked against the same allow-list a bare
+        # target would be: `Lit` is not on it, but a reviewed scalar is.
+        self.assertFalse(m._cast_target_is_safe("Lit &"))
+        self.assertFalse(m._cast_target_is_safe("const Lit&"))
+        self.assertFalse(m._cast_target_is_safe("Lit&&"))
+        self.assertTrue(m._cast_target_is_safe("const Int&"))
+        self.assertTrue(m._cast_target_is_safe("Int&"))
 
     def test_cast_target_is_safe_checks_a_bare_target_the_same_as_a_declared_type(self):
         # A bare (non-pointer, non-reference) cast target is checked exactly like a declared variable's
@@ -264,6 +275,11 @@ class RuleConstObjectTest(unittest.TestCase):
         self.assertTrue(m._cast_target_is_safe("const Int"))
         self.assertFalse(m._cast_target_is_safe("Lit"))
         self.assertFalse(m._cast_target_is_safe("AudioEventRTS"))
+
+    def test_cast_target_is_safe_fails_closed_on_an_empty_target(self):
+        # `cast_type[-1:] in "*&"` (the pre-fix check) returns True for an empty string too; the fix must
+        # not reintroduce that hole through a different spelling.
+        self.assertFalse(m._cast_target_is_safe(""))
 
     def test_declared_type_name_reads_the_type_not_the_out_of_line_scope(self):
         self.assertEqual(m._declared_type_name("const AudioEventRTS WaypointMap::s_click"), "AudioEventRTS")
@@ -438,6 +454,42 @@ class RuleConstObjectTest(unittest.TestCase):
     def test_by_value_const_static_cast_to_an_unreviewed_class_type_is_not_safe(self):
         # The same gap as the C-style cast above, spelled as a functional-style static_cast.
         self.assert_const('static const Int n = static_cast<Lit>("z");', False)
+
+    def test_by_value_const_cast_to_a_reference_to_an_unreviewed_class_type_is_not_safe(self):
+        # `(const Lit&)expr` is valid exactly when `const Lit t(expr)` is, which still runs Lit's own
+        # converting constructor to materialise the temporary (and, landing back on the declared `Int`,
+        # Lit's own conversion operator too). A reference target must not be waved through the way a
+        # pointer target is: casting TO a reference is a reference binding, but what it binds to is a
+        # constructor call when the referent is a class.
+        self.assert_const('static const Int n = (const Lit&)"z";', False)
+
+    def test_by_value_const_static_cast_to_a_const_reference_to_an_unreviewed_class_type_is_not_safe(self):
+        # The same gap as the C-style reference cast above, spelled as a functional-style static_cast.
+        self.assert_const('static const Int n = static_cast<const Lit&>("z");', False)
+
+    def test_by_value_const_static_cast_to_an_rvalue_reference_of_an_unreviewed_class_type_is_not_safe(self):
+        # An rvalue-reference target (`T&&`) materialises the same temporary a `const T&` target does.
+        self.assert_const('static const Int n = static_cast<Lit&&>("z");', False)
+
+    def test_by_value_const_reinterpret_cast_style_reference_to_an_unreviewed_class_type_is_not_safe(self):
+        # `_CAST_RE`'s own single trailing `&`/`*` spelling (`(Lit&)expr`), as opposed to
+        # `_STATIC_CAST_RE`'s `<...>` capture above.
+        self.assert_const('static const Int n = (Lit&)"z";', False)
+
+    def test_const_pointer_cast_to_a_const_reference_to_an_unreviewed_class_type_is_not_safe(self):
+        # The same reference-target hazard as the by-value tests above, reached through
+        # `_pointer_init_is_safe`'s own, separate cast branch instead of `_is_safe_value_expr`'s.
+        self.assert_const('static const char* const p = (const Lit&)"z";', False)
+
+    def test_const_pointer_cast_to_an_unreviewed_class_type_is_not_safe(self):
+        # `_pointer_init_is_safe`'s cast branch checks its own target type (`_cast_target_is_safe`) before
+        # trusting the operand underneath; removing that check still leaves the operand (a string literal)
+        # looking pure, so this must be caught by the gate itself, not by anything else in the chain.
+        self.assert_const('static const char* const p = (Lit)"z";', False)
+
+    def test_const_pointer_static_cast_to_an_unreviewed_class_type_is_not_safe(self):
+        # The same gap as the C-style pointer-form cast above, spelled as a functional-style static_cast.
+        self.assert_const('static const char* const p = static_cast<Lit>("z");', False)
 
     def test_by_value_const_initialized_from_a_void_pointer_cast_of_an_enumerator_is_safe(self):
         # StateConditionInfo's own `void* userData` (the real shape this codebase uses:

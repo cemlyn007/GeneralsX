@@ -1118,19 +1118,25 @@ _STATIC_CAST_RE = re.compile(
 def _cast_target_is_safe(cast_type):
     """True when a cast's own target type (`cast_type`, as either `_CAST_RE` or `_STATIC_CAST_RE` captures
     it) can never itself run an unreviewed converting constructor or conversion operator, so recursing into
-    the cast's operand (what both regexes' callers actually do next) is safe to trust. A pointer or
-    reference target (`void*`, `AudioEventRTS*`, `Foo&`: trailing `*`/`&` after stripping) is always safe
-    regardless of its pointee/referent's own name, because casting TO a pointer or reference type is a
-    pointer conversion or a reference binding, never a constructor call, whatever class the pointee is
-    (this is the `(void*)ATTACK_CONTINUED_TARGET_FORCED`-shaped argument StateConditionInfo's own
-    constructor call takes). Any other target is checked the same way a declared variable's own type is
-    (`_declared_type_is_const_safe`): a built-in scalar, an allow-listed value-constructor name, or a class
-    this rule has specifically reviewed may be cast to; any other class type — reached only through a
-    cast's target, never through a variable's own declared type — fails closed, exactly as a bare
-    declaration of that same unreviewed class type already would."""
+    the cast's operand (what both regexes' callers actually do next) is safe to trust. A pointer target
+    (`void*`, `AudioEventRTS*`, found anywhere in `cast_type`, so a reference-to-pointer such as `Foo*&` is
+    covered too) is always safe regardless of its pointee's own name, because casting TO a pointer type is
+    a pointer conversion, never a constructor call, whatever class the pointee is (this is the
+    `(void*)ATTACK_CONTINUED_TARGET_FORCED`-shaped argument StateConditionInfo's own constructor call
+    takes). A reference target with no pointer in it (`Foo&`, `const Foo&`, `Foo&&`) is NOT exempt the same
+    way: `(const T&)expr`/`static_cast<const T&>(expr)`/`static_cast<T&&>(expr)` is valid exactly when
+    `const T t(expr)` is, which materialises a temporary `T` through `T`'s own converting constructor (and,
+    when the declared type is a scalar, then runs `T`'s own conversion operator too) — the same hazard a
+    bare, non-reference cast target has. So a reference target is checked the same way a bare one is: the
+    trailing `&`/`&&` (and any leading `const`) is stripped first, then the referent's own name is checked
+    exactly like a declared variable's own type (`_declared_type_is_const_safe`): a built-in scalar, an
+    allow-listed value-constructor name, or a class this rule has specifically reviewed may be cast to; any
+    other class type — reached only through a cast's target, never through a variable's own declared type
+    — fails closed, exactly as a bare declaration of that same unreviewed class type already would."""
     cast_type = cast_type.strip()
-    if cast_type[-1:] in "*&":
+    if "*" in cast_type:
         return True
+    cast_type = cast_type.rstrip("& \t")
     cast_type = re.sub(r"^const\s+", "", cast_type).strip()
     return _declared_type_is_const_safe(cast_type)
 
@@ -1470,10 +1476,10 @@ def _pointer_init_is_safe(init):
     cast of a signed literal or an add/subtract on the parenthesised `name`, and this regex cannot tell a
     type name from a writable pointer's own name to prove which. The cast branch also checks its own
     target type (`_cast_target_is_safe`, same as `_is_safe_value_expr`'s cast branches) before trusting the
-    operand underneath: a cast to a pointer/reference type (the common case here, since the declared
-    variable is itself a pointer) is always safe to recurse through, but a cast to a bare, unreviewed class
-    type could still run that class's own converting constructor on the way to the pointer this
-    initialises, exactly as it could for a by-value const."""
+    operand underneath: a cast to a pointer type (the common case here, since the declared variable is
+    itself a pointer) is always safe to recurse through, but a cast to a bare, unreviewed class type — or
+    to a reference to one — could still run that class's own converting constructor on the way to the
+    pointer this initialises, exactly as it could for a by-value const."""
     init = init.strip()
     if init[:1] == "(" and init[-1:] == ")" and _fully_parenthesized(init):
         return _pointer_init_is_safe(init[1:-1])
