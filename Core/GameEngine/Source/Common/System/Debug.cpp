@@ -764,11 +764,15 @@ static void TriggerMiniDump()
 
 
 // GeneralsX @feature cemlyn007 28/09/2026 Embedded mode (see FatalEngineError.h)
-// GeneralsX @bugfix cemlyn007 02/10/2026 Pre-C++11/VC6 builds have no std::atomic<bool> (see the
+// GeneralsX @bugfix cemlyn007 03/10/2026 Pre-C++11/VC6 builds have no std::atomic<bool> (see the
 // <atomic> guard above); a plain volatile Bool is the same fallback WWLib/mutex.h uses for its
-// FastCriticalSectionClass flag on those presets. Set/IsEngineEmbeddedMode is called at most
-// once per engine, well before any other thread can observe it, so the relaxed ordering a plain
-// write/read gives on that path is sufficient.
+// FastCriticalSectionClass flag on those presets. The only host that ever stores true,
+// rlgenerals' launcher, does so from its own single boot/engine thread: once before init() and
+// again, storing false, before a normal teardown (ReleaseCrash itself reads the flag up to four
+// times per crash, and the host's own test hooks read it on every init()/loadGame(), but always
+// from that same thread). A VC6/retail build links no embedded host at all, so this flag there
+// is read-only in practice (always false); the volatile bool fallback exists so such presets
+// still link, not because they observe the flag from a second thread.
 #if !(defined(_MSC_VER) && _MSC_VER < 1300)
 static std::atomic<bool> theEngineEmbeddedMode(false);
 #else
