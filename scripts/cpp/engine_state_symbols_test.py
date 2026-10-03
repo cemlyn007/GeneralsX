@@ -650,7 +650,20 @@ class CompareTest(unittest.TestCase):
     """compare() drives `check`'s error/warning split for a symbol the TSV already lists."""
 
     def row(self, **overrides):
-        base = {"class": "render-only", "phase": "", "by": "hand", "count": "1", "source": "mesh.cpp:10"}
+        base = {
+            "class": "render-only",
+            "phase": "",
+            "by": "hand",
+            "count": "1",
+            "source": "mesh.cpp:10",
+            # Match m.Symbol's own defaults (scope/section/binding empty, bytes "0"), so a strict comparison
+            # sees no spurious difference on a column a test does not care about.
+            "scope": "",
+            "section": "",
+            "binding": "",
+            "bytes": "0",
+            "note": "",
+        }
         base.update(overrides)
         return base
 
@@ -688,6 +701,38 @@ class CompareTest(unittest.TestCase):
         errors, stale = m.compare("k", self.sym(1, "?"), self.row())
         self.assertEqual(errors, [])
         self.assertTrue(any("definition moved" in s for s in stale))
+
+    def test_non_strict_ignores_a_note_and_by_change(self):
+        # A hand note edited, or a symbol moved from a rule to a hand entry (same class/phase), without a
+        # re-run of `snapshot`: non-strict `check` must not notice, it only warns on structural staleness.
+        s = self.sym(1, "mesh.cpp:10", by="rule:const")
+        s.note = "a new note snapshot would write"
+        errors, stale = m.compare("k", s, self.row(by="hand", note="an old note"))
+        self.assertEqual(errors, [])
+        self.assertEqual(stale, [])
+
+    def test_strict_flags_a_note_change_as_stale(self):
+        s = self.sym(1, "mesh.cpp:10", by="rule:const")
+        s.note = "a new note snapshot would write"
+        errors, stale = m.compare("k", s, self.row(by="rule:const", note="an old note"), strict=True)
+        self.assertEqual(errors, [])
+        self.assertTrue(any("note changed" in line for line in stale))
+
+    def test_strict_flags_a_by_change_with_an_unchanged_class_as_stale(self):
+        # The TSV-reproducibility gap this closes: a symbol moved from rule:const to a hand entry, with the
+        # same class and phase, must still be caught as stale under --strict.
+        s = self.sym(1, "mesh.cpp:10", by="hand")
+        s.note = "safe on inspection"
+        errors, stale = m.compare("k", s, self.row(by="rule:const", note="safe on inspection"), strict=True)
+        self.assertEqual(errors, [])
+        self.assertTrue(any("by changed" in line for line in stale))
+
+    def test_strict_is_silent_when_every_column_still_matches(self):
+        s = self.sym(1, "mesh.cpp:10", by="hand")
+        s.note = "note"
+        errors, stale = m.compare("k", s, self.row(by="hand", note="note"), strict=True)
+        self.assertEqual(errors, [])
+        self.assertEqual(stale, [])
 
 
 class DemangleTest(unittest.TestCase):

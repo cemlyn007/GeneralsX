@@ -1117,13 +1117,16 @@ def cmd_snapshot(args):
     return 0
 
 
-def compare(key, sym, row):
+def compare(key, sym, row, strict=False):
     """(errors, stale) for a symbol the list records. Errors in every mode: a class or phase that changed
     (including to `unreviewed`: a hand entry deleted, or a hand regex or `file:` pattern that stopped
     matching after an upstream rename or move), a blanket `file:` match replacing a reviewed one, and a new
     instance of an already listed name (a count or a set of defining files that grew: a new TU's static of
     the same name would otherwise inherit the existing classification unseen). Stale only: fewer instances,
-    and definitions that moved."""
+    definitions that moved, and, with `strict`, any other column (scope, binding, section, bytes, note, by)
+    that no longer matches what `row_of(sym)` would write today: those never fail a non-strict `check`
+    (the row's classification is still correct), but they do mean the checked-in TSV is not what `snapshot`
+    writes, which `--strict` promises to catch."""
     errors, stale = [], []
     if row["class"] != sym.cls or row["phase"] != sym.phase:
         errors.append(f"class changed: {key}: {row['class']} {row['phase']} -> {sym.cls} {sym.phase} (by {sym.by})")
@@ -1147,6 +1150,11 @@ def compare(key, sym, row):
         stale.append(f"fewer instances: {key}: {recorded_count} -> {sym.count}")
     elif row.get("source") != sym.source:
         stale.append(f"definition moved: {key}: {row.get('source')} -> {sym.source}")
+    if strict:
+        current = row_of(sym)
+        for col in ("scope", "binding", "section", "bytes", "note", "by"):
+            if row.get(col, "") != current[col]:
+                stale.append(f"{col} changed: {key}: {row.get(col, '')!r} -> {current[col]!r}")
     return errors, stale
 
 
@@ -1190,7 +1198,7 @@ def cmd_check(args):
             else:
                 stale.append(f"new symbol, classified {sym.cls} by {sym.by}: {key} ({sym.source})")
         else:
-            e, st = compare(key, sym, row)
+            e, st = compare(key, sym, row, args.strict)
             errors += e
             stale += st
     for key in sorted(set(recorded) - set(symbols)):
