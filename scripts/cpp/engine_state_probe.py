@@ -13,7 +13,9 @@
 #                which PLAN-023 Phase 8 moves into the engine), or render-const with a phase (a constant
 #                today that the named stage still changes: the row's note says whether it builds once for
 #                the process what a render boot rewrites, makes const what is only copied, or moves a
-#                pointer table with the per-engine objects it points to);
+#                pointer table with the per-engine objects it points to). Only the rows REWRITTEN names
+#                are written by a render boot today; a write to any other phased render-const row is
+#                unexpected;
 #   allowed      named in the explicit allowlist (ALLOWLIST below, or the caller's), each with its reason: a
 #                process-wide counter, pool or cache that is written on purpose and safe to share;
 #   unexpected   anything else: a symbol the list calls constant, render-const without a phase, render-process, debug-only,
@@ -52,6 +54,18 @@ LIBRARY = "libgeneralsx.so"
 PROBED_SECTIONS = {".data", ".bss"}
 WORKLIST_CLASSES = {"render-per-engine", "render-scratch"}
 GUARD = "guard variable for "
+# The phased render-const rows that a render boot rewrites with the same value, until RR2b builds them once for
+# the process. Every other phased render-const row is never written, so a write to it is a bug.
+REWRITTEN = {
+    "D3DFormatToWW3DFormatConversionArray",
+    "D3DFormatToWW3DZFormatConversionArray",
+    "BoxRenderObjClass::DisplayMask",
+    "_BoxShader",
+    "default_dazzle_shader",
+    "default_halo_shader",
+    "vis_shader",
+    "debug_shader",
+}
 
 # Written on purpose, and safe to share between engines: each by exact key (the TSV's symbol column), with its
 # reason. A class is never enough: a process-global symbol that a render step writes is listed here once
@@ -182,8 +196,8 @@ class Report:
     def _judge(probe, key, cls, phase=""):
         if cls in WORKLIST_CLASSES:
             return "worklist", ""
-        # A render-const row with a phase is constant today but the named stage still changes it.
-        if cls == "render-const" and phase:
+        # A render boot rewrites these constants with the same value until the named stage builds them once.
+        if cls == "render-const" and phase and key in REWRITTEN:
             return "worklist", f"render-const until {phase}"
         if key in probe.allowlist:
             return "allowed", probe.allowlist[key]

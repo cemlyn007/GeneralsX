@@ -48,7 +48,7 @@
 #   engine_state_symbols.py check --render LIB.so
 #                                             also print the render work list (warnings only): the
 #                                             render-per-engine and render-scratch symbols by phase, and the
-#                                             render-const ones a phase still has to build once, with counts
+#                                             render-const ones a stage still changes, with counts
 #   engine_state_symbols.py report [LIB.so]   print the per-engine work list grouped by phase, the counts
 #                                             per class and the unreviewed symbols (from the TSV, or from
 #                                             the library when given)
@@ -525,7 +525,7 @@ def resolve_sources(root, symbols, third_party):
 PER, GLOBAL, CONST, DEBUG, RENDER, RPER, RSCR, RCONST, RPROC, UNREVIEWED = CLASSES
 # GeneralsX @feature cemlyn007 30/09/2026 The render classes (PLAN-023 Phase 8, stage RR1): a phase is the stage
 # that moves the symbol, required for the two classes of state that must move, optional for render-const and
-# render-process (the stage that still has to build it once, or change how it is shared).
+# render-process (the stage that still changes it, or how it is shared: the row's note says how).
 PHASE_REQUIRED = {PER, RPER, RSCR}
 PHASE_ALLOWED = PHASE_REQUIRED | {RCONST, RPROC}
 RENDER_CLASSES = (RPER, RSCR, RCONST, RPROC)
@@ -893,7 +893,7 @@ def cmd_check(args):
 
 def render_worklist(symbols):
     """The render work list (PLAN-023 Phase 8), as warnings: every render-per-engine and render-scratch symbol
-    and every render-const one a stage still has to build once, grouped by phase, with counts per class. Guard
+    and every render-const one a stage still changes, grouped by phase, with counts per class. Guard
     variables follow their statics and are left out."""
     syms = [s for s in symbols.values() if s.by != "guard"]
     counts = collections.Counter(s.cls for s in syms if s.cls in RENDER_CLASSES)
