@@ -10,6 +10,7 @@
 # locale is checked by identity (the thread is off the global locale inside a Scope and back on it afterwards),
 # so that needs no particular host locale. Where the host has a locale with a comma radix (en_DK, de_DE or
 # fr_FR), the host's LC_NUMERIC is that locale too and the radix is checked; only the radix test skips without one.
+# Without one the host's LC_NUMERIC is C.utf8 and the Scope's switch to "C" is checked by the locale's name.
 #
 # Usage:
 #   engine_context_scope_test.py [--library LIB.so]
@@ -68,6 +69,9 @@ libc.newlocale.restype = ctypes.c_void_p
 libc.newlocale.argtypes = [ctypes.c_int, ctypes.c_char_p, ctypes.c_void_p]
 libc.freelocale.argtypes = [ctypes.c_void_p]
 libc.uselocale.argtypes = [ctypes.c_void_p]
+libc.nl_langinfo.restype = ctypes.c_char_p
+libc.nl_langinfo.argtypes = [ctypes.c_int]
+NL_LOCALE_NAME_NUMERIC = (LC_NUMERIC << 16) | 0xFFFF  # glibc's _NL_LOCALE_NAME(LC_NUMERIC)
 
 # glibc x86-64's fenv_t: the x87 control word is its first 16 bits, the SSE control/status register its last 32.
 X87 = platform.machine() in ("x86_64", "AMD64") and sys.platform.startswith("linux")
@@ -98,6 +102,11 @@ def set_fenv_fields(control_word, mxcsr_mode_bits):
 
 def radix_is_dot():
     return libc.strtod(b"0.5", None) == 0.5
+
+
+def numeric_name():
+    # The name of the current thread locale's LC_NUMERIC: "C" in the engine's, whatever the host's is outside it.
+    return libc.nl_langinfo(NL_LOCALE_NAME_NUMERIC)
 
 
 def utf8_multibyte_works():
@@ -138,8 +147,15 @@ class ScopeInvariants(unittest.TestCase):
                 cls.comma = name
                 break
             libc.setlocale(LC_NUMERIC, b"C")
+        if not cls.comma:
+            # Not "C", so that the Scope's switch of LC_NUMERIC shows by the locale's name.
+            libc.setlocale(LC_NUMERIC, b"C.utf8")
         cls.enter.argtypes = [ctypes.c_void_p]
         cls.leave.argtypes = [ctypes.c_void_p]
+
+    @property
+    def host_numeric(self):
+        return self.comma or b"C.utf8"
 
     def host_mode(self):
         libm.fesetround(FE_UPWARD)
@@ -151,6 +167,7 @@ class ScopeInvariants(unittest.TestCase):
         self.assertEqual(mxcsr_mode(), MXCSR_HOST, f"{where}: SSE rounding, flush-to-zero and denormals-are-zero")
         if self.comma:
             self.assertFalse(radix_is_dot(), f"{where}: LC_NUMERIC")
+        self.assertEqual(numeric_name(), self.host_numeric, f"{where}: LC_NUMERIC name")
         self.assertTrue(utf8_multibyte_works(), f"{where}: LC_CTYPE")
 
     def ascii_locale(self):
@@ -172,6 +189,7 @@ class ScopeInvariants(unittest.TestCase):
             self.assertEqual(control_word() & 0x0F00, 0, "engine x87 precision (24 bits) and rounding")
             self.assertEqual(mxcsr_mode(), 0, "engine SSE rounding, flush-to-zero and denormals-are-zero")
             self.assertTrue(radix_is_dot(), "engine radix")
+            self.assertEqual(numeric_name(), b"C", "engine LC_NUMERIC")
             self.assertEqual(libc.strtod(b"0,5", None), 0.0, "engine radix is not a comma")
             self.assertTrue(utf8_multibyte_works(), "the engine keeps the host's LC_CTYPE")
         finally:
@@ -287,17 +305,19 @@ class ScopeInvariants(unittest.TestCase):
                 self.assertFalse(utf8_multibyte_works(), "the thread's own locale has an ASCII LC_CTYPE")
                 self.enter(inner)
                 try:
+                    self.assertNotIn(libc.uselocale(None), (own, previous), "a locale of the Scope's own")
                     self.assertTrue(radix_is_dot(), "engine radix over the thread's own locale")
+                    self.assertEqual(numeric_name(), b"C", "engine LC_NUMERIC over the thread's own locale")
                     self.assertFalse(utf8_multibyte_works(), "LC_CTYPE of the thread's own locale, not the cached one")
                 finally:
                     self.leave(inner)
                 self.assertEqual(libc.uselocale(None), own, "the thread's own locale back")
+                self.assertEqual(numeric_name(), self.host_numeric, "the thread's own LC_NUMERIC back")
                 if self.comma:
                     self.assertFalse(radix_is_dot(), "the thread's own locale back")
                 self.assertTrue(keys_holding(previous), "the outer Scope's locale is still the cached one, unfreed")
             finally:
                 libc.uselocale(previous)
-                self.assertEqual(libc.uselocale(None), previous, "the engine's locale before the outer Scope leaves")
                 self.leave(outer)
             self.assertEqual(libc.uselocale(None), LC_GLOBAL_LOCALE, "the thread's locale is back to the global one")
             libc.freelocale(own)
