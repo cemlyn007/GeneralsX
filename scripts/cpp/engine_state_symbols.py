@@ -480,7 +480,9 @@ class SourceIndex:
         a `static const` here at all, and a brace-initialised aggregate with a callback field (a
         `FieldParse` table's rows, for instance) never reaches this call-shaped check in the first place,
         so restricting the exemption to `StateConditionInfo` costs nothing here, though it does not mean
-        `StateConditionInfo` is the only type in the codebase whose constructor ever takes one)."""
+        `StateConditionInfo` is the only type in the codebase whose constructor ever takes one).
+        `_fieldparse_init_is_safe` likewise applies this answer to a `FieldParse` row's parse-callback
+        field alone."""
         cached = self._is_function_cache.get(name)
         if cached is not None:
             return cached
@@ -525,6 +527,44 @@ class SourceIndex:
         the initialiser being checked is (harmlessly) treated the same as one that does: a textual rule has
         no `#include` graph to resolve which macro table a given initialiser actually sees."""
         return name in self._object_like_macros
+
+    def is_written(self, parsed, source):
+        """Whether the variable `parsed` names, defined at `source` (the symbol's `file:line` sites joined by
+        `;`), is ever written outside its own declaration: assigned (`=`, `+=`, `<<=`, ...), incremented or
+        decremented, or had its address taken. Only a textual scan for the bare name, so a same-named
+        variable elsewhere is (harmlessly) read as the same one, and a write through a reference or pointer
+        that was handed the variable some other way is not seen. A function-local static can only be named
+        from the rest of the block that declares it, so that is all that is scanned; a namespace- or
+        class-scope one is scanned everywhere in the tree it can be named (every file that mentions its
+        name). A site that cannot be read counts as written."""
+        write_re = re.compile(
+            rf"(?<![.\w])(?<!->){re.escape(parsed.var)}\b\s*(?:\[[^\]]*\]\s*)*"
+            r"(?:(?<![=!<>])=(?!=)|[-+*/%&|^]=|<<=|>>=|\+\+|--)"
+            rf"|(?:\+\+|--|(?<!&)&(?!&))\s*(?<![.\w])(?<!->){re.escape(parsed.var)}\b"
+        )
+        spans = {}
+        for site in source.split(SITE_SEP):
+            rel, _sep, line = site.rpartition(":")
+            text = self.files.get(rel)
+            if text is None or not line.isdigit():
+                return True
+            start = 0
+            for _ in range(int(line) - 1):
+                start = text.find("\n", start) + 1
+            end = text.find("\n", start)
+            decl_end = start + len(self._statement_text(text, start, text[start : end if end >= 0 else len(text)]))
+            if parsed.scope in ("function", "guard") and parsed.func:
+                depth, i = 0, decl_end
+                while i < len(text) and depth >= 0:
+                    depth += (text[i] == "{") - (text[i] == "}")
+                    i += 1
+                spans.setdefault(rel, []).append((decl_end, i))
+            else:
+                spans.setdefault(rel, []).extend([(0, start), (decl_end, len(text))])
+        if not (parsed.scope in ("function", "guard") and parsed.func):
+            for rel in self.candidates(parsed.var):
+                spans.setdefault(rel, [(0, len(self.files[rel]))])
+        return any(write_re.search(self.files[rel], a, b) for rel, ranges in spans.items() for a, b in ranges)
 
     def class_bodies(self, rel, cls):
         """(start, end) offsets of the body of every definition of class `cls` in `rel`, braces matched (outside
@@ -714,16 +754,23 @@ class SourceIndex:
             # A static data member defined in the class body (inline or constexpr): only inside that class's
             # own body, so that another class's member of the same name is never taken for it. Only a
             # fallback: when some TU has the qualified out-of-line definition, the in-class line is its
-            # declaration, not a second definition site.
+            # declaration, not a second definition site. A bare declaration (`static const T name;`) is not
+            # a definition either: its real one is out of line where the qualified search could not see it
+            # (a template's `Cls<T>::name`, a header or `.inl`, a type on the line before), so the symbol
+            # stays `?` and every rule that reads declarations fails closed.
             if not found_qualified:
                 for rel in self.candidates(parsed.var, parsed.cls):
                     for body_start, body_end in self.class_bodies(rel, parsed.cls):
                         site = None
-                        for ls, line, a, _b in self.lines_with(rel, var_re, body_start):
+                        for ls, line, a, b in self.lines_with(rel, var_re, body_start):
                             if ls + a >= body_end:
                                 break
                             prefix = line[:a]
-                            if re.search(r"\bstatic\b", prefix) and "(" not in prefix:
+                            if (
+                                re.search(r"\bstatic\b", prefix)
+                                and "(" not in prefix
+                                and (re.search(r"\b(?:inline|constexpr)\b", prefix) or IN_CLASS_INIT_RE.match(line[b:]))
+                            ):
                                 site = self.where_is(rel, ls, line)
                                 break
                         if site:
@@ -780,6 +827,9 @@ DEF_PREFIX_RE = re.compile(
     r"|[A-Z_][A-Z_0-9]*\(.*\)\s*)"  # a declaring macro (DECLARE_DEFINITION_FACTORY(...) name;)
 )
 DEF_SUFFIX_RE = re.compile(r"\s*(?:\[[^\]]*\]\s*)*(?:=|;|\{|\(|,|$)")
+# What follows a class-body static's name when the line itself initialises it (`= 5`, `{5}`): a bare
+# `;` or `,` is only a declaration.
+IN_CLASS_INIT_RE = re.compile(r"\s*(?:\[[^\]]*\]\s*)*(?:=|\{)")
 
 
 def is_def_prefix(prefix):
@@ -913,12 +963,14 @@ def declarations(sym):
 # The variable itself must be a NameKeyType/StaticNameKey (optionally const), not merely mention one
 # somewhere in its type: a container or struct keyed by NameKeyType is not a cache of one. Decision 2
 # shares the generator, not the strings fed to it, so the cached key is process-wide only when every
-# engine computes the same key: whenever there is an initialiser (const or not), it must be exactly a
+# engine computes the same key: the declaration must carry an initialiser that is exactly a
 # NAMEKEY(...) or TheNameKeyGenerator->nameToKey(...) call on a string literal, never on an
 # engine-dependent expression (`NAMEKEY(TheGlobalData->m_mapName)`, `NAMEKEY(m_templateName)`), a bare
 # copy of another cache (`= s_lastKey`), or anything with a trailing operation (`NAMEKEY("x") + s_offset`).
-# A const declaration with no initialiser at all can still pass (it is filled in later by a reviewed call);
-# a non-const one with no initialiser cannot, since nothing here proves what it is ever reassigned to.
+# A declaration with no initialiser at all (const or not) does not pass: nothing here sees what fills it.
+# A non-const one must also never be written after its declaration (`SourceIndex.is_written`): the
+# initialiser alone does not stop a later `k = NAMEKEY(m_name)`. That check needs a real source-tree lookup,
+# so, like the macro check in `rule_const_object`, it is skipped only when none is given (a direct unit test).
 NAMEKEY_DECL_RE = re.compile(r"^(?:static\s+)?(const\s+)?(?:NameKeyType|StaticNameKey)\s+\w+\s*(?:\[[^\]]*\])?\s*$")
 _NAMEKEY_STRING_LITERAL_RE = r'"(?:[^"\\]|\\.)*"'
 NAMEKEY_INIT_RE = re.compile(
@@ -931,15 +983,20 @@ def rule_namekey(sym, symbols=None, is_function_name=None):
     p = sym.parsed
     if sym.key.startswith("TheKey_") or (p.var == "nk" and p.func == "getModuleNameKey"):
         return GLOBAL, "", "cached NameKeyType: process-wide by PLAN-023 Decision 2 (shared immortal generator)"
+    mutable = False
     for d in declarations(sym):
         decl, sep, init = d.partition("=")
         m = NAMEKEY_DECL_RE.match(decl.rstrip().rstrip(";").rstrip())
         if not m:
             return None
-        if sep:
-            if not NAMEKEY_INIT_RE.match(init):
-                return None
-        elif not m.group(1):
+        if not sep or not NAMEKEY_INIT_RE.match(init):
+            return None
+        mutable = mutable or not m.group(1)
+    if mutable and is_function_name is not None:
+        assert hasattr(is_function_name, "is_written"), (
+            "is_function_name must be None or expose is_written (FunctionLookup does)"
+        )
+        if is_function_name.is_written(sym):
             return None
     return GLOBAL, "", "cached NameKeyType (a name or window ID key): process-wide by PLAN-023 Decision 2"
 
@@ -948,15 +1005,99 @@ def rule_namekey(sym, symbols=None, is_function_name=None):
 # appearing in the type (a mutable pointer, a container or map keyed/valued by it, a non-const array) is
 # not provably a built-once table.
 FIELDPARSE_DECL_RE = re.compile(r"^(?:static\s+)?const\s+FieldParse\s+\w+\s*\[[^\]]*\]\s*$")
+# A table that lands in .data rather than a read-only section does so because some row is computed at run
+# time. Every call in its rows must be one of these (a field offset, a size, a bit-name list of a flags
+# type: the same names on every engine). Outside the argument lists of `offsetof`/`sizeof` (type and member
+# names, never evaluated) a row may name only literals, `_FIELDPARSE_PLAIN_NAMES` and ALL_CAPS names that
+# are neither writable nor object-like macros (under RTS_ENGINE_CONTEXT most per-engine state is a macro
+# over the engine context, so never a symbol); only the second field (the parse callback) may also name a
+# function a source-tree lookup confirms, and only the third (the user data) may call `getBitNames`. No
+# call may hide behind a template-id, a parenthesised or subscripted callee or a lambda, and no name may be
+# followed by a brace (a temporary `T{...}` runs a constructor).
+FIELDPARSE_PURE_CALL_RE = re.compile(r"^(?:offsetof|sizeof|(?:\w+::)*\w+::getBitNames)$")
+_CALL_RE = re.compile(r"([A-Za-z_][\w:]*)\s*\(")
+_INDIRECT_CALL_RE = re.compile(r"[>)\]}]\s*\(")
+_BRACE_INIT_RE = re.compile(r"[\w>)\]]\s*\{")
+# The FieldParse fields (token, parse callback, user data, offset) that may hold a function name and a
+# `getBitNames` call.
+_FIELDPARSE_CALLBACK_FIELD = 1
+_FIELDPARSE_USER_DATA_FIELD = 2
+_UNEVALUATED_RE = re.compile(r"\b(?:offsetof|sizeof)\s*\(")
+_BIT_NAMES_CALLEE_RE = re.compile(r"(?:\w+::)*\w+::getBitNames\s*\(")
+_FIELDPARSE_NUMBER_RE = re.compile(r"(?<![\w.])\d[\w.]*")
+_IDENTIFIER_RE = re.compile(r"[A-Za-z_]\w*(?:::[A-Za-z_]\w*)*")
+_LITERAL_TEXT_RE = re.compile(r"\"(?:[^\"\\]|\\.)*\"|'(?:[^'\\]|\\.)*'")
+# Names a row may use although a macro or keyword: a null pointer and the boolean constants.
+_FIELDPARSE_PLAIN_NAMES = frozenset({"NULL", "TRUE", "FALSE", "nullptr", "true", "false"})
+
+
+def _drop_unevaluated_arguments(text):
+    """`text` with every `offsetof(...)`/`sizeof(...)` argument list replaced by `0`."""
+    while True:
+        mo = _UNEVALUATED_RE.search(text)
+        if not mo:
+            return text
+        text = text[: mo.start()] + "0" + text[skip_balanced(text, mo.end() - 1, "(", ")") :]
+
+
+def _fieldparse_init_is_safe(init, writable_names, is_function_name=None):
+    """True when a FieldParse table's whole initialiser is a brace list of brace-list rows with no `->`
+    read, `++`/`--` or assignment, no call outside `FIELDPARSE_PURE_CALL_RE` (a template-id, parenthesised
+    or subscripted callee, or lambda counts as one), no brace-initialised temporary and, outside
+    `offsetof`/`sizeof` argument lists, no identifier but the allow-listed kinds named at
+    `FIELDPARSE_PURE_CALL_RE`: no writable name (qualified or by its last segment), no object-like macro
+    (each `::` segment, as the preprocessor sees them) and, when a source-tree lookup is given, no
+    lower-case or mixed-case name other than a function it confirms in a row's second field. Like
+    `_is_safe_value_expr`, a textual allow-list over the rows, not a proof over the whole language."""
+    init = _LITERAL_TEXT_RE.sub('""', init.strip())
+    if not init.startswith("{") or skip_balanced(init, 0, "{", "}") != len(init):
+        return False
+    if GLOBAL_LOOKUP_RE.search(init) or INC_DEC_RE.search(init) or ASSIGN_RE.search(init):
+        return False
+    if _INDIRECT_CALL_RE.search(init) or _BRACE_INIT_RE.search(init):
+        return False
+    if not all(FIELDPARSE_PURE_CALL_RE.match(call) for call in _CALL_RE.findall(init)):
+        return False
+    if is_function_name is not None:
+        assert hasattr(is_function_name, "is_macro_name"), (
+            "is_function_name must be None or expose is_macro_name (FunctionLookup does); a plain "
+            "callable would silently disable the object-like-macro check"
+        )
+    for row in _split_top_level_commas(init[1:-1]):
+        if not (row.startswith("{") and row.endswith("}")):
+            return False
+        for index, field in enumerate(_split_top_level_commas(row[1:-1])):
+            if index != _FIELDPARSE_USER_DATA_FIELD and _BIT_NAMES_CALLEE_RE.search(field):
+                return False
+            named = _FIELDPARSE_NUMBER_RE.sub("0", _BIT_NAMES_CALLEE_RE.sub("(", _drop_unevaluated_arguments(field)))
+            for name in _IDENTIFIER_RE.findall(named):
+                if name in _FIELDPARSE_PLAIN_NAMES:
+                    continue
+                last = name.rsplit("::", 1)[-1]
+                if name in writable_names or last in writable_names:
+                    return False
+                if is_function_name is not None:
+                    if any(is_function_name.is_macro_name(part) for part in name.split("::")):
+                        return False
+                    if not (last.isupper() or (index == _FIELDPARSE_CALLBACK_FIELD and is_function_name(last))):
+                        return False
+    return True
 
 
 def rule_field_parse(sym, symbols=None, is_function_name=None):
     """INI FieldParse table: built once, never written. By declared type, not by the variable's name alone
     (a variable merely named dataFieldParse/myFieldParse/commonFieldParse is not provably one), and not by
-    `FieldParse` merely appearing in the type somewhere (a mutable pointer or container is not a table)."""
+    `FieldParse` merely appearing in the type somewhere (a mutable pointer or container is not a table).
+    Its rows must also pass `_fieldparse_init_is_safe`."""
+    writable_names = _writable_global_names(symbols)
     for d in declarations(sym):
-        decl = d.split("=")[0].rstrip().rstrip(";").rstrip()
-        if not FIELDPARSE_DECL_RE.match(decl):
+        d = d.rstrip()
+        if not d.endswith(";"):
+            return None
+        decl, sep, init = d.rstrip(";").partition("=")
+        if not FIELDPARSE_DECL_RE.match(decl.rstrip()):
+            return None
+        if not sep or not _fieldparse_init_is_safe(init, writable_names, is_function_name):
             return None
     return CONST, "", "INI FieldParse table: built once, never written"
 
@@ -1756,6 +1897,9 @@ class FunctionLookup:
 
     def is_macro_name(self, name):
         return self._index.is_object_like_macro_name(name)
+
+    def is_written(self, sym):
+        return self._index.is_written(sym.parsed, sym.source)
 
 
 def load_library(root, lib, vcpkg_lib):

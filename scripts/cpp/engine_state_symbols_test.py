@@ -33,15 +33,19 @@ class FakeLookup:
     """A minimal stand-in for `FunctionLookup` (callable for `is_function_name`, plus `is_macro_name`),
     for tests that need to control the macro answer without building a real `SourceIndex`."""
 
-    def __init__(self, functions=(), macros=()):
+    def __init__(self, functions=(), macros=(), written=()):
         self._functions = set(functions)
         self._macros = set(macros)
+        self._written = set(written)
 
     def __call__(self, name):
         return name in self._functions
 
     def is_macro_name(self, name):
         return name in self._macros
+
+    def is_written(self, sym):
+        return sym.key in self._written
 
 
 class RulePerEngineStaticTest(unittest.TestCase):
@@ -995,14 +999,27 @@ class RuleNamekeyTest(unittest.TestCase):
     def test_namekey_from_macro_is_safe(self):
         self.assert_namekey('static NameKeyType s_key = NAMEKEY("Foo");', True)
 
-    def test_const_namekey_with_no_initializer_is_safe(self):
-        self.assert_namekey("static const NameKeyType s_key", True)
+    def test_namekey_with_no_initializer_is_not_safe(self):
+        # Nothing here sees what fills it: a const one's value comes from an out-of-line definition no
+        # rule has read, a non-const one's from any later assignment.
+        self.assert_namekey("static const NameKeyType s_key", False)
+        self.assert_namekey("static NameKeyType s_key", False)
 
     def test_namekey_from_generator_call_is_safe(self):
         self.assert_namekey('static NameKeyType s_key = TheNameKeyGenerator->nameToKey("Foo");', True)
 
     def test_mutable_namekey_reassigned_to_a_constant_is_not_safe(self):
         self.assert_namekey("static NameKeyType s_lastSelected = NAMEKEY_INVALID;", False)
+
+    def test_mutable_namekey_that_is_written_after_its_declaration_is_not_safe(self):
+        decl = 'static NameKeyType s_key = NAMEKEY("Foo");'
+        sym = make_symbol("s", [decl])
+        self.assertIsNotNone(m.rule_namekey(sym, None, FakeLookup()))
+        self.assertIsNone(m.rule_namekey(sym, None, FakeLookup(written=["s"])))
+
+    def test_const_namekey_is_not_checked_for_writes(self):
+        sym = make_symbol("s", ['static const NameKeyType s_key = NAMEKEY("Foo");'])
+        self.assertIsNotNone(m.rule_namekey(sym, None, FakeLookup(written=["s"])))
 
     def test_container_of_namekeys_is_not_safe(self):
         self.assert_namekey("static std::map<NameKeyType, Object*> s_byKey;", False)
@@ -1059,6 +1076,141 @@ class RuleFieldParseTest(unittest.TestCase):
     def test_non_const_fieldparse_array_is_not_safe(self):
         sym = make_symbol("s", ["static FieldParse s_scratch[16];"])
         self.assertIsNone(m.rule_field_parse(sym))
+
+    CALLBACKS = ("parse", "parseInt", "parseBool", "parseIndexList", "parseRiderInfo")
+
+    def assert_fieldparse(self, rows, expect, writable=(), macros=None, functions=None):
+        decl = f"static const FieldParse s_table[] = {{ {rows} }};"
+        symbols = {}
+        for name in writable:
+            symbols[name] = make_symbol(name, [], sections={".bss"})
+        lookup = None
+        if macros is not None or functions is not None:
+            lookup = FakeLookup(functions=self.CALLBACKS + tuple(functions or ()), macros=macros or ())
+        got = m.rule_field_parse(make_symbol("s", [decl]), symbols, lookup) is not None
+        self.assertEqual(got, expect, decl)
+
+    def test_table_rows_of_names_literals_and_pure_calls_are_safe(self):
+        self.assert_fieldparse(
+            '{ "A", INI::parseInt, nullptr, offsetof( Data, m_a[0] ) }, '
+            '{ "B", INI::parseIndexList, ModelConditionFlags::getBitNames(), offsetof( Data, m_b ) }, '
+            "{ nullptr, nullptr, nullptr, 0 }",
+            True,
+        )
+
+    def test_table_row_reading_engine_state_is_not_safe(self):
+        # Such a row is why the table is built at run time (and so is not in a read-only section): its
+        # initialiser, not just its declarator, decides whether the table is the same on every engine.
+        for row in (
+            '{ "A", INI::parseInt, nullptr, TheGlobalData->m_offset }',
+            '{ "A", INI::parseInt, TheNames->lookup( "x" ), 0 }',
+            '{ "A", INI::parseInt, nullptr, GameLogicRandomValue( 0, 3 ) }',
+            '{ "A", INI::parseInt, nullptr, s_calls++ }',
+            '{ "A", INI::parseInt, nullptr, s_offset = 4 }',
+        ):
+            self.assert_fieldparse(row, False)
+
+    def test_table_row_naming_a_writable_symbol_is_not_safe(self):
+        row = '{ "A", INI::parseInt, nullptr, S_OFFSET }'
+        self.assert_fieldparse(row, True)
+        self.assert_fieldparse(row, False, writable=["S_OFFSET"])
+        self.assert_fieldparse('{ "A", Foo::parse, nullptr, Foo::S_OFFSET }', False, writable=["Foo::S_OFFSET"])
+        # Without a source-tree lookup only the writable-symbol check applies.
+        self.assert_fieldparse('{ "A", INI::parseInt, nullptr, s_offset }', False, writable=["s_offset"])
+
+    def test_table_row_naming_a_non_function_is_not_safe(self):
+        # A member, a parameter or a local is neither a literal, an ALL_CAPS name nor a function, so a row
+        # reading one bakes the first engine's value into the table whether or not any symbol names it.
+        for row in (
+            '{ "A", INI::parseInt, nullptr, m_offset }',
+            '{ "A", INI::parseInt, &p, 0 }',
+            '{ "A", INI::parseInt, names, 0 }',
+            '{ "A", Foo::parse, nullptr, Foo::s_offset }',
+            '{ "A", INI::parseInt, nullptr, Foo::Size }',
+        ):
+            self.assert_fieldparse(row, False, functions=())
+        self.assert_fieldparse('{ "A", INI::parseInt, nullptr, helperOffset }', False, functions=())
+        # A function confirmed by the lookup is a parser callback only in the second field: anywhere else
+        # the same name may be a member, parameter or local that merely shares a function's name.
+        self.assert_fieldparse('{ "A", INI::parseInt, nullptr, helperOffset }', False, functions=["helperOffset"])
+        self.assert_fieldparse('{ "A", INI::parseInt, helperData, 0 }', False, functions=["helperData"])
+        self.assert_fieldparse('{ helperToken, INI::parseInt, nullptr, 0 }', False, functions=["helperToken"])
+        self.assert_fieldparse('{ "A", helperParse, nullptr, 0 }', True, functions=["helperParse"])
+        self.assert_fieldparse('{ "A", Foo::helperParse, nullptr, 0 }', True, functions=["helperParse"])
+
+    def test_get_bit_names_call_is_safe_only_in_the_user_data_field(self):
+        names = "ModelConditionFlags::getBitNames()"
+        self.assert_fieldparse('{ "A", INI::parseIndexList, %s, 0 }' % names, True)
+        self.assert_fieldparse('{ "A", INI::parseIndexList, nullptr, %s }' % names, False)
+        self.assert_fieldparse('{ %s, INI::parseIndexList, nullptr, 0 }' % names, False)
+
+    def test_table_that_is_not_a_list_of_brace_rows_is_not_safe(self):
+        decl = "static const FieldParse s_table[] = %s;"
+        for init in ('{ "A", INI::parseInt, nullptr, 0 }', '{ { "A", INI::parseInt, nullptr, 0 } } , { }', "{}{}"):
+            sym = make_symbol("s", [decl % init])
+            self.assertIsNone(m.rule_field_parse(sym, {}, FakeLookup(functions=self.CALLBACKS)), init)
+        sym = make_symbol("s", [decl % "{}"])
+        self.assertIsNotNone(m.rule_field_parse(sym, {}, FakeLookup(functions=self.CALLBACKS)))
+
+    def test_table_row_numbers_and_unevaluated_arguments_are_not_names(self):
+        self.assert_fieldparse(
+            '{ "A", INI::parseInt, nullptr, 0x10u }, { "B", INI::parseInt, nullptr, 1.5f }, '
+            "{ \"C\", INI::parseInt, nullptr, sizeof( Data::m_c ) + offsetof( Data, m_d[0] ) }",
+            True,
+            functions=(),
+        )
+
+    def test_table_row_naming_an_object_like_macro_is_not_safe(self):
+        # Under RTS_ENGINE_CONTEXT a per-engine singleton is a macro over the engine context, never a
+        # symbol, so the writable-symbol check cannot see it; an ALL_CAPS macro of the same kind likewise.
+        rows = (
+            '{ "Store", INI::parseInt, THE_THING_FACTORY, 0 }',
+            '{ "Off", INI::parseInt, nullptr, CURRENT_OFFSET }',
+            '{ "Q", Foo::parse, nullptr, Foo::CURRENT_OFFSET }',
+        )
+        for row in rows:
+            self.assert_fieldparse(row, True)
+            self.assert_fieldparse(row, True, macros=["Unrelated"])
+            self.assert_fieldparse(row, False, macros=["THE_THING_FACTORY", "CURRENT_OFFSET"])
+        # A mixed-case singleton macro is rejected whether or not the macro check sees it.
+        row = '{ "Store", INI::parseInt, TheThingFactory, 0 }'
+        self.assert_fieldparse(row, False, macros=["TheThingFactory"])
+        self.assert_fieldparse(row, False, macros=[])
+
+    def test_table_row_may_use_null_and_boolean_macros(self):
+        row = '{ "A", INI::parseBool, NULL, offsetof( Data, m_a ) }, { "B", INI::parseBool, NULL, TRUE }'
+        self.assert_fieldparse(row, True, macros=["NULL", "TRUE", "FALSE"])
+
+    def test_macro_name_inside_a_string_literal_is_not_a_name(self):
+        self.assert_fieldparse('{ "TheThingFactory", INI::parseInt, nullptr, 0 }', True, macros=["TheThingFactory"])
+
+    def test_table_row_with_an_indirect_call_is_not_safe(self):
+        # A template-id call or a call through a parenthesised, subscripted or lambda callee is never seen
+        # as `name(`.
+        for row in (
+            '{ "A", INI::parseIndexList, getBitNamesFor<ModelConditionFlags>(), 0 }',
+            '{ "A", INI::parseInt, nullptr, engineOffset<Data>() }',
+            '{ "A", INI::parseInt, nullptr, (*s_fn)() }',
+            '{ "A", INI::parseInt, nullptr, (s_fn)() }',
+            '{ "A", INI::parseIndexList, S_NAMES_FNS[0](), 0 }',
+            '{ "A", INI::parseInt, nullptr, []{ return 0; }() }',
+        ):
+            self.assert_fieldparse(row, False)
+
+    def test_table_row_with_a_brace_initialized_temporary_is_not_safe(self):
+        # `T{...}` runs a constructor (and a conversion operator for an Int field) without any `(`.
+        for row in (
+            '{ "A", INI::parseInt, nullptr, ENGINE_OFFSET{} }',
+            '{ "A", INI::parseInt, nullptr, ENGINE_OFFSET{ 3 } }',
+            '{ "A", INI::parseInt, nullptr, EngineOffset{ 3 } }',
+            '{ "A", INI::parseInt, nullptr, Foo::EngineOffset{} }',
+            '{ "A", INI::parseInt, nullptr, EngineOffset<Data>{} }',
+        ):
+            self.assert_fieldparse(row, False, functions=("EngineOffset",))
+        self.assert_fieldparse('{ "A", INI::parseInt, nullptr, ENGINE_OFFSET( 3 ) }', False)
+
+    def test_table_without_an_initializer_is_not_safe(self):
+        self.assertIsNone(m.rule_field_parse(make_symbol("s", ["static const FieldParse s_table[16];"])))
 
 
 class CodeOnlyTest(unittest.TestCase):
@@ -1188,6 +1340,176 @@ class SourceIndexDefinitionTest(unittest.TestCase):
         m.resolve_sources(self.root, symbols, {})
         self.assertEqual(sym.source, "Core/dx8wrapper.cpp:1")
         self.assertEqual(sym.decls, [])
+
+    def classify_static(self, key):
+        sym = m.Symbol(key)
+        sym.count = 1
+        sym.sections = {".bss"}
+        symbols = {key: sym}
+        index = m.resolve_sources(self.root, symbols, {})
+        m.classify(sym, symbols, m.FunctionLookup(index))
+        return sym
+
+    def test_class_static_declaration_whose_definition_is_out_of_sight_is_not_a_definition(self):
+        # The in-class line `static const T name;` carries no initialiser, so reading it as the definition
+        # would make rule:const and rule:namekey accept whatever the real, out-of-line definition computes.
+        # Each of these definitions is one the qualified search cannot see: a template's, one in a header,
+        # one whose type is on the line before `Cls::name`.
+        self.write(
+            "pool.h",
+            "template<class T> class Pool {\n"
+            "    static const Int s_size;\n"
+            "    static const NameKeyType s_key;\n"
+            "};\n"
+            "template<class T> const Int Pool<T>::s_size = TheGlobalData->m_someInt;\n"
+            "template<class T> const NameKeyType Pool<T>::s_key = NAMEKEY(TheGlobalData->m_mapName);\n",
+        )
+        self.write(
+            "bar.h",
+            "class Bar {\n    static const Int s_split;\n    static const Real s_inl;\n};\n"
+            "const Real Bar::s_inl = TheGlobalData->m_maxCameraHeight;\n",
+        )
+        self.write("bar.cpp", "const Int\nBar::s_split = TheGlobalData->m_someInt;\n")
+        for key in ("Pool<int>::s_size", "Pool<int>::s_key", "Bar::s_split", "Bar::s_inl"):
+            sym = self.classify_static(key)
+            self.assertEqual(sym.source, "?", key)
+            self.assertEqual(sym.cls, m.UNREVIEWED, key)
+
+    def test_class_static_initialised_in_the_class_body_is_still_a_definition(self):
+        self.write(
+            "inl.h",
+            "class Inl {\n"
+            "    static const Int s_plain = 5;\n"
+            "    static constexpr Int s_cexpr = 6;\n"
+            "    static inline Int s_inline;\n"
+            "    static const Int s_declared;\n"
+            "};\n",
+        )
+        for var, line in (("s_plain", 2), ("s_cexpr", 3), ("s_inline", 4), ("s_declared", None)):
+            sym = m.Symbol(f"Inl::{var}")
+            m.resolve_sources(self.root, {sym.key: sym}, {})
+            self.assertEqual(sym.source, f"Core/inl.h:{line}" if line else "?", var)
+
+    def test_namekey_static_written_after_its_declaration_is_not_a_safe_cache(self):
+        # A literal initialiser does not make a non-const static a constant key: any later assignment
+        # (or increment, or address taken for a write through a pointer) makes it per-engine state.
+        self.write(
+            "tabs.cpp",
+            "void a() {\n"
+            '    static NameKeyType s_lastTab = NAMEKEY("TabOne");\n'
+            "    if (s_lastTab == NAMEKEY(\"x\")) {}\n"
+            "    s_lastTab = TheNameKeyGenerator->nameToKey(m_tabName);\n"
+            "}\n"
+            "void b() {\n"
+            '    static NameKeyType s_calls = NAMEKEY("Calls");\n'
+            "    ++s_calls;\n"
+            "}\n"
+            "void c() {\n"
+            '    static NameKeyType s_ptr = NAMEKEY("Ptr");\n'
+            "    Poke(&s_ptr);\n"
+            "}\n"
+            "void d() {\n"
+            '    static NameKeyType s_ok = NAMEKEY("Ok");\n'
+            "    use(s_ok, s_ok == s_ok, obj.s_ok = 1, p->s_ok = 2);\n"
+            "}\n"
+            "void e() {\n"
+            "    s_ok = 3;\n"  # another function's own name: out of scope of d's static
+            "}\n"
+            "namespace {\n"
+            'static NameKeyType s_file = NAMEKEY("File");\n'
+            'static NameKeyType s_fileOk = NAMEKEY("FileOk");\n'
+            "}\n"
+            "void f() { s_file += 1; }\n",
+        )
+        self.write("other.cpp", "extern NameKeyType s_file;\nvoid g() { s_fileOk = 5; }\n")
+        expect = {
+            "a()::s_lastTab": m.UNREVIEWED,
+            "b()::s_calls": m.UNREVIEWED,
+            "c()::s_ptr": m.UNREVIEWED,
+            "d()::s_ok": m.GLOBAL,
+            "s_file": m.UNREVIEWED,
+            "s_fileOk": m.UNREVIEWED,
+        }
+        for key, cls in expect.items():
+            self.assertEqual(self.classify_static(key).cls, cls, key)
+
+    def test_fieldparse_row_reading_a_context_macro_is_not_a_safe_table(self):
+        # The singleton is an object-like macro over the engine context, so no symbol names it: only the
+        # source-tree lookup sees that the row bakes the first engine's pointer into a process-wide table.
+        self.write(
+            "ctx.h",
+            "#define TheThingFactory (::rts::ctx()->thingFactory)\n#define CURRENT_OFFSET (::rts::ctx()->off)\n",
+        )
+        self.write(
+            "tables.cpp",
+            "void a() {\n"
+            "    static const FieldParse s_pure[] = { { \"A\", INI::parseInt, nullptr, offsetof( Data, m_a ) }, "
+            "{ nullptr, nullptr, nullptr, 0 } };\n"
+            "}\n"
+            "void b() {\n"
+            "    static const FieldParse s_store[] = { { \"Store\", INI::parseInt, TheThingFactory, 0 }, "
+            "{ nullptr, nullptr, nullptr, 0 } };\n"
+            "}\n"
+            "void c() {\n"
+            "    static const FieldParse s_off[] = { { \"Off\", INI::parseInt, nullptr, CURRENT_OFFSET }, "
+            "{ nullptr, nullptr, nullptr, 0 } };\n"
+            "}\n",
+        )
+        self.write("ini.cpp", "void INI::parseInt( INI* ini )\n{\n}\n")
+        expect = {"a()::s_pure": m.CONST, "b()::s_store": m.UNREVIEWED, "c()::s_off": m.UNREVIEWED}
+        for key, cls in expect.items():
+            self.assertEqual(self.classify_static(key).cls, cls, key)
+
+    def test_fieldparse_row_reading_a_member_parameter_or_local_is_not_a_safe_table(self):
+        # None of these is a symbol or a macro, so only the allow-list over the row's names rejects them,
+        # even when a function (or a constructor) elsewhere in the tree has the same name.
+        self.write("ini.cpp", "void INI::parseInt( INI* ini )\n{\n}\n")
+        self.write(
+            "same_names.h",
+            "class Msg {\n"
+            "    const void* data() const { return m_p; }\n"
+            "    int size() const { return m_n; }\n"
+            "};\n"
+            "EngineOffset::EngineOffset()\n{\n}\n",
+        )
+        row = '{ "A", INI::parseInt, %s, %s }, { nullptr, nullptr, nullptr, 0 }'
+        self.write(
+            "tables.cpp",
+            "void Thing::parseSelf() {\n"
+            "    static const FieldParse t[] = { " + row % ("nullptr", "m_offset") + " };\n"
+            "}\n"
+            "void Mod::buildFieldParse(MultiIniFieldParse& p) {\n"
+            "    static const FieldParse t[] = { " + row % ("&p", "0") + " };\n"
+            "}\n"
+            "void local() {\n"
+            "    const void* names = TheThingFactory;\n"
+            "    static const FieldParse t[] = { " + row % ("names", "0") + " };\n"
+            "}\n"
+            "void sameNamedLocal() {\n"
+            "    const void* data = TheThingFactory;\n"
+            "    static const FieldParse t[] = { " + row % ("data", "0") + " };\n"
+            "}\n"
+            "void Thing::sameNamedMember() {\n"
+            "    static const FieldParse t[] = { " + row % ("nullptr", "size") + " };\n"
+            "}\n"
+            "void temporary() {\n"
+            "    static const FieldParse t[] = { " + row % ("nullptr", "EngineOffset{}") + " };\n"
+            "}\n"
+            "void pure() {\n"
+            "    static const FieldParse t[] = { " + row % ("nullptr", "0") + " };\n"
+            "}\n",
+        )
+        expect = {
+            "sameNamedLocal()::t": m.UNREVIEWED,
+            "Thing::sameNamedMember()::t": m.UNREVIEWED,
+            "temporary()::t": m.UNREVIEWED,
+            "Thing::parseSelf()::t": m.UNREVIEWED,
+            "Mod::buildFieldParse(MultiIniFieldParse&)::t": m.UNREVIEWED,
+            "local()::t": m.UNREVIEWED,
+            "pure()::t": m.CONST,
+        }
+        for key, cls in expect.items():
+            self.assertEqual(self.classify_static(key).cls, cls, key)
 
     def test_member_function_static_does_not_gain_header_class_line(self):
         # The member function has a real out-of-line body with the static inside it: the class-line macro
