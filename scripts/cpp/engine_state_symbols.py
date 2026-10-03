@@ -1005,25 +1005,41 @@ def rule_namekey(sym, symbols=None, is_function_name=None):
 FIELDPARSE_DECL_RE = re.compile(r"^(?:static\s+)?const\s+FieldParse\s+\w+\s*\[[^\]]*\]\s*$")
 # A table that lands in .data rather than a read-only section does so because some row is computed at run
 # time. Every call in its rows must be one of these (a field offset, a size, a bit-name list of a flags
-# type: the same names on every engine). Every identifier must be neither a writable symbol nor an
-# object-like macro (under RTS_ENGINE_CONTEXT most per-engine state is a macro over the engine context, so
-# it is never a symbol), and no call may hide behind a template-id or a parenthesised callee.
+# type: the same names on every engine). Outside the argument lists of `offsetof`/`sizeof` (type and member
+# names, never evaluated) a row may name only literals, `_FIELDPARSE_PLAIN_NAMES`, ALL_CAPS names that are
+# neither writable nor object-like macros (under RTS_ENGINE_CONTEXT most per-engine state is a macro over
+# the engine context, so never a symbol) and names a source-tree lookup confirms are functions (parser
+# callbacks); a member, a parameter or a local is none of these. No call may hide behind a template-id, a
+# parenthesised or subscripted callee, or a lambda.
 FIELDPARSE_PURE_CALL_RE = re.compile(r"^(?:offsetof|sizeof|(?:\w+::)*\w+::getBitNames)$")
 _CALL_RE = re.compile(r"([A-Za-z_][\w:]*)\s*\(")
-_INDIRECT_CALL_RE = re.compile(r"[>)]\s*\(")
+_INDIRECT_CALL_RE = re.compile(r"[>)\]}]\s*\(")
+_UNEVALUATED_RE = re.compile(r"\b(?:offsetof|sizeof)\s*\(")
+_BIT_NAMES_CALLEE_RE = re.compile(r"(?:\w+::)*\w+::getBitNames\s*\(")
+_FIELDPARSE_NUMBER_RE = re.compile(r"(?<![\w.])\d[\w.]*")
 _IDENTIFIER_RE = re.compile(r"[A-Za-z_]\w*(?:::[A-Za-z_]\w*)*")
 _LITERAL_TEXT_RE = re.compile(r"\"(?:[^\"\\]|\\.)*\"|'(?:[^'\\]|\\.)*'")
 # Names a row may use although a macro or keyword: a null pointer and the boolean constants.
-_FIELDPARSE_PLAIN_NAMES = frozenset({"NULL", "TRUE", "FALSE", "nullptr", "true", "false", "offsetof", "sizeof"})
+_FIELDPARSE_PLAIN_NAMES = frozenset({"NULL", "TRUE", "FALSE", "nullptr", "true", "false"})
+
+
+def _drop_unevaluated_arguments(text):
+    """`text` with every `offsetof(...)`/`sizeof(...)` argument list replaced by `0`."""
+    while True:
+        mo = _UNEVALUATED_RE.search(text)
+        if not mo:
+            return text
+        text = text[: mo.start()] + "0" + text[skip_balanced(text, mo.end() - 1, "(", ")") :]
 
 
 def _fieldparse_init_is_safe(init, writable_names, is_function_name=None):
     """True when a FieldParse table's whole initialiser is a brace list with no `->` read, `++`/`--` or
-    assignment, no call outside `FIELDPARSE_PURE_CALL_RE` (a template-id or parenthesised callee counts as
-    one), no name `writable_names` reports as writable (qualified or by its last segment) and, when a
-    source-tree lookup is given, no identifier it reports as an object-like macro (each `::` segment, as
-    the preprocessor sees them; `_FIELDPARSE_PLAIN_NAMES` excepted). Like `_is_safe_value_expr`, a textual
-    allow-list over the rows, not a proof over the whole language."""
+    assignment, no call outside `FIELDPARSE_PURE_CALL_RE` (a template-id, parenthesised or subscripted
+    callee, or lambda counts as one) and, outside `offsetof`/`sizeof` argument lists, no identifier but the
+    allow-listed kinds named at `FIELDPARSE_PURE_CALL_RE`: no writable name (qualified or by its last
+    segment), no object-like macro (each `::` segment, as the preprocessor sees them), and, when a
+    source-tree lookup is given, no lower-case or mixed-case name it does not confirm is a function. Like
+    `_is_safe_value_expr`, a textual allow-list over the rows, not a proof over the whole language."""
     init = _LITERAL_TEXT_RE.sub('""', init.strip())
     if not init.startswith("{") or not _is_balanced(init):
         return False
@@ -1038,13 +1054,18 @@ def _fieldparse_init_is_safe(init, writable_names, is_function_name=None):
             "is_function_name must be None or expose is_macro_name (FunctionLookup does); a plain "
             "callable would silently disable the object-like-macro check"
         )
-    for name in _IDENTIFIER_RE.findall(init):
-        if name in writable_names or name.rsplit("::", 1)[-1] in writable_names:
+    named = _FIELDPARSE_NUMBER_RE.sub("0", _BIT_NAMES_CALLEE_RE.sub("(", _drop_unevaluated_arguments(init)))
+    for name in _IDENTIFIER_RE.findall(named):
+        if name in _FIELDPARSE_PLAIN_NAMES:
+            continue
+        last = name.rsplit("::", 1)[-1]
+        if name in writable_names or last in writable_names:
             return False
         if is_function_name is not None:
-            for part in name.split("::"):
-                if part not in _FIELDPARSE_PLAIN_NAMES and is_function_name.is_macro_name(part):
-                    return False
+            if any(is_function_name.is_macro_name(part) for part in name.split("::")):
+                return False
+            if not (last.isupper() or is_function_name(last)):
+                return False
     return True
 
 

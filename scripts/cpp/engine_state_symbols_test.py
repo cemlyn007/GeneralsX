@@ -1019,12 +1019,16 @@ class RuleFieldParseTest(unittest.TestCase):
         sym = make_symbol("s", ["static FieldParse s_scratch[16];"])
         self.assertIsNone(m.rule_field_parse(sym))
 
-    def assert_fieldparse(self, rows, expect, writable=(), macros=None):
+    CALLBACKS = ("parse", "parseInt", "parseBool", "parseIndexList", "parseRiderInfo")
+
+    def assert_fieldparse(self, rows, expect, writable=(), macros=None, functions=None):
         decl = f"static const FieldParse s_table[] = {{ {rows} }};"
         symbols = {}
         for name in writable:
             symbols[name] = make_symbol(name, [], sections={".bss"})
-        lookup = None if macros is None else FakeLookup(macros=macros)
+        lookup = None
+        if macros is not None or functions is not None:
+            lookup = FakeLookup(functions=self.CALLBACKS + tuple(functions or ()), macros=macros or ())
         got = m.rule_field_parse(make_symbol("s", [decl]), symbols, lookup) is not None
         self.assertEqual(got, expect, decl)
 
@@ -1049,39 +1053,69 @@ class RuleFieldParseTest(unittest.TestCase):
             self.assert_fieldparse(row, False)
 
     def test_table_row_naming_a_writable_symbol_is_not_safe(self):
-        row = '{ "A", INI::parseInt, nullptr, s_offset }'
+        row = '{ "A", INI::parseInt, nullptr, S_OFFSET }'
         self.assert_fieldparse(row, True)
-        self.assert_fieldparse(row, False, writable=["s_offset"])
-        self.assert_fieldparse('{ "A", Foo::parse, nullptr, Foo::s_offset }', False, writable=["Foo::s_offset"])
+        self.assert_fieldparse(row, False, writable=["S_OFFSET"])
+        self.assert_fieldparse('{ "A", Foo::parse, nullptr, Foo::S_OFFSET }', False, writable=["Foo::S_OFFSET"])
+        # Without a source-tree lookup only the writable-symbol check applies.
+        self.assert_fieldparse('{ "A", INI::parseInt, nullptr, s_offset }', False, writable=["s_offset"])
+
+    def test_table_row_naming_a_non_function_is_not_safe(self):
+        # A member, a parameter or a local is neither a literal, an ALL_CAPS name nor a function, so a row
+        # reading one bakes the first engine's value into the table whether or not any symbol names it.
+        for row in (
+            '{ "A", INI::parseInt, nullptr, m_offset }',
+            '{ "A", INI::parseInt, &p, 0 }',
+            '{ "A", INI::parseInt, names, 0 }',
+            '{ "A", Foo::parse, nullptr, Foo::s_offset }',
+            '{ "A", INI::parseInt, nullptr, Foo::Size }',
+        ):
+            self.assert_fieldparse(row, False, functions=())
+        self.assert_fieldparse('{ "A", INI::parseInt, nullptr, helperOffset }', False, functions=())
+        self.assert_fieldparse('{ "A", INI::parseInt, nullptr, helperOffset }', True, functions=["helperOffset"])
+
+    def test_table_row_numbers_and_unevaluated_arguments_are_not_names(self):
+        self.assert_fieldparse(
+            '{ "A", INI::parseInt, nullptr, 0x10u }, { "B", INI::parseInt, nullptr, 1.5f }, '
+            "{ \"C\", INI::parseInt, nullptr, sizeof( Data::m_c ) + offsetof( Data, m_d[0] ) }",
+            True,
+            functions=(),
+        )
 
     def test_table_row_naming_an_object_like_macro_is_not_safe(self):
         # Under RTS_ENGINE_CONTEXT a per-engine singleton is a macro over the engine context, never a
         # symbol, so the writable-symbol check cannot see it; an ALL_CAPS macro of the same kind likewise.
         rows = (
-            '{ "Store", INI::parseInt, TheThingFactory, 0 }',
-            '{ "Data", INI::parseInt, TheGlobalData, 0 }',
+            '{ "Store", INI::parseInt, THE_THING_FACTORY, 0 }',
             '{ "Off", INI::parseInt, nullptr, CURRENT_OFFSET }',
             '{ "Q", Foo::parse, nullptr, Foo::CURRENT_OFFSET }',
         )
         for row in rows:
             self.assert_fieldparse(row, True)
             self.assert_fieldparse(row, True, macros=["Unrelated"])
-            self.assert_fieldparse(row, False, macros=["TheThingFactory", "TheGlobalData", "CURRENT_OFFSET"])
+            self.assert_fieldparse(row, False, macros=["THE_THING_FACTORY", "CURRENT_OFFSET"])
+        # A mixed-case singleton macro is rejected whether or not the macro check sees it.
+        row = '{ "Store", INI::parseInt, TheThingFactory, 0 }'
+        self.assert_fieldparse(row, False, macros=["TheThingFactory"])
+        self.assert_fieldparse(row, False, macros=[])
 
     def test_table_row_may_use_null_and_boolean_macros(self):
         row = '{ "A", INI::parseBool, NULL, offsetof( Data, m_a ) }, { "B", INI::parseBool, NULL, TRUE }'
-        self.assert_fieldparse(row, True, macros=["NULL", "TRUE", "FALSE", "offsetof"])
+        self.assert_fieldparse(row, True, macros=["NULL", "TRUE", "FALSE"])
 
     def test_macro_name_inside_a_string_literal_is_not_a_name(self):
         self.assert_fieldparse('{ "TheThingFactory", INI::parseInt, nullptr, 0 }', True, macros=["TheThingFactory"])
 
     def test_table_row_with_an_indirect_call_is_not_safe(self):
-        # A template-id call or a call through a parenthesised callee is never seen as `name(`.
+        # A template-id call or a call through a parenthesised, subscripted or lambda callee is never seen
+        # as `name(`.
         for row in (
             '{ "A", INI::parseIndexList, getBitNamesFor<ModelConditionFlags>(), 0 }',
             '{ "A", INI::parseInt, nullptr, engineOffset<Data>() }',
             '{ "A", INI::parseInt, nullptr, (*s_fn)() }',
             '{ "A", INI::parseInt, nullptr, (s_fn)() }',
+            '{ "A", INI::parseIndexList, S_NAMES_FNS[0](), 0 }',
+            '{ "A", INI::parseInt, nullptr, []{ return 0; }() }',
         ):
             self.assert_fieldparse(row, False)
 
@@ -1331,7 +1365,37 @@ class SourceIndexDefinitionTest(unittest.TestCase):
             "{ nullptr, nullptr, nullptr, 0 } };\n"
             "}\n",
         )
+        self.write("ini.cpp", "void INI::parseInt( INI* ini )\n{\n}\n")
         expect = {"a()::s_pure": m.CONST, "b()::s_store": m.UNREVIEWED, "c()::s_off": m.UNREVIEWED}
+        for key, cls in expect.items():
+            self.assertEqual(self.classify_static(key).cls, cls, key)
+
+    def test_fieldparse_row_reading_a_member_parameter_or_local_is_not_a_safe_table(self):
+        # None of these is a symbol or a macro, so only the allow-list over the row's names rejects them.
+        self.write("ini.cpp", "void INI::parseInt( INI* ini )\n{\n}\n")
+        row = '{ "A", INI::parseInt, %s, %s }, { nullptr, nullptr, nullptr, 0 }'
+        self.write(
+            "tables.cpp",
+            "void Thing::parseSelf() {\n"
+            "    static const FieldParse t[] = { " + row % ("nullptr", "m_offset") + " };\n"
+            "}\n"
+            "void Mod::buildFieldParse(MultiIniFieldParse& p) {\n"
+            "    static const FieldParse t[] = { " + row % ("&p", "0") + " };\n"
+            "}\n"
+            "void local() {\n"
+            "    const void* names = TheThingFactory;\n"
+            "    static const FieldParse t[] = { " + row % ("names", "0") + " };\n"
+            "}\n"
+            "void pure() {\n"
+            "    static const FieldParse t[] = { " + row % ("nullptr", "0") + " };\n"
+            "}\n",
+        )
+        expect = {
+            "Thing::parseSelf()::t": m.UNREVIEWED,
+            "Mod::buildFieldParse(MultiIniFieldParse&)::t": m.UNREVIEWED,
+            "local()::t": m.UNREVIEWED,
+            "pure()::t": m.CONST,
+        }
         for key, cls in expect.items():
             self.assertEqual(self.classify_static(key).cls, cls, key)
 
