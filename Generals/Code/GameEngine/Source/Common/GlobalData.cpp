@@ -1214,8 +1214,8 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 	// TheWritableGlobalData into this override (a memberwise copy, not implemented on VC6 -- see
 	// newOverride()), so re-deriving and re-creating it here for an override would discard that copy
 	// and just re-read $XDG_DATA_HOME/$HOME, redundantly re-creating the same directory on every
-	// map.ini/solo.ini GameData block (and, on a transient failure, re-printing
-	// createUserDataDirectory's stderr diagnostic each time). Generals has no setPath_UserData, so
+	// map.ini/solo.ini GameData block (and, while the default cannot be created, e.g. a read-only
+	// $HOME, re-printing createUserDataDirectory's stderr diagnostic each time). Generals has no setPath_UserData, so
 	// unlike GeneralsMD's matching constructor guard there is no separately-set, already-working
 	// directory this could clobber -- it is simply wasted work. One side effect: on Windows,
 	// an override's own UserDataLeafName INI field (parsed into TheWritableGlobalData->m_userDataLeafName
