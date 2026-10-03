@@ -9,9 +9,10 @@
 #
 # A written symbol is judged by name, never by its class alone:
 #
-#   worklist     classified render-per-engine or render-scratch, or render-const with a phase (still
-#                rewritten at every render boot until that stage builds it once): state known to change
-#                as an engine draws, which PLAN-023 Phase 8 moves into the engine (the row's phase says when);
+#   worklist     classified render-per-engine or render-scratch (state known to change as an engine draws,
+#                which PLAN-023 Phase 8 moves into the engine), or render-const with a phase (a constant
+#                every render boot still rewrites until that stage builds it once for the process); the
+#                row's phase says when;
 #   allowed      named in the explicit allowlist (ALLOWLIST below, or the caller's), each with its reason: a
 #                process-wide counter, pool or cache that is written on purpose and safe to share;
 #   unexpected   anything else: a symbol the list calls constant, render-const without a phase, render-process, debug-only,
