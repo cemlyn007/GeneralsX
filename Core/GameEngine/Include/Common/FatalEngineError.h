@@ -29,11 +29,16 @@
 // it either (its destructors may run on inconsistent state). A fatal error raised while a
 // destructor is running still ends the process, through std::terminate.
 //
-// GeneralsX @bugfix cemlyn007 28/09/2026 The teardown window (PLAN-023 Phase 1). Once the engine is
-// being torn down, or while another exception is already propagating, a fatal error returns as it did
-// before embedded mode (after writing the crash file, if TheGlobalData is still there): a throw there
-// would almost always escape a destructor and end the process through std::terminate. Before the
-// engine has made TheGlobalData (early boot) it still throws, without a crash file.
+// GeneralsX @bugfix cemlyn007 03/10/2026 The teardown window (PLAN-023 Phase 1). Once the engine is
+// being torn down, or while another exception is already propagating, a fatal error writes the crash
+// file (if TheGlobalData exists) and then returns to its caller instead of throwing: a throw there
+// would almost always escape a destructor and end the process through std::terminate. Upstream
+// returns only once TheGlobalData is gone and otherwise exits the process, so with TheGlobalData
+// alive this is new behaviour: the caller carries on past the fatal error. The sticky fault latch
+// below is still set. Outside that window, with no TheGlobalData it throws without a crash file.
+// The teardown flag is cleared only by the next GameEngine(): a host that boots again in the same
+// process (or context) must call SetEngineTearingDown(false) before its startup parse, or fatal
+// errors in that parse return as well.
 
 #pragma once
 
@@ -68,7 +73,7 @@ FATAL_ENGINE_ERROR_API bool IsEngineTearingDown();
 // depends on every catch (...) between RELEASE_CRASH and the host having a
 // catch (const FatalEngineError&) { throw; } in front of it. Something that swallows the
 // exception anyway (a catch (...) added later, upstream or in a merge) still sets this latch
-// first, so a host that polls HasEngineFaulted() after each call into the engine can detect the
+// first, even when the error is returned instead of thrown (the teardown window above), so a host that polls HasEngineFaulted() after each call into the engine can detect the
 // fault even when the exception itself never reaches it.
 //
 // The flag is process-wide, like IsEngineEmbeddedMode() above, and nothing in this engine ever

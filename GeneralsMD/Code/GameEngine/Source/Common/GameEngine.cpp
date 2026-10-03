@@ -282,7 +282,7 @@ GameEngine::GameEngine()
 //-------------------------------------------------------------------------------------------------
 GameEngine::~GameEngine()
 {
-	// GeneralsX @bugfix cemlyn007 28/09/2026 From here on a fatal error with no TheGlobalData does not
+	// GeneralsX @bugfix cemlyn007 28/09/2026 From here on an embedded-mode fatal error does not
 	// throw (see FatalEngineError.h)
 	SetEngineTearingDown(true);
 
