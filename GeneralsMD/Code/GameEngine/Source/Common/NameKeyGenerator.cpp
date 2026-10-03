@@ -174,8 +174,8 @@ namespace
 {
 	AsciiString reason;
 	if (internedAfterPriming)
-		reason.format("NameKey '%s' was first interned after the priming engine's init (during play), so its key "
-			"differs from a fresh process's while a later engine boots", name);
+		reason.format("NameKey '%s' was first interned after the priming engine's frozen window ended (by any engine), "
+			"so its key differs from a fresh process's while a later engine boots", name);
 	else
 		reason.format("NameKey '%s' is new to this process while a later engine boots: its data differs from the "
 			"first engine's, so the name keys it shares with it (sciences, upgrades) cannot be trusted", name);
@@ -184,7 +184,7 @@ namespace
 }
 }
 
-// A name the priming engine interned after its init completed is new to a later engine's frozen window.
+// A name interned after the priming engine's frozen window ended is new to a later engine's frozen window.
 NameKeyType NameKeyGenerator::keyOfExisting(const Bucket* b) const
 {
 	if (b->m_afterPriming && rts::ctx()->nameKeysFrozen)
@@ -387,9 +387,10 @@ NameKeyGenerator::PrimingState thePrimingState = NameKeyGenerator::PRIMING_NOT_S
 const char* thePrimingFailure = nullptr;
 }
 
-// GeneralsX @bugfix cemlyn007 03/10/2026 A refusal that does not poison the process is a host usage
-// error, not a crash: ReleaseCrash would rotate and rewrite the crash report for it, so it raises the
-// error directly. It deliberately does not set the fault latch (FatalEngineError.h): no engine faulted.
+// GeneralsX @bugfix cemlyn007 03/10/2026 A refusal that poisons nothing new (a host usage error, or
+// a repeat of the failure that already poisoned the process) is not a crash: ReleaseCrash would rotate
+// and rewrite the crash report for it, so it raises the error directly. It deliberately does not set
+// the fault latch (FatalEngineError.h): no engine faulted.
 [[noreturn]] static void refuseInit(const char* reason)
 {
 	fprintf(stderr, "GeneralsX: GameEngine::init refused: %s\n", reason);
@@ -442,10 +443,9 @@ NameKeyGenerator::PrimingLatch::PrimingLatch() : m_priming(FALSE), m_completed(F
 	if (inProgress)
 		refuseInit("another engine is still priming this process (the first engine must complete "
 			"GameEngine::init alone)");
-	// Never returns: ReleaseCrash alone returns when there is no TheGlobalData (a host that called init
-	// before its startup parse, say), and init must not run on then.
+	// The failure that poisoned the process already wrote the crash report and set the fault latch.
 	if (refusal != nullptr)
-		ReleaseCrashNoReturn(refusal);
+		refuseInit(refusal);
 	if (!m_priming)
 		rts::ctx()->nameKeysFrozen = true;
 }
@@ -474,6 +474,12 @@ NameKeyGenerator::PrimingLatch::~PrimingLatch()
 void NameKeyGenerator::PrimingLatch::endFrozenNames()
 {
 	rts::ctx()->nameKeysFrozen = false;
+	if (m_priming)
+	{
+		// Every name interned from here on is one a later engine's frozen window must not meet.
+		std::lock_guard<std::mutex> lock(TheNameKeyGenerator->m_insertMutex);
+		TheNameKeyGenerator->m_primed = true;
+	}
 }
 
 void NameKeyGenerator::PrimingLatch::complete()
@@ -481,10 +487,6 @@ void NameKeyGenerator::PrimingLatch::complete()
 	m_completed = TRUE;
 	if (m_priming)
 	{
-		{
-			std::lock_guard<std::mutex> lock(TheNameKeyGenerator->m_insertMutex);
-			TheNameKeyGenerator->m_primed = true;
-		}
 		std::lock_guard<std::mutex> lock(thePrimingMutex);
 		thePrimingState = PRIMED;
 	}

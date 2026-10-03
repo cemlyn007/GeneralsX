@@ -70,7 +70,7 @@ public:
 	NameKeyType		m_key;
 	AsciiString		m_nameString;
 #if RTS_ENGINE_CONTEXT
-	Bool					m_afterPriming;	///< interned after the priming engine's GameEngine::init completed (see PrimingLatch)
+	Bool					m_afterPriming;	///< interned after the priming engine's frozen window ended (see PrimingLatch)
 #endif
 };
 
@@ -147,8 +147,8 @@ public:
 	// GameEngine::init alone. Every later engine boots from the same data, so it finds every boot
 	// name already interned, with the same key, and must intern nothing new until its upgrades are
 	// loaded (the science and upgrade keys are what orders carry): a new name there means different
-	// data, which is a fatal error. A name the priming engine interned only after its own init
-	// completed (during play) counts as new there too. If the priming engine fails partway, the generator holds a
+	// data, which is a fatal error. A name first interned after the priming engine's own frozen window
+	// ended counts as new there too. If the priming engine fails partway, the generator holds a
 	// partial prefix that a retry would extend differently, so the process is poisoned: every later
 	// engine fails in GameEngine::init, and the host has to restart the process. So is it if a later
 	// engine's init fails partway: that leaves process-wide state half built, and ~GameEngine cannot
@@ -156,6 +156,9 @@ public:
 	//
 	// No refusal here returns. The poisoning and frozen-window ones end through ReleaseCrashNoReturn
 	// (FatalEngineError when embedded, otherwise ReleaseCrash's own exit, or abort() if it returned).
+	// The refusals that repeat an earlier failure or are host usage errors (init while another engine
+	// is priming, outside every context, or in an already poisoned process) raise FatalEngineError (or
+	// abort()) directly, leaving the crash report alone.
 	enum PrimingState
 	{
 		PRIMING_NOT_STARTED,	///< no engine has started GameEngine::init in this process
@@ -174,7 +177,8 @@ public:
 	public:
 		PrimingLatch();
 		~PrimingLatch();
-		// This engine may intern new names from here on (its upgrades are loaded).
+		// This engine may intern new names from here on (its upgrades are loaded). For the priming
+		// engine this also starts the names a later engine's frozen window must not meet.
 		void endFrozenNames();
 		void complete();
 
@@ -198,7 +202,7 @@ private:
 	NameKeyType createNameKey(UnsignedInt hash, const AsciiString& name);
 #if RTS_ENGINE_CONTEXT
 	NameKeyType keyOfExisting(const Bucket* b) const;
-	bool m_primed;	///< the priming engine's GameEngine::init completed; guarded by m_insertMutex
+	bool m_primed;	///< the priming engine's frozen window has ended; guarded by m_insertMutex
 #endif
 
 	void freeSockets();

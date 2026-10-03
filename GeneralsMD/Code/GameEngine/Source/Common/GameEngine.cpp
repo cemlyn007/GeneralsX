@@ -28,7 +28,7 @@
 
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
-#include <cstdlib>  // std::getenv (GENERALSX_TEST_FAULT_IN_INIT)
+#include <cstdlib>  // std::getenv (the GENERALSX_TEST_* hooks)
 
 #include "Common/ActionManager.h"
 #include "Common/AudioAffect.h"
@@ -789,6 +789,11 @@ void GameEngine::init()
 #if RTS_ENGINE_CONTEXT
 		// GeneralsX @feature cemlyn007 28/09/2026 Every name key a later engine needs to share with
 		// the priming engine (the science and upgrade keys that orders carry) is interned by now
+		// Test hook (embedded mode only, like GENERALSX_TEST_FAULT_IN_INIT): a later engine looks up the
+		// given name inside its frozen window.
+		if (IsEngineEmbeddedMode() && rts::ctx()->nameKeysFrozen)
+			if (const char* name = std::getenv("GENERALSX_TEST_INTERN_IN_FROZEN_WINDOW"))
+				TheNameKeyGenerator->nameToKey(name);
 		primingLatch.endFrozenNames();
 #endif
 		initSubsystem(TheGameClient,"TheGameClient", createGameClient(), nullptr);
