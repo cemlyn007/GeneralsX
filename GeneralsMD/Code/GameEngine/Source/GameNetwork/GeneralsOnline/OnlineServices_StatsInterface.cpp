@@ -5,11 +5,11 @@
 #include "GameNetwork/GeneralsOnline/NGMP_json.h"
 #include "GameNetwork/GeneralsOnline/ngmp_curl_utils.h"
 #include "GameNetwork/GeneralsOnline/NGMPGame.h"
+#include "Common/GlobalData.h"
 #include "Common/ScoreKeeper.h"
 #include <cinttypes>
 #include <thread>
 #include <curl/curl.h>
-#include "Common/EngineContext.h" // GeneralsX @feature cemlyn007 28/09/2026 rts::withCurrentEngine
 
 using json = nlohmann::json;
 
@@ -106,7 +106,11 @@ void NGMP_OnlineServices_StatsInterface::CommitMyOutcome(ScoreKeeper* pScoreKeep
 	std::string authToken = NGMP_OnlineServicesManager::getInstance().getAuthToken();
 	uint32_t tokenVersion = NGMP_OnlineServicesManager::getInstance().getAuthTokenVersion();
 
-	std::thread(::rts::withCurrentEngine([url, payloadStr, authToken, tokenVersion]() {
+	// GeneralsX @bugfix cemlyn007 03/10/2026 Read the engine values here: this thread is detached, so it
+	// may outlive the engine's context and must not reach engine state itself.
+	const uint32_t exeCRC = TheGlobalData ? TheGlobalData->m_exeCRC : 0;
+	const uint32_t iniCRC = TheGlobalData ? TheGlobalData->m_iniCRC : 0;
+	std::thread([url, payloadStr, authToken, tokenVersion, exeCRC, iniCRC]() {
 		CURL* curl = curl_easy_init();
 		if (!curl) {
 			fprintf(stderr, "[NGMP] CommitMyOutcome: failed to initialize curl\n");
@@ -143,7 +147,7 @@ void NGMP_OnlineServices_StatsInterface::CommitMyOutcome(ScoreKeeper* pScoreKeep
 		if (httpCode == 401) {
 			fprintf(stderr, "[NGMP] CommitMyOutcome: 401 Unauthorized (session expired mid-game), refreshing token...\n");
 			fflush(stderr);
-			if (NGMP_OnlineServicesManager::getInstance().refreshSessionTokenSync(tokenVersion)) {
+			if (NGMP_OnlineServicesManager::getInstance().refreshSessionTokenSync(exeCRC, iniCRC, tokenVersion)) {
 				std::string freshToken = NGMP_OnlineServicesManager::getInstance().getAuthToken();
 				curl = curl_easy_init();
 				if (curl) {
@@ -180,5 +184,5 @@ void NGMP_OnlineServices_StatsInterface::CommitMyOutcome(ScoreKeeper* pScoreKeep
 		}
 		fflush(stderr);
 		NGMP_OnlineServicesManager::getInstance().postEvent(ev);
-	})).detach();
+	}).detach();
 }
