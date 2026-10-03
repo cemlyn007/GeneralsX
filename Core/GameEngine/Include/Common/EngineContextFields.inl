@@ -1,11 +1,12 @@
 // FILE: EngineContextFields.inl
 // GeneralsX @feature cemlyn007 03/10/2026 The direct EngineContext fields (PLAN-023 Phases 2-3)
 //
-// X-macro list of the EngineContext fields that are neither singletons (Common/EngineSingletons.inl) nor
-// the RNG seed arrays. Common/EngineContext.h declares them from this list, Common/EngineContext.cpp
-// enumerates the pointer fields for the lifecycle checks and compares the value fields with their initial
-// values for noEngineIsPristine(), so a field added here is covered by both. A field outside this list is
-// not checked.
+// X-macro list of the EngineContext fields other than the singletons (Common/EngineSingletons.inl), the
+// RNG seeds (the three arrays and gameLogicBaseSeed) and originalGlobalData. Common/EngineContext.h
+// declares them from this list, Common/EngineContext.cpp enumerates the pointer fields for the lifecycle
+// checks and compares the value fields with their initial values for noEngineIsPristine(), so a field
+// added here is covered by both. The seeds and originalGlobalData are checked by hand in
+// noEngineIsPristine() and ~EngineContext(); any other field added outside this list is not checked.
 //
 //   RTS_ENGINE_CONTEXT_POINTER(Class, name)      -- `Class* name = nullptr`, Class declared with `class`,
 //                                                   set by the engine and freed and nulled at its teardown
