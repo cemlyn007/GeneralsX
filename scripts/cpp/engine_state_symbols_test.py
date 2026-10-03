@@ -1070,6 +1070,26 @@ class SourceIndexDefinitionTest(unittest.TestCase):
         self.assertNotIn("->", control.decl)
         self.assertEqual(control.by, "rule:const")
 
+    def test_classify_with_a_real_function_lookup_rejects_an_all_caps_macro_reading_a_global(self):
+        # End to end through resolve_sources, FunctionLookup and classify, the way `load_library` actually
+        # calls them (not a FakeLookup handed directly to rule_const_object, and not classify() called with
+        # no lookup at all, as every other classify() test in this file does): an object-like macro that
+        # expands to a per-engine read must still make rule:const refuse it once a real `SourceIndex`-backed
+        # lookup is threaded all the way through. A plain callable in `load_library`'s place (`index.
+        # is_function_name` instead of `FunctionLookup(index)`) would pass this symbol as constant, because
+        # `_is_safe_value_expr` finds the macro check via `getattr(lookup, "is_macro_name", None)` and a
+        # plain callable has no such attribute.
+        self.write("crcdebug.cpp", "#define FOO TheX->y\n")
+        self.write("flag.cpp", "static const Bool s = FOO;\n")
+        sym = m.Symbol("s")
+        sym.count = 1
+        sym.sections = {".bss"}
+        symbols = {"s": sym}
+        index = m.resolve_sources(self.root, symbols, {})
+        m.classify(sym, symbols, m.FunctionLookup(index))
+        self.assertEqual(sym.cls, m.UNREVIEWED)
+        self.assertEqual(sym.by, "none")
+
     def test_rule_const_fails_closed_on_a_statement_longer_than_the_scan_window(self):
         # A statement longer than _statement_text's own scan window is cut off before reaching its `;`, so
         # the recorded declaration can never show the real `->` read or RNG call: rule:const must refuse a
