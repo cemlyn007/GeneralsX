@@ -192,9 +192,9 @@ class RuleConstObjectTest(unittest.TestCase):
         )
 
     def test_by_value_const_initialized_from_an_unreviewed_template_id_is_not_safe(self):
-        # `_declared_type_name` must read the template's own name (`Cache`), not the last template
-        # argument (`Int`): the declared type is a specialisation this scan has never reviewed, whatever
-        # its argument looks like.
+        # `_declared_type_name` must not read the last template argument (`Int`) as the declared type: it
+        # fails closed (returns "") on any template-id, so a specialisation this scan has never reviewed
+        # is rejected whatever its argument looks like.
         self.assert_const('static const Cache<Int> d("q");', False)
 
     def test_by_value_const_initialized_from_a_template_id_whose_argument_is_a_reviewed_class_type_is_not_safe(
@@ -222,10 +222,10 @@ class RuleConstObjectTest(unittest.TestCase):
 
     def test_by_value_const_initialized_from_a_color_typedef_call_is_still_safe(self):
         # Color (Color.h/ParticleSys.h/Xfer.h: `typedef Int Color;`) must stay accepted now that the
-        # declared type is gated unconditionally: the 4 chatNormalColor/mainColor/dropColor-shaped rows
-        # already checked in to PLAN-023_STATE_CLASSIFICATION.tsv call `GameMakeColor` to build a `const
-        # Color`, and `Color` was never itself on any of the three allow-lists before this fix added it to
-        # `SCALAR_TYPE_NAMES`.
+        # declared type is gated unconditionally: the 3 chatNormalColor/mainColor/dropColor rows (4
+        # definition sites: chatNormalColor alone has two) already checked in to
+        # PLAN-023_STATE_CLASSIFICATION.tsv call `GameMakeColor` to build a `const Color`, and `Color` was
+        # never itself on any of the three allow-lists before this fix added it to `SCALAR_TYPE_NAMES`.
         self.assert_const("static const Color mainColor = GameMakeColor(0, 255, 0, 255);", True)
 
     def test_declared_type_name_fails_closed_on_a_template_id(self):
