@@ -420,6 +420,59 @@ class RuleConstObjectTest(unittest.TestCase):
     def test_by_value_const_initialized_from_a_parenthesized_callee_with_no_arguments_is_not_safe(self):
         self.assert_const("static const Int v = (getValue)();", False)
 
+    def test_by_value_const_initialized_from_a_parenthesized_writable_global_plus_one_is_not_safe(self):
+        # `(s_counter)+1` is, textually, either a cast of the signed literal `+1` or an addition on the
+        # parenthesised `s_counter`: since this rule cannot prove `s_counter` is a type and not a writable
+        # symbol, a leading sign on the cast's would-be operand must not be read as a cast at all, only as
+        # the unsafe second reading. Unparenthesised, `s_counter+1` is already rejected (`_has_unsafe_
+        # operator`'s `+` is never special-cased); this is the same read spelled with the extra parens a
+        # real C-style cast also uses.
+        writable = {"s_counter": make_symbol("s_counter", [], sections={".bss"})}
+        self.assert_const("static const Int s = (s_counter)+1;", False, symbols=writable)
+
+    def test_by_value_const_initialized_from_a_parenthesized_writable_global_with_a_space_plus_one_is_not_safe(
+        self,
+    ):
+        self.assert_const(
+            "static const Int s = (s_counter) +1;",
+            False,
+            symbols={"s_counter": make_symbol("s_counter", [], sections={".bss"})},
+        )
+
+    def test_by_value_const_initialized_from_a_parenthesized_writable_global_minus_one_is_not_safe(self):
+        # The subtraction spelling this codebase actually writes (`(T)-1`-shaped), for a name that is a
+        # writable global rather than a type: REPLAY_CRC_INTERVAL is ALL_CAPS but mutable (rewritten by
+        # replay playback), the same writable spelled-as-a-constant hazard the ALL_CAPS branch already
+        # guards against for the unparenthesised form.
+        writable = {"REPLAY_CRC_INTERVAL": make_symbol("REPLAY_CRC_INTERVAL", [], sections={".data"})}
+        self.assert_const("static const UnsignedInt s = (REPLAY_CRC_INTERVAL)-1;", False, symbols=writable)
+
+    def test_by_value_const_initialized_from_a_parenthesized_writable_global_minus_hex_is_not_safe(self):
+        writable = {"s_counter": make_symbol("s_counter", [], sections={".bss"})}
+        self.assert_const("static const Int s = (s_counter)-0x10;", False, symbols=writable)
+
+    def test_by_value_const_initialized_from_a_parenthesized_object_like_macro_plus_one_is_not_safe(self):
+        # The same hazard again, but for a name the symbol table never sees at all: an object-like macro
+        # (IS_FRAME_OK_TO_LOG) that expands to a per-engine read. Only a real lookup's `is_macro_name` can
+        # catch this one, and the cast branch must not bypass that check by reading `)+1` as a cast.
+        lookup = FakeLookup(macros={"IS_FRAME_OK_TO_LOG"})
+        self.assert_const(
+            "static const Int s = (IS_FRAME_OK_TO_LOG)+1;", False, is_function_name=lookup
+        )
+
+    def test_const_pointer_initialized_from_a_parenthesized_writable_global_plus_one_is_not_safe(self):
+        # `_pointer_init_is_safe` has the same cast branch, with the same hazard: `(TheFoo)+1` must not be
+        # read as a cast of the literal `+1` just because `TheFoo` sits in parentheses.
+        self.assert_const("static Foo* const p = (TheFoo)+1;", False)
+
+    def test_by_value_const_initialized_from_a_cast_of_a_negative_literal_is_still_rejected(self):
+        # Keeping the sign rejection simple (any leading `+`/`-` on the cast's would-be operand) means a
+        # genuine cast of a negative literal, such as `(Int)-1`, also now fails closed rather than being
+        # read as a cast: this rule has no way to tell that one apart from `(s_counter)-1` from the text
+        # alone, and no current rule:const row relies on the negative-literal-cast reading, so failing
+        # closed here costs nothing today.
+        self.assert_const("static const Int x = (Int)-1;", False)
+
     def test_by_value_const_initialized_from_an_ampersand_taken_function_pointer_is_safe(self):
         # FUNC_PTR_ARG_RE's own comment says a function-pointer argument may be "bare, `&`-taken or
         # scoped": the `&` must be stripped before the lower-case check, not counted as the first character.

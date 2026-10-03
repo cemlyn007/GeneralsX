@@ -1268,12 +1268,19 @@ def _is_safe_value_expr(expr, type_name, writable_names, is_function_name=None):
     if m:
         return _is_safe_value_expr(m.group("rest"), type_name, writable_names, is_function_name)
     m = _CAST_RE.match(expr)
-    if m and m.group("rest")[:1] != "(":
+    if m and m.group("rest")[:1] not in "(+-":
         # `(name)(args)` is a parenthesised callee (a call through a function pointer, or a macro that
         # expands to one), not a C-style cast: a real cast's operand is never itself a call whose own
-        # `(...)` could be mistaken for the cast's parentheses. Falling through here (rather than
-        # recursing into "(args)" as the cast's operand) leaves this expression to the checks below, all
-        # of which require a leading identifier or `{`/`(` that is not this cast-looking prefix, so it is
+        # `(...)` could be mistaken for the cast's parentheses. `(name)+1`/`(name)-1` is, textually,
+        # either a cast of a signed literal (`(Int)-1`) or an addition/subtraction on the parenthesised
+        # `name` (`(s_counter)+1`, `(REPLAY_CRC_INTERVAL)-1`): this regex cannot tell a type name from a
+        # variable/macro name, so a leading sign on the operand is never read as a cast's operand, only
+        # ever as this second, unsafe shape (a textual rule has no way to prove `name` is a type and not a
+        # writable symbol or macro, so treating it as a cast would let a read of either slip through the
+        # writable-name/object-like-macro checks the ALL_CAPS branch above applies to an unparenthesised
+        # reference to the very same name). Falling through here (rather than recursing into "(args)" or
+        # a signed operand as the cast's operand) leaves this expression to the checks below, all of
+        # which require a leading identifier or `{`/`(` that is not this cast-looking prefix, so it is
         # rejected rather than read as a cast of a safe-looking argument list.
         return _is_safe_value_expr(m.group("rest"), type_name, writable_names, is_function_name)
     if expr[0] == "{" and expr[-1] == "}":
@@ -1401,12 +1408,15 @@ def _pointer_init_is_safe(init):
     `RTS_ENGINE_CONTEXT`) is every bit as unsafe to take the address of as a writable symbol or an
     engine-singleton macro (`The*`) by name, and a textual rule has no way to prove a name is none of
     these from the initialiser text alone. No current rule:const row is a pointer, so this never narrows
-    what the checked-in list accepts."""
+    what the checked-in list accepts. The cast branch rejects a signed operand (`(TheFoo)+1`) the same way
+    `_is_safe_value_expr`'s does, and for the same reason: `(name)+1`/`(name)-1` is, textually, either a
+    cast of a signed literal or an add/subtract on the parenthesised `name`, and this regex cannot tell a
+    type name from a writable pointer's own name to prove which."""
     init = init.strip()
     if init[:1] == "(" and init[-1:] == ")" and _fully_parenthesized(init):
         return _pointer_init_is_safe(init[1:-1])
     m = _CAST_RE.match(init)
-    if m and m.group("rest")[:1] != "(":
+    if m and m.group("rest")[:1] not in "(+-":
         return _pointer_init_is_safe(m.group("rest"))
     m = _STATIC_CAST_RE.match(init)
     if m:
