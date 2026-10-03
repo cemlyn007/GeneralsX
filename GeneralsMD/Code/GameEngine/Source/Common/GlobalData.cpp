@@ -1493,10 +1493,10 @@ static Bool createUserDataDirectory(const std::filesystem::path &path, const cha
 // attribute bit, not ACLs, so it can report writable for a directory an ACL-denied write would
 // reject.
 // GeneralsX @feature cemlyn007 02/10/2026 Takes an out-param rather than just returning FALSE, so a
-// caller can report why the probe write failed: the first descriptor-consuming call on an
-// explicit-directory boot (create_directories()/is_directory() above need no fd, and the .big
-// archives are not open yet), so EMFILE/ENFILE -- PLAN-023 Phase 5's own per-engine .big-handle limit
-// -- or ENOSPC/EDQUOT are at least as likely a cause as an actual permissions problem.
+// caller can report why the probe write failed: this fopen is a real open, so it can fail for
+// EMFILE/ENFILE (PLAN-023 Phase 5's own per-engine .big-handle limit, or any other descriptors a host
+// embedding several engines already holds by this point) or ENOSPC/EDQUOT, just as it can for an
+// actual permissions problem.
 static Bool isUserDataDirectoryWritable(const AsciiString &pathWithSeparator, int *outErrno)
 {
 	AsciiString probe = pathWithSeparator;
