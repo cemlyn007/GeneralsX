@@ -46,6 +46,7 @@
 #pragma once
 
 #include <atomic>
+#include <type_traits>
 #include <stdarg.h>
 #include "Lib/BaseType.h"
 #include "Common/Debug.h"
@@ -81,19 +82,24 @@ class UnicodeString
 {
 private:
 
-	// Note, this is a Plain Old Data Structure... don't
-	// add a ctor/dtor, 'cuz they won't ever be called.
+	// GeneralsX @fix cemlyn007 03/10/2026 Not a Plain Old Data Structure any more: m_refCount is std::atomic,
+	// so the struct is neither trivially copyable nor safe to memcpy or value-copy. It stays safe to
+	// placement-allocate raw and never construct, because every member (the atomic included) is trivially
+	// destructible; the count is initialised with store(), not a constructor. Don't add a ctor/dtor; one
+	// still won't ever be called on that raw memory.
 	struct UnicodeStringData
 	{
 #if defined(RTS_DEBUG)
 		const WideChar* m_debugptr;	// just makes it easier to read in the debugger
 #endif
 		// GeneralsX @performance cemlyn007 29/09/2026 Atomic reference count in place of the process-wide
-		// TheUnicodeStringCriticalSection. Engines stepped on separate threads in one process share some strings
-		// (process-global statics, NameKeyGenerator names), and the global lock serialised every copy and
-		// release across them. The copy constructor and set() add a reference with a relaxed increment,
-		// releaseBuffer() drops one with an acq_rel decrement and frees on 1 -> 0, and every copy-on-write
-		// uniqueness test loads the count with acquire. Same size and layout as the plain unsigned short.
+		// TheUnicodeStringCriticalSection. The count makes a buffer shared between distinct UnicodeString
+		// copies safe without a lock; it does not make one UnicodeString object safe to write from more than
+		// one thread. A UnicodeString object shared across engine threads, such as a process-global static,
+		// must stay immutable after boot instead (PLAN-023 Phase 5b item 2). The copy constructor and set()
+		// add a reference with a relaxed increment, releaseBuffer() drops one with an acq_rel decrement and
+		// frees on 1 -> 0, and every copy-on-write uniqueness test loads the count with acquire. Same size
+		// and layout as the plain unsigned short.
 		std::atomic<unsigned short>	m_refCount;		// reference count
 		unsigned short	m_numCharsAllocated;  // length of data allocated
 		// WideChar m_stringdata[];
@@ -102,6 +108,7 @@ private:
 	};
 	static_assert(sizeof(std::atomic<unsigned short>) == sizeof(unsigned short), "m_refCount must keep the plain unsigned short layout");
 	static_assert(std::atomic<unsigned short>::is_always_lock_free, "m_refCount must be lock-free");
+	static_assert(std::is_trivially_destructible<UnicodeStringData>::value, "UnicodeStringData is allocated raw and never destroyed");
 
 	#ifdef RTS_DEBUG
 	void validate() const;

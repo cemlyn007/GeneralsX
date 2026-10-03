@@ -228,10 +228,13 @@ void UnicodeString::ensureUniqueBufferOfSize(int numCharsNeeded, Bool preserveDa
 	const int usableNumChars = numCharsNeeded - 1;
 
 	// GeneralsX @performance cemlyn007 29/09/2026 Copy-on-write safety without the global lock: a buffer is
-	// written in place only when this string holds the sole reference. Strings shared across engines on other
-	// threads (process-global statics, NameKeyGenerator names) keep the count at 2 or more, so they are never
-	// mutated in place while shared. The acquire load pairs with the acq_rel decrement in releaseBuffer(), so
-	// every read the last other holder made of this buffer happens before our in-place write.
+	// written in place only when this string holds the sole reference. That count protects a buffer shared
+	// between distinct UnicodeString copies; it says nothing about one UnicodeString object written by more
+	// than one thread, which this class never made safe (the old global lock just serialised those writes
+	// too). A process-global static UnicodeString is safe to read from any engine's thread only because
+	// nothing mutates it after boot (PLAN-023 Phase 5b item 2), not because of its refcount. The acquire load
+	// pairs with the acq_rel decrement in releaseBuffer(), so every read the last other holder made of this
+	// buffer happens before our in-place write.
 	if (m_data &&
 			m_data->m_refCount.load(std::memory_order_acquire) == 1 &&
 			m_data->m_numCharsAllocated >= numCharsNeeded)
