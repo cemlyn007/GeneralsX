@@ -213,11 +213,13 @@ static void extractAndSaveMap( AsciiString mapToSave, Xfer *xfer )
 	}
 
 	// GeneralsX @bugfix cemlyn007 03/10/2026 Close fp (and free buffer) on every throw path below,
-	// not just the explicit DEBUG_CRASH/throw ones that already did. beginBlock()/xferUser() can
-	// themselves throw SC_INVALID_DATA on a truncated or corrupt save; leaving fp open on that path
-	// meant the caller's now-tracked partial file (see m_scratchPadMaps above) failed to delete on
-	// Windows (DeleteFile of an open handle fails) and leaked one file descriptor per failed load
-	// everywhere else, in a long-lived embedded host.
+	// not just the explicit DEBUG_CRASH/throw ones that already did. On a truncated or corrupt
+	// save, xferUser()'s read reaches XferLoad::xferImplementation, which throws XFER_READ_ERROR
+	// (beginBlock() itself never throws: on a short read it DEBUG_CRASHes and returns 0, which
+	// then fails the allocation or fwrite below with an explicit SC_INVALID_DATA throw); leaving fp
+	// open on any of these paths meant the caller's now-tracked partial file (see m_scratchPadMaps
+	// above) failed to delete on Windows (DeleteFile of an open handle fails) and leaked one file
+	// descriptor per failed load everywhere else, in a long-lived embedded host.
 	char *buffer = nullptr;
 	try
 	{
@@ -421,12 +423,14 @@ void GameStateMap::xfer( Xfer *xfer )
 		// in the save directory temporarily
 		//
 		// GeneralsX @bugfix cemlyn007 02/10/2026 Record the path before calling extractAndSaveMap,
-		// not after: that function fopen("w+b")s the file before beginBlock/xferUser/fwrite, any of
-		// which can throw SC_INVALID_DATA on a truncated or corrupt save, leaving a partial file on
-		// disk. Recording first means clearScratchPadMaps still deletes that partial file even
-		// though extraction itself never returned to record it the old way; dedupe against a
-		// repeat of the same leaf (loading the same map twice in one session) so
-		// clearScratchPadMaps does not try to delete the same already-removed path twice.
+		// not after: that function fopen("w+b")s the file before beginBlock/xferUser/fwrite; a
+		// truncated or corrupt save then throws out of xferUser (XFER_READ_ERROR) or out of the
+		// explicit allocation/fwrite checks (SC_INVALID_DATA), leaving a partial file on disk.
+		// Recording first means clearScratchPadMaps still deletes that partial file even though
+		// extraction itself never returned to record it the old way. The std::find guard below is
+		// purely defensive: GameState::loadGame clears m_scratchPadMaps before every xfer, so
+		// within one load this vector starts empty and the guard never actually matches; it only
+		// protects against a future caller that xfers more than one map without that same clear.
 		if( std::find( m_scratchPadMaps.begin(), m_scratchPadMaps.end(), saveGameInfo->saveGameMapName )
 		    == m_scratchPadMaps.end() )
 			m_scratchPadMaps.push_back( saveGameInfo->saveGameMapName );
