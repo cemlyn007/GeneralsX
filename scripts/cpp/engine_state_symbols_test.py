@@ -1004,6 +1004,88 @@ class SourceIndexDefinitionTest(unittest.TestCase):
         self.assertEqual(decl, "static const int x = 5;")
 
 
+class SourceIndexIsFunctionNameTest(unittest.TestCase):
+    """SourceIndex.is_function_name must prove a real definition: a `name(...)` immediately followed by
+    `{` is not enough on its own, because a member-initialiser-list entry, a parameter's own inline
+    initialiser and a call inside a condition all share that same textual shape without defining `name`."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = self._tmp.name
+        os.makedirs(os.path.join(self.root, "Core"))
+        self._old_scan_roots = m.SCAN_ROOTS
+        m.SCAN_ROOTS = ["Core"]
+
+    def tearDown(self):
+        m.SCAN_ROOTS = self._old_scan_roots
+        self._tmp.cleanup()
+
+    def write(self, rel, text):
+        path = os.path.join(self.root, "Core", rel)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w") as f:
+            f.write(text)
+
+    def index(self):
+        return m.SourceIndex(self.root, set())
+
+    def test_a_member_last_in_a_constructor_initializer_list_is_not_a_function(self):
+        self.write(
+            "ini.h",
+            "class MultiIniFieldParse {\n"
+            "    Int m_count;\n"
+            "public:\n"
+            "    MultiIniFieldParse() : m_count(0)\n"
+            "    {\n"
+            "    }\n"
+            "};\n",
+        )
+        self.assertFalse(self.index().is_function_name("m_count"))
+
+    def test_a_parameter_own_inline_initializer_is_not_a_function(self):
+        self.write(
+            "d3dx8math.h",
+            "struct Vector2 {\n"
+            "    float x, y;\n"
+            "    Vector2(float x, float y) : x(x), y(y)\n"
+            "    {\n"
+            "    }\n"
+            "};\n",
+        )
+        self.assertFalse(self.index().is_function_name("y"))
+
+    def test_a_call_inside_an_if_condition_is_not_a_function_even_nested_in_a_larger_expression(self):
+        self.write(
+            "controlbar.cpp",
+            "void update(Thing* obj) {\n"
+            "    if (obj->ready() && obj->getDisabledFlags().count() == 1)\n"
+            "    {\n"
+            "    }\n"
+            "}\n",
+        )
+        self.assertFalse(self.index().is_function_name("count"))
+
+    def test_a_real_callback_definition_with_the_statetransfuncptr_signature_is_a_function(self):
+        self.write(
+            "aistates.cpp",
+            "Bool outOfWeaponRangeObject( State *thisState, void* userData )\n"
+            "{\n"
+            "    return TRUE;\n"
+            "}\n",
+        )
+        self.assertTrue(self.index().is_function_name("outOfWeaponRangeObject"))
+
+    def test_a_real_out_of_line_method_definition_is_a_function(self):
+        self.write(
+            "dozeraiupdate.cpp",
+            "Bool DozerPrimaryStateMachine::isBuildMostImportant( State *thisState, void* userData )\n"
+            "{\n"
+            "    return TRUE;\n"
+            "}\n",
+        )
+        self.assertTrue(self.index().is_function_name("isBuildMostImportant"))
+
+
 class CompareTest(unittest.TestCase):
     """compare() drives `check`'s error/warning split for a symbol the TSV already lists."""
 

@@ -425,16 +425,46 @@ class SourceIndex:
         safe code; a name is not in `wanted`/`where` here (those only index the symbols being classified,
         never an arbitrary callback name found inside an initialiser), so this searches every scanned file's
         text directly rather than `candidates()`'s narrower index, and caches the answer by name since the
-        same callback name recurs across many state tables. A name whose only definition lives outside
-        `SCAN_ROOTS`/`SKIP_DIRS`, or that this regex's single-non-nested-parameter-list shape does not match,
-        is not found: that fails closed (rejected as not provably a function), never the reverse."""
+        same callback name recurs across many state tables. `name(...)` immediately followed by `{` does not
+        by itself prove a definition: the same shape also appears as the last entry of a constructor's
+        member-initialiser list (`m_count(0)\\n{`), a parameter's own inline initialiser (`x(x), y(y) ...
+        {`), and any call inside an `if`/`while`/`switch`/`catch` condition, however deep in a larger
+        expression (`if (a && obj->get(x).count() == 1)\\n{`), none of which define `name` as a function.
+        `name`'s own argument list is matched by depth, not by a character class that stops only at `;`/
+        `{`/`}` (which cannot tell `name`'s own closing `)` from one belonging to an enclosing call or
+        condition, and so would accept the first `)` before the next `{` whichever call it closes): finding
+        `name`'s matching `)` this way means a real definition's own `{` must follow immediately (past
+        `const`), while a condition's call is instead followed by the condition's own closing `)` and a
+        member-initialiser's by `,` or the initialiser list's next entry, never the body's `{` directly.
+        What immediately precedes `name`, past any `Class::` prefix, tells apart the two remaining shapes: a
+        member-initialiser entry or a later constructor argument is always preceded there by a bare `:`
+        (not `::`) or a `,`, where a real definition's return type, scope qualifier or (for a destructor)
+        `~` never is. A match right after one of those, or whose own closing `)` is not immediately
+        followed by `{`, is skipped, not treated as a definition; scanning continues over the rest of that
+        file and the tree for a later, real one. A name whose only definition lives outside `SCAN_ROOTS`/
+        `SKIP_DIRS`, or that this shape does not match at all, is not found: that fails closed (rejected as
+        not provably a function), never the reverse."""
         cached = self._is_function_cache.get(name)
         if cached is not None:
             return cached
-        pattern = re.compile(
-            rf"(?:\b[A-Za-z_]\w*\s*::\s*)?\b{re.escape(name)}\s*\([^;{{}}]*\)\s*(?:const\s*)?\{{"
-        )
-        found = any(pattern.search(text) for text in self.files.values())
+        name_re = re.compile(rf"(?:\b[A-Za-z_]\w*\s*::\s*)?\b{re.escape(name)}\s*\(")
+        tail_re = re.compile(r"\s*(?:const\s*)?\{")
+        found = False
+        for text in self.files.values():
+            for mo in name_re.finditer(text):
+                close_idx = skip_balanced(text, mo.end() - 1, "(", ")")
+                if not tail_re.match(text, close_idx):
+                    # `name`'s own argument list is not immediately followed by a body: it closed inside a
+                    # larger call or condition (`if (... name(x) ...)  {`), not as a definition.
+                    continue
+                prefix = text[: mo.start()].rstrip()
+                if prefix and (prefix[-1] in ",(" or (prefix[-1] == ":" and not prefix.endswith("::"))):
+                    # A member-initialiser-list entry or a later constructor argument: never a definition.
+                    continue
+                found = True
+                break
+            if found:
+                break
         self._is_function_cache[name] = found
         return found
 
