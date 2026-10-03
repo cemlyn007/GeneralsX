@@ -161,31 +161,49 @@ static void embedInUseMap( AsciiString map, Xfer *xfer )
 	// rewind file back to start
 	fseek( fp, 0, SEEK_SET );
 
-	// allocate a buffer big enough for the entire file
-	char *buffer = new char[ fileSize ];
-	if( buffer == nullptr )
+	// GeneralsX @bugfix cemlyn007 03/10/2026 Close fp (and free buffer) on every throw path below,
+	// the same defect extractAndSaveMap had: an open handle on this tracked scratch-pad map fails
+	// a later DeleteFile of it on Windows, and leaks one file descriptor per failed save otherwise,
+	// in a long-lived embedded host. xfer->xferUser below can throw XFER_WRITE_ERROR (for example
+	// on a full disk) with both fp and buffer still live, so both need the same catch-and-rethrow
+	// the allocation and read failures below already got.
+	char *buffer = nullptr;
+	try
 	{
 
-		DEBUG_CRASH(( "embedInUseMap - Unable to allocate buffer for file '%s'", map.str() ));
-		throw SC_INVALID_DATA;
+		// allocate a buffer big enough for the entire file
+		buffer = new char[ fileSize ];
+		if( buffer == nullptr )
+		{
+
+			DEBUG_CRASH(( "embedInUseMap - Unable to allocate buffer for file '%s'", map.str() ));
+			throw SC_INVALID_DATA;
+
+		}
+
+		// read the entire file
+		if( fread( buffer, 1, fileSize, fp ) != fileSize )
+		{
+
+			DEBUG_CRASH(( "embedInUseMap - Error reading from file '%s'", map.str() ));
+			throw SC_INVALID_DATA;
+
+		}
+
+		// embed file into xfer stream
+		xfer->beginBlock();
+		xfer->xferUser( buffer, fileSize );
+		xfer->endBlock();
 
 	}
-
-	// read the entire file
-	if( fread( buffer, 1, fileSize, fp ) != fileSize )
+	catch (...)
 	{
 
-		delete[] buffer;
-
-		DEBUG_CRASH(( "embedInUseMap - Error reading from file '%s'", map.str() ));
-		throw SC_INVALID_DATA;
+		delete [] buffer;
+		fclose( fp );
+		throw;
 
 	}
-
-	// embed file into xfer stream
-	xfer->beginBlock();
-	xfer->xferUser( buffer, fileSize );
-	xfer->endBlock();
 
 	// close the file
 	fclose( fp );
