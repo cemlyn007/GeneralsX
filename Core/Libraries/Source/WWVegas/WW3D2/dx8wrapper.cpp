@@ -704,8 +704,8 @@ void MoveRectIntoOtherRect(const RECT& inner, const RECT& outer, int* x, int* y)
 bool DX8Wrapper::Init(void * hwnd, bool lite)
 {
 #if RTS_ENGINE_CONTEXT
-	// GeneralsX @feature cemlyn007 30/09/2026 This engine's render state, freed by Shutdown (PLAN-023 Phase 8, stage
-	// RR2a-1).
+	// GeneralsX @feature cemlyn007 30/09/2026 This engine's render state, freed by Destroy_Render_State at the end of
+	// WW3D::Shutdown (PLAN-023 Phase 8, stages RR2a-1, RR2a-2).
 	Create_Render_State();
 #endif
 	WWASSERT(!IsInitted);
