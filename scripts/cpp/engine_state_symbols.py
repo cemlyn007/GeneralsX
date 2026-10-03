@@ -874,10 +874,13 @@ _STAR_PREFIX_CHARS = set("([{,=&|!<>+-*/%^~:")
 # A subscript on anything (`theGameLogicSeed[0]`, `TheGlobalData[0]`): none of this codebase's safe,
 # literal-only initialisers index into an array, so any `name[` is rejected outright.
 SUBSCRIPT_RE = re.compile(r"\w\s*\[")
-# A member access (`.field`) on an identifier or a parenthesised expression (`(*TheGlobalData).field`):
-# never a pure value. The lookbehind rules out a floating-point literal's own `.` (`1.0f`), which is never
-# preceded by a letter.
-MEMBER_ACCESS_RE = re.compile(r"(?<=[A-Za-z_0-9)\]])\s*\.\s*[A-Za-z_]")
+# A member access (`.field`) on an identifier (which, unlike a numeric literal, always starts with a letter
+# or underscore, whatever digits follow) or a parenthesised/subscripted expression (`(*TheGlobalData).field`,
+# `arr[0].field`): never a pure value. Matching the token itself, rather than a single preceding character,
+# rules out a floating-point literal's own `.` (`0.f`, `1.0f`) without also missing a member access on an
+# identifier that happens to end in a digit (`s_t2.field`): a digit alone, with no letter/underscore before
+# it, can only be a number literal's own digits, never an identifier.
+MEMBER_ACCESS_RE = re.compile(r"(?:[A-Za-z_]\w*|[)\]])\s*\.\s*[A-Za-z_]")
 # `++`/`--`: a counter, never a pure value.
 INC_DEC_RE = re.compile(r"\+\+|--")
 # A bare assignment inside the initialiser (not `==`, `!=`, `<=`, `>=`): never a pure value.
@@ -901,6 +904,7 @@ _STATIC_CAST_RE = re.compile(
 # constructor (a callback field, such as StateConditionInfo's), never as a value on its own, and never when
 # it ends in an ALL_CAPS segment (that is an enumerator, already accepted above as a plain value).
 FUNC_PTR_ARG_RE = re.compile(r"^&?[A-Za-z_]\w*(?:::[A-Za-z_]\w*)*$")
+
 
 
 def _declared_type_name(decl):
@@ -971,8 +975,17 @@ def _is_safe_value_expr(expr, type_name):
         return True
     if ALL_CAPS_RE.match(expr) and expr.rsplit("::", 1)[-1].isupper():
         return True
-    m = _STATIC_CAST_RE.match(expr) or _CAST_RE.match(expr)
+    m = _STATIC_CAST_RE.match(expr)
     if m:
+        return _is_safe_value_expr(m.group("rest"), type_name)
+    m = _CAST_RE.match(expr)
+    if m and m.group("rest")[:1] != "(":
+        # `(name)(args)` is a parenthesised callee (a call through a function pointer, or a macro that
+        # expands to one), not a C-style cast: a real cast's operand is never itself a call whose own
+        # `(...)` could be mistaken for the cast's parentheses. Falling through here (rather than
+        # recursing into "(args)" as the cast's operand) leaves this expression to the checks below, all
+        # of which require a leading identifier or `{`/`(` that is not this cast-looking prefix, so it is
+        # rejected rather than read as a cast of a safe-looking argument list.
         return _is_safe_value_expr(m.group("rest"), type_name)
     if expr[0] == "{" and expr[-1] == "}":
         return all(_is_safe_value_expr(e, type_name) for e in _split_top_level_commas(expr[1:-1]))
@@ -991,7 +1004,11 @@ def _is_safe_value_expr(expr, type_name):
         args = _split_top_level_commas(call.group(2))
         return all(
             _is_safe_value_expr(a, type_name)
-            or (call.group(1) == type_name and FUNC_PTR_ARG_RE.match(a) and a.rsplit("::", 1)[-1][:1].islower())
+            or (
+                call.group(1) == type_name
+                and FUNC_PTR_ARG_RE.match(a)
+                and a.lstrip("&").rsplit("::", 1)[-1][:1].islower()
+            )
             for a in args
         )
     return False

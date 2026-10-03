@@ -276,6 +276,30 @@ class RuleConstObjectTest(unittest.TestCase):
     def test_const_pointer_initialized_from_a_subscripted_global_is_not_safe(self):
         self.assert_const("static Player* const s_p = ThePlayerList[0];", False)
 
+    def test_by_value_const_initialized_from_a_parenthesized_callee_call_is_not_safe(self):
+        # `(name)(args)` is a call through a parenthesised callee, not a C-style cast of `args`: the cast
+        # regex must not let a literal-looking argument list through as though it were a cast operand.
+        self.assert_const("static const Int pick = (GameLogicRandomValue)(0, 3);", False)
+
+    def test_by_value_const_initialized_from_a_parenthesized_callee_with_no_arguments_is_not_safe(self):
+        self.assert_const("static const Int v = (getValue)();", False)
+
+    def test_by_value_const_initialized_from_an_ampersand_taken_function_pointer_is_safe(self):
+        # FUNC_PTR_ARG_RE's own comment says a function-pointer argument may be "bare, `&`-taken or
+        # scoped": the `&` must be stripped before the lower-case check, not counted as the first character.
+        self.assert_const(
+            "static const StateConditionInfo s_info = StateConditionInfo(&isConditionTrue, 0);",
+            True,
+        )
+
+    def test_by_value_const_initialized_from_a_float_literal_with_no_leading_digit_is_safe(self):
+        # `0.f`'s `.` must not be misread as a member access just because a digit precedes it: a digit run
+        # with no letter/underscore before it can only be a numeric literal's own digits.
+        self.assert_const("static const Real x = 0.f;", True)
+
+    def test_by_value_const_initialized_from_a_constructor_with_float_literal_arguments_is_safe(self):
+        self.assert_const("static const Vector3 v = Vector3(0.f, 1.f, 0.f);", True)
+
 
 class RuleNamekeyTest(unittest.TestCase):
     """rule:namekey is SAFE_FOR_NEW: the variable itself must be a NameKeyType/StaticNameKey cache, not a
