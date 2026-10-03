@@ -229,17 +229,10 @@ public:
 
 	T& get() const
 	{
-		EngineContext* context = ctx();
-		void* object = context->getSlot(m_index);
-		if (object == nullptr)
-		{
-			Holder* holder = new Holder();
+		return get([this](T& value) {
 			if (m_initialize != nullptr)
-				m_initialize(holder->value);
-			context->setSlot(m_index, holder, &destroy);
-			object = holder;
-		}
-		return static_cast<Holder*>(object)->value;
+				m_initialize(value);
+		});
 	}
 
 	// GeneralsX @feature cemlyn007 28/09/2026 As get(), but the object is made with `initialize(object)`, which
