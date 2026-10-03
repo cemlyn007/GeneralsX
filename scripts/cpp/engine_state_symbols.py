@@ -1019,6 +1019,9 @@ SCALAR_TYPE_NAMES = {
     "Real",
     "double",
     "size_t",
+    # Color.h/ParticleSys.h/Xfer.h each spell `typedef Int Color;`: a packed-integer colour value, not a
+    # class, so it is exactly as constructor-free as `Int` itself.
+    "Color",
 }
 # Class types this classified library's own `static const` initialisers build by default-, direct- or
 # brace-initialisation, or by calling the declared type's own name (`T(args)`/`T name(args)`/`T name{args}`/
@@ -1121,12 +1124,28 @@ def _declared_type_name(decl):
     """The declared type's own bare name (`WaypointMap` from `static const WaypointMap s_emptyWaypoints`,
     `Real` from `static const Real s_literals[ARRAY_SIZE(s_names)]`): the declaration's last identifier is
     the variable being declared, so the one before it is its type, UNLESS that variable is an array, in
-    which case its own bound (`[ARRAY_SIZE(s_names)]`, `[1 << 4]`) sits between the type and the name and
-    may hold identifiers of its own (a call, a sizeof argument); stripping every bracketed bound first
-    (`_ARRAY_BOUND_RE`, non-nested: this codebase's own bound expressions never bracket a further
-    subscript) keeps the "second-to-last identifier" reading correct for an array declarator too, not just
-    a plain one."""
+    which case its own bound (`[ARRAY_SIZE(s_names)]`, `[1 << 4]`) FOLLOWS the name instead of sitting
+    between the type and the name, and may hold identifiers of its own (a call, a sizeof argument) that
+    would otherwise push the real name (and so the type) out of the last two slots; stripping every
+    bracketed bound first (`_ARRAY_BOUND_RE`, non-nested: this codebase's own bound expressions never
+    bracket a further subscript) keeps the "second-to-last identifier" reading correct for an array
+    declarator too, not just a plain one.
+
+    Two more declarator shapes need the same kind of correction before that final "second-to-last
+    identifier" read is safe. A template-id (`Cache<Int>`, `Cache<AsciiString>`) holds its own identifiers
+    inside `<...>`; left in place, the LAST template argument becomes "the second-to-last identifier"
+    instead of the declared type's own name (and could itself be an unrelated name already on
+    `SAFE_CONST_CLASS_TYPES`, wrongly passing an unreviewed specialisation), so any `<` surviving the
+    array-bound strip fails this closed (returns `""`) rather than guessing which argument is the type: a
+    textual rule has no reliable way to tell a template argument list apart from a comparison/shift pair
+    either. An out-of-line member definition's declared name is itself `::`-qualified (`WaypointMap::
+    s_click` in `const AudioEventRTS WaypointMap::s_click(...)`); left in place, the scope (`WaypointMap`)
+    becomes "the second-to-last identifier" instead of the actual declared type (`AudioEventRTS`), so a
+    trailing `Scope::`+ prefix on the declared name is collapsed back to its own bare identifier first."""
     decl = _ARRAY_BOUND_RE.sub("", decl)
+    if "<" in decl:
+        return ""
+    decl = re.sub(r"(?:[A-Za-z_]\w*\s*::\s*)+([A-Za-z_]\w*)\s*$", r"\1", decl)
     tokens = [t for t in re.findall(r"[A-Za-z_]\w*", decl) if t not in DECL_KEYWORDS]
     return tokens[-2] if len(tokens) >= 2 else ""
 
@@ -1284,15 +1303,18 @@ def _is_safe_value_expr(expr, type_name, writable_names, is_function_name=None):
         # rejected rather than read as a cast of a safe-looking argument list.
         return _is_safe_value_expr(m.group("rest"), type_name, writable_names, is_function_name)
     if expr[0] == "{" and expr[-1] == "}":
-        # `{...}` is either an array's own literal element list (`type_name` is the array's element type,
-        # and no element here ever runs `type_name`'s constructor: aggregate initialisation copies each
-        # literal straight into the slot) or a single object's brace-direct-initialisation (`T name{args};`,
-        # which for a non-aggregate `T` does call its constructor with `args`). The text alone cannot tell
-        # these apart, so this still requires `type_name` to be reviewed-pure before trusting either
-        # reading of it: an array of a reviewed-pure element type is unaffected (each element is also
-        # checked on its own merits below), and a single unreviewed class's brace-constructed value, such
-        # as `static const AudioEventRTS s_click{"GUIClick"};`, now fails closed instead of passing just
-        # because `"GUIClick"` alone looks like a pure value.
+        # `{...}` is either an array's own literal element list (`type_name` is the array's element type)
+        # or a single object's brace-direct-initialisation (`T name{args};`). Aggregate initialisation of
+        # the array still copy-initialises every element from its own entry in the list, so for a
+        # class-type element this runs `type_name`'s constructor once per element, exactly as a single
+        # object's brace-direct-initialisation runs it once (`static const Lit arr[] = { "x", "y" };` runs
+        # `Lit(const char*)` twice, not zero times): the text alone cannot tell the array and single-object
+        # readings apart, and neither reading ever skips the constructor. This still requires `type_name`
+        # to be reviewed-pure before trusting either reading of it: an array of a reviewed-pure element
+        # type is unaffected (each element is also checked on its own merits below), and a single
+        # unreviewed class's brace-constructed value, such as `static const AudioEventRTS
+        # s_click{"GUIClick"};`, now fails closed instead of passing just because `"GUIClick"` alone looks
+        # like a pure value.
         return _declared_type_is_const_safe(type_name) and all(
             _is_safe_value_expr(e, type_name, writable_names, is_function_name)
             for e in _split_top_level_commas(expr[1:-1])
@@ -1547,7 +1569,22 @@ def rule_const_object(sym, symbols=None, is_function_name=None):
         else:
             if not CONST_DECL_RE.match(decl):
                 return None
-            if not _by_value_init_is_safe(init, _declared_type_name(decl), writable_names, is_function_name):
+            type_name = _declared_type_name(decl)
+            if not _declared_type_is_const_safe(type_name):
+                # Gated here, once, for every by-value declarator whatever its initialiser's own syntax
+                # (copy, direct, brace, or a cast of any of these): `_is_safe_value_expr`'s own by-value
+                # branches (default-construction, `{...}`, direct-init's `(...)`, a call to the declared
+                # type's own name) already re-check this same `type_name` before trusting an all-literal
+                # argument list as proof of a pure constructor, but copy-initialisation
+                # (`static const Lit c = "z";`, a class with a non-explicit `const char*` constructor) and
+                # a cast of a literal to the declared type (`(AudioEventRTS)"GUIClick"`,
+                # `static_cast<AudioEventRTS>("GUIClick")`) never reach any of those branches: a literal
+                # alone satisfies `_is_safe_value_expr` regardless of `type_name`, so without this gate an
+                # unreviewed class type's own converting constructor could run unexamined through either
+                # spelling. Checking it here instead closes both gaps in one place, for the declared type
+                # alone, rather than threading the same check into every syntactic form that could skip it.
+                return None
+            if not _by_value_init_is_safe(init, type_name, writable_names, is_function_name):
                 return None
     return CONST, "", "const object: initialized once, never written"
 

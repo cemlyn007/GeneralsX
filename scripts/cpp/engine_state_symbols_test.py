@@ -170,6 +170,89 @@ class RuleConstObjectTest(unittest.TestCase):
         # whether this particular `{...}` happens to look like one) tells the two apart.
         self.assert_const('static const AudioEventRTS s_click{"GUIClick"};', False)
 
+    def test_by_value_const_copy_initialized_from_an_unreviewed_class_types_literal_is_not_safe(self):
+        # Copy-initialisation (`T name = "literal";`) never reaches any of the call-shaped checks above at
+        # all: `_is_safe_value_expr` accepts the bare string literal on its own merits, whatever the
+        # declared type is, unless the declared type is gated too. A class with a non-explicit
+        # `const char*` constructor (the same shape AudioEventRTS itself has) would otherwise run that
+        # constructor unreviewed, exactly like the direct- and brace-initialised forms above.
+        self.assert_const('static const Lit c = "z";', False)
+
+    def test_by_value_const_cast_initialized_from_an_unreviewed_class_type_is_not_safe(self):
+        # A C-style cast to the declared type (`(AudioEventRTS)"GUIClick"`) recurses into the cast's own
+        # operand without ever consulting `type_name`: the operand alone (a string literal) looks pure,
+        # so without gating the declared type up front this still runs AudioEventRTS's own
+        # AsciiString(const char*)-converting constructor unreviewed.
+        self.assert_const('static const AudioEventRTS s_click = (AudioEventRTS)"GUIClick";', False)
+
+    def test_by_value_const_static_cast_initialized_from_an_unreviewed_class_type_is_not_safe(self):
+        # The same gap as the C-style cast above, spelled as a functional-style static_cast.
+        self.assert_const(
+            'static const AudioEventRTS s_click = static_cast<AudioEventRTS>("GUIClick");', False
+        )
+
+    def test_by_value_const_initialized_from_an_unreviewed_template_id_is_not_safe(self):
+        # `_declared_type_name` must read the template's own name (`Cache`), not the last template
+        # argument (`Int`): the declared type is a specialisation this scan has never reviewed, whatever
+        # its argument looks like.
+        self.assert_const('static const Cache<Int> d("q");', False)
+
+    def test_by_value_const_initialized_from_a_template_id_whose_argument_is_a_reviewed_class_type_is_not_safe(
+        self,
+    ):
+        # The same template-id gap, but with a last argument (`AsciiString`) that is itself on
+        # `SAFE_CONST_CLASS_TYPES`: reading it as the declared type would wrongly pass an unreviewed
+        # `Cache<AsciiString>` specialisation just because `AsciiString` alone is reviewed-pure.
+        self.assert_const("static const Cache<AsciiString> d;", False)
+
+    def test_out_of_line_member_const_definition_of_an_unreviewed_class_type_is_not_safe(self):
+        # `_declared_type_name` must read the declared type (`AudioEventRTS`), not the out-of-line
+        # definition's own scope qualifier (`WaypointMap`, itself on `SAFE_CONST_CLASS_TYPES`): reading the
+        # scope as the type would wrongly pass this unreviewed `AudioEventRTS` just because some other,
+        # unrelated reviewed type happens to share its name with the enclosing scope.
+        self.assert_const('const AudioEventRTS WaypointMap::s_click("GUIClick");', False)
+
+    def test_const_pointer_cast_initialized_from_a_writable_global_signed_literal_shape_stays_unsafe(self):
+        # _pointer_init_is_safe has its own, separate cast branch, already rejecting a cast-looking
+        # operand that starts with a sign; the declared-type gate added for the by-value checks above
+        # does not apply to pointers at all (a pointer's own pointee type is never checked against
+        # `SAFE_CONST_CLASS_TYPES`), so this stays covered by that existing cast-of-a-signed-operand
+        # rejection, not by the new gate.
+        self.assert_const("static Foo* const p = (TheFoo)+1;", False)
+
+    def test_by_value_const_initialized_from_a_color_typedef_call_is_still_safe(self):
+        # Color (Color.h/ParticleSys.h/Xfer.h: `typedef Int Color;`) must stay accepted now that the
+        # declared type is gated unconditionally: the 4 chatNormalColor/mainColor/dropColor-shaped rows
+        # already checked in to PLAN-023_STATE_CLASSIFICATION.tsv call `GameMakeColor` to build a `const
+        # Color`, and `Color` was never itself on any of the three allow-lists before this fix added it to
+        # `SCALAR_TYPE_NAMES`.
+        self.assert_const("static const Color mainColor = GameMakeColor(0, 255, 0, 255);", True)
+
+    def test_declared_type_name_fails_closed_on_a_template_id(self):
+        # Rather than guess which template argument (if any) is safe to read as the type (the LAST
+        # argument would otherwise become "the second-to-last identifier" instead of the template's own
+        # name), any surviving `<` (after the array-bound strip, which already removes a bound's own
+        # `<`/`>` operators) is read as "unknown type", not as some particular argument. This also covers
+        # the case where that last argument happens to itself be a reviewed-pure class
+        # (`Cache<AsciiString>`): it must not be mistaken for the declared type just because it is on
+        # `SAFE_CONST_CLASS_TYPES`.
+        self.assertEqual(m._declared_type_name("static const Cache<Int> d"), "")
+        self.assertEqual(m._declared_type_name("static const Cache<AsciiString> d"), "")
+        self.assertEqual(m._declared_type_name("static const Cache<Int, Real> d"), "")
+
+    def test_by_value_const_array_of_an_unreviewed_class_type_is_not_safe(self):
+        # A `{...}` array element list still copy-initialises every element from the declared (element)
+        # type's own constructor, so an unreviewed class type must fail closed here exactly as it does for
+        # a single brace-initialised object: there is no "it's just an array, nothing gets constructed"
+        # exemption (see the fixed `_is_safe_value_expr` brace-branch comment).
+        self.assert_const('static const Lit arr[2] = { "x", "y" };', False)
+
+    def test_declared_type_name_reads_the_type_not_the_out_of_line_scope(self):
+        self.assertEqual(m._declared_type_name("const AudioEventRTS WaypointMap::s_click"), "AudioEventRTS")
+        self.assertEqual(
+            m._declared_type_name("const AudioEventRTS Outer::Inner::s_click"), "AudioEventRTS"
+        )
+
     def test_by_value_const_initialized_from_an_rng_call_is_not_safe(self):
         # GameLogicRandomValue reads/advances the per-engine logic RNG: not a pure value constructor, even
         # though its own arguments are literals, so a literal-argument check alone would miss it.
