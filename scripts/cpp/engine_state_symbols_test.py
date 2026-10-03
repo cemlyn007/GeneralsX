@@ -247,6 +247,24 @@ class RuleConstObjectTest(unittest.TestCase):
         # exemption (see the fixed `_is_safe_value_expr` brace-branch comment).
         self.assert_const('static const Lit arr[2] = { "x", "y" };', False)
 
+    def test_cast_target_is_safe_treats_a_pointer_or_reference_target_as_always_safe(self):
+        # Casting TO a pointer or reference type is a pointer conversion or a reference binding, never a
+        # constructor call, whatever class the pointee/referent is named: `Lit` is not on any allow-list,
+        # but `Lit*`/`Lit&` must still pass.
+        self.assertTrue(m._cast_target_is_safe("void*"))
+        self.assertTrue(m._cast_target_is_safe("Lit*"))
+        self.assertTrue(m._cast_target_is_safe("Lit &"))
+
+    def test_cast_target_is_safe_checks_a_bare_target_the_same_as_a_declared_type(self):
+        # A bare (non-pointer, non-reference) cast target is checked exactly like a declared variable's
+        # own type: reviewed-safe scalars and classes pass, an unreviewed class does not, and a leading
+        # `const` on the target does not change the answer either way.
+        self.assertTrue(m._cast_target_is_safe("Int"))
+        self.assertTrue(m._cast_target_is_safe("AsciiString"))
+        self.assertTrue(m._cast_target_is_safe("const Int"))
+        self.assertFalse(m._cast_target_is_safe("Lit"))
+        self.assertFalse(m._cast_target_is_safe("AudioEventRTS"))
+
     def test_declared_type_name_reads_the_type_not_the_out_of_line_scope(self):
         self.assertEqual(m._declared_type_name("const AudioEventRTS WaypointMap::s_click"), "AudioEventRTS")
         self.assertEqual(
@@ -407,6 +425,31 @@ class RuleConstObjectTest(unittest.TestCase):
 
     def test_by_value_const_initialized_from_a_static_cast_literal_is_safe(self):
         self.assert_const("static const Int x = static_cast<Int>(5);", True)
+
+    def test_by_value_const_cast_to_an_unreviewed_class_type_is_not_safe(self):
+        # The declared type (`Int`) is a reviewed-safe scalar, but a C-style cast to an unrelated,
+        # unreviewed class type (`Lit`) runs THAT class's own converting constructor from the string
+        # literal underneath, then (to land back on the declared `Int`) its conversion operator: neither
+        # is reviewed just because the declared type and the literal underneath both look safe on their
+        # own. `rule_const_object`'s own declared-type gate cannot catch this, since it only ever looks at
+        # the declared type (`Int`), never at a cast reached underneath the initialiser.
+        self.assert_const('static const Int n = (Lit)"z";', False)
+
+    def test_by_value_const_static_cast_to_an_unreviewed_class_type_is_not_safe(self):
+        # The same gap as the C-style cast above, spelled as a functional-style static_cast.
+        self.assert_const('static const Int n = static_cast<Lit>("z");', False)
+
+    def test_by_value_const_initialized_from_a_void_pointer_cast_of_an_enumerator_is_safe(self):
+        # StateConditionInfo's own `void* userData` (the real shape this codebase uses:
+        # `StateConditionInfo(isConditionTrue, MY_STATE, (void*)ATTACK_CONTINUED_TARGET_FORCED)`): a cast
+        # to a pointer type is a pointer conversion, never a constructor call, whatever name follows
+        # `void*`, so this must stay safe even though the cast-target gate above now rejects a cast to a
+        # bare, unreviewed class name.
+        self.assert_const(
+            "static const StateConditionInfo s_info = "
+            "StateConditionInfo(isConditionTrue, MY_STATE, (void*)ATTACK_CONTINUED_TARGET_FORCED);",
+            True,
+        )
 
     def test_by_value_const_initialized_from_a_qualified_enumerator_is_safe(self):
         # The scope prefix (a class/namespace name) need not itself be upper case; only the final,

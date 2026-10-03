@@ -1102,11 +1102,39 @@ LITERAL_RE = re.compile(rf"^(?:{_NUMBER_RE}|\"(?:[^\"\\]|\\.)*\"|'(?:[^'\\]|\\.)
 # (unqualified) segment is upper case.
 ALL_CAPS_RE = re.compile(r"^[A-Za-z_]\w*(?:::[A-Za-z_]\w*)*$")
 # A C-style or functional cast (`(Int)expr`, `static_cast<Int>(expr)`) ahead of a value this rule still
-# checks underneath: the cast itself reads nothing, so only the expression it casts need be a pure value.
-_CAST_RE = re.compile(r"^\(\s*(?:const\s+)?[A-Za-z_][\w:]*\s*(?:[*&]\s*)?\)\s*(?P<rest>\S.*)$", re.DOTALL)
-_STATIC_CAST_RE = re.compile(
-    r"^(?:static|const|reinterpret)_cast\s*<[^<>]*>\s*\((?P<rest>.*)\)$", re.DOTALL
+# checks underneath: the cast itself reads nothing, but a cast to a class type is not inert the way a cast
+# to a scalar is. `(T)expr`/`static_cast<T>(expr)` runs T's own converting constructor when T is a class,
+# and a later conversion back out of that temporary (to whatever the declared type actually is) can run
+# T's own conversion operator too; neither of those is reviewed just because the operand underneath looks
+# like a pure value. `cast_type` is also checked (`_cast_target_is_safe`, below) before the operand is.
+_CAST_RE = re.compile(
+    r"^\((?P<cast_type>\s*(?:const\s+)?[A-Za-z_][\w:]*\s*(?:[*&]\s*)?)\)\s*(?P<rest>\S.*)$", re.DOTALL
 )
+_STATIC_CAST_RE = re.compile(
+    r"^(?:static|const|reinterpret)_cast\s*<(?P<cast_type>[^<>]*)>\s*\((?P<rest>.*)\)$", re.DOTALL
+)
+
+
+def _cast_target_is_safe(cast_type):
+    """True when a cast's own target type (`cast_type`, as either `_CAST_RE` or `_STATIC_CAST_RE` captures
+    it) can never itself run an unreviewed converting constructor or conversion operator, so recursing into
+    the cast's operand (what both regexes' callers actually do next) is safe to trust. A pointer or
+    reference target (`void*`, `AudioEventRTS*`, `Foo&`: trailing `*`/`&` after stripping) is always safe
+    regardless of its pointee/referent's own name, because casting TO a pointer or reference type is a
+    pointer conversion or a reference binding, never a constructor call, whatever class the pointee is
+    (this is the `(void*)ATTACK_CONTINUED_TARGET_FORCED`-shaped argument StateConditionInfo's own
+    constructor call takes). Any other target is checked the same way a declared variable's own type is
+    (`_declared_type_is_const_safe`): a built-in scalar, an allow-listed value-constructor name, or a class
+    this rule has specifically reviewed may be cast to; any other class type — reached only through a
+    cast's target, never through a variable's own declared type — fails closed, exactly as a bare
+    declaration of that same unreviewed class type already would."""
+    cast_type = cast_type.strip()
+    if cast_type[-1:] in "*&":
+        return True
+    cast_type = re.sub(r"^const\s+", "", cast_type).strip()
+    return _declared_type_is_const_safe(cast_type)
+
+
 # A function (pointer) name, bare or `&`-taken, possibly scoped (`isConditionTrue`, `&foo`,
 # `DeliverPayloadStateMachine::isOffMap`): accepted only as a direct argument of the declared type's own
 # constructor (a callback field, such as StateConditionInfo's), never as a value on its own, never when it
@@ -1220,12 +1248,15 @@ def _is_safe_value_expr(expr, type_name, writable_names, is_function_name=None):
     """True when `expr` (a whole by-value initialiser, or one brace-list element / call argument of one)
     is provably a pure value: a literal, an ALL_CAPS named constant or enumerator that is neither itself a
     writable symbol nor an object-like macro (see below), `true`/`false`/`nullptr`, a cast of another pure
-    value, a call to an allow-listed pure value constructor or to the declared type's own name (each of its
-    arguments checked the same way, except that, when the declared type is `StateConditionInfo` (the only
-    type that this classified library's own `static const` initialisers ever build, by calling the
-    declared type's own name, with a function-pointer field in that call: other callback-taking types
-    built that way, such as `StateMachine::TransitionInfo` or `DLINK_ITERATOR`, are deliberately left out
-    and fail closed until someone reviews them and adds them; a brace-initialised aggregate with a
+    value to a target type that is itself reviewed-pure or a pointer/reference (`_cast_target_is_safe`,
+    below: a cast's target is not inert when it is a bare class type, since the cast can run that class's
+    own converting constructor), a call to an allow-listed pure value constructor or to the declared type's
+    own name (each of its arguments checked the same way, except that, when the declared type is
+    `StateConditionInfo` (the only type that this classified library's own `static const` initialisers
+    ever build, by calling the declared type's own name, with a function-pointer field in that call: other
+    callback-taking types built that way, such as `StateMachine::TransitionInfo` or `DLINK_ITERATOR`, are
+    deliberately left out and fail closed until someone reviews them and adds them; a brace-initialised
+    aggregate with a
     callback field, such as a `FieldParse` table's rows, never reaches this call-shaped check at all) and
     the callee is that same name, the call's first argument is additionally accepted as a lower-case-led
     function name (bare, `&`-taken or scoped) that `is_function_name` (when given) confirms is actually
@@ -1285,7 +1316,9 @@ def _is_safe_value_expr(expr, type_name, writable_names, is_function_name=None):
         return True
     m = _STATIC_CAST_RE.match(expr)
     if m:
-        return _is_safe_value_expr(m.group("rest"), type_name, writable_names, is_function_name)
+        return _cast_target_is_safe(m.group("cast_type")) and _is_safe_value_expr(
+            m.group("rest"), type_name, writable_names, is_function_name
+        )
     m = _CAST_RE.match(expr)
     if m and m.group("rest")[:1] not in "(+-":
         # `(name)(args)` is a parenthesised callee (a call through a function pointer, or a macro that
@@ -1301,7 +1334,9 @@ def _is_safe_value_expr(expr, type_name, writable_names, is_function_name=None):
         # a signed operand as the cast's operand) leaves this expression to the checks below, all of
         # which require a leading identifier or `{`/`(` that is not this cast-looking prefix, so it is
         # rejected rather than read as a cast of a safe-looking argument list.
-        return _is_safe_value_expr(m.group("rest"), type_name, writable_names, is_function_name)
+        return _cast_target_is_safe(m.group("cast_type")) and _is_safe_value_expr(
+            m.group("rest"), type_name, writable_names, is_function_name
+        )
     if expr[0] == "{" and expr[-1] == "}":
         # `{...}` is either an array's own literal element list (`type_name` is the array's element type)
         # or a single object's brace-direct-initialisation (`T name{args};`). Aggregate initialisation of
@@ -1433,16 +1468,21 @@ def _pointer_init_is_safe(init):
     what the checked-in list accepts. The cast branch rejects a signed operand (`(TheFoo)+1`) the same way
     `_is_safe_value_expr`'s does, and for the same reason: `(name)+1`/`(name)-1` is, textually, either a
     cast of a signed literal or an add/subtract on the parenthesised `name`, and this regex cannot tell a
-    type name from a writable pointer's own name to prove which."""
+    type name from a writable pointer's own name to prove which. The cast branch also checks its own
+    target type (`_cast_target_is_safe`, same as `_is_safe_value_expr`'s cast branches) before trusting the
+    operand underneath: a cast to a pointer/reference type (the common case here, since the declared
+    variable is itself a pointer) is always safe to recurse through, but a cast to a bare, unreviewed class
+    type could still run that class's own converting constructor on the way to the pointer this
+    initialises, exactly as it could for a by-value const."""
     init = init.strip()
     if init[:1] == "(" and init[-1:] == ")" and _fully_parenthesized(init):
         return _pointer_init_is_safe(init[1:-1])
     m = _CAST_RE.match(init)
     if m and m.group("rest")[:1] not in "(+-":
-        return _pointer_init_is_safe(m.group("rest"))
+        return _cast_target_is_safe(m.group("cast_type")) and _pointer_init_is_safe(m.group("rest"))
     m = _STATIC_CAST_RE.match(init)
     if m:
-        return _pointer_init_is_safe(m.group("rest"))
+        return _cast_target_is_safe(m.group("cast_type")) and _pointer_init_is_safe(m.group("rest"))
     if init in ("nullptr", "NULL"):
         return True
     return bool(LITERAL_RE.match(init))
