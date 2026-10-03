@@ -1284,8 +1284,9 @@ void Drawable::updateDrawable()
   //
   // GeneralsX @performance cemlyn007 29/09/2026 Skip the restart when the audio manager can never
   // play a sound (PLAN-023 Phase 5b, perf2). The device-free managers (headless engines and -noaudio runs) drop every
-  // request, so isCurrentlyPlaying is always false and every looping ambient sound was restarted on
-  // every frame: a stop, an AudioEventRTS copy and an addAudioEvent per drawable per frame, all
+  // request at the next audio update, which runs before the client update, so by the time this check
+  // runs the previous frame's restart is gone and isCurrentlyPlaying is false: every looping ambient
+  // sound was restarted on every frame: a stop, an AudioEventRTS copy and an addAudioEvent per drawable per frame, all
   // discarded at the next audio update. A real audio manager answers TRUE, so its behaviour is
   // unchanged. The simulation cannot see the skip: m_ambientSound is client-side (Drawable::xfer only
   // clears it on load), ambient sounds are not logical audio, and addAudioEvent's side effects are
