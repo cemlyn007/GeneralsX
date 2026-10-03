@@ -221,9 +221,32 @@ void SubsystemInterfaceList::shutdownAll()
 	{
 		SubsystemInterface* sys = *it;
 		delete sys;
+#if RTS_ENGINE_CONTEXT
+		// GeneralsX @feature cemlyn007 28/09/2026 Null the deleted subsystem's singleton (see the header)
+		for (std::vector<SingletonReference>::iterator ref = m_singletonReferences.begin(); ref != m_singletonReferences.end(); ++ref)
+		{
+			if (ref->sys == sys)
+				ref->reset(ref->reference);
+		}
+#endif
 	}
 	m_subsystems.clear();
+#if RTS_ENGINE_CONTEXT
+	m_singletonReferences.clear();
+#endif
 }
+
+#if RTS_ENGINE_CONTEXT
+//-----------------------------------------------------------------------------
+// GeneralsX @feature cemlyn007 28/09/2026 Lifecycle nulling (PLAN-023 Phase 1; see the header)
+void SubsystemInterfaceList::recordSingletonReference(SubsystemInterface* sys, void* reference, SingletonResetFn reset)
+{
+	if (sys == nullptr)
+		return;
+	SingletonReference entry = { sys, reference, reset };
+	m_singletonReferences.push_back(entry);
+}
+#endif
 
 #ifdef DUMP_PERF_STATS
 //-----------------------------------------------------------------------------

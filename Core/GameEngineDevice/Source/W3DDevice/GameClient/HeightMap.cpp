@@ -1028,6 +1028,11 @@ Int HeightMapRenderObjClass::updateBlock(Int x0, Int y0, Int x1, Int y1,  WorldH
 //=============================================================================
 HeightMapRenderObjClass::~HeightMapRenderObjClass()
 {
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 28/09/2026 No dangling singleton after teardown (PLAN-023 Phase 1)
+	if (TheHeightMap == this)
+		TheHeightMap = nullptr;
+#endif
 	freeMapResources();
 
 	delete [] m_extraBlendTilePositions;

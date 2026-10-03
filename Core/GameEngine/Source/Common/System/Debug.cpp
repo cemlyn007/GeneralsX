@@ -65,6 +65,7 @@
 // vc6/vc6-debug/vc6-profile presets (which still build this shared Core file) keep working.
 #if !(defined(_MSC_VER) && _MSC_VER < 1300)
 #include <atomic>
+#include <cstdlib>
 #include <exception>
 #endif
 #include "Common/CRCDebug.h"
@@ -834,6 +835,7 @@ void ClearEngineFault()
 #if RTS_ENGINE_CONTEXT
 void SetEngineTearingDown(bool tearingDown)
 {
+	// g_noEngine stays pristine: no engine is being torn down there.
 	rts::EngineContext* context = rts::ctx();
 	if (context != &rts::g_noEngine)
 		context->engineTearingDown = tearingDown;
@@ -841,8 +843,8 @@ void SetEngineTearingDown(bool tearingDown)
 
 bool IsEngineTearingDown()
 {
-	const rts::EngineContext* context = rts::ctx();
-	return context == &rts::g_noEngine || context->engineTearingDown;
+	// Outside every engine (rts::g_noEngine) no engine is being torn down: false.
+	return rts::ctx()->engineTearingDown;
 }
 #else
 static bool theEngineTearingDown = false;
@@ -858,21 +860,59 @@ bool IsEngineTearingDown()
 }
 #endif
 
-// GeneralsX @bugfix cemlyn007 02/10/2026 Single place for the embedded-mode fatal error, used by
-// ReleaseCrash and ReleaseCrashLocalized's sites alike. Returns false outside embedded mode (the
-// caller carries on with the normal crash path). Otherwise it latches the fault and then throws,
-// unless that would end the process through std::terminate (the engine is being torn down, or
-// another exception is already propagating): then it returns true without throwing and the caller
-// returns. The embedded-mode flag is read once, so the latch and the decision cannot disagree.
-static bool HandleEmbeddedFatalError(const char *reason)
+// GeneralsX @feature cemlyn007 02/10/2026 Sets the fault latch (see FatalEngineError.h).
+static void latchEngineFault()
 {
-	if (!IsEngineEmbeddedMode())
-		return false;
 #if !(defined(_MSC_VER) && _MSC_VER < 1300)
 	theEngineHasFaulted.store(true);
 #else
 	theEngineHasFaulted = true;
 #endif
+}
+
+// GeneralsX @bugfix cemlyn007 28/09/2026 Whether this thread is inside ReleaseCrashNoReturn, which
+// reports a ReleaseCrash that returned itself (see throwWithoutGlobalData).
+static thread_local bool theInReleaseCrashNoReturn = false;
+
+// Embedded mode with no TheGlobalData: latch the fault, then throw, unless that would end the process
+// through std::terminate (the engine is being torn down, or another exception is already propagating).
+static bool throwWithoutGlobalData(const char *reason)
+{
+	if (!IsEngineEmbeddedMode())
+		return false;
+	latchEngineFault();
+	if (IsEngineTearingDown() || std::uncaught_exceptions() != 0)
+		return false;
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @bugfix cemlyn007 28/09/2026 Outside every engine context (rts::g_noEngine, where
+	// TheGlobalData is always null) the caller is either a host call that entered no engine or a static
+	// destructor or exit handler, and there is no telling which: a static built at any time (a
+	// function-local one first reached during play, say) is destroyed at exit, in no engine's scope.
+	// A throw out of a destructor ends the process through std::terminate, so it returns there, as
+	// upstream does once TheGlobalData is gone, but says so on stderr rather than swallow the error.
+	if (rts::ctx() == &rts::g_noEngine)
+	{
+		// ReleaseCrashNoReturn reports it itself, and raises it after all in embedded mode.
+		if (!theInReleaseCrashNoReturn)
+			fprintf(stderr, "GeneralsX: fatal engine error outside every engine context, not raised%s%s\n",
+				reason ? ": " : "", reason ? reason : "");
+		return false;
+	}
+#endif
+	return true;
+}
+
+// GeneralsX @bugfix cemlyn007 02/10/2026 Single place for the embedded-mode fatal error where
+// TheGlobalData exists, used by ReleaseCrash and ReleaseCrashLocalized's sites alike. Returns false
+// outside embedded mode (the caller carries on with the normal crash path). Otherwise it latches the
+// fault and then throws, unless that would end the process through std::terminate (the engine is being
+// torn down, or another exception is already propagating): then it returns true without throwing and
+// the caller returns. The embedded-mode flag is read once, so the latch and the decision cannot disagree.
+static bool HandleEmbeddedFatalError(const char *reason)
+{
+	if (!IsEngineEmbeddedMode())
+		return false;
+	latchEngineFault();
 	if (IsEngineTearingDown() || std::uncaught_exceptions() != 0)
 		return true;
 	throw FatalEngineError(reason ? reason : "");
@@ -904,7 +944,9 @@ void ReleaseCrash(const char *reason)
 		// GeneralsX @bugfix cemlyn007 28/09/2026 Embedded mode: there is no crash file to write, but
 		// the caller still must not carry on, so hand the error to the host (see FatalEngineError.h).
 		// GeneralsX @bugfix cemlyn007 28/09/2026 Not in the teardown window, though.
-		HandleEmbeddedFatalError(reason);
+		if (throwWithoutGlobalData(reason)) {
+			throw FatalEngineError(reason ? reason : "");
+		}
 		return; // We are shutting down, and TheGlobalData has been freed.  jba. [4/15/2003]
 	}
 
@@ -982,6 +1024,28 @@ void ReleaseCrash(const char *reason)
 	_exit(1);
 }
 
+// GeneralsX @bugfix cemlyn007 28/09/2026 See FatalEngineError.h
+void ReleaseCrashNoReturn(const char *reason)
+{
+	struct InNoReturn
+	{
+		InNoReturn() { theInReleaseCrashNoReturn = true; }
+		~InNoReturn() { theInReleaseCrashNoReturn = false; }
+	};
+	{
+		InNoReturn inNoReturn;
+		ReleaseCrash(reason);
+	}
+	// ReleaseCrash returned: no TheGlobalData, and it did not throw.
+	const bool raise = IsEngineEmbeddedMode();
+	fprintf(stderr, "GeneralsX: fatal engine error, %s: %s\n", raise ? "raised" : "aborting",
+		reason ? reason : "");
+	fflush(stderr);
+	if (raise)
+		throw FatalEngineError(reason ? reason : "");
+	abort();
+}
+
 void ReleaseCrashLocalized(const AsciiString& p, const AsciiString& m)
 {
 	if (!TheGameText) {
@@ -1054,7 +1118,12 @@ void ReleaseCrashLocalized(const AsciiString& p, const AsciiString& m)
 	// GeneralsX @bugfix cemlyn007 28/09/2026 In the teardown window return instead, as ReleaseCrash does
 	// (the code below needs TheGlobalData).
 	if (TheGlobalData == nullptr) {
-		HandleEmbeddedFatalError(reason.str());
+		// (The message is on stderr already.)
+		if (throwWithoutGlobalData(nullptr)) {
+			AsciiString reason;
+			reason.translate(mesg);
+			throw FatalEngineError(reason.str());
+		}
 		return;
 	}
 

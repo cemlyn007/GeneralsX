@@ -266,6 +266,11 @@ SelectionTranslator::SelectionTranslator()
 //-----------------------------------------------------------------------------
 SelectionTranslator::~SelectionTranslator()
 {
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 28/09/2026 No dangling singleton after teardown (PLAN-023 Phase 1)
+	if (TheSelectionTranslator == this)
+		TheSelectionTranslator = nullptr;
+#endif
 }
 
 //-----------------------------------------------------------------------------

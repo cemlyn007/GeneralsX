@@ -65,15 +65,38 @@ FATAL_ENGINE_ERROR_API void SetEngineEmbeddedMode(bool embedded);
 FATAL_ENGINE_ERROR_API bool IsEngineEmbeddedMode();
 
 // Per engine (per engine context with RTS_ENGINE_CONTEXT): GameEngine's destructor sets it and its
-// constructor clears it. Outside every engine context it reads as set (nothing to hand an error to).
+// constructor clears it.
+//
+// GeneralsX @bugfix cemlyn007 28/09/2026 It must not carry over into the next engine:
+// - With RTS_ENGINE_CONTEXT it is a field of the engine context, so a new engine (a new context) starts
+//   clear. Outside every engine context (rts::g_noEngine) it is never set. A fatal error there with no
+//   TheGlobalData (always the case there) is not thrown, though, but reported on stderr: the caller may
+//   be a static destructor or an exit handler (noexcept, so a throw would end the process), which
+//   cannot be told apart from a host call that entered no engine.
+// - Without it there is one flag for the process, which stays set after ~GameEngine (the statics
+//   destroyed at exit still see no TheGlobalData). A host that brings up another engine after a
+//   teardown clears it first, SetEngineTearingDown(false), before anything that can raise a fatal error.
 FATAL_ENGINE_ERROR_API void SetEngineTearingDown(bool tearingDown);
 FATAL_ENGINE_ERROR_API bool IsEngineTearingDown();
+
+// GeneralsX @bugfix cemlyn007 28/09/2026 A fatal error that never returns (PLAN-023 Phase 1). ReleaseCrash
+// returns when there is no TheGlobalData and it does not throw (not embedded, the teardown window, another
+// exception propagating, or outside every engine context: see above), and upstream callers carry on after
+// it then. A caller that must not carry on in any case calls this instead: ReleaseCrash, and if that
+// returns, FatalEngineError in embedded mode (which ends the process through std::terminate if a
+// destructor is running) or abort() otherwise, with the reason on stderr.
+//
+// Never call it from a destructor (or anything a destructor calls, an exit handler included): in
+// embedded mode it throws even where ReleaseCrash would not, and a throw out of a destructor ends the
+// process through std::terminate. Such callers keep ReleaseCrash, which returns there.
+[[noreturn]] FATAL_ENGINE_ERROR_API void ReleaseCrashNoReturn(const char *reason);
 
 // GeneralsX @feature cemlyn007 02/10/2026 Sticky fault latch: fault delivery to the host otherwise
 // depends on every catch (...) between RELEASE_CRASH and the host having a
 // catch (const FatalEngineError&) { throw; } in front of it. The engine sets this latch before it
 // throws, so something that swallows the exception anyway (a catch (...) added later, upstream or
-// in a merge) still leaves it set. It is also set when the teardown window above makes the error
+// in a merge) still leaves it set. Host-usage refusals and the repeat of a poisoned process (NameKeyGenerator's refuseInit) deliberately
+// do not set it: no engine faulted. It is also set when the teardown window above makes the error
 // return instead of throw. A host that polls HasEngineFaulted() after each call into the engine can
 // therefore detect the fault even when no exception reaches it.
 //

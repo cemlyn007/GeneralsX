@@ -44,6 +44,10 @@
 
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
+#if RTS_ENGINE_CONTEXT
+#include <mutex>
+#endif
+
 // SYSTEM INCLUDES
 
 // USER INCLUDES
@@ -3532,12 +3536,25 @@ void *realloc(void *p, size_t s)
 }
 #endif
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 28/09/2026 The memory manager is process-wide and every engine in the
+// process uses it, so initMemoryManager/shutdownMemoryManager are refcounted: only the last shutdown
+// destroys it (PLAN-023 Phase 1).
+static std::mutex theMemoryManagerUsersMutex;
+static Int theMemoryManagerUsers = 0;
+#endif
+
 //-----------------------------------------------------------------------------
 /**
 	Initialize the memory manager, and create TheMemoryPoolFactory and TheDynamicMemoryAllocator.
 */
 void initMemoryManager()
 {
+#if RTS_ENGINE_CONTEXT
+	std::lock_guard<std::mutex> users(theMemoryManagerUsersMutex);
+	if (theMemoryManagerUsers++ > 0)
+		return;
+#endif
 	if (TheMemoryPoolFactory == nullptr)
 	{
 		Int numSubPools;
@@ -3614,6 +3631,11 @@ static NOINLINE void preMainInitMemoryManagerImpl()
 */
 void shutdownMemoryManager()
 {
+#if RTS_ENGINE_CONTEXT
+	std::lock_guard<std::mutex> users(theMemoryManagerUsersMutex);
+	if (theMemoryManagerUsers == 0 || --theMemoryManagerUsers > 0)
+		return;
+#endif
 	if (thePreMainInitFlag)
 	{
 	#ifdef MEMORYPOOL_DEBUG
