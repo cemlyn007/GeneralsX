@@ -614,6 +614,28 @@ class SourceIndexDefinitionTest(unittest.TestCase):
         self.assertIn("{ 1, 2, 3 }", decl)
         self.assertTrue(decl.rstrip().endswith(";"))
 
+    def test_rule_const_reads_a_global_pointer_read_past_the_old_160_char_cap(self):
+        # End to end through resolve_sources and classify: a multi-line initialiser with a `->` read well
+        # past the 160th character must still make rule:const refuse it, not stop at a truncated copy of
+        # the declaration that never reaches the unsafe read.
+        padding = ", ".join(f"{i}.0f" for i in range(1, 29))  # pushes the `->` read past character 160
+        self.write(
+            "longtable.cpp",
+            "static const Real s_longtable[] =\n"
+            "{\n"
+            f"    {padding},\n"
+            "    TheGlobalData->m_maxCameraHeight,\n"
+            "};\n",
+        )
+        sym = m.Symbol("s_longtable")
+        sym.count = 1
+        symbols = {"s_longtable": sym}
+        m.resolve_sources(self.root, symbols, {})
+        self.assertGreater(len(sym.decl), 160)
+        self.assertIn("->", sym.decl)
+        m.classify(sym, symbols)
+        self.assertNotEqual(sym.by, "rule:const")
+
     def test_find_does_not_extend_a_statement_that_already_ends_on_its_own_line(self):
         # The common, already-correct case must not be touched: a declaration complete on one line keeps
         # exactly that line (nothing from the next statement bleeds in).

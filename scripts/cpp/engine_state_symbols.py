@@ -711,9 +711,9 @@ def resolve_sources(root, symbols, third_party):
             sites = index.find_all(p)
             if len(sites) > 1:
                 source = SITE_SEP.join(site for site, _decl in sites)
-                sym.decls = [re.sub(r"\s+", " ", d)[:160] for _site, d in sites]
+                sym.decls = [re.sub(r"\s+", " ", d) for _site, d in sites]
         sym.source = source
-        sym.decl = re.sub(r"\s+", " ", decl)[:160]
+        sym.decl = re.sub(r"\s+", " ", decl)
         sym.parsed = p
     return index
 
