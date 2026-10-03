@@ -150,6 +150,26 @@ class RuleConstObjectTest(unittest.TestCase):
         # anything (the s_emptyWaypoints shape: `static const WaypointMap s_emptyWaypoints = WaypointMap();`).
         self.assert_const("static const WaypointMap s_emptyWaypoints = WaypointMap();", True)
 
+    def test_by_value_const_initialized_from_an_unreviewed_class_types_own_name_is_not_safe(self):
+        # `WaypointMap` (above) is reviewed and on `SAFE_CONST_CLASS_TYPES`; a type this scan has never
+        # looked at must not be waved through just because its own-name call's argument is a literal.
+        # AudioEventRTS's own constructor, called exactly this way elsewhere in the codebase, caches a
+        # per-engine `AudioEventInfo*` into a `mutable` member well after this call returns, so an
+        # all-literal argument never proves the call itself is pure.
+        self.assert_const('static const AudioEventRTS s_click = AudioEventRTS("GUIClick");', False)
+
+    def test_by_value_const_direct_initialized_from_an_unreviewed_class_type_is_not_safe(self):
+        # The same gap as the test above, but direct-initialised (`T name(args)`, no `=`): the recorded
+        # initialiser is just `("GUIClick")`, textually identical in shape to `pick(3)`'s own `(3)`, so the
+        # declared type must still be checked before unwrapping it as a safe literal argument list.
+        self.assert_const('static const AudioEventRTS s_click("GUIClick");', False)
+
+    def test_by_value_const_brace_initialized_from_an_unreviewed_class_type_is_not_safe(self):
+        # The same gap again, brace-initialised (`T name{args}`): this shape is textually identical to an
+        # array's own literal element list (`{ 1.0f, 2.0f }`), so only gating on the declared type (not on
+        # whether this particular `{...}` happens to look like one) tells the two apart.
+        self.assert_const('static const AudioEventRTS s_click{"GUIClick"};', False)
+
     def test_by_value_const_initialized_from_an_rng_call_is_not_safe(self):
         # GameLogicRandomValue reads/advances the per-engine logic RNG: not a pure value constructor, even
         # though its own arguments are literals, so a literal-argument check alone would miss it.
@@ -200,6 +220,12 @@ class RuleConstObjectTest(unittest.TestCase):
     def test_by_value_const_with_no_initializer_is_still_safe(self):
         # A default-constructed const (no `=`, `(` or `{` at all) has no initialiser to distrust.
         self.assert_const("static const WaypointMap s_emptyWaypoints;", True)
+
+    def test_by_value_const_of_an_unreviewed_class_type_with_no_initializer_is_not_safe(self):
+        # The same no-initialiser shape as the test above, but for a type this scan has never reviewed:
+        # "no arguments at all" is not a weaker claim than "all-literal arguments", so it must fail closed
+        # the same way, not be waved through just because there is nothing to misread as a pure value.
+        self.assert_const("static const AudioEventRTS s_click;", False)
 
     def test_every_tu_must_qualify(self):
         sym = make_symbol(
@@ -340,6 +366,15 @@ class RuleConstObjectTest(unittest.TestCase):
     def test_direct_initialized_table_with_an_unsafe_argument_is_not_safe(self):
         self.assert_const(
             "const Matrix3D Matrix3D::Identity ( 1.0, TheGlobalData->m_maxCameraHeight, 0.0, 0.0 );",
+            False,
+        )
+
+    def test_direct_initialized_table_of_an_unreviewed_class_type_is_not_safe(self):
+        # The same several-comma-separated-arguments shape as Matrix3D::Identity above, but for a type
+        # this scan has never reviewed: every argument being a pure literal must not be enough, the same
+        # way it is not enough for a single-argument direct-init (see the AudioEventRTS tests above).
+        self.assert_const(
+            "const Foo Foo::Something ( 1.0, 0.0, 0.0, 0.0 );",
             False,
         )
 

@@ -959,7 +959,8 @@ CONST_PTR_DECL_RE = re.compile(r"\*\s*const\s+\w+\s*(?:\[[^\]]*\]\s*)*$")
 # `++`/`--`, an assignment) are caught by `_by_value_init_is_safe`'s allow-list instead, not by this regex.
 GLOBAL_LOOKUP_RE = re.compile(r"->")
 # Pure value constructors used in this codebase to build a by-value const from literals alone: no lookup, no
-# engine-state read, no counter or RNG draw. Nothing outside this list (and the declared type's own name) is
+# engine-state read, no counter or RNG draw. Nothing outside this list (and the declared type's own name,
+# when that type is itself reviewed pure: see `SAFE_CONST_CLASS_TYPES`/`_declared_type_is_const_safe`) is
 # accepted as a call initialiser, and even a call to one of these is still rejected if an argument itself
 # names a writable symbol (see `_writable_global_names`).
 SAFE_VALUE_CONSTRUCTOR_NAMES = {
@@ -981,6 +982,88 @@ SAFE_VALUE_CONSTRUCTOR_NAMES = {
     "RGBAColorReal",
     "RGBAColorInt",
 }
+# Built-in/typedef scalar types (Core/Libraries/Include/Lib/BaseTypeCore.h's own typedefs, plus the raw
+# C++ fundamental keywords): a default-, direct- or brace-initialised const of one of these, or a call to
+# its own name (a functional-style cast, `Int(5)`), can never run an impure constructor or hide a mutable
+# per-engine cache, because none of these types has a constructor body at all. A class/struct type is
+# never on this list, however pure its own constructors happen to be in practice: see
+# `SAFE_CONST_CLASS_TYPES` below for those, and `_declared_type_is_const_safe` for how the two combine.
+SCALAR_TYPE_NAMES = {
+    "bool",
+    "Bool",
+    "char",
+    "Char",
+    "signed char",
+    "unsigned char",
+    "Byte",
+    "UnsignedByte",
+    "wchar_t",
+    "WideChar",
+    "short",
+    "Short",
+    "unsigned short",
+    "UnsignedShort",
+    "int",
+    "Int",
+    "unsigned",
+    "signed",
+    "unsigned int",
+    "UnsignedInt",
+    "long",
+    "unsigned long",
+    "long long",
+    "unsigned long long",
+    "Int64",
+    "UnsignedInt64",
+    "float",
+    "Real",
+    "double",
+    "size_t",
+}
+# Class types this classified library's own `static const` initialisers build by default-, direct- or
+# brace-initialisation, or by calling the declared type's own name (`T(args)`/`T name(args)`/`T name{args}`/
+# `T name;`): reviewed and confirmed to have pure constructors (built only from their own literal/safe-value
+# arguments, with no engine-state lookup) and no `mutable` member a per-engine cache could later write
+# through. Any other class type is NOT on this list, however literal-looking its own constructor's
+# arguments are: an all-literal argument list does not prove a pure constructor (AudioEventRTS's own
+# `mutable const AudioEventInfo*`/`mutable Int` are filled from inside `AudioManager::addAudioEvent`, long
+# after a call such as `AudioEventRTS("GUIClick")` returns, so even `static const AudioEventRTS
+# s("GUIClick");` must fail closed), so an unreviewed class type is rejected by
+# `_declared_type_is_const_safe` below, the same fail-closed stance `SAFE_VALUE_CONSTRUCTOR_NAMES` already
+# takes for a call to any OTHER function's name.
+SAFE_CONST_CLASS_TYPES = {
+    "string",
+    "std::string",
+    "AsciiString",
+    "UnicodeString",
+    "StateConditionInfo",
+    "Matrix3D",
+    "Matrix3x3",
+    "WaypointMap",
+}
+
+
+def _declared_type_is_const_safe(type_name):
+    """True when `type_name`'s own default-, direct- or brace-initialisation, or a call to its own name,
+    may be trusted without examining what its constructor actually does: a built-in scalar/typedef
+    (`SCALAR_TYPE_NAMES`, which has no constructor body at all), a pure value constructor function this
+    rule already allow-lists by name (`SAFE_VALUE_CONSTRUCTOR_NAMES`, e.g. `Vector3`/`Coord3D`), or a
+    class type this rule has specifically reviewed and found to have a pure constructor and no `mutable`
+    member (`SAFE_CONST_CLASS_TYPES`). Any other declared type — a class this scan has never looked at,
+    whether or not its own constructor's arguments happen to look like plain literals — is not: callers
+    must then reject default-, direct- and brace-initialisation and an own-name call for it, the same way
+    a call to any other, non-allow-listed function name is already rejected. This is deliberately a closed
+    allow-list, not a lookup against the source tree for a `mutable` member or an impure constructor body
+    (which this textual rule has no reliable way to parse): fewer type names is a stricter, not a looser,
+    answer, so a type genuinely safe but missing from either list simply stays unreviewed until it is
+    added here, rather than being guessed at."""
+    return (
+        type_name in SCALAR_TYPE_NAMES
+        or type_name in SAFE_VALUE_CONSTRUCTOR_NAMES
+        or type_name in SAFE_CONST_CLASS_TYPES
+    )
+
+
 # Storage/qualifier keywords that are never the declared type or the variable name, skipped when reading
 # a declaration's last two identifiers off (the variable name, then its type).
 DECL_KEYWORDS = {"static", "const", "inline"}
@@ -1031,9 +1114,19 @@ _STATIC_CAST_RE = re.compile(
 FUNC_PTR_ARG_RE = re.compile(r"^&?[A-Za-z_]\w*(?:::[A-Za-z_]\w*)*$")
 
 
+_ARRAY_BOUND_RE = re.compile(r"\[[^\[\]]*\]")
+
+
 def _declared_type_name(decl):
-    """The declared type's own bare name (`WaypointMap` from `static const WaypointMap s_emptyWaypoints`):
-    the declaration's last identifier is the variable being declared, so the one before it is its type."""
+    """The declared type's own bare name (`WaypointMap` from `static const WaypointMap s_emptyWaypoints`,
+    `Real` from `static const Real s_literals[ARRAY_SIZE(s_names)]`): the declaration's last identifier is
+    the variable being declared, so the one before it is its type, UNLESS that variable is an array, in
+    which case its own bound (`[ARRAY_SIZE(s_names)]`, `[1 << 4]`) sits between the type and the name and
+    may hold identifiers of its own (a call, a sizeof argument); stripping every bracketed bound first
+    (`_ARRAY_BOUND_RE`, non-nested: this codebase's own bound expressions never bracket a further
+    subscript) keeps the "second-to-last identifier" reading correct for an array declarator too, not just
+    a plain one."""
+    decl = _ARRAY_BOUND_RE.sub("", decl)
     tokens = [t for t in re.findall(r"[A-Za-z_]\w*", decl) if t not in DECL_KEYWORDS]
     return tokens[-2] if len(tokens) >= 2 else ""
 
@@ -1138,10 +1231,19 @@ def _is_safe_value_expr(expr, type_name, writable_names, is_function_name=None):
     both exemptions are fail-closed there: a name that is not provably a function (a member, a parameter,
     or a per-engine variable the symbol table happens to miss) is rejected, not assumed to be a callback,
     and an ALL_CAPS name that is defined as an object-like macro is rejected too, not assumed to be a named
-    constant, however its expansion reads."""
+    constant, however its expansion reads. A default-constructed value, a direct- or brace-initialisation
+    unwrapped to its own argument list, and a call to the declared type's own name are each additionally
+    gated on `_declared_type_is_const_safe(type_name)`: an all-literal argument list (or no arguments at
+    all) never proves the constructor those forms actually run is pure, so only a declared type this rule
+    has specifically reviewed (a built-in scalar, an allow-listed value-constructor name, or a class on
+    `SAFE_CONST_CLASS_TYPES`) may use them; any other class type fails closed, exactly like a call to a
+    function name that is not on `SAFE_VALUE_CONSTRUCTOR_NAMES`."""
     expr = expr.strip()
     if not expr:
-        return True
+        # A default-constructed value (`static const Foo foo;`): safe only when `Foo` is itself a
+        # reviewed-pure type (see `_declared_type_is_const_safe`), never for an arbitrary class whose
+        # default constructor this scan has not looked at.
+        return _declared_type_is_const_safe(type_name)
     if _has_unsafe_operator(expr):
         return False
     if LITERAL_RE.match(expr) or expr in ("true", "false", "nullptr", "NULL"):
@@ -1175,22 +1277,38 @@ def _is_safe_value_expr(expr, type_name, writable_names, is_function_name=None):
         # rejected rather than read as a cast of a safe-looking argument list.
         return _is_safe_value_expr(m.group("rest"), type_name, writable_names, is_function_name)
     if expr[0] == "{" and expr[-1] == "}":
-        return all(
+        # `{...}` is either an array's own literal element list (`type_name` is the array's element type,
+        # and no element here ever runs `type_name`'s constructor: aggregate initialisation copies each
+        # literal straight into the slot) or a single object's brace-direct-initialisation (`T name{args};`,
+        # which for a non-aggregate `T` does call its constructor with `args`). The text alone cannot tell
+        # these apart, so this still requires `type_name` to be reviewed-pure before trusting either
+        # reading of it: an array of a reviewed-pure element type is unaffected (each element is also
+        # checked on its own merits below), and a single unreviewed class's brace-constructed value, such
+        # as `static const AudioEventRTS s_click{"GUIClick"};`, now fails closed instead of passing just
+        # because `"GUIClick"` alone looks like a pure value.
+        return _declared_type_is_const_safe(type_name) and all(
             _is_safe_value_expr(e, type_name, writable_names, is_function_name)
             for e in _split_top_level_commas(expr[1:-1])
         )
-    if expr[0] == "(" and _fully_parenthesized(expr):
+    if expr[0] == "(" and _fully_parenthesized(expr) and _declared_type_is_const_safe(type_name):
         # Direct-initialisation's own `(...)` (`pick(3)`'s initialiser is recorded as `(3)`, `Matrix3D::
         # Identity`'s is `(1.0, 0.0, ..., 0.0)`) or a plain grouping: neither is a call (a call starts with
         # the callee's name, not `(`), so unwrap one layer. Several top-level, comma-separated arguments
         # are the declared type's own constructor args (direct-init has no other way to pass more than
         # one); a single one is just a parenthesised expression and is checked the same way either way.
+        # Gated on `type_name` being reviewed-pure for the same reason as the `{...}` branch above: this
+        # unwrap also runs a constructor whenever the whole expression IS that constructor's own argument
+        # list (`AudioEventRTS s_click("GUIClick");`'s recorded initialiser is `("GUIClick")`, identical in
+        # shape to `pick(3)`), and an all-literal argument list does not prove that constructor is pure.
         parts = _split_top_level_commas(expr[1:-1])
         if len(parts) > 1:
             return all(_is_safe_value_expr(p, type_name, writable_names, is_function_name) for p in parts)
         return _is_safe_value_expr(expr[1:-1], type_name, writable_names, is_function_name)
     call = re.match(r"^([A-Za-z_]\w*)\s*\((.*)\)$", expr, re.DOTALL)
-    if call and (call.group(1) in SAFE_VALUE_CONSTRUCTOR_NAMES or call.group(1) == type_name):
+    if call and (
+        call.group(1) in SAFE_VALUE_CONSTRUCTOR_NAMES
+        or (call.group(1) == type_name and _declared_type_is_const_safe(type_name))
+    ):
         args = _split_top_level_commas(call.group(2))
         return all(
             _is_safe_value_expr(a, type_name, writable_names, is_function_name)
