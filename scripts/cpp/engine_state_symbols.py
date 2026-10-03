@@ -900,26 +900,34 @@ def _split_initializer(decl):
     """(declarator, initialiser text) for a recorded declaration line, however it initialises: copy
     (`= expr`), direct (`name(expr)`) or brace (`name{expr}`). The initialiser is `""` when the declarator
     has none at all (a default-constructed `static const Foo foo;`), and `None` when the recorded line
-    (one source line) does not hold it: it ends with a bare `=`, or with an unclosed `(`/`{`, because the
-    initialiser starts on the next source line. The caller must treat `None` as not provably safe, never as
-    an empty, trivially-safe one.
+    (one source line) does not hold it: it ends with a bare `=`, or with an unclosed `(`/`{`/`[`, because the
+    initialiser starts on the next source line, or because the scan could not find the declarator/initialiser
+    boundary at all. The caller must treat `None` as not provably safe, never as an empty, trivially-safe
+    one.
 
-    The scan for the first `=`, `(` or `{` skips over balanced `[...]` and `<...>` groups (an array bound's
-    own parentheses, `[ARRAY_SIZE(x)]` or `[sizeof(T)]`, and a template argument list), so it lands on the
-    declarator/initialiser boundary after the declared name and its array bounds, never on a `(` that is
-    part of the bound itself."""
+    The scan for the first `=`, `(` or `{` skips over balanced `[...]` groups (an array bound's own
+    parentheses, `[ARRAY_SIZE(x)]` or `[sizeof(T)]`), so it lands on the declarator/initialiser boundary
+    after the declared name and its array bounds, never on a `(` that is part of the bound itself. `<`/`>`
+    are never treated as brackets: inside an array bound they are almost always operators (`[1 << 4]`,
+    `[N < 2 ? 1 : 2]`, `[N >> 1]`), not a template argument list, and misreading them as brackets either
+    swallows the real `=` (leaving the depth above zero for the rest of the declaration, so the scan runs
+    off the end) or drops the depth back to zero mid-bound (handing the boundary to a later `(` that is
+    still part of the bound)."""
     i, n, depth = 0, len(decl), 0
     while i < n:
         c = decl[i]
-        if c in "[<":
+        if c == "[":
             depth += 1
-        elif c in "]>":
+        elif c == "]":
             depth = max(0, depth - 1)
         elif depth == 0 and c in "=({":
             break
         i += 1
     if i == n:
-        return decl, ""
+        # Either a plain declaration with no initialiser at all (depth stayed 0 throughout: a safe, empty
+        # initialiser), or the scan ran off the end still inside an unbalanced `[...]` (a malformed or
+        # unrecognised declarator): fail closed rather than assume "no initialiser".
+        return decl, (None if depth else "")
     declarator = decl[:i].rstrip()
     if decl[i] == "=":
         init = decl[i + 1 :].strip()

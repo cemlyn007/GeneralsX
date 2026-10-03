@@ -159,6 +159,31 @@ class RuleConstObjectTest(unittest.TestCase):
     def test_array_with_a_call_bound_and_literal_initializer_is_safe(self):
         self.assert_const("static const Real s_literals[ARRAY_SIZE(s_names)] = { 1.0f, 2.0f };", True)
 
+    def test_array_with_a_shift_bound_initialized_from_an_rng_call_is_not_safe(self):
+        # `<<` inside the bound must never be read as an opening bracket: that leaves the scan's depth
+        # above zero for the rest of the declaration, so it never finds the real `=` and wrongly reports
+        # "no initialiser" (trivially safe).
+        self.assert_const("static const Int s_picks[1 << 4] = { GameLogicRandomValue(0, 3) };", False)
+
+    def test_array_with_a_shift_bound_and_literal_initializer_is_safe(self):
+        self.assert_const("static const Int s_picks[1 << 4] = { 1, 2 };", True)
+
+    def test_array_with_a_conditional_bound_reading_a_global_pointer_is_not_safe(self):
+        # `<` inside the bound (a comparison, not a template argument list) must not be read as an opening
+        # bracket either.
+        self.assert_const(
+            "static const Real s_h[N < 2 ? 1 : 2] = { TheGlobalData->m_maxCameraHeight };",
+            False,
+        )
+
+    def test_array_with_a_shifted_call_bound_initialized_from_an_rng_call_is_not_safe(self):
+        # `>>` inside the bound must not drop the scan's depth back to zero mid-bound: that would hand the
+        # boundary to the bound's own `sizeof(` instead of the real `= {...}` that follows.
+        self.assert_const(
+            "static const Int s_picks[(N >> 1) + sizeof(Int)] = { GameLogicRandomValue(0, 3) };",
+            False,
+        )
+
 
 class RuleNamekeyTest(unittest.TestCase):
     """rule:namekey is SAFE_FOR_NEW: the variable itself must be a NameKeyType/StaticNameKey cache, not a
