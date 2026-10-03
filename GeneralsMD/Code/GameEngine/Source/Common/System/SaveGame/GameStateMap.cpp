@@ -212,30 +212,48 @@ static void extractAndSaveMap( AsciiString mapToSave, Xfer *xfer )
 
 	}
 
-	// read data size from file
-	dataSize = xfer->beginBlock();
-
-	// allocate buffer big enough for the entire map file
-	char *buffer = new char[ dataSize ];
-	if( buffer == nullptr )
+	// GeneralsX @bugfix cemlyn007 03/10/2026 Close fp (and free buffer) on every throw path below,
+	// not just the explicit DEBUG_CRASH/throw ones that already did. beginBlock()/xferUser() can
+	// themselves throw SC_INVALID_DATA on a truncated or corrupt save; leaving fp open on that path
+	// meant the caller's now-tracked partial file (see m_scratchPadMaps above) failed to delete on
+	// Windows (DeleteFile of an open handle fails) and leaked one file descriptor per failed load
+	// everywhere else, in a long-lived embedded host.
+	char *buffer = nullptr;
+	try
 	{
 
-		DEBUG_CRASH(( "extractAndSaveMap - Unable to allocate buffer for file '%s'", mapToSave.str() ));
-		throw SC_INVALID_DATA;
+		// read data size from file
+		dataSize = xfer->beginBlock();
+
+		// allocate buffer big enough for the entire map file
+		buffer = new char[ dataSize ];
+		if( buffer == nullptr )
+		{
+
+			DEBUG_CRASH(( "extractAndSaveMap - Unable to allocate buffer for file '%s'", mapToSave.str() ));
+			throw SC_INVALID_DATA;
+
+		}
+
+		// read map file
+		xfer->xferUser( buffer, dataSize );
+
+		// write contents of buffer to new file
+		if( fwrite( buffer, 1, dataSize, fp ) != dataSize )
+		{
+
+			DEBUG_CRASH(( "extractAndSaveMap - Error writing to file '%s'", mapToSave.str() ));
+			throw SC_INVALID_DATA;
+
+		}
 
 	}
-
-	// read map file
-	xfer->xferUser( buffer, dataSize );
-
-	// write contents of buffer to new file
-	if( fwrite( buffer, 1, dataSize, fp ) != dataSize )
+	catch (...)
 	{
 
-		delete[] buffer;
-
-		DEBUG_CRASH(( "extractAndSaveMap - Error writing to file '%s'", mapToSave.str() ));
-		throw SC_INVALID_DATA;
+		delete [] buffer;
+		fclose( fp );
+		throw;
 
 	}
 

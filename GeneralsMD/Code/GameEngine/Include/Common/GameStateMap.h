@@ -82,6 +82,15 @@ protected:
 	// subdirectory, which also needs a per-engine user_data_dir to be worth doing (otherwise two
 	// engines could still race on the same real file while both think they own it); until then,
 	// engines sharing a user-data dir must not load or save the same map concurrently.
+	//
+	// Known gap: this instance-scoped tracking cleans up only the maps *this* GameStateMap
+	// extracted (clearScratchPadMaps, this instance's next loadGame, or its own destructor). A map
+	// left by a process that was killed before destruction, or by an embedded engine that faulted
+	// (deliberately leaked, never destroyed, after a fatal error -- see the launcher's fault latch),
+	// is tracked by nobody and stays in the shared Save dir indefinitely. The old whole-directory
+	// sweep this replaced would have removed those too, at the cost of also removing another live
+	// engine's still-needed scratch map. A real fix wants the same per-engine scratch subdirectory
+	// noted above, swept wholesale by whichever engine owns it on next start.
 	std::vector<AsciiString> m_scratchPadMaps;
 
 };
