@@ -31,6 +31,9 @@
 #include "PreRTS.h"
 
 #include <algorithm>  // std::find (m_scratchPadMaps dedupe)
+#ifndef _WIN32
+#include <cerrno>     // errno, ENOENT, ENOTDIR (scratchPadMapIsDefinitelyGone)
+#endif
 
 #include "Common/file.h"
 #include "Common/FileSystem.h"
@@ -524,6 +527,31 @@ void GameStateMap::xfer( Xfer *xfer )
 
 }
 
+// GeneralsX @bugfix cemlyn007 03/10/2026 A GetFileAttributes/stat failure is not by itself proof
+// that a scratch-pad map is gone: on non-Windows, file_compat.h's GetFileAttributes wraps stat()
+// and returns INVALID_FILE_ATTRIBUTES for *any* stat() failure, not only "no such file" (EACCES
+// on an ancestor directory losing its search bit, or ESTALE/EIO from a network-mounted user-data
+// root, fail the same way). Answer only a definite not-found, so clearScratchPadMaps below can
+// tell "really gone" apart from "could not be checked" and keep retrying (and reporting) the
+// latter instead of silently dropping it from m_scratchPadMaps.
+#if defined(_WIN32)
+static Bool scratchPadMapIsDefinitelyGone( const AsciiString &path )
+{
+	if( GetFileAttributes( path.str() ) != 0xFFFFFFFF )
+		return FALSE; // still there
+	DWORD err = ::GetLastError();
+	return ( err == ERROR_FILE_NOT_FOUND || err == ERROR_PATH_NOT_FOUND );
+}
+#else
+static Bool scratchPadMapIsDefinitelyGone( const AsciiString &path )
+{
+	struct stat st;
+	if( stat( path.str(), &st ) == 0 )
+		return FALSE; // still there
+	return ( errno == ENOENT || errno == ENOTDIR );
+}
+#endif
+
 // ------------------------------------------------------------------------------------------------
 /** Delete any scratch pad maps in the save directory.  Scratch pad maps are maps that
 	* were embedded in previously loaded save game files and temporarily written out as
@@ -565,16 +593,19 @@ void GameStateMap::clearScratchPadMaps()
 	// path that no longer exists under its tracked name, just because some unrelated case-variant
 	// happens to share the directory. That would also undermine the exact-path claim in the
 	// comment above: this cleanup would no longer be unfoolable by a case-variant name.
-	// GetFileAttributes (stat() on non-Windows) answers only for the exact path.
+	// scratchPadMapIsDefinitelyGone (above) answers only for the exact path, and only when the
+	// path is definitely not found -- any other GetFileAttributes/stat failure is treated the
+	// same as the path still being there, so it is reported and retried rather than silently
+	// dropped.
 	std::vector<AsciiString> stillPending;
 	for( std::vector<AsciiString>::const_iterator it = m_scratchPadMaps.begin(); it != m_scratchPadMaps.end(); ++it )
 	{
 
 		// a scratch pad map left behind would be picked up by a later load; only report and retry
 		// one that is genuinely still there under its exact tracked name -- a DeleteFile failure on
-		// one that is already gone (another thread or process beat us to it, or whose only
-		// remaining match is a case-variant name) needs neither
-		if( DeleteFile( it->str() ) == 0 && GetFileAttributes( it->str() ) != 0xFFFFFFFF )
+		// one that is definitely already gone (another thread or process beat us to it, or whose
+		// only remaining match is a case-variant name) needs neither
+		if( DeleteFile( it->str() ) == 0 && !scratchPadMapIsDefinitelyGone( *it ) )
 		{
 			fprintf( stderr, "GameStateMap::clearScratchPadMaps - Unable to delete scratch pad map '%s'\n", it->str() );
 			fflush( stderr );
