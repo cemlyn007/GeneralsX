@@ -247,6 +247,7 @@ AsciiString QuotedPrintableToAsciiString(AsciiString original)
 		}
 		src++;
 		c++;
+		i++;
 	}
 
 	*c = 0;
