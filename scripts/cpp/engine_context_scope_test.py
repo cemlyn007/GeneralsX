@@ -147,12 +147,24 @@ class ScopeInvariants(unittest.TestCase):
         # Entered on this thread and left here, with another thread entering and leaving in between.
         self.host_mode()
         saved = ctypes.create_string_buffer(64)
+        errors = []
+
+        def run():
+            try:
+                self.enter_leave()
+            except BaseException as e:  # reported on the test's thread
+                errors.append(e)
+
         self.enter(saved)
-        other = threading.Thread(target=self.enter_leave)
-        other.start()
-        other.join()
-        self.assertEqual(libm.fegetround(), FE_TONEAREST, "this thread still in the engine's mode")
-        self.leave(saved)
+        try:
+            other = threading.Thread(target=run)
+            other.start()
+            other.join()
+            self.assertEqual(libm.fegetround(), FE_TONEAREST, "this thread still in the engine's mode")
+        finally:
+            self.leave(saved)
+        if errors:
+            raise errors[0]
         self.check_host_mode("after")
 
 
