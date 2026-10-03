@@ -1088,8 +1088,16 @@ PathfindCellInfo *PathfindCellInfo::s_firstFree = nullptr;
 #if RETAIL_COMPATIBLE_PATHFINDING
 // TheSuperHackers @info This variable is here so the code will run down the retail compatible path till a failure mode is hit
 // The pathfinding will then switch over to the corrected pathfinding code for SH clients
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 03/10/2026 Per engine, like the cell-info pool above: one engine's pool
+// exhaustion must not force-clean another engine's healthy pool or switch it onto the fixed-pathfinding
+// fallback (PLAN-023 Phase 2).
+#define s_useFixedPathfinding (::rts::ctx()->pathfindUseFixedPathfinding)
+#define s_forceCleanCells (::rts::ctx()->pathfindForceCleanCells)
+#else
 Bool s_useFixedPathfinding = false;
 Bool s_forceCleanCells = false;
+#endif
 
 void PathfindCellInfo::forceCleanPathFindCellInfos()
 {
