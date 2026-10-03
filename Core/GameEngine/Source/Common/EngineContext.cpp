@@ -84,6 +84,11 @@ EngineContext::~EngineContext()
 	m_slots = nullptr;
 }
 
+bool EngineContext::hasSlots() const
+{
+	return m_slots != nullptr && !m_slots->inCreationOrder.empty();
+}
+
 void* EngineContext::getSlot(std::size_t index) const
 {
 	if (m_slots == nullptr || index >= m_slots->byIndex.size())
@@ -124,7 +129,7 @@ std::size_t EngineContext::forEachLiveSingleton(void (*visit)(const char* name, 
 
 bool noEngineIsPristine()
 {
-	return g_noEngine.countLiveSingletons() == 0 && !g_noEngine.engineTearingDown && !g_noEngine.nameKeysFrozen
+	return g_noEngine.countLiveSingletons() == 0 && !g_noEngine.hasSlots() && !g_noEngine.engineTearingDown && !g_noEngine.nameKeysFrozen
 		&& g_noEngine.originalGlobalData == nullptr;
 }
 

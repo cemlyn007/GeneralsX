@@ -139,6 +139,9 @@ struct RTS_ENGINE_CONTEXT_API EngineContext
 	// Stores a slot object that this context owns and destroys with `destroy`. The index must not be set.
 	void setSlot(std::size_t index, void* object, EngineSlotDestroyFn destroy);
 
+	// True when any slot object is set (for the lifecycle checks).
+	bool hasSlots() const;
+
 	// The number of singleton fields that are not null (for the lifecycle checks).
 	std::size_t countLiveSingletons() const;
 	// Calls `visit` with the name (`TheXxx`) of every singleton field that is not null, in list order,
@@ -161,7 +164,7 @@ inline EngineContext* ctx() noexcept
 	return t_engine;
 }
 
-// True when g_noEngine still has every singleton null (nothing assigned one outside a Scope).
+// True when g_noEngine still has every singleton null and no slot set (nothing assigned one outside a Scope).
 RTS_ENGINE_CONTEXT_API bool noEngineIsPristine();
 
 // Makes `context` the current context for its lifetime, then restores the previous one. Scopes nest.
