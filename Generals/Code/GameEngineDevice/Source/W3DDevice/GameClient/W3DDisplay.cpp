@@ -2036,14 +2036,7 @@ AGAIN:
 		}
 	}
 
-	// GeneralsX @bugfix cemlyn007 30/09/2026 Render-headless (an embed host's image observations) advances
-	// WW3D's clock only by the logic frames it draws. Every draw adds a frame's time to the clock's pending
-	// time, which the next Sync with a logic update takes in whole, so the draws the load screen and the
-	// start-of-game fade make while the map loads (paced by the wall clock: about 180,000-310,000 of them,
-	// fewer on a busy machine) set every animation's phase for the rest of the game, and the images of two
-	// runs of one game differed (PLAN-023 Phase 8, stage RR0c).
-	if (!(TheGlobalData->m_headless && TheGlobalData->m_headlessRender) || TheGameLogic->hasUpdated())
-		WW3D::Update_Logic_Frame_Time(TheFramePacer->getLogicTimeStepMilliseconds());
+	WW3D::Update_Logic_Frame_Time(TheFramePacer->getLogicTimeStepMilliseconds());
 
 	// TheSuperHackers @info This binds the WW3D update to the logic update.
 	WW3D::Sync(TheGameLogic->hasUpdated());
