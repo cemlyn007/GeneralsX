@@ -305,9 +305,11 @@ int Random3Class::operator() ()
 		int temp    = hihold ^  Mix1[i];
 		int itmpl   = temp   &  0xffff;
 		int itmph   = temp   >> 16;
-		temp    = itmpl * itmpl + ~(itmph * itmph);
-		temp    = (temp >> 16) | (temp << 16);
-		hiword  = loword ^ ((temp ^ Mix2[i]) + itmpl * itmph);
+		// GeneralsX @bugfix cemlyn007 03/10/2026 The mixing in unsigned arithmetic: the signed products and sums
+		// overflowed (undefined behaviour); the result is the same on a two's complement target.
+		unsigned int utmp = (unsigned int)itmpl * (unsigned int)itmpl + ~((unsigned int)itmph * (unsigned int)itmph);
+		utmp    = (unsigned int)((int)utmp >> 16) | (utmp << 16); // the arithmetic shift, as before
+		hiword  = loword ^ (int)((utmp ^ (unsigned int)Mix2[i]) + (unsigned int)itmpl * (unsigned int)itmph);
 		loword  = hihold;
 	}
 	return(hiword);
