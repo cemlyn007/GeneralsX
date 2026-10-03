@@ -1666,7 +1666,6 @@ def rule_per_engine_static(sym):
 
 
 RULES = [
-    ("per-engine-static", rule_per_engine_static),
     ("toolchain", rule_toolchain),
     ("libstdc++", rule_libstdcxx),
     ("third-party", rule_third_party),
@@ -1682,8 +1681,11 @@ RULES = [
 # here, however they match: a `re:` or `file:` pattern names the symbols its author read, and a new symbol
 # that happens to match it (a new `static Int key_count` under `re:.*::key_\w+`) would otherwise inherit a
 # classification nobody gave it. A guard variable is safe when its static is listed (see `new_symbol_error`).
-# A rule added here must be as sound for an unseen symbol as these.
-SAFE_FOR_NEW = {f"rule:{name}" for name, _rule in RULES}
+# A rule added here must be as sound for an unseen symbol as these. `rule:per-engine-static` is included
+# here directly rather than as a RULES entry: `classify` already calls it once of its own accord, ahead of
+# the hand list (see its docstring), so it must never also sit in RULES, whose loop calls every rule with
+# `(sym, symbols, is_function_name)` — a signature `rule_per_engine_static` does not have.
+SAFE_FOR_NEW = {f"rule:{name}" for name, _rule in RULES} | {"rule:per-engine-static"}
 
 
 def classify(sym, symbols, is_function_name=None):

@@ -44,6 +44,25 @@ class FakeLookup:
         return name in self._macros
 
 
+class RulePerEngineStaticNotDuplicatedTest(unittest.TestCase):
+    """rule_per_engine_static must run exactly once per symbol, from `classify`'s own explicit call ahead
+    of the hand list, never again from the RULES loop: that loop calls every entry as
+    `rule(sym, symbols, is_function_name)`, a signature rule_per_engine_static does not have, so a second
+    registration there raises TypeError for every symbol that rule rejects and none of the hand entries or
+    earlier RULES claim."""
+
+    def test_classify_does_not_raise_on_a_symbol_no_rule_classifies(self):
+        sym = make_symbol("s", ["static int s_other;"], source="x.cpp:1", sections={".bss"})
+        m.classify(sym, {})
+        self.assertEqual(sym.cls, m.UNREVIEWED)
+
+    def test_is_not_registered_twice_in_rules(self):
+        self.assertNotIn(m.rule_per_engine_static, [rule for _name, rule in m.RULES])
+
+    def test_is_still_safe_for_new(self):
+        self.assertIn("rule:per-engine-static", m.SAFE_FOR_NEW)
+
+
 class RuleConstObjectTest(unittest.TestCase):
     """rule:const is SAFE_FOR_NEW: it must never pass a reassignable pointer or reference."""
 
