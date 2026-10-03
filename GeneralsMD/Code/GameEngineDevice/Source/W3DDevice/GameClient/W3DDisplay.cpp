@@ -669,6 +669,9 @@ static bool s_filteredDirty = true;
 static void buildFilteredResolutions()
 {
 	s_filteredResolutions.clear();
+	// GeneralsX @bugfix cemlyn007 03/10/2026 A driver that reports no display modes adds no device, and the table's first
+	// entry is then a null reference: init's last resolution attempt would fault instead of failing the boot.
+	if (WW3D::Get_Render_Device_Count() <= 0) return;
 	const RenderDeviceDescClass &devDesc = WW3D::Get_Render_Device_Desc(0);
 	const DynamicVectorClass<ResolutionDescClass> &resolutions = devDesc.Enumerate_Resolutions();
 
