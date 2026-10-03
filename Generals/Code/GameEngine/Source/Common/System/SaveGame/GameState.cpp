@@ -1374,9 +1374,9 @@ void GameState::iterateSaveFiles( IterateSaveFileCallback callback, void *userDa
 		return;
 
 	// GeneralsX @bugfix cemlyn007 27/09/2026 List the save directory by absolute path instead of switching the
-	// process into it, which changed the working directory under every other thread. The local file system lists
-	// the directory on every platform, and a save directory that does not exist yet lists nothing. The listing is
-	// complete before any callback runs, so a callback that throws leaves no directory state behind to restore;
+	// process into it, which changed the working directory under every other thread. On Windows (below) the local
+	// file system lists the directory, and a save directory that does not exist yet lists nothing; the listing is
+	// complete before any callback runs, so a callback that throws leaves no directory state behind to restore.
 	// callbacks handle their own errors, as addGameToAvailableList does.
 #ifndef _WIN32
 	// GeneralsX @bugfix cemlyn007 02/10/2026 List the directory directly instead of through
@@ -1386,17 +1386,38 @@ void GameState::iterateSaveFiles( IterateSaveFileCallback callback, void *userDa
 	// non-directory entry, including a FIFO, socket or dangling symlink: opening one of those in
 	// getSaveGameInfoFromFile's XferLoad::open can block forever (a FIFO) or fail per entry (a
 	// dangling symlink). Iterate case-sensitively here and keep only regular files (and symlinks
-	// that resolve to one), matching the old POSIX iterateSaveFiles this replaced.
+	// that resolve to one), matching the old POSIX iterateSaveFiles this replaced. Unlike the
+	// Windows branch below, this one bypasses TheLocalFileSystem, so it also bypasses its error
+	// reporting: a directory that does not exist yet is an ordinary empty listing, but any other
+	// failure (permissions, a mid-read I/O error) is reported here the same way
+	// StdLocalFileSystem::getFileListInDirectory does, since a silently short or empty listing
+	// (e.g. a save directory whose scratch-pad maps were never cleared) would otherwise be hard to
+	// trace; the listing this produces is not necessarily complete before the first callback runs,
+	// since a mid-read error stops the loop with whatever entries it already saw.
 	{
 		std::error_code ec;
 		std::filesystem::directory_iterator dirIter( getSaveDirectory().str(), ec );
-		if( !ec )
+		if( ec )
+		{
+			if( ec != std::errc::no_such_file_or_directory )
+			{
+				fprintf( stderr, "GameState::iterateSaveFiles - Error opening directory '%s': %s\n",
+				         getSaveDirectory().str(), ec.message().c_str() );
+				fflush( stderr );
+			}
+		}
+		else
 		{
 			const std::filesystem::directory_iterator end;
 			for( ; dirIter != end; dirIter.increment( ec ) )
 			{
 				if( ec )
+				{
+					fprintf( stderr, "GameState::iterateSaveFiles - Error reading directory '%s': %s\n",
+					         getSaveDirectory().str(), ec.message().c_str() );
+					fflush( stderr );
 					break;
+				}
 
 				std::error_code statusError;
 				const Bool isRegular = std::filesystem::is_regular_file( dirIter->path(), statusError );
