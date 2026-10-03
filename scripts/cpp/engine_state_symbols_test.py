@@ -44,6 +44,45 @@ class FakeLookup:
         return name in self._macros
 
 
+class RulePerEngineStaticTest(unittest.TestCase):
+    """rule:per-engine-static is SAFE_FOR_NEW: it must classify only a declaration whose type is itself
+    rts::PerEngineStatic<...>, not merely one that mentions it somewhere else in the declaration (a
+    container or pointer of them is still mutable process-wide state, not a single write-once slot)."""
+
+    def assert_rule(self, decl, expect, msg=None):
+        got = m.rule_per_engine_static(make_symbol("s", [decl])) is not None
+        self.assertEqual(got, expect, msg or decl)
+
+    def test_plain_declaration_is_a_slot_index(self):
+        self.assert_rule("rts::PerEngineStatic<Dict> TheWorldDict_perEngine;", True)
+
+    def test_static_declaration_is_a_slot_index(self):
+        self.assert_rule("static rts::PerEngineStatic<Random4Class> rand4_perEngine;", True)
+
+    def test_nested_template_argument_is_a_slot_index(self):
+        self.assert_rule("rts::PerEngineStatic<OVERRIDE<WeatherSetting> > TheWeatherSetting_perEngine;", True)
+
+    def test_array_type_argument_is_a_slot_index(self):
+        self.assert_rule(
+            "static rts::PerEngineStatic<AsciiString[MAX_PLAYER_COUNT]> static_readPlayerNames_perEngine;", True
+        )
+
+    def test_pointer_template_argument_is_a_slot_index(self):
+        # The pointee, not the PerEngineStatic itself, is a pointer: still a single slot index.
+        self.assert_rule("static rts::PerEngineStatic<TransportStatus *> s_transportStatuses_perEngine;", True)
+
+    def test_container_of_per_engine_static_is_not_a_slot_index(self):
+        # The declared type is std::vector<...>, which merely mentions PerEngineStatic; it is not safe.
+        self.assert_rule("static std::vector<rts::PerEngineStatic<Foo>*> s_registry;", False)
+
+    def test_pointer_to_per_engine_static_is_not_a_slot_index(self):
+        # The pointer itself, unlike the slot it points to, can be reassigned to point at any engine's slot.
+        self.assert_rule("static rts::PerEngineStatic<Foo>* s_cache;", False)
+
+    def test_reference_to_per_engine_static_is_not_a_slot_index(self):
+        self.assert_rule("static rts::PerEngineStatic<Foo>& s_ref = x;", False)
+
+
 class RulePerEngineStaticNotDuplicatedTest(unittest.TestCase):
     """rule_per_engine_static must run exactly once per symbol, from `classify`'s own explicit call ahead
     of the hand list, never again from the RULES loop: that loop calls every entry as
