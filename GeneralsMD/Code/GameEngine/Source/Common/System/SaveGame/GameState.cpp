@@ -713,11 +713,12 @@ SaveCode GameState::loadGame( AvailableGameInfo gameInfo )
 		// function's own `catch (const FatalEngineError&) { throw; }` rethrow site below
 		// specifically, the same way GameEngine::init's GENERALSX_TEST_FAULT_IN_INIT hook covers
 		// that function's rethrow site. Without this, every fault test that reaches a real
-		// RELEASE_CRASH does so from outside any engine-side try block (a host's own unsafe test
-		// hook, or GameEngine::init's own hook), so none of them tell this rethrow site apart from
-		// one a later edit moved `catch (...)` ahead of. Gated on IsEngineEmbeddedMode(), not just
-		// the env var, so a retail or stock build (which never calls SetEngineEmbeddedMode(true))
-		// can never reach this regardless of environment.
+		// RELEASE_CRASH does so either from outside any engine-side try block (a host's own unsafe
+		// test hook) or from inside GameEngine::init's own try block (GENERALSX_TEST_FAULT_IN_INIT),
+		// so none of them pass through this function's rethrow site, and none of them tell it apart
+		// from one a later edit moved `catch (...)` ahead of. Gated on IsEngineEmbeddedMode(), not
+		// just the env var, so a retail or stock build (which never calls
+		// SetEngineEmbeddedMode(true)) can never reach this regardless of environment.
 		if (IsEngineEmbeddedMode() && std::getenv("GENERALSX_TEST_FAULT_IN_LOADGAME"))
 			RELEASE_CRASH("test fault inside GameState::loadGame (GENERALSX_TEST_FAULT_IN_LOADGAME)");
 
