@@ -392,7 +392,10 @@ bool noEngineIsPristine()
 		// still writes DX8Wrapper_HeadlessRender/DX8Wrapper_PreserveFPU before entering a Scope lands on
 		// g_noEngine instead of the engine it meant, so a non-default value here means state leaked outside
 		// every Scope, same as the checks above (PLAN-023 Phase 8, stage RR2a-1).
-		&& !g_noEngine.dx8HeadlessRender && g_noEngine.dx8PreserveFPU == 0;
+		&& !g_noEngine.dx8HeadlessRender && g_noEngine.dx8PreserveFPU == 0
+		// Likewise TheSDL3Window and ApplicationHWnd (Common/ApplicationWindow.h): a window bound before entering
+		// a Scope lands here, and every engine without a Scope then reads it (PLAN-023 Phase 8, stage RR2a-2).
+		&& g_noEngine.sdl3Window == nullptr && g_noEngine.applicationHWnd == nullptr;
 }
 
 } // namespace rts
