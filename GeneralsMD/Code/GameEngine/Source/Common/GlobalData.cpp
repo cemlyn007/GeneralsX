@@ -1551,8 +1551,9 @@ static Bool createUserDataDirectoryWin32(const AsciiString &path)
 // GeneralsX @feature cemlyn007 02/10/2026 Returns Bool and validates rather than accepting
 // anything: refuses an empty `dir`, which would otherwise resolve to the filesystem root
 // (append-a-separator-to-nothing), and refuses a directory that cannot be made or used (it exists as
-// a file, a nested path whose parent is missing, or -- see isUserDataDirectoryWritable above -- it
-// exists but is not writable), rather than accepting it and failing every later write silently.
+// a file, an ancestor cannot be created, or -- see isUserDataDirectoryWritable above -- it exists but
+// is not writable), rather than accepting it and failing every later write silently. A nested path
+// whose parent does not yet exist is not refused: createUserDataDirectory below creates it.
 // `m_userDataDir` is left unchanged on a refusal, so a caller that ignores the return value keeps
 // whatever directory (the default, or an earlier successful override) it already had.
 Bool GlobalData::setPath_UserData(const AsciiString &dir)
