@@ -1666,7 +1666,7 @@ def rule_per_engine_static(sym):
     or pointer of them is still mutable process-wide state): the match is anchored on the whole
     declaration, with no '*' or '&' after the closing '>', rather than searched for anywhere inside it."""
     if all(PER_ENGINE_STATIC_DECL_RE.search(d.split("=")[0].strip()) for d in declarations(sym)):
-        return GLOBAL, "", "PER_ENGINE_STATIC slot index, written once at static initialisation; the object lives in each engine's EngineContext"
+        return GLOBAL, "", "PER_ENGINE_STATIC slot index, written once at static initialization; the object lives in each engine's EngineContext"
     return None
 
 
