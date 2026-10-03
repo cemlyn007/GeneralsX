@@ -79,6 +79,7 @@
 
 #include "assetmgr.h"
 #include <assert.h>
+#include <atomic>
 
 #include "WWLib/bittype.h"
 #include "WWLib/chunkio.h"
@@ -818,7 +819,7 @@ RenderObjClass * WW3DAssetManager::Create_Render_Obj(const char * name)
 	}
 
 	if (proto == nullptr) {
-		static int warning_count = 0;
+		static std::atomic<int> warning_count(0);
 		// Note - objects named "#..." are scaled cached objects, so don't warn...
 		if (name[0] != '#') {
 			if (++warning_count <= 20) {
