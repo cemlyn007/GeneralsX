@@ -11,8 +11,9 @@
 #
 #   worklist     classified render-per-engine or render-scratch (state known to change as an engine draws,
 #                which PLAN-023 Phase 8 moves into the engine), or render-const with a phase (a constant
-#                every render boot still rewrites until that stage builds it once for the process); the
-#                row's phase says when;
+#                today that the named stage still changes: the row's note says whether it builds once for
+#                the process what a render boot rewrites, makes const what is only copied, or moves a
+#                pointer table with the per-engine objects it points to);
 #   allowed      named in the explicit allowlist (ALLOWLIST below, or the caller's), each with its reason: a
 #                process-wide counter, pool or cache that is written on purpose and safe to share;
 #   unexpected   anything else: a symbol the list calls constant, render-const without a phase, render-process, debug-only,
@@ -181,10 +182,9 @@ class Report:
     def _judge(probe, key, cls, phase=""):
         if cls in WORKLIST_CLASSES:
             return "worklist", ""
-        # A render-const row with a phase says so itself: every render boot still rewrites it (with the same
-        # value) until that stage builds it once.
+        # A render-const row with a phase is constant today but the named stage still changes it.
         if cls == "render-const" and phase:
-            return "worklist", f"rewritten at every render boot until {phase}"
+            return "worklist", f"render-const until {phase}"
         if key in probe.allowlist:
             return "allowed", probe.allowlist[key]
         return "unexpected", ""

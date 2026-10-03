@@ -15,8 +15,8 @@
 #                   to the next: moves into the engine in the stage its phase names (RR2a-1 ... RR3)
 #   render-scratch  (Phase 8) filled and consumed within one render call: safe for one renderer at a time,
 #                   not for renderers drawing at once (per engine, per thread or a local by its phase)
-#   render-const    (Phase 8) the same for every engine and device (a phase: still rewritten at every render
-#                   boot, with the same value, until that stage builds it once)
+#   render-const    (Phase 8) the same for every engine and device (a phase: constant today, but that stage still
+#                   changes it: the row's note says how)
 #   render-process  (Phase 8) one per process by design: the D3D8 library, the host's hooks, and what only a
 #                   user interface reaches in the W3D device layer
 #   unreviewed      not classified yet: nobody has looked, so nothing is claimed

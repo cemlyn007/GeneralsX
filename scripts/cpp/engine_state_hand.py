@@ -226,8 +226,7 @@ HAND = [
     #   render-scratch     filled and consumed within one call (a draw, a load): safe for one renderer at a time,
     #                      not for renderers drawing at once; per engine, per thread or a local by its phase;
     #   render-const       the same for every engine and device: built at static initialisation or from
-    #                      constants (a phase: still rewritten at every render boot, with the same value, until
-    #                      that stage builds it once);
+    #                      constants (a phase: constant today, but that stage still changes it: its note says how);
     #   render-process     one per process by design: the D3D8 library, the host's hooks, and what only a user
     #                      interface reaches (every rlgenerals engine keeps GlobalData::m_headless TRUE, the
     #                      viewer's included, so no menu, mouse cursor, control bar or radar is drawn).
