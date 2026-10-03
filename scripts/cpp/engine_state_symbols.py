@@ -911,10 +911,20 @@ def declarations(sym):
 
 
 # The variable itself must be a NameKeyType/StaticNameKey (optionally const), not merely mention one
-# somewhere in its type: a container or struct keyed by NameKeyType is not a cache of one. Unless const, it
-# must also be initialised from the shared generator, so it is never reassigned to a different key later.
+# somewhere in its type: a container or struct keyed by NameKeyType is not a cache of one. Decision 2
+# shares the generator, not the strings fed to it, so the cached key is process-wide only when every
+# engine computes the same key: whenever there is an initialiser (const or not), it must be exactly a
+# NAMEKEY(...) or TheNameKeyGenerator->nameToKey(...) call on a string literal, never on an
+# engine-dependent expression (`NAMEKEY(TheGlobalData->m_mapName)`, `NAMEKEY(m_templateName)`), a bare
+# copy of another cache (`= s_lastKey`), or anything with a trailing operation (`NAMEKEY("x") + s_offset`).
+# A const declaration with no initialiser at all can still pass (it is filled in later by a reviewed call);
+# a non-const one with no initialiser cannot, since nothing here proves what it is ever reassigned to.
 NAMEKEY_DECL_RE = re.compile(r"^(?:static\s+)?(const\s+)?(?:NameKeyType|StaticNameKey)\s+\w+\s*(?:\[[^\]]*\])?\s*$")
-NAMEKEY_INIT_RE = re.compile(r"^\s*(?:NAMEKEY\s*\(|TheNameKeyGenerator\s*->\s*nameToKey\b)")
+_NAMEKEY_STRING_LITERAL_RE = r'"(?:[^"\\]|\\.)*"'
+NAMEKEY_INIT_RE = re.compile(
+    r"^\s*(?:NAMEKEY\s*\(\s*" + _NAMEKEY_STRING_LITERAL_RE + r"\s*\)"
+    r"|TheNameKeyGenerator\s*->\s*nameToKey\s*\(\s*" + _NAMEKEY_STRING_LITERAL_RE + r"\s*\))\s*;?\s*$"
+)
 
 
 def rule_namekey(sym, symbols=None, is_function_name=None):
@@ -926,7 +936,10 @@ def rule_namekey(sym, symbols=None, is_function_name=None):
         m = NAMEKEY_DECL_RE.match(decl.rstrip().rstrip(";").rstrip())
         if not m:
             return None
-        if not m.group(1) and not (sep and NAMEKEY_INIT_RE.search(init)):
+        if sep:
+            if not NAMEKEY_INIT_RE.match(init):
+                return None
+        elif not m.group(1):
             return None
     return GLOBAL, "", "cached NameKeyType (a name or window ID key): process-wide by PLAN-023 Decision 2"
 

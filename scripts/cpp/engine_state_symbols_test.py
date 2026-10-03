@@ -951,6 +951,31 @@ class RuleNamekeyTest(unittest.TestCase):
     def test_struct_mentioning_namekey_is_not_safe(self):
         self.assert_namekey("static StructWithANameKeyType s_thing;", False)
 
+    def test_namekey_from_macro_on_an_engine_dependent_read_is_not_safe(self):
+        # Decision 2 shares the generator, not the string fed to it: two engines with different
+        # TheGlobalData/map data would compute, and cache, two different keys.
+        self.assert_namekey("static NameKeyType k = NAMEKEY(TheGlobalData->m_mapName);", False)
+
+    def test_namekey_from_macro_on_a_plain_member_name_is_not_safe(self):
+        self.assert_namekey("static NameKeyType k = NAMEKEY(m_templateName);", False)
+
+    def test_namekey_from_generator_call_on_an_engine_dependent_read_is_not_safe(self):
+        self.assert_namekey(
+            "static NameKeyType k = TheNameKeyGenerator->nameToKey(TheGlobalData->m_mapName);", False
+        )
+
+    def test_const_namekey_copied_from_another_cache_is_not_safe(self):
+        self.assert_namekey("static const NameKeyType k = s_lastKey;", False)
+
+    def test_const_namekey_from_an_engine_dependent_read_is_not_safe(self):
+        self.assert_namekey("static const NameKeyType k = TheGlobalData->m_someKey;", False)
+
+    def test_const_namekey_reassigned_to_a_constant_is_not_safe(self):
+        self.assert_namekey("static const NameKeyType k = NAMEKEY_INVALID;", False)
+
+    def test_namekey_with_a_trailing_operation_is_not_safe(self):
+        self.assert_namekey('static NameKeyType k = NAMEKEY("x") + s_offset;', False)
+
 
 class RuleFieldParseTest(unittest.TestCase):
     """rule:fieldparse decides by declared type, not by the variable's name alone."""
