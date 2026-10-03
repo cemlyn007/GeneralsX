@@ -19,7 +19,7 @@ This plan is being delivered as a stack of PRs (each paired with the rlgenerals 
 
 rlgenerals' answers to the [open questions](#open-questions) (from its `docs/planning/MULTI_ENGINE_CONSUMER.md`):
 
-1. **Thread migration: not needed.** One engine stays on one thread for its whole life. `Scope` stays per call, so migration remains possible, but it is not tested first.
+1. **Pool stepping: not needed, and no engine is pinned to a fixed owner thread either.** Only one thread is ever inside a given engine at a time (a busy claim refuses a second). Between-call migration *is* needed and is routine: a worker thread can step an engine, and a different thread can later close it once the worker is between calls. This works because `Scope` (`EnterEngine`) restores the engine's floating-point mode and `LC_NUMERIC` on whichever thread enters it, so a call landing on a thread that has never touched this engine before still sees the numeric state the engine's own code expects.
 2. **Render mode: N headless engines plus at most one rendering engine per process is enough.** Phase 8 is off the critical path.
 3. **Create/destroy: create N at the start, `reset()` in place, destroy only on close; after a fault the context is leaked and replaced (create, fault, leak, create).** Create, destroy, create must work (tests and fault recovery), but it need not be fast. (A faulted engine's context is never destroyed, since `~GameEngine` on corrupt state may crash; see "Faulted engines" below, which this answer must stay consistent with.)
 4. **Shared INI/asset data: not a goal now.** Revisit after the consumer's threaded benchmarks.
