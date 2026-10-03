@@ -2154,8 +2154,10 @@ AGAIN:
 	// start-of-game fade make while the map loads (paced by the wall clock: about 180,000-310,000 of them,
 	// fewer on a busy machine) set every animation's phase for the rest of the game, and the images of two
 	// runs of one game differed (PLAN-023 Phase 8, stage RR0c).
-	if (!(TheGlobalData->m_headless && TheGlobalData->m_headlessRender) || TheGameLogic->hasUpdated())
-		WW3D::Update_Logic_Frame_Time(TheFramePacer->getLogicTimeStepMilliseconds());
+	// A draw with no logic update passes zero, so LogicFrameTimeMs, which the draw path's own animations
+	// (cloud scroll, rings, spheres) multiply once per draw, holds them still too.
+	const Bool renderHeadless = TheGlobalData->m_headless && TheGlobalData->m_headlessRender;
+	WW3D::Update_Logic_Frame_Time(!renderHeadless || TheGameLogic->hasUpdated() ? TheFramePacer->getLogicTimeStepMilliseconds() : 0.0f);
 
 	// TheSuperHackers @info This binds the WW3D update to the logic update.
 	WW3D::Sync(TheGameLogic->hasUpdated());
