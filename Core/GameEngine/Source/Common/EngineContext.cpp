@@ -381,10 +381,18 @@ void leaveEngineThreadInvariants(const ThreadInvariants& saved) noexcept
 #endif
 }
 
+static_assert(isStandInGuarded<ContextField<::W3DRenderState*, &EngineContext::w3dRender>>,
+	"a ContextField must not be copyable or have unary operator& (ContextFieldOps)");
+
 bool noEngineIsPristine()
 {
 	return g_noEngine.countLiveSingletons() == 0 && !g_noEngine.engineTearingDown && !g_noEngine.nameKeysFrozen
-		&& g_noEngine.originalGlobalData == nullptr && !g_noEngine.wwMathInitialized && !g_noEngine.hasSlotObjects();
+		&& g_noEngine.originalGlobalData == nullptr && !g_noEngine.wwMathInitialized && !g_noEngine.hasSlotObjects()
+		// GeneralsX @bugfix cemlyn007 02/10/2026 dx8HeadlessRender/dx8PreserveFPU (EngineContext.h): a host that
+		// still writes DX8Wrapper_HeadlessRender/DX8Wrapper_PreserveFPU before entering a Scope lands on
+		// g_noEngine instead of the engine it meant, so a non-default value here means state leaked outside
+		// every Scope, same as the checks above (PLAN-023 Phase 8, stage RR2a-1).
+		&& !g_noEngine.dx8HeadlessRender && g_noEngine.dx8PreserveFPU == 0;
 }
 
 } // namespace rts

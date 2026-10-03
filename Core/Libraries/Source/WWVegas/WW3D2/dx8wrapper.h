@@ -695,6 +695,8 @@ protected:
 	// RR2a-1): macros (w3drenderstate_names.h), except these two, which are also members of other classes used here.
 	static constexpr rts::IndirectContextField<W3DRenderState, &rts::EngineContext::w3dRender, W3DRenderState::Defaults, int, &W3DRenderState::BitDepth> BitDepth{};
 	static constexpr rts::IndirectContextField<W3DRenderState, &rts::EngineContext::w3dRender, W3DRenderState::Defaults, IDirect3DBaseTexture8*[MAX_TEXTURE_STAGES], &W3DRenderState::Textures> Textures{};
+	static_assert(rts::isStandInGuarded<decltype(BitDepth)> && rts::isStandInGuarded<decltype(Textures)>,
+		"an IndirectContextField must not be copyable or have unary operator&");
 
 	// Declared upstream, never defined or used.
 	static void *							Hwnd;
@@ -707,6 +709,9 @@ protected:
 	// Set_Display_Size_Provider); Destroy_Render_State frees both (the end of WW3D::Shutdown, RR2a-2).
 	static void Create_Render_State();
 	static void Destroy_Render_State();
+	// GeneralsX @bugfix cemlyn007 02/10/2026 Frees this engine's W3DRenderState if it has one, without
+	// touching any device or interface: Init's failure returns, which never create a device.
+	static void Free_Render_State();
 #else
 	static DX8_CleanupHook *m_pCleanupHook;
 
