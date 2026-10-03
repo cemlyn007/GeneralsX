@@ -769,7 +769,7 @@ static void TriggerMiniDump()
 // FastCriticalSectionClass flag on those presets. The only host that ever stores true,
 // rlgenerals' launcher, does so from its own single boot/engine thread: once before init() and
 // again, storing false, before a normal teardown (ReleaseCrash reads the flag up to twice per
-// crash and ReleaseCrashLocalized up to four times, and the host's own test hooks read it on
+// crash and ReleaseCrashLocalized up to three times, and the host's own test hooks read it on
 // every init()/loadGame(), but always from that same thread). A VC6/retail build links no
 // embedded host at all, so this flag there is read-only in practice (always false); the
 // volatile bool fallback exists so such presets still link, not because they observe the flag
