@@ -235,16 +235,16 @@ HAND = [
     (RPROC, "", "DX8Wrapper_FinalReleaseHook", "the embedding host's check before a render device's or Direct3D interface's last release (RR1): set once, before any render device"),
     # RR2a-1 moved DX8Wrapper's device state (its class statics, dx8wrapper.cpp's file statics and globals) and
     # Debug_Statistics' counters (statistics.cpp) into W3DRenderState, one per render engine (EngineContext::w3dRender,
-    # heap-allocated by DX8Wrapper::Init, freed by Shutdown); the host's two render switches are EngineContext fields.
+    # heap-allocated by DX8Wrapper::Init, freed by Destroy_Render_State at the end of WW3D::Shutdown from RR2a-2); the host's two render switches are EngineContext fields.
     (RCONST, "", "W3DRenderState::Defaults", "the render state an engine without one reads (RR2a-1): every field at its upstream initial value, built at static initialisation and never written (an engine that renders reads and writes its own W3DRenderState; a host makes its pages read-only, W3D_Protect_Render_Defaults, RR2a-2)"),
     # RR2a-2 moved WW3D's statics (its render settings and render-loop state, ww3d.cpp's file statics) into WW3DState,
     # one per render engine (EngineContext::ww3dState, allocated and freed with w3dRender), and ShaderClass's device
     # state (CurrentShader, ShaderDirty, _PolygonCullMode) into W3DRenderState; the 22 preset shaders are const
     # (constant-initialised, so read-only data); TheSDL3Window and ApplicationHWnd are EngineContext fields; and
     # W3DDisplay's FPS history and debug statistics are its members.
-    (RCONST, "", "WW3DState::Defaults", "the WW3D state an engine without one reads (RR2a-2): every field at its upstream initial value, built at static initialisation and never written (a host makes its pages read-only, W3D_Protect_Render_Defaults)"),
+    (RCONST, "", "WW3DState::Defaults", "the WW3D state an engine without one reads (RR2a-2): every field at its upstream initial value, constant-initialised and never written (a host makes its pages read-only, W3D_Protect_Render_Defaults)"),
     (RPROC, "", "W3D_Protect_Render_Defaults(bool)::s_exitHandlerOnce", "registers, once per process, the exit handler that makes the render defaults writable again for their static destructors (RR2a-2)"),
-    (RPROC, "", "W3D_Protect_Render_Defaults(bool)::s_defaultsReadOnly", "whether the render defaults' pages are read-only now, so that a failed call rolls back to it (RR3): the host's switch, set before any engine boots, atomic"),
+    (RPROC, "", "W3D_Protect_Render_Defaults(bool)::s_readOnly", "which of the two render defaults' pages are read-only now, so that a failed call puts back only the pages it changed (RR2b): the host's switch, set before any engine boots"),
     (DEBUG, "", "file:WW3D2/dx8rendererdebugger\\.cpp", "WW3D renderer debugger (DX8RendererDebugger::Enabled is never set)"),
     (RCONST, "", "VertexMaterialClass::Apply_Null()::default_settings", "the null material's settings, constant data"),
     (RCONST, "", "DAZZLE_INI_FILENAME", "the dazzle INI's name, never reassigned"),
@@ -281,8 +281,9 @@ HAND = [
     (RCONST, "", "SortingRendererClass::_EnableTriangleDraw", "never written: _Enable_Triangle_Draw has no caller"),
     (RPROC, "", "re:AnimatedSoundMgrClass::\\w+", "W3D animated sounds (WWAudio), never initialised by the game (not used by its audio)"),
     # The terrain, tree, bib, bridge, road, status-circle, water and player-colour shaders (detailOpaqueShader,
-    # detailAlphaShader, zFillAlphaShader, PlayerColorShader; one per TU, only read) left the writable data at
-    # RR2a-2: ShaderClass's constructor from bits is constexpr, so they are constant-initialised read-only data.
+    # detailAlphaShader, zFillAlphaShader, PlayerColorShader; one per TU) left the writable data at RR2a-2: they
+    # are `static const`, and ShaderClass's constructor from bits is constexpr, so they are constant-initialised
+    # read-only data.
     # RR3 made W3DDevice's draw state per engine. W3DShaderManager's statics, its shader and filter objects and their
     # lists, and the screen filters' statics are one PER_ENGINE_STATIC (W3DShaderManagerState_perEngine, so gone from
     # the library). The shadows' buffers, cursors, culling box, camera frustum and light position are members of the
