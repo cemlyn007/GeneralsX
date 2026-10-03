@@ -431,10 +431,11 @@ W3DDisplay::~W3DDisplay()
 	for (Int j=0; j<LightEnvironmentClass::MAX_LIGHTS; j++)
 		REF_PTR_RELEASE( m_myLight[j] );
 
-	PredictiveLODOptimizerClass::Free();
-
 	// shutdown
-	Debug_Statistics::Shutdown_Statistics();
+	// GeneralsX @bugfix cemlyn007 03/10/2026 Only a rendering engine frees the process-wide render statistics
+	// string; WW3D::Shutdown frees the predictive LOD arrays (PLAN-023 Phase 8, stage RR0a).
+	if (!TheGlobalData->m_headless)
+		Debug_Statistics::Shutdown_Statistics();
 	if (!TheGlobalData->m_headless)
 		W3DShaderManager::shutdown();
 	m_assetManager->Free_Assets();

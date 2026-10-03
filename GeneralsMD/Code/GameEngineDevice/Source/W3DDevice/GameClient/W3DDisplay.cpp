@@ -482,27 +482,27 @@ W3DDisplay::~W3DDisplay()
 	for (Int j=0; j<LightEnvironmentClass::MAX_LIGHTS; j++)
 		REF_PTR_RELEASE( m_myLight[j] );
 
-	// GeneralsX @bugfix cemlyn007 30/09/2026 Only an engine that renders frees the predictive LOD arrays and
-	// the render statistics' string: both are process-wide, and only the render path (Prepare_LOD, End_Statistics)
-	// fills them, so a headless engine's teardown freed them under the rendering engine beside it (PLAN-023
+	// GeneralsX @bugfix cemlyn007 30/09/2026 Only an engine that renders tears down the process-wide render
+	// state (the render statistics' string, the predictive LOD arrays that WW3D::Shutdown frees, the shader
+	// manager): a headless engine's teardown freed them under the rendering engine beside it (PLAN-023
 	// Phase 8, stage RR0a; found by ThreadSanitizer).
-	if (!TheGlobalData->m_headless || TheGlobalData->m_headlessRender)
-		PredictiveLODOptimizerClass::Free();
+	const Bool renders = !TheGlobalData->m_headless || TheGlobalData->m_headlessRender;
 
 	// shutdown
-	if (!TheGlobalData->m_headless || TheGlobalData->m_headlessRender)
+	if (renders)
+	{
 		Debug_Statistics::Shutdown_Statistics();
-	if (!TheGlobalData->m_headless || TheGlobalData->m_headlessRender)
 		W3DShaderManager::shutdown();
+	}
 	m_assetManager->Free_Assets();
 	delete m_assetManager;
 	// GeneralsX @bugfix cemlyn007 28/09/2026 Null it: with RTS_ENGINE_CONTEXT it is this engine's context
 	// field, which the context's lifecycle checks expect null after the teardown (PLAN-023 Phase 3).
 	m_assetManager = nullptr;
-	if (!TheGlobalData->m_headless || TheGlobalData->m_headlessRender)
+	if (renders)
 		WW3D::Shutdown();
 	WWMath::Shutdown();
-	if (!TheGlobalData->m_headless || TheGlobalData->m_headlessRender)
+	if (renders)
 		DX8WebBrowser::Shutdown();
 	delete TheW3DFileSystem;
 	TheW3DFileSystem = nullptr;
