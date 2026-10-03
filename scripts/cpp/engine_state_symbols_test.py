@@ -293,6 +293,12 @@ class RuleConstObjectTest(unittest.TestCase):
         # first one's brace closes first.
         self.assert_const("static const Int x{1}, y = GameLogicRandomValue(0, 3);", False)
 
+    def test_two_direct_initialized_declarators_on_one_line_is_not_safe(self):
+        # `a(5), b(expr)`: the same hazard as the brace-initialised pair above, but with both declarators
+        # direct-initialised. Whichever symbol the recorded line belongs to, the scan must not stop at the
+        # first declarator's own closing `)` and report it as the whole, safe-looking initialiser.
+        self.assert_const("static const Int s_a(5), s_b(GameLogicRandomValue(0, 3));", False)
+
     def test_const_pointer_copied_from_a_global_pointer_is_not_safe(self):
         # A bare copy of a per-engine global pointer is exactly the same first-engine-wins defect as the
         # `TheX->find(...)` lookup shape, just without a `->` or a call for the old deny-list to catch.
