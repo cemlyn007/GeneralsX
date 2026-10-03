@@ -90,6 +90,9 @@ endif()
 # with it (SDL3, SDL3_image, gamespy, GameMath, lzhl). vcpkg ports and DXVK (built by their own
 # toolchains) are not instrumented. A host links the resulting library into an executable built with
 # the same sanitiser (rlgenerals' --config=tsan / --config=asan). Empty (the default) changes nothing.
+# RTS_SANITIZE=address also turns RTS_GAMEMEMORY_ENABLE off (cmake/config-memory.cmake), the same as
+# RTS_BUILD_OPTION_ASAN: Game Memory's own operator new/delete and its pools would otherwise hide
+# allocations from ASan.
 set(RTS_SANITIZE "" CACHE STRING "Sanitizer for every engine target: empty, thread or address (GCC/Clang only)")
 set_property(CACHE RTS_SANITIZE PROPERTY STRINGS "" thread address)
 if(RTS_SANITIZE)
