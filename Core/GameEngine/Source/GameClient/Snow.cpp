@@ -70,14 +70,14 @@ void SnowManager::updateIniSettings()
 	Int boxDimensions = (Int)TheWeatherSetting->m_snowBoxDimensions;
 #if RTS_ENGINE_CONTEXT
 	// The engine's generator, bound once rather than looked up per particle.
-	Random3Class& random = SnowRandom_perEngine.get();
+	Random3Class& snowRandom = SnowRandom_perEngine.get();
 #endif
 	for (Int y=0; y<SNOW_NOISE_Y; y++)
 	{
 		for (Int x=0; x<SNOW_NOISE_X; x++)
 		{
 #if RTS_ENGINE_CONTEXT
-			*dst=(Real)((unsigned)random()%(unsigned)(boxDimensions));
+			*dst=(Real)((unsigned)snowRandom()%(unsigned)(boxDimensions));
 #else
 			*dst=(Real)(rand()%(boxDimensions));
 #endif
