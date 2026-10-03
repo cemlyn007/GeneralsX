@@ -248,6 +248,23 @@ class RuleConstObjectTest(unittest.TestCase):
             False,
         )
 
+    def test_declared_types_own_template_argument_parenthesis_is_not_the_initializer(self):
+        # A `(` inside the declared type's own template arguments (`std::function<Int()>`) must not be
+        # mistaken for the declarator/initialiser boundary: that would read only the empty "()" as the
+        # initialiser and silently ignore the real `= makePicker(...)` that follows it.
+        self.assert_const(
+            "static const std::function<Int()> s_pick = makePicker(TheGlobalData->m_seed);",
+            False,
+        )
+
+    def test_declared_types_own_sizeof_argument_is_not_the_initializer(self):
+        self.assert_const("static const Foo<sizeof(INT)> s_x = GameLogicRandomValue(0, 3);", False)
+
+    def test_two_comma_joined_declarators_on_one_line_is_not_safe(self):
+        # `x{1}, y = expr`: the second declarator's own initialiser must not be ignored just because the
+        # first one's brace closes first.
+        self.assert_const("static const Int x{1}, y = GameLogicRandomValue(0, 3);", False)
+
 
 class RuleNamekeyTest(unittest.TestCase):
     """rule:namekey is SAFE_FOR_NEW: the variable itself must be a NameKeyType/StaticNameKey cache, not a

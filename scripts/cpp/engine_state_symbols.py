@@ -1042,7 +1042,12 @@ def _split_initializer(decl):
     `[N < 2 ? 1 : 2]`, `[N >> 1]`), not a template argument list, and misreading them as brackets either
     swallows the real `=` (leaving the depth above zero for the rest of the declaration, so the scan runs
     off the end) or drops the depth back to zero mid-bound (handing the boundary to a later `(` that is
-    still part of the bound)."""
+    still part of the bound). The same reason keeps the direct/brace branch from trusting the first matched
+    group it finds: the declared type's own template arguments can hold a `(`/`{` too (`std::function<Int()>`,
+    `Foo<sizeof(INT)>`), and two comma-joined declarators share one recorded line (`x{1}, y = expr`). Once
+    that group's closing bracket is found, anything other than the end of the declaration after it means
+    the group was not the initialiser after all, so the boundary (and the real initialiser) is still
+    unknown."""
     i, n, depth = 0, len(decl), 0
     while i < n:
         c = decl[i]
@@ -1075,6 +1080,8 @@ def _split_initializer(decl):
         elif decl[j] == close_c:
             depth -= 1
             if depth == 0:
+                if decl[j + 1 :].strip():
+                    return declarator, None
                 return declarator, decl[i : j + 1]
         j += 1
     return declarator, None
