@@ -1334,7 +1334,7 @@ void Drawable::updateDrawable()
   // bit is on and the loop count is 0 (loop forever).
   //
   // GeneralsX @performance cemlyn007 29/09/2026 Skip the restart when the audio manager can never
-  // play a sound (PLAN-023 Phase 5b, perf2). The device-free managers of headless engines drop every
+  // play a sound (PLAN-023 Phase 5b, perf2). The device-free managers (headless engines and -noaudio runs) drop every
   // request, so isCurrentlyPlaying is always false and every looping ambient sound was restarted on
   // every frame: a stop, an AudioEventRTS copy and an addAudioEvent per drawable per frame, all
   // discarded at the next audio update. A real audio manager answers TRUE, so its behaviour is
