@@ -461,7 +461,7 @@ public:
 	// These clock all the time under user control, and are used to update
    // Stats.UserStat* when performance sampling is enabled.
 #if RTS_ENGINE_CONTEXT
-	// GeneralsX @feature cemlyn007 30/09/2026 The engine's (WW3DState, below; PLAN-023 Phase 8, stage RR2a-2).
+	// GeneralsX @feature cemlyn007 30/09/2026 The engine's (WW3DState, above; PLAN-023 Phase 8, stage RR2a-2).
 	static constexpr rts::IndirectContextField<WW3DState, &rts::EngineContext::ww3dState, WW3DState::Defaults, long, &WW3DState::UserStat0> UserStat0{};
 	static constexpr rts::IndirectContextField<WW3DState, &rts::EngineContext::ww3dState, WW3DState::Defaults, long, &WW3DState::UserStat1> UserStat1{};
 	static constexpr rts::IndirectContextField<WW3DState, &rts::EngineContext::ww3dState, WW3DState::Defaults, long, &WW3DState::UserStat2> UserStat2{};
@@ -517,7 +517,7 @@ private:
 #endif
 
 #if RTS_ENGINE_CONTEXT
-	// GeneralsX @feature cemlyn007 30/09/2026 The current engine's WW3DState fields (below; PLAN-023 Phase 8, stage
+	// GeneralsX @feature cemlyn007 30/09/2026 The current engine's WW3DState fields (above; PLAN-023 Phase 8, stage
 	// RR2a-2): each name is a stand-in for its field, so the uses are unchanged.
 	static constexpr rts::IndirectContextField<WW3DState, &rts::EngineContext::ww3dState, WW3DState::Defaults, float, &WW3DState::PixelCenterX> PixelCenterX{};
 	static constexpr rts::IndirectContextField<WW3DState, &rts::EngineContext::ww3dState, WW3DState::Defaults, float, &WW3DState::PixelCenterY> PixelCenterY{};

@@ -1272,6 +1272,7 @@ ICoord2D TheMousePos;
 //=============================================================================
 void W3DDisplay::gatherDebugStats()
 {
+	// GeneralsX @refactor cemlyn007 30/09/2026 The display's own members, not function-local statics (PLAN-023 Phase 8, stage RR2a-2).
 	// allocate the display strings if needed
 	if( m_displayStrings[0] == nullptr )
 	{
