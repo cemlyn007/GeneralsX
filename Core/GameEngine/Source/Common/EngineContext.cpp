@@ -202,11 +202,20 @@ namespace
 std::once_flag theEngineLocaleOnce;
 locale_t theEngineLocale = (locale_t)0;
 
-// The "C" locale every engine runs in, made once per process and never freed (a thread may still use it at
-// exit).
+// The locale every engine runs in: the process's locale with LC_NUMERIC "C" (INI parsing uses strtod and atof),
+// so the other categories (LC_CTYPE's multibyte conversions) stay as the host set them. Made once per process
+// and never freed (a thread may still use it at exit).
 locale_t engineLocale() noexcept
 {
-	std::call_once(theEngineLocaleOnce, []() { theEngineLocale = newlocale(LC_ALL_MASK, "C", (locale_t)0); });
+	std::call_once(theEngineLocaleOnce, []() {
+		const locale_t base = duplocale(LC_GLOBAL_LOCALE);
+		if (base != (locale_t)0)
+		{
+			theEngineLocale = newlocale(LC_NUMERIC_MASK, "C", base);
+			if (theEngineLocale == (locale_t)0)
+				freelocale(base);
+		}
+	});
 	return theEngineLocale;
 }
 }

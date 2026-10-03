@@ -507,7 +507,7 @@ Still not done, so still needed even for engines stepped on one thread: `SagePat
   - Phase 4's process-global strings are unchanged: each is written once before any engine steps.
   - Every note in the classification says which of these applies.
 - **Item 3 (RT1).** An `rts::Scope` that switches the thread to a different engine calls `enterEngineThreadInvariants` (`EngineContext.cpp`), and the matching exit restores the thread's state.
-  - On entry it saves the thread's `fenv` (`fegetenv`) and the x87 control word, calls `setFPMode()`, and `uselocale`s a "C" locale made once under `std::call_once`. Windows has no `uselocale`, so there the thread keeps its locale.
+  - On entry it saves the thread's `fenv` (`fegetenv`) and the x87 control word, calls `setFPMode()`, and `uselocale`s a locale made once under `std::call_once`: the process's locale with `LC_NUMERIC` set to "C" (INI parsing uses `strtod`), so the other categories, `LC_CTYPE` included, stay the host's. Windows has no `uselocale`, so there the thread keeps its locale.
   - On exit it restores all three.
   - Nested scopes on the current engine, and scopes for `g_noEngine`, do nothing extra.
   - The saved state is opaque in the header (32 bytes of `fenv_t` storage, the locale as a `void*`), so `EngineContext.h` still includes neither `<cfenv>` nor `<locale.h>`. `rts::Scope` is now 64 bytes, and rlgenerals' `EnterEngine` reserves 128.
@@ -566,9 +566,9 @@ Goal: N engines in one process, each stepped on its own thread at the same time,
    Walk every process-global entry whose note says a boot, a map load or a teardown writes it. Make each write-once (`std::call_once`, or skipped once primed), atomic or per engine, and say which in its note. The same rule covers the process-global `AsciiString`s listed in Phase 4: the string lock covers the refcount, not an in-place write through `ensureUniqueBufferOfSize`.
 3. **`Scope` restores the per-thread invariants** (this part of Phase 5 comes forward).
    - **When:** only when a `Scope` changes `t_engine` to a different context. Nested scopes on the same engine do nothing, so the cost stays at the outermost call.
-   - **On entry:** save the thread's floating-point environment and locale, then call `setFPMode()` and `uselocale` a C locale created once under `std::call_once`.
+   - **On entry:** save the thread's floating-point environment and locale, then call `setFPMode()` and `uselocale` a locale created once under `std::call_once` (the process's, with `LC_NUMERIC` "C").
    - **On exit:** restore both.
-   - **Why:** `setFPMode` sets the x87/SSE control words of the calling thread only, and only the boot, INI and load-screen paths call it. Without this, an engine handed to another thread, or stepped on a thread whose mode the host changed, can drift from its solo run.
+   - **Why:** `setFPMode` sets the x87/SSE control words of the calling thread only. The engine calls it at boot, at INI and map loads and around every `GameLogic::update`, so the `Scope` sets it at entry for the rest of a call (client update, host reads). Without this, an engine handed to another thread, or stepped on a thread whose mode or number format the host changed, can drift from its solo run.
    - **Cost:** measure it on rlgenerals' NOOP step loop.
    - **OFF build:** unchanged (no `Scope`).
 4. **Engine-started threads.** Confirm, with a test on the host side, that a headless, device-free engine starts no thread of its own: no audio, screenshot or file-loading thread. The ones a rendering engine starts already carry their context (Phase 1).

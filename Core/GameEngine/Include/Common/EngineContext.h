@@ -249,7 +249,8 @@ struct ThreadInvariants
 };
 
 // Saves the calling thread's invariants into `saved`, then sets the engine's: setFPMode()'s rounding and
-// precision, and the "C" locale (made once per process) for this thread.
+// precision, and the engine's locale (made once per process: LC_NUMERIC "C", the rest as the process has it)
+// for this thread.
 RTS_ENGINE_CONTEXT_API void enterEngineThreadInvariants(ThreadInvariants& saved) noexcept;
 // Restores what enterEngineThreadInvariants saved.
 RTS_ENGINE_CONTEXT_API void leaveEngineThreadInvariants(const ThreadInvariants& saved) noexcept;
@@ -258,12 +259,13 @@ RTS_ENGINE_CONTEXT_API void leaveEngineThreadInvariants(const ThreadInvariants& 
 // A null context means g_noEngine.
 //
 // GeneralsX @feature cemlyn007 28/09/2026 A Scope that switches the thread to a different engine also sets the
-// engine's per-thread invariants (PLAN-023 Phase 5b): the floating-point mode setFPMode() sets and the "C"
-// locale, which the engine's boot, INI and load-screen paths set only on the thread that ran them. An engine
-// may be stepped on another thread than it booted on, or on one whose mode the host changed, and must still
-// run as it would alone. The thread's own mode and locale come back when the Scope ends. A nested Scope on
-// the engine already current, and a Scope for g_noEngine, do nothing more than before, so the cost is paid
-// once per outermost call into an engine.
+// engine's per-thread invariants (PLAN-023 Phase 5b): the floating-point mode setFPMode() sets, which applies
+// to the calling thread only, and LC_NUMERIC "C" (the other locale categories stay the host's). The engine calls
+// setFPMode() at boot, at INI and map loads and around every GameLogic::update, so the Scope sets it at entry
+// for the rest of a call (client update, host reads). An engine may be stepped on another thread than it
+// booted on, or on one whose mode or number format the host changed, and must still run as it would alone. The thread's own mode and locale come back when the Scope ends. A nested
+// Scope on the engine already current, and a Scope for g_noEngine, do nothing more than before, so the cost is
+// paid once per outermost call into an engine.
 class [[nodiscard]] Scope
 {
 public:
