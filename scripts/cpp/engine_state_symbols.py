@@ -36,7 +36,9 @@
 #                                             TSV is stale in any way (a new symbol a safe rule classifies, a
 #                                             vanished symbol, a moved definition). In every mode also exit 1
 #                                             on any per-engine symbol, in the library or the list: PLAN-023
-#                                             Phase 5b emptied the per-engine list, so one is a regression
+#                                             Phase 5b emptied the per-engine list, so one is a regression,
+#                                             and on a hand entry whose note says thread_local but whose
+#                                             symbol is not in .tbss/.tdata
 #   engine_state_symbols.py report [LIB.so]   print the per-engine work list grouped by phase, the counts
 #                                             per class and the unreviewed symbols (from the TSV, or from
 #                                             the library when given)
@@ -71,6 +73,8 @@ TSV = "docs/WORKDIR/planning/PLAN-023_STATE_CLASSIFICATION.tsv"
 SCAN_ROOTS = ["Core", "GeneralsMD/Code", "Generals/Code/CompatLib", "Dependencies"]
 SKIP_DIRS = {"Core/Tools", "GeneralsMD/Code/Tools"}
 SOURCE_EXTENSIONS = (".cpp", ".c", ".cc", ".h", ".hpp", ".inl")
+
+TLS_SECTIONS = {".tbss", ".tdata"}
 
 CLASSES = ("per-engine", "process-global", "constant", "debug-only", "render-only", "unreviewed")
 COLUMNS = ("symbol", "scope", "binding", "section", "count", "bytes", "source", "class", "phase", "note", "by")
@@ -372,10 +376,21 @@ class SourceIndex:
                 if parsed.cls
                 else rf"\b{func}\s*\("
             )
-            # Defined out of line, then (inline in the class body) anywhere after the function's name.
-            for branch, owner_re in (("owner", owner), ("inline", re.compile(rf"\b{func}\s*\("))):
+            # Defined out of line (the function's definition, not a call to it: `WW3DAssetManager::f(` is
+            # also called in W3DAssetManager.cpp), then named out of line anywhere, then (inline in the class
+            # body) anywhere after the function's name.
+            for branch, owner_re, definitions_only in (
+                ("owner", owner, True),
+                ("owner-call", owner, False),
+                ("inline", re.compile(rf"\b{func}\s*\("), False),
+            ):
                 for rel in self.candidates(parsed.var, parsed.func, parsed.cls):
-                    fm = owner_re.search(self.files[rel])
+                    text = self.files[rel]
+                    fm = None
+                    for m in owner_re.finditer(text):
+                        if not definitions_only or parsed.cls and is_def_prefix(text[text.rfind("\n", 0, m.start()) + 1 : m.start()]):
+                            fm = m
+                            break
                     if not fm:
                         continue
                     for ls, line, a, _b in self.lines_with(rel, var_re, fm.start()):
@@ -836,6 +851,12 @@ def cmd_check(args):
     for key, sym in sorted(symbols.items()):
         if sym.cls == PER:
             errors.append(f"per-engine state left process-wide (move it into the engine, PLAN-023): {key} ({sym.source})")
+    # GeneralsX @feature cemlyn007 03/10/2026 A hand note that says thread_local promises per-thread storage: the
+    # classifier matches by name only, so a symbol whose THREAD_LOCAL was dropped (it moved from .tbss to .bss)
+    # would otherwise stay classified process-global and pass.
+    for key, sym in sorted(symbols.items()):
+        if sym.by == "hand" and sym.note.startswith("thread_local") and not sym.sections <= TLS_SECTIONS:
+            errors.append(f"classified thread_local but not in thread-local storage ({sym.section}): {key} ({sym.source})")
     for key, row in sorted(recorded.items()):
         if row["class"] == PER and key not in symbols:
             errors.append(f"the list still has a per-engine entry: {key}")
