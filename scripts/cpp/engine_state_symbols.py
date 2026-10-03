@@ -1005,41 +1005,63 @@ def rule_namekey(sym, symbols=None, is_function_name=None):
 FIELDPARSE_DECL_RE = re.compile(r"^(?:static\s+)?const\s+FieldParse\s+\w+\s*\[[^\]]*\]\s*$")
 # A table that lands in .data rather than a read-only section does so because some row is computed at run
 # time. Every call in its rows must be one of these (a field offset, a size, a bit-name list of a flags
-# type: the same names on every engine), never a lookup or a read of engine state.
+# type: the same names on every engine). Every identifier must be neither a writable symbol nor an
+# object-like macro (under RTS_ENGINE_CONTEXT most per-engine state is a macro over the engine context, so
+# it is never a symbol), and no call may hide behind a template-id or a parenthesised callee.
 FIELDPARSE_PURE_CALL_RE = re.compile(r"^(?:offsetof|sizeof|(?:\w+::)*\w+::getBitNames)$")
 _CALL_RE = re.compile(r"([A-Za-z_][\w:]*)\s*\(")
+_INDIRECT_CALL_RE = re.compile(r"[>)]\s*\(")
 _IDENTIFIER_RE = re.compile(r"[A-Za-z_]\w*(?:::[A-Za-z_]\w*)*")
+_LITERAL_TEXT_RE = re.compile(r"\"(?:[^\"\\]|\\.)*\"|'(?:[^'\\]|\\.)*'")
+# Names a row may use although a macro or keyword: a null pointer and the boolean constants.
+_FIELDPARSE_PLAIN_NAMES = frozenset({"NULL", "TRUE", "FALSE", "nullptr", "true", "false", "offsetof", "sizeof"})
 
 
-def _fieldparse_init_is_safe(init, writable_names):
+def _fieldparse_init_is_safe(init, writable_names, is_function_name=None):
     """True when a FieldParse table's whole initialiser is a brace list with no `->` read, `++`/`--` or
-    assignment, no call outside `FIELDPARSE_PURE_CALL_RE`, and no name `writable_names` reports as writable
-    (qualified or by its last segment). Like `_is_safe_value_expr`, a textual allow-list over the rows, not
-    a proof over the whole language."""
-    init = init.strip()
+    assignment, no call outside `FIELDPARSE_PURE_CALL_RE` (a template-id or parenthesised callee counts as
+    one), no name `writable_names` reports as writable (qualified or by its last segment) and, when a
+    source-tree lookup is given, no identifier it reports as an object-like macro (each `::` segment, as
+    the preprocessor sees them; `_FIELDPARSE_PLAIN_NAMES` excepted). Like `_is_safe_value_expr`, a textual
+    allow-list over the rows, not a proof over the whole language."""
+    init = _LITERAL_TEXT_RE.sub('""', init.strip())
     if not init.startswith("{") or not _is_balanced(init):
         return False
     if GLOBAL_LOOKUP_RE.search(init) or INC_DEC_RE.search(init) or ASSIGN_RE.search(init):
         return False
+    if _INDIRECT_CALL_RE.search(init):
+        return False
     if not all(FIELDPARSE_PURE_CALL_RE.match(call) for call in _CALL_RE.findall(init)):
         return False
-    return not any(
-        name in writable_names or name.rsplit("::", 1)[-1] in writable_names for name in _IDENTIFIER_RE.findall(init)
-    )
+    if is_function_name is not None:
+        assert hasattr(is_function_name, "is_macro_name"), (
+            "is_function_name must be None or expose is_macro_name (FunctionLookup does); a plain "
+            "callable would silently disable the object-like-macro check"
+        )
+    for name in _IDENTIFIER_RE.findall(init):
+        if name in writable_names or name.rsplit("::", 1)[-1] in writable_names:
+            return False
+        if is_function_name is not None:
+            for part in name.split("::"):
+                if part not in _FIELDPARSE_PLAIN_NAMES and is_function_name.is_macro_name(part):
+                    return False
+    return True
 
 
 def rule_field_parse(sym, symbols=None, is_function_name=None):
     """INI FieldParse table: built once, never written. By declared type, not by the variable's name alone
     (a variable merely named dataFieldParse/myFieldParse/commonFieldParse is not provably one), and not by
     `FieldParse` merely appearing in the type somewhere (a mutable pointer or container is not a table).
-    Its rows must also be built from nothing but names, literals and pure calls (`_fieldparse_init_is_safe`)."""
+    Its rows must also pass `_fieldparse_init_is_safe`."""
     writable_names = _writable_global_names(symbols)
     for d in declarations(sym):
         d = d.rstrip()
         if not d.endswith(";"):
             return None
         decl, sep, init = d.rstrip(";").partition("=")
-        if not FIELDPARSE_DECL_RE.match(decl.rstrip()) or not sep or not _fieldparse_init_is_safe(init, writable_names):
+        if not FIELDPARSE_DECL_RE.match(decl.rstrip()):
+            return None
+        if not sep or not _fieldparse_init_is_safe(init, writable_names, is_function_name):
             return None
     return CONST, "", "INI FieldParse table: built once, never written"
 
