@@ -2,8 +2,8 @@
 # GeneralsX @feature cemlyn007 03/10/2026 Builds and runs engine_context_unit_test.cpp (PLAN-023)
 #
 # Compiles Common/EngineContext.cpp and the test with g++ against a stub PreRTS.h, under AddressSanitizer,
-# and runs it. Run with `python3 -m unittest scripts/cpp/engine_context_unit_test.py` (or pytest); no bazel
-# target needed, same as engine_state_symbols_test.py. It is skipped where g++ is missing.
+# and runs it. Run with `python3 -m unittest scripts/cpp/engine_context_unit_test.py` (or pytest). It is
+# skipped where g++ is missing.
 
 import os
 import shutil

@@ -150,8 +150,10 @@ static void testSlotsAreDestroyedNewestFirstWithTheContext()
 	{
 		rts::EngineContext context;
 		rts::Scope scope(&context);
-		theCounter.get().value = 1;
-		theOther.get().value = 2;
+		// theOther's slot index is the higher one (defined second), so creating it first keeps creation
+		// order and descending index order apart.
+		theOther.get().value = 1;
+		theCounter.get().value = 2;
 		CHECK(theLiveCounters == before + 2);
 	}
 	CHECK(theLiveCounters == before);
