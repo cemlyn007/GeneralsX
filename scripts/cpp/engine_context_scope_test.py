@@ -47,6 +47,9 @@ libc.strtod.argtypes = [ctypes.c_char_p, ctypes.c_void_p]
 libc.mbstowcs.restype = ctypes.c_ssize_t
 libc.mbstowcs.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_size_t]
 libc.uselocale.restype = ctypes.c_void_p
+libc.newlocale.restype = ctypes.c_void_p
+libc.newlocale.argtypes = [ctypes.c_int, ctypes.c_char_p, ctypes.c_void_p]
+libc.freelocale.argtypes = [ctypes.c_void_p]
 libc.uselocale.argtypes = [ctypes.c_void_p]
 
 # glibc x86-64's fenv_t: the x87 control word is its first 16 bits, the SSE control/status register its last 32.
@@ -180,6 +183,147 @@ class ScopeInvariants(unittest.TestCase):
         if errors:
             raise errors[0]
         self.check_host_mode("after")
+
+    def test_a_change_made_inside_a_nested_scope_is_undone(self):
+        # The inner Scope finds the thread already in the engine's mode, so it has nothing to load on entry, but
+        # it must still undo a change made inside it (another engine's code leaving its own mode behind).
+        self.host_mode()
+        outer = ctypes.create_string_buffer(64)
+        inner = ctypes.create_string_buffer(64)
+        self.enter(outer)
+        try:
+            self.assertEqual(mxcsr_mode(), 0, "engine SSE mode")
+            self.enter(inner)
+            try:
+                libm.fesetround(FE_UPWARD)
+                set_fenv_fields(control_word() | 0x0300, MXCSR_HOST)
+            finally:
+                self.leave(inner)
+            self.assertEqual(libm.fegetround(), FE_TONEAREST, "x87 rounding after the nested Scope")
+            self.assertEqual(control_word() & 0x0F00, 0, "x87 precision and rounding after the nested Scope")
+            self.assertEqual(mxcsr_mode(), 0, "SSE mode after the nested Scope")
+        finally:
+            self.leave(outer)
+        self.check_host_mode("after")
+
+    def test_a_locale_of_the_threads_own_taken_after_the_first_entry(self):
+        # The thread's cached engine locale is still in use by the outer Scope when the thread switches to a
+        # locale of its own and a nested Scope enters: that one gets a locale for itself alone.
+        errors = []
+
+        def run():
+            try:
+                outer = ctypes.create_string_buffer(64)
+                inner = ctypes.create_string_buffer(64)
+                self.enter(outer)
+                own = libc.newlocale(LC_CTYPE_MASK | LC_NUMERIC_MASK, b"en_DK.utf8", None)
+                self.assertTrue(own)
+                previous = libc.uselocale(own)
+                try:
+                    self.assertFalse(radix_is_dot(), "the thread's own locale has a comma radix")
+                    self.enter(inner)
+                    try:
+                        self.assertTrue(radix_is_dot(), "engine radix over the thread's own locale")
+                        self.assertTrue(utf8_multibyte_works(), "LC_CTYPE of the thread's own locale kept")
+                    finally:
+                        self.leave(inner)
+                    self.assertFalse(radix_is_dot(), "the thread's own locale back")
+                finally:
+                    libc.uselocale(previous)
+                    self.leave(outer)
+                libc.freelocale(own)
+                self.assertFalse(radix_is_dot(), "the thread's locale back")
+            except BaseException as e:  # reported on the test's thread
+                errors.append(e)
+
+        t = threading.Thread(target=run)
+        t.start()
+        t.join()
+        if errors:
+            raise errors[0]
+
+    def test_a_reused_host_locale_address_does_not_keep_a_stale_engine_locale(self):
+        # The engine locale is not keyed on the address of a host locale that may since have been freed.
+        errors = []
+
+        def run():
+            try:
+                saved = ctypes.create_string_buffer(64)
+                for name in (b"en_DK.utf8", b"C.utf8", b"en_DK.utf8"):
+                    own = libc.newlocale(LC_CTYPE_MASK, name, None)
+                    previous = libc.uselocale(own)
+                    self.enter(saved)
+                    try:
+                        self.assertTrue(radix_is_dot())
+                    finally:
+                        self.leave(saved)
+                    libc.uselocale(previous)
+                    libc.freelocale(own)
+            except BaseException as e:  # reported on the test's thread
+                errors.append(e)
+
+        t = threading.Thread(target=run)
+        t.start()
+        t.join()
+        if errors:
+            raise errors[0]
+
+    def test_a_thread_exit_frees_its_cached_locale(self):
+        # Each thread that enters caches a locale freed by a pthread key's destructor at its exit: many short
+        # threads must not grow the heap by one locale each.
+        class Mallinfo2(ctypes.Structure):
+            _fields_ = [(n, ctypes.c_size_t) for n in (
+                "arena", "ordblks", "smblks", "hblks", "hblkhd", "usmblks", "fsmblks", "uordblks", "fordblks", "keepcost")]
+
+        if not hasattr(libc, "mallinfo2"):
+            self.skipTest("no mallinfo2")
+        libc.mallinfo2.restype = Mallinfo2
+
+        def run():
+            saved = ctypes.create_string_buffer(64)
+            self.enter(saved)
+            self.leave(saved)
+
+        def burst(count):
+            for _ in range(count):
+                t = threading.Thread(target=run)
+                t.start()
+                t.join()
+
+        burst(50)  # warm-up: the key and the allocator's arenas
+        before = libc.mallinfo2().uordblks
+        burst(1000)
+        grown = libc.mallinfo2().uordblks - before
+        self.assertLess(grown, 100 * 1024, f"the heap grew by {grown} bytes over 1000 threads")
+
+
+class LibraryIsPinned(unittest.TestCase):
+    def test_dlclose_leaves_the_library_mapped(self):
+        # Entering from a thread makes the pthread key whose destructor is in the library, which must then
+        # survive a dlclose (a later thread exit calls the destructor).
+        path = os.environ.get("GENERALSX_LIBRARY") or find_library_path()
+        if path is None or not os.path.exists(path):
+            self.skipTest("no libgeneralsx.so (pass --library)")
+        code = (
+            "import ctypes, sys, threading\n"
+            "lib = ctypes.CDLL(sys.argv[1])\n"
+            "try:\n"
+            "    enter = lib[sys.argv[2]]\n"
+            "except AttributeError:\n"
+            "    sys.exit(77)\n"
+            "enter.argtypes = [ctypes.c_void_p]\n"
+            "buf = ctypes.create_string_buffer(64)\n"
+            "t = threading.Thread(target=lambda: enter(buf))\n"
+            "t.start(); t.join()\n"
+            "ctypes.CDLL(None).dlclose(ctypes.c_void_p(lib._handle))\n"
+            "import os\n"
+            "sys.exit(0 if os.path.realpath(sys.argv[1]) in open('/proc/self/maps').read() else 1)\n"
+        )
+        import subprocess
+        result = subprocess.run([sys.executable, "-c", code, os.path.realpath(path), ENTER])
+        if result.returncode == 77:
+            self.skipTest("the library is built without RTS_ENGINE_CONTEXT")
+        self.assertEqual(result.returncode, 0, "the library was unmapped by dlclose")
 
 
 def find_library_path():

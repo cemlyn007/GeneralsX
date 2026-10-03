@@ -32,6 +32,7 @@
 #include <vector>
 
 #ifndef _WIN32
+#include <dlfcn.h>
 #include <locale.h>
 #include <pthread.h>
 #if defined(__APPLE__)
@@ -229,7 +230,8 @@ unsigned long long packFloatingPointMode(unsigned short controlWord, unsigned in
 // thread's own, never the process's global one: with the GIL released, another thread's setlocale() cannot change
 // the engine's number parsing in the middle of a step. A thread on the global locale (LC_GLOBAL_LOCALE, as
 // Python's are) keeps the snapshot of it taken at its first entry; one that uselocale()s another locale of its
-// own gets a new engine locale made from that one at its next outermost entry. `users` counts the Scopes on this
+// own gets a new engine locale made from that one at each outermost entry (`source` is only trusted while it is
+// LC_GLOBAL_LOCALE: the host may free its own locale and a new one may take its address). `users` counts the Scopes on this
 // thread that switched to it and have not yet left. Freed at thread exit (a pthread key's destructor; the main
 // thread's goes with the process).
 struct ThreadEngineLocale
@@ -257,7 +259,12 @@ const ThreadEngineLocaleKey& threadEngineLocaleKey() noexcept
 {
 	static const ThreadEngineLocaleKey key = []() noexcept {
 		ThreadEngineLocaleKey k{};
-		k.made = pthread_key_create(&k.key, freeThreadEngineLocale) == 0;
+		// The destructor is code in this library, so the library is pinned (never unloaded) before the key exists:
+		// a thread that exits after a dlclose would otherwise call unmapped code.
+		Dl_info info{};
+		if (dladdr(reinterpret_cast<const void*>(&freeThreadEngineLocale), &info) != 0 && info.dli_fname != nullptr
+			&& dlopen(info.dli_fname, RTLD_LAZY | RTLD_NOLOAD | RTLD_NODELETE) != nullptr)
+			k.made = pthread_key_create(&k.key, freeThreadEngineLocale) == 0;
 		return k;
 	}();
 	return key;
@@ -324,7 +331,7 @@ void enterEngineThreadInvariants(ThreadInvariants& saved) noexcept
 	// Already the engine's (a Scope for another engine inside one): nothing to switch.
 	if (cache.locale != (locale_t)0 && current == cache.locale)
 		return;
-	if (cache.locale == (locale_t)0 || current != cache.source)
+	if (cache.locale == (locale_t)0 || current != cache.source || current != LC_GLOBAL_LOCALE)
 	{
 		const locale_t engine = makeEngineLocale(current);
 		if (engine == (locale_t)0)
@@ -363,9 +370,17 @@ void leaveEngineThreadInvariants(const ThreadInvariants& saved) noexcept
 			--t_engineLocale.users;
 	}
 #endif
-	if (!saved.floatingPointSaved)
-		return;
 #if RTS_SCOPE_CONTROL_WORDS
+	if (!saved.floatingPointSaved)
+	{
+		// The thread entered in the engine's mode: reload it only if something inside the Scope changed it.
+		unsigned short controlWord = 0;
+		unsigned int mxcsr = 0;
+		__asm__ __volatile__("fnstcw %0" : "=m" (controlWord));
+		__asm__ __volatile__("stmxcsr %0" : "=m" (mxcsr));
+		if (controlWord == saved.x87ControlWord && mxcsr == saved.mxcsr)
+			return;
+	}
 	__asm__ __volatile__("fldcw %0" : : "m" (saved.x87ControlWord));
 	__asm__ __volatile__("ldmxcsr %0" : : "m" (saved.mxcsr));
 #else
