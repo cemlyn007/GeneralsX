@@ -29,11 +29,11 @@
 // it either (its destructors may run on inconsistent state). A fatal error raised while a
 // destructor is running still ends the process, through std::terminate.
 //
-// GeneralsX @bugfix cemlyn007 28/09/2026 The teardown window (PLAN-023 Phase 1). With no TheGlobalData
-// a fatal error has no crash file to write. Before the engine has made TheGlobalData (early boot) it
-// still throws, but once the engine is being torn down (TheGlobalData is freed by then) it returns, as
-// it did before embedded mode: a throw there would almost always escape a destructor and end the
-// process through std::terminate. It also returns while another exception is already propagating.
+// GeneralsX @bugfix cemlyn007 28/09/2026 The teardown window (PLAN-023 Phase 1). Once the engine is
+// being torn down, or while another exception is already propagating, a fatal error returns as it did
+// before embedded mode (after writing the crash file, if TheGlobalData is still there): a throw there
+// would almost always escape a destructor and end the process through std::terminate. Before the
+// engine has made TheGlobalData (early boot) it still throws, without a crash file.
 
 #pragma once
 

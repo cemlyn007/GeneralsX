@@ -874,9 +874,9 @@ bool IsEngineTearingDown()
 }
 #endif
 
-// Embedded mode with no TheGlobalData: throw, unless that would end the process through std::terminate
-// (the engine is being torn down, or another exception is already propagating).
-static bool throwWithoutGlobalData()
+// Embedded mode: throw, unless that would end the process through std::terminate (the engine is being
+// torn down, or another exception is already propagating).
+static bool embeddedMayThrow()
 {
 	return IsEngineEmbeddedMode() && !IsEngineTearingDown() && std::uncaught_exceptions() == 0;
 }
@@ -907,7 +907,7 @@ void ReleaseCrash(const char *reason)
 		// GeneralsX @bugfix cemlyn007 28/09/2026 Embedded mode: there is no crash file to write, but
 		// the caller still must not carry on, so hand the error to the host (see FatalEngineError.h).
 		// GeneralsX @bugfix cemlyn007 28/09/2026 Not in the teardown window, though.
-		if (throwWithoutGlobalData()) {
+		if (embeddedMayThrow()) {
 			ThrowIfEmbedded(reason);
 		}
 		return; // We are shutting down, and TheGlobalData has been freed.  jba. [4/15/2003]
@@ -950,7 +950,14 @@ void ReleaseCrash(const char *reason)
 
 	// GeneralsX @feature cemlyn007 28/09/2026 Embedded mode: hand the error to the host instead of
 	// showing a message box and exiting the process.
-	ThrowIfEmbedded(reason);
+	// GeneralsX @bugfix cemlyn007 03/10/2026 Not in the teardown window or while another exception is
+	// propagating, though: return there, as with no TheGlobalData above.
+	if (IsEngineEmbeddedMode()) {
+		if (!embeddedMayThrow()) {
+			return;
+		}
+		ThrowIfEmbedded(reason);
+	}
 
 	if (!DX8Wrapper_IsWindowed) {
 		if (ApplicationHWnd) {
@@ -1056,7 +1063,7 @@ void ReleaseCrashLocalized(const AsciiString& p, const AsciiString& m)
 	// GeneralsX @bugfix cemlyn007 28/09/2026 In the teardown window return instead, as ReleaseCrash does
 	// (the code below needs TheGlobalData).
 	if (TheGlobalData == nullptr) {
-		if (throwWithoutGlobalData()) {
+		if (embeddedMayThrow()) {
 			ThrowIfEmbedded(reason.str());
 		}
 		return;
@@ -1102,7 +1109,13 @@ void ReleaseCrashLocalized(const AsciiString& p, const AsciiString& m)
 
 	// GeneralsX @feature cemlyn007 28/09/2026 Embedded mode: hand the error to the host instead of
 	// exiting the process (see FatalEngineError.h).
-	ThrowIfEmbedded(reason.str());
+	// Not in the teardown window or while another exception is propagating: return, as ReleaseCrash does.
+	if (IsEngineEmbeddedMode()) {
+		if (!embeddedMayThrow()) {
+			return;
+		}
+		ThrowIfEmbedded(reason.str());
+	}
 
 	_exit(1);
 }
