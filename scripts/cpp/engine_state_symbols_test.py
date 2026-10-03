@@ -33,15 +33,19 @@ class FakeLookup:
     """A minimal stand-in for `FunctionLookup` (callable for `is_function_name`, plus `is_macro_name`),
     for tests that need to control the macro answer without building a real `SourceIndex`."""
 
-    def __init__(self, functions=(), macros=()):
+    def __init__(self, functions=(), macros=(), written=()):
         self._functions = set(functions)
         self._macros = set(macros)
+        self._written = set(written)
 
     def __call__(self, name):
         return name in self._functions
 
     def is_macro_name(self, name):
         return name in self._macros
+
+    def is_written(self, sym):
+        return sym.key in self._written
 
 
 class RuleConstObjectTest(unittest.TestCase):
@@ -949,6 +953,16 @@ class RuleNamekeyTest(unittest.TestCase):
     def test_mutable_namekey_reassigned_to_a_constant_is_not_safe(self):
         self.assert_namekey("static NameKeyType s_lastSelected = NAMEKEY_INVALID;", False)
 
+    def test_mutable_namekey_that_is_written_after_its_declaration_is_not_safe(self):
+        decl = 'static NameKeyType s_key = NAMEKEY("Foo");'
+        sym = make_symbol("s", [decl])
+        self.assertIsNotNone(m.rule_namekey(sym, None, FakeLookup()))
+        self.assertIsNone(m.rule_namekey(sym, None, FakeLookup(written=["s"])))
+
+    def test_const_namekey_is_not_checked_for_writes(self):
+        sym = make_symbol("s", ['static const NameKeyType s_key = NAMEKEY("Foo");'])
+        self.assertIsNotNone(m.rule_namekey(sym, None, FakeLookup(written=["s"])))
+
     def test_container_of_namekeys_is_not_safe(self):
         self.assert_namekey("static std::map<NameKeyType, Object*> s_byKey;", False)
 
@@ -1004,6 +1018,43 @@ class RuleFieldParseTest(unittest.TestCase):
     def test_non_const_fieldparse_array_is_not_safe(self):
         sym = make_symbol("s", ["static FieldParse s_scratch[16];"])
         self.assertIsNone(m.rule_field_parse(sym))
+
+    def assert_fieldparse(self, rows, expect, writable=()):
+        decl = f"static const FieldParse s_table[] = {{ {rows} }};"
+        symbols = {}
+        for name in writable:
+            symbols[name] = make_symbol(name, [], sections={".bss"})
+        got = m.rule_field_parse(make_symbol("s", [decl]), symbols) is not None
+        self.assertEqual(got, expect, decl)
+
+    def test_table_rows_of_names_literals_and_pure_calls_are_safe(self):
+        self.assert_fieldparse(
+            '{ "A", INI::parseInt, nullptr, offsetof( Data, m_a[0] ) }, '
+            '{ "B", INI::parseIndexList, ModelConditionFlags::getBitNames(), offsetof( Data, m_b ) }, '
+            "{ nullptr, nullptr, nullptr, 0 }",
+            True,
+        )
+
+    def test_table_row_reading_engine_state_is_not_safe(self):
+        # Such a row is why the table is built at run time (and so is not in a read-only section): its
+        # initialiser, not just its declarator, decides whether the table is the same on every engine.
+        for row in (
+            '{ "A", INI::parseInt, nullptr, TheGlobalData->m_offset }',
+            '{ "A", INI::parseInt, TheNames->lookup( "x" ), 0 }',
+            '{ "A", INI::parseInt, nullptr, GameLogicRandomValue( 0, 3 ) }',
+            '{ "A", INI::parseInt, nullptr, s_calls++ }',
+            '{ "A", INI::parseInt, nullptr, s_offset = 4 }',
+        ):
+            self.assert_fieldparse(row, False)
+
+    def test_table_row_naming_a_writable_symbol_is_not_safe(self):
+        row = '{ "A", INI::parseInt, nullptr, s_offset }'
+        self.assert_fieldparse(row, True)
+        self.assert_fieldparse(row, False, writable=["s_offset"])
+        self.assert_fieldparse('{ "A", Foo::parse, nullptr, Foo::s_offset }', False, writable=["Foo::s_offset"])
+
+    def test_table_without_an_initializer_is_not_safe(self):
+        self.assertIsNone(m.rule_field_parse(make_symbol("s", ["static const FieldParse s_table[16];"])))
 
 
 class CodeOnlyTest(unittest.TestCase):
@@ -1134,7 +1185,7 @@ class SourceIndexDefinitionTest(unittest.TestCase):
         self.assertEqual(sym.source, "Core/dx8wrapper.cpp:1")
         self.assertEqual(sym.decls, [])
 
-    def classify_class_static(self, key):
+    def classify_static(self, key):
         sym = m.Symbol(key)
         sym.count = 1
         sym.sections = {".bss"}
@@ -1164,7 +1215,7 @@ class SourceIndexDefinitionTest(unittest.TestCase):
         )
         self.write("bar.cpp", "const Int\nBar::s_split = TheGlobalData->m_someInt;\n")
         for key in ("Pool<int>::s_size", "Pool<int>::s_key", "Bar::s_split", "Bar::s_inl"):
-            sym = self.classify_class_static(key)
+            sym = self.classify_static(key)
             self.assertEqual(sym.source, "?", key)
             self.assertEqual(sym.cls, m.UNREVIEWED, key)
 
@@ -1182,6 +1233,49 @@ class SourceIndexDefinitionTest(unittest.TestCase):
             sym = m.Symbol(f"Inl::{var}")
             m.resolve_sources(self.root, {sym.key: sym}, {})
             self.assertEqual(sym.source, f"Core/inl.h:{line}" if line else "?", var)
+
+    def test_namekey_static_written_after_its_declaration_is_not_a_safe_cache(self):
+        # A literal initialiser does not make a non-const static a constant key: any later assignment
+        # (or increment, or address taken for a write through a pointer) makes it per-engine state.
+        self.write(
+            "tabs.cpp",
+            "void a() {\n"
+            '    static NameKeyType s_lastTab = NAMEKEY("TabOne");\n'
+            "    if (s_lastTab == NAMEKEY(\"x\")) {}\n"
+            "    s_lastTab = TheNameKeyGenerator->nameToKey(m_tabName);\n"
+            "}\n"
+            "void b() {\n"
+            '    static NameKeyType s_calls = NAMEKEY("Calls");\n'
+            "    ++s_calls;\n"
+            "}\n"
+            "void c() {\n"
+            '    static NameKeyType s_ptr = NAMEKEY("Ptr");\n'
+            "    Poke(&s_ptr);\n"
+            "}\n"
+            "void d() {\n"
+            '    static NameKeyType s_ok = NAMEKEY("Ok");\n'
+            "    use(s_ok, s_ok == s_ok, obj.s_ok = 1, p->s_ok = 2);\n"
+            "}\n"
+            "void e() {\n"
+            "    s_ok = 3;\n"  # another function's own name: out of scope of d's static
+            "}\n"
+            "namespace {\n"
+            'static NameKeyType s_file = NAMEKEY("File");\n'
+            'static NameKeyType s_fileOk = NAMEKEY("FileOk");\n'
+            "}\n"
+            "void f() { s_file += 1; }\n",
+        )
+        self.write("other.cpp", "extern NameKeyType s_file;\nvoid g() { s_fileOk = 5; }\n")
+        expect = {
+            "a()::s_lastTab": m.UNREVIEWED,
+            "b()::s_calls": m.UNREVIEWED,
+            "c()::s_ptr": m.UNREVIEWED,
+            "d()::s_ok": m.GLOBAL,
+            "s_file": m.UNREVIEWED,
+            "s_fileOk": m.UNREVIEWED,
+        }
+        for key, cls in expect.items():
+            self.assertEqual(self.classify_static(key).cls, cls, key)
 
     def test_member_function_static_does_not_gain_header_class_line(self):
         # The member function has a real out-of-line body with the static inside it: the class-line macro
