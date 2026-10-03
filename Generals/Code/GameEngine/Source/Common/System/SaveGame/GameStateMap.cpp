@@ -212,15 +212,17 @@ static void extractAndSaveMap( AsciiString mapToSave, Xfer *xfer )
 	}
 
 	// GeneralsX @bugfix cemlyn007 03/10/2026 Close fp (and free buffer) on every throw path below,
-	// not just the explicit DEBUG_CRASH/throw ones that already did. On a truncated or corrupt
-	// save, both the size read and the body read end up throwing XFER_READ_ERROR out of XferLoad:
-	// beginBlock() itself never throws (on a short read it DEBUG_CRASHes and returns 0), but the
+	// not just the explicit DEBUG_CRASH/throw ones that already did. On a truncated save, both
+	// the size read and the body read end up throwing XFER_READ_ERROR out of XferLoad: beginBlock()
+	// itself never throws (on a short read it DEBUG_CRASHes and returns 0), but the
 	// xferUser(buffer, 0) that follows still reaches XferLoad::xferImplementation's
 	// fread(data, 0, 1, fp), which returns 0 rather than the 1 it checks for, so it throws there
-	// instead (the allocation below never fails -- new char[0] returns a valid pointer -- and the
-	// explicit fwrite check only fails on a write error to the scratch file itself). Leaving fp
-	// open on any of these paths meant the caller's now-tracked partial file (see m_scratchPadMaps
-	// above) failed to delete on Windows (DeleteFile of an open handle fails) and leaked one file
+	// instead. The allocation's null check below never fires either way, since new throws rather
+	// than returning null: with a size of 0 it returns a valid pointer, while a corrupt (as
+	// opposed to merely truncated) save can hand beginBlock() a bogus size that makes the
+	// allocation itself throw ERROR_OUT_OF_MEMORY instead of XFER_READ_ERROR. Leaving fp open on
+	// any of these paths meant the caller's now-tracked partial file (see m_scratchPadMaps above)
+	// failed to delete on Windows (DeleteFile of an open handle fails) and leaked one file
 	// descriptor per failed load everywhere else, in a long-lived embedded host.
 	char *buffer = nullptr;
 	try
@@ -421,9 +423,11 @@ void GameStateMap::xfer( Xfer *xfer )
 		//
 		// GeneralsX @bugfix cemlyn007 02/10/2026 Record the path before calling extractAndSaveMap,
 		// not after: that function fopen("w+b")s the file before beginBlock/xferUser/fwrite; a
-		// truncated or corrupt save then throws XFER_READ_ERROR out of xferUser, whether the short
-		// read happens in beginBlock's own header read or in the body read that follows it, leaving
-		// a partial file on disk. Recording first means clearScratchPadMaps still deletes that
+		// truncated save then throws XFER_READ_ERROR out of xferUser, whether the short read
+		// happens in beginBlock's own header read or in the body read that follows it, while a
+		// corrupt (as opposed to merely truncated) size can instead make the allocation itself
+		// throw ERROR_OUT_OF_MEMORY before xferUser is ever reached -- either way leaving a
+		// partial file on disk. Recording first means clearScratchPadMaps still deletes that
 		// partial file even though extraction itself never returned to record it the old way. The
 		// std::find guard below is purely defensive: GameState::loadGame clears m_scratchPadMaps
 		// before every xfer, so within one load this vector starts empty and the guard never
