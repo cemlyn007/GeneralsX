@@ -1374,12 +1374,10 @@ UnsignedInt GlobalData::generateExeCRC()
 // so on stderr if it cannot be used", instead of the create+report sequence copied at both
 // non-Windows branches below (GeneralsMD's twin of this helper covers its own
 // branches plus setPath_UserData, which Generals does not have).
-// GeneralsX @bugfix cemlyn007 02/10/2026 Only the __APPLE__ and Linux branches below
-// call this, but it was defined unconditionally, with no '#ifndef _WIN32' guard, while this file's
-// '#include <filesystem>' above is itself guarded by '#ifndef _WIN32'. On Windows the helper's
-// std::filesystem::path parameter and body referenced a type this TU never declares, so g_generals
-// stopped compiling on MSVC/mingw -- the same kind of build break already fixed in
-// GeneralsMD's twin of this helper. Guard the whole helper here too, matching the include.
+// GeneralsX @feature cemlyn007 02/10/2026 Guarded to non-Windows, matching this file's own
+// '#include <filesystem>' above: only the __APPLE__ and Linux branches below call this helper, and
+// its std::filesystem::path parameter and body reference a type this TU never declares on Windows,
+// the same gap GeneralsMD's twin of this helper guards against too.
 #ifndef _WIN32
 static Bool createUserDataDirectory(const std::filesystem::path &path)
 {

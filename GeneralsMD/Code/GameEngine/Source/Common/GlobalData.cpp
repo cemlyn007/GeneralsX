@@ -75,16 +75,17 @@
 #endif
 #endif
 
-// GeneralsX @bugfix cemlyn007 02/10/2026 setPath_UserData (below) uses std::filesystem on every
+// GeneralsX @feature cemlyn007 02/10/2026 setPath_UserData (below) uses std::filesystem on every
 // platform it is compiled for, not only inside BuildUserDataPathFromRegistry()'s non-Windows
-// branches, so these includes cannot stay confined to '#ifndef _WIN32' -- that left setPath_UserData
-// calling std::filesystem::create_directories()/is_directory() on Windows with neither <filesystem>
-// nor <system_error> included, failing to compile there (the win32-vcpkg and mingw-w64 z_generals
-// targets). std::filesystem needs VS2017 15.7 (_MSC_VER 1914); MSVC before that -- in practice VC6
-// (_MSC_VER < 1300, which this file already special-cases elsewhere), the only preset still built,
-// though the guard also covers the unbuilt VS2002-VS2017-15.6 range -- has no std::filesystem at
-// all, so setPath_UserData falls back to the Win32 API there (see GENERALSX_HAVE_STD_FILESYSTEM
-// below), matching the guard UserPreferences.cpp already uses for the same gap.
+// branches, so these includes stay here rather than confined to the '#ifndef _WIN32' block above --
+// scoped there, setPath_UserData would call std::filesystem::create_directories()/is_directory() on
+// Windows (the win32-vcpkg and mingw-w64 z_generals targets) with neither <filesystem> nor
+// <system_error> included, and fail to compile. std::filesystem needs VS2017 15.7 (_MSC_VER 1914);
+// MSVC before that -- in practice VC6 (_MSC_VER < 1300, which this file already special-cases
+// elsewhere), the only preset still built, though the guard also covers the unbuilt VS2002-VS2017-15.6
+// range -- has no std::filesystem at all, so setPath_UserData falls back to the Win32 API there (see
+// GENERALSX_HAVE_STD_FILESYSTEM below), matching the guard UserPreferences.cpp already uses for the
+// same gap.
 #if !defined(_MSC_VER) || (_MSC_VER >= 1914)
 #define GENERALSX_HAVE_STD_FILESYSTEM 1
 #include <filesystem>    // std::filesystem::create_directories()
@@ -1109,14 +1110,15 @@ GlobalData::GlobalData()
 	// Adopts upstream refactoring with extended cross-platform support
 	// Set user data directory based on registry settings instead of INI parameters.
 	// This allows us to localize the leaf name.
-	// GeneralsX @bugfix cemlyn007 02/10/2026 Only the original instance derives and creates the
+	// GeneralsX @feature cemlyn007 02/10/2026 Only the original instance derives and creates the
 	// default: every override is also a fresh `NEW GlobalData` (newOverride(), for every
 	// INI_LOAD_CREATE_OVERRIDES GameData block), and newOverride() immediately overwrites
 	// m_userDataDir with a memberwise copy of the current TheWritableGlobalData anyway. Without this
-	// guard, every override construction re-read $XDG_DATA_HOME/$HOME and re-tried to create the
-	// (about-to-be-discarded) default, and printed createUserDataDirectory's "cannot use ... as the
-	// default user data directory" diagnostic on stderr even for an engine whose own explicit
-	// directory setPath_UserData already set -- as if its working setup were failing.
+	// guard, every override construction would re-read $XDG_DATA_HOME/$HOME and re-try creating the
+	// (about-to-be-discarded) default, and, while the default cannot be created, print
+	// createUserDataDirectory's "cannot use ... as the default user data directory" diagnostic on
+	// stderr again, even for an engine whose own setPath_UserData directory already works -- as if
+	// its working setup were failing.
 	if (this == m_theOriginal)
 	{
 		m_userDataDir = BuildUserDataPathFromRegistry();
@@ -1444,16 +1446,15 @@ UnsignedInt GlobalData::generateExeCRC()
 // GeneralsX @refactor cemlyn007 02/10/2026 One place for "make this directory (recursively) and say
 // so on stderr if it cannot be used", instead of the create+stat+fprintf sequence copied at every
 // default-directory branch below plus a near-duplicate in setPath_UserData.
-// Centralising it also fixes a latent bug: create_directories() and is_directory() used to share
-// one std::error_code, so a successful create followed by is_directory()'s own (irrelevant) stat
-// could silently clear a real creation failure, or a creation failure's error_code could be
-// overwritten by is_directory()'s unrelated ENOENT. They are now reported separately, preferring the
-// creation error since it is the more specific cause.
-// GeneralsX @bugfix cemlyn007 02/10/2026 setPath_UserData used std::filesystem unconditionally, but
-// GlobalData.cpp only included <filesystem>/<system_error> on non-Windows: this
-// helper exists only when GENERALSX_HAVE_STD_FILESYSTEM is defined (see the includes above), i.e.
-// everywhere except MSVC before 19.14 (in practice VC6, the only such preset still built), which
-// setPath_UserData falls back to the Win32 API for instead.
+// Uses separate error_codes for the create and the stat below, so neither masks the other: sharing
+// one would let a successful create's is_directory() stat (an irrelevant ENOENT check once the
+// directory exists) clear a real creation failure, or let a creation failure's error_code be
+// overwritten by is_directory()'s unrelated one. Reported separately, preferring the creation error
+// since it is the more specific cause.
+// GeneralsX @feature cemlyn007 02/10/2026 Guarded to GENERALSX_HAVE_STD_FILESYSTEM (defined along
+// with this file's <filesystem>/<system_error> includes above), i.e. everywhere except MSVC before
+// 19.14 (in practice VC6, the only such preset still built), which setPath_UserData falls back to
+// the Win32 API for instead.
 #if GENERALSX_HAVE_STD_FILESYSTEM
 static Bool createUserDataDirectory(const std::filesystem::path &path, const char *label)
 {
@@ -1474,17 +1475,17 @@ static Bool createUserDataDirectory(const std::filesystem::path &path, const cha
 }
 #endif
 
-// GeneralsX @bugfix cemlyn007 02/10/2026 setPath_UserData's own validation (create_directories plus
-// is_directory, see createUserDataDirectory above) only checked that the directory exists, so an
+// GeneralsX @feature cemlyn007 02/10/2026 Probes with a real write, because create_directories
+// plus is_directory (createUserDataDirectory above) only checks that the directory exists: an
 // existing directory without write permission -- the motivating read-only-$HOME/sandbox case, when
-// the directory already exists in the image -- passed, and every later write still failed silently.
-// Probe with an actual write: create and remove a small marker file, which gives
-// the actual outcome of a write rather than access()'s/_access()'s prediction of it. access()/_access()
-// can disagree with the real write: access() checks the real uid rather than the effective one
-// (irrelevant here, but a trap if this code is ever reused somewhere setuid), root-squashed NFS and
-// some FUSE filesystems can diverge from what an actual open does, and on Windows _access() only looks
-// at the read-only attribute bit, not ACLs, so it can report writable for a directory an ACL-denied
-// write would reject.
+// the directory already exists in the image -- would otherwise pass, and every later write would
+// still fail silently. Create and remove a small marker file, which gives the actual outcome of a
+// write rather than access()'s/_access()'s prediction of it. access()/_access() can disagree with the
+// real write: access() checks the real uid rather than the effective one (irrelevant here, but a
+// trap if this code is ever reused somewhere setuid), root-squashed NFS and some FUSE filesystems can
+// diverge from what an actual open does, and on Windows _access() only looks at the read-only
+// attribute bit, not ACLs, so it can report writable for a directory an ACL-denied write would
+// reject.
 static Bool isUserDataDirectoryWritable(const AsciiString &pathWithSeparator)
 {
 	AsciiString probe = pathWithSeparator;
@@ -1547,13 +1548,13 @@ static Bool createUserDataDirectoryWin32(const AsciiString &path)
 // constructor's own BuildUserDataPathFromRegistry()/CreateDirectory() do for the registry/XDG default.
 // Only valid on the original instance: GlobalData::reset() (an override pop) would otherwise silently
 // revert the path to whatever the original held, so callers must set it before any override is pushed.
-// GeneralsX @bugfix cemlyn007 02/10/2026 Returns Bool and validates instead of accepting anything: an
-// empty `dir` used to become "/" or "\\" (append-a-separator-to-nothing is the filesystem root), a
-// directory that could not be made or used (it exists as a file, a nested path whose parent is
-// missing, or -- see isUserDataDirectoryWritable above -- it exists but is not writable) was accepted
-// anyway, so every later write failed silently. `m_userDataDir` is left unchanged on a refusal, so a
-// caller that ignores the return value keeps whatever directory (the default, or an earlier
-// successful override) it already had.
+// GeneralsX @feature cemlyn007 02/10/2026 Returns Bool and validates rather than accepting
+// anything: refuses an empty `dir`, which would otherwise resolve to the filesystem root
+// (append-a-separator-to-nothing), and refuses a directory that cannot be made or used (it exists as
+// a file, a nested path whose parent is missing, or -- see isUserDataDirectoryWritable above -- it
+// exists but is not writable), rather than accepting it and failing every later write silently.
+// `m_userDataDir` is left unchanged on a refusal, so a caller that ignores the return value keeps
+// whatever directory (the default, or an earlier successful override) it already had.
 Bool GlobalData::setPath_UserData(const AsciiString &dir)
 {
 	DEBUG_ASSERTCRASH(this == m_theOriginal, ("setPath_UserData: must be called on the original GlobalData instance, before any override is loaded"));
