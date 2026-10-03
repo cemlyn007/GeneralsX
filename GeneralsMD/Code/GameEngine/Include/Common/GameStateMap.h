@@ -73,6 +73,15 @@ protected:
 	// engines can resolve the same shared user-data Save dir (PLAN-023 R1's per-engine
 	// user_data_dir is a later phase), and deleting the whole directory would remove a scratch-pad
 	// map another live engine's embedInUseMap still needs.
+	//
+	// This does not make two engines safe to save or load the *same map leaf* at once: the scratch
+	// path is named after the map leaf alone (getFilePathInSaveDirectory/portableMapPathToRealMapPath,
+	// GameStateMap.cpp), so two engines loading saves of that map still resolve to the identical
+	// path in the shared Save dir and write over each other's extracted copy. That is the common
+	// case for N training engines on one map. A real fix needs a per-engine scratch name or
+	// subdirectory, which also needs a per-engine user_data_dir to be worth doing (otherwise two
+	// engines could still race on the same real file while both think they own it); until then,
+	// engines sharing a user-data dir must not load or save the same map concurrently.
 	std::vector<AsciiString> m_scratchPadMaps;
 
 };

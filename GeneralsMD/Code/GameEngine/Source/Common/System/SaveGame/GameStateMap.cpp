@@ -30,6 +30,8 @@
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
 #include "PreRTS.h"
 
+#include <algorithm>  // std::find (m_scratchPadMaps dedupe)
+
 #include "Common/file.h"
 #include "Common/FileSystem.h"
 #include "Common/GameState.h"
@@ -400,11 +402,18 @@ void GameStateMap::xfer( Xfer *xfer )
 		// take the embedded map file out of the save file, and save as its own .map file
 		// in the save directory temporarily
 		//
-		extractAndSaveMap( saveGameInfo->saveGameMapName, xfer );
+		// GeneralsX @bugfix cemlyn007 02/10/2026 Record the path before calling extractAndSaveMap,
+		// not after: that function fopen("w+b")s the file before beginBlock/xferUser/fwrite, any of
+		// which can throw SC_INVALID_DATA on a truncated or corrupt save, leaving a partial file on
+		// disk. Recording first means clearScratchPadMaps still deletes that partial file even
+		// though extraction itself never returned to record it the old way; dedupe against a
+		// repeat of the same leaf (loading the same map twice in one session) so
+		// clearScratchPadMaps does not try to delete the same already-removed path twice.
+		if( std::find( m_scratchPadMaps.begin(), m_scratchPadMaps.end(), saveGameInfo->saveGameMapName )
+		    == m_scratchPadMaps.end() )
+			m_scratchPadMaps.push_back( saveGameInfo->saveGameMapName );
 
-		// GeneralsX @bugfix cemlyn007 02/10/2026 Record what this instance just extracted, so
-		// clearScratchPadMaps deletes only this engine's scratch-pad maps (see GameStateMap.h).
-		m_scratchPadMaps.push_back( saveGameInfo->saveGameMapName );
+		extractAndSaveMap( saveGameInfo->saveGameMapName, xfer );
 
 	}
 
