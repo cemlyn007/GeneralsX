@@ -9,7 +9,7 @@
 #
 # A written symbol is judged by name, never by its class alone:
 #
-#   worklist     classified render-per-engine or render-scratch (or per-engine): state known to change as an
+#   worklist     classified render-per-engine or render-scratch: state known to change as an
 #                engine draws, which PLAN-023 Phase 8 moves into the engine (the row's phase says when);
 #   allowed      named in the explicit allowlist (ALLOWLIST below, or the caller's), each with its reason: a
 #                process-wide counter, pool or cache that is written on purpose and safe to share;
@@ -47,7 +47,7 @@ import engine_state_symbols as ess  # noqa: E402
 
 LIBRARY = "libgeneralsx.so"
 PROBED_SECTIONS = {".data", ".bss"}
-WORKLIST_CLASSES = {"per-engine", "render-per-engine", "render-scratch"}
+WORKLIST_CLASSES = {"render-per-engine", "render-scratch"}
 GUARD = "guard variable for "
 
 # Written on purpose, and safe to share between engines: each by exact key (the TSV's symbol column), with its
