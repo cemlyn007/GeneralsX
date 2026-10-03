@@ -73,6 +73,12 @@ void FramePacer::reset()
 	m_updateTime = 1.0f / (Real)getActualFramesPerSecondLimit();
 }
 
+void FramePacer::resetToStep(Real seconds)
+{
+	m_frameRateLimit.reset();
+	m_updateTime = seconds;
+}
+
 void FramePacer::setFramesPerSecondLimit( Int fps )
 {
 	DEBUG_LOG(("FramePacer::setFramesPerSecondLimit() - setting max fps to %d (TheGlobalData->m_useFpsLimit == %d)", fps, TheGlobalData->m_useFpsLimit));

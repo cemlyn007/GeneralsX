@@ -2355,15 +2355,15 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 			}
 
 		}
-
-		// GeneralsX @bugfix cemlyn007 03/10/2026 An embed host never calls TheFramePacer->update() again, so
-		// the last wall-clock measurement of the fade loop would scale the draw path's per-frame adjustments
-		// (camera zoom, pivot) for the rest of the game: reset the pacer's step instead, so those scalings no
-		// longer depend on load. With the embed host's uncapped pacer that step is 1 us, so they are
-		// effectively zero.
-		if (TheGlobalData->m_headless)
-			TheFramePacer->reset();
 	}
+
+	// GeneralsX @bugfix cemlyn007 03/10/2026 An embed host never calls TheFramePacer->update() again, so
+	// whatever step the pacer holds scales the draw path's per-frame adjustments (camera zoom, pivot
+	// easing) for the rest of the game. Set the nominal logic step, so the scaling ratios are exactly 1
+	// and do not depend on load, the fps limit or which game the engine played before. Applies to save
+	// loads too.
+	if (TheGlobalData->m_headless)
+		TheFramePacer->resetToStep(SECONDS_PER_LOGICFRAME_REAL);
 
 	if(m_loadScreen)
 	{

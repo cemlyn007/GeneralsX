@@ -41,6 +41,8 @@ public:
 	void update(); ///< Signal that the app/render update is done and wait for the fps limit if applicable.
 	void reset(); ///< Move the frame timing anchor to now and predict the next update time from the target frame rate. Call after a long blocking operation so its duration does not leak into the next frame delta.
 
+	void resetToStep(Real seconds); ///< Like reset(), but sets the predicted update delta time to the given step in seconds.
+
 	void setFramesPerSecondLimit( Int fps ); ///< Set the update fps limit.
 	Int  getFramesPerSecondLimit() const; ///< Get the update fps limit.
 	void enableFramesPerSecondLimit( Bool enable ); ///< Enable or disable the update fps limit.
