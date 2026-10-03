@@ -836,10 +836,6 @@ CONST_DECL_RE = re.compile(r"^(?:static\s+)?(?:inline\s+)?(?:const\s+static|cons
 # `T* const name`, the only pointer declarator that cannot be reseated; a trailing array bound is allowed
 # (`T* const table[]`), but anything after the name (another declarator, a function parameter list) is not.
 CONST_PTR_DECL_RE = re.compile(r"\*\s*const\s+\w+\s*(?:\[[^\]]*\]\s*)*$")
-# A one-time lookup (`TheX->find(...)`, `someFunc(...)`) that a per-engine cache (ActiveBody's templates,
-# WaveGuideUpdate's particles, ...) would also use to fill its pointer on first call: not a constant
-# expression, even though the pointer slot itself is never written again.
-LOOKUP_INIT_RE = re.compile(r"->|\w+\s*\(")
 # A `->` read through a global pointer (`TheGlobalData->m_mapName`, `TheWriterSomething->field`): per-engine
 # or INI/map-dependent state captured by the first engine to run, whether the static itself is a pointer or
 # a by-value object. This is only the arrow form; a by-value initialiser's other ways of reading the same
@@ -1011,6 +1007,35 @@ def _by_value_init_is_safe(init, type_name):
     return _is_safe_value_expr(init, type_name)
 
 
+# The address of a named value (`&kDefault`), optionally scoped: the only way this codebase's safe pointer
+# initialisers take an address, as opposed to copying another pointer.
+POINTER_ADDR_RE = re.compile(r"^&[A-Za-z_]\w*(?:::[A-Za-z_]\w*)*$")
+
+
+def _pointer_init_is_safe(init):
+    """True when a `T* const` pointer's by-value initialiser is provably never a per-engine read: an
+    allow-list, not a deny-list of only `->` and a call (which a bare copy of a per-engine global pointer,
+    `static ThingFactory* const s_factory = TheThingFactory;`, matches neither of, and so would pass).
+    Only nullptr/NULL, a literal (a null pointer's own `0`, or a string literal for a `const char* const`),
+    the address of a named value, and a cast of one of these are safe; a bare identifier (a copy of another
+    pointer, per-engine or not), a subscript and any call are rejected, the same per-engine pointer-cache
+    defect as a reassignable pointer's own `TheX->find(...)` shape."""
+    init = init.strip()
+    if init[:1] == "(" and init[-1:] == ")" and _fully_parenthesized(init):
+        return _pointer_init_is_safe(init[1:-1])
+    m = _CAST_RE.match(init)
+    if m and m.group("rest")[:1] != "(":
+        return _pointer_init_is_safe(m.group("rest"))
+    m = _STATIC_CAST_RE.match(init)
+    if m:
+        return _pointer_init_is_safe(m.group("rest"))
+    if init in ("nullptr", "NULL"):
+        return True
+    if LITERAL_RE.match(init):
+        return True
+    return bool(POINTER_ADDR_RE.match(init))
+
+
 def _is_balanced(text):
     """True when every `(`/`[`/`{` in `text` closes before the text ends, and nothing closes early. A copy
     (`= expr`) initialiser that fails this was cut off mid-expression (the recorded text ran out before the
@@ -1091,8 +1116,11 @@ def rule_const_object(sym):
     """A const object (dynamically initialised, so it lands in .data/.bss): never written after its
     initialisation. A reference is never safe here (it can alias per-engine state at any type). A pointer is
     safe only when the pointer itself cannot be reseated (`T* const name`, not `const T*`, whatever the
-    pointee type) and its initialiser is not a lookup: a per-engine pointer cache has exactly the `T* const
-    name = TheX->find(...)` shape. A by-value const must have its whole initialiser provably built from pure
+    pointee type) and its initialiser is provably built from nothing but nullptr/NULL, a literal, the
+    address of a named value, and casts of these (`_pointer_init_is_safe`'s allow-list): a per-engine
+    pointer cache can fill the slot from either a one-time lookup (`T* const name = TheX->find(...)`) or a
+    bare copy of another per-engine global pointer (`T* const name = TheGlobalData`), and both are
+    rejected. A by-value const must have its whole initialiser provably built from pure
     values and nothing else (`_by_value_init_is_safe`'s allow-list: literals, named constants, casts and
     allow-listed/own-type constructor calls): any way of reading or changing per-engine state is rejected,
     whether a `->` read (`static const Real r = TheGlobalData->m_maxCameraHeight;`), a dereference or
@@ -1116,7 +1144,7 @@ def rule_const_object(sym):
         if GLOBAL_LOOKUP_RE.search(init):
             return None
         if "*" in decl:
-            if not CONST_PTR_DECL_RE.search(decl) or LOOKUP_INIT_RE.search(init):
+            if not CONST_PTR_DECL_RE.search(decl) or not _pointer_init_is_safe(init):
                 return None
         else:
             if not CONST_DECL_RE.match(decl):

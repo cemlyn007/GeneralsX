@@ -265,6 +265,17 @@ class RuleConstObjectTest(unittest.TestCase):
         # first one's brace closes first.
         self.assert_const("static const Int x{1}, y = GameLogicRandomValue(0, 3);", False)
 
+    def test_const_pointer_copied_from_a_global_pointer_is_not_safe(self):
+        # A bare copy of a per-engine global pointer is exactly the same first-engine-wins defect as the
+        # `TheX->find(...)` lookup shape, just without a `->` or a call for the old deny-list to catch.
+        self.assert_const("static ThingFactory* const s_factory = TheThingFactory;", False)
+
+    def test_const_pointer_direct_initialized_from_a_global_pointer_is_not_safe(self):
+        self.assert_const("static const GlobalData* const s_gd(TheGlobalData);", False)
+
+    def test_const_pointer_initialized_from_a_subscripted_global_is_not_safe(self):
+        self.assert_const("static Player* const s_p = ThePlayerList[0];", False)
+
 
 class RuleNamekeyTest(unittest.TestCase):
     """rule:namekey is SAFE_FOR_NEW: the variable itself must be a NameKeyType/StaticNameKey cache, not a
