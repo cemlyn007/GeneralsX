@@ -203,6 +203,9 @@ class AudioManager : public SubsystemInterface
 		// isCurrentlyPlaying, DO NOT USE THIS FOR GAMELOGIC PURPOSES.
 		virtual Bool canPlaySounds() const { return TRUE; }
 
+		// How many audio handles allocateNewHandle() has handed out since the last reset.
+		AudioHandle getHandlesAllocated() const;
+
 		// Device Dependent open and close functions
 		virtual void openDevice() = 0;
 		virtual void closeDevice() = 0;

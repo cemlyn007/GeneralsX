@@ -1089,6 +1089,12 @@ AudioHandle AudioManager::allocateNewHandle()
 }
 
 //-------------------------------------------------------------------------------------------------
+AudioHandle AudioManager::getHandlesAllocated() const
+{
+	return theAudioHandlePool - AHSV_FirstHandle;
+}
+
+//-------------------------------------------------------------------------------------------------
 void AudioManager::muteAudio( MuteAudioReason reason )
 {
 	m_muteReasonBits |= 1u << reason;
