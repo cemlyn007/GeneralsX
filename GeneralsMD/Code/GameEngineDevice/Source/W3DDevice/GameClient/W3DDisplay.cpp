@@ -670,7 +670,7 @@ static void buildFilteredResolutions()
 {
 	s_filteredResolutions.clear();
 	// GeneralsX @bugfix cemlyn007 03/10/2026 A driver that reports no display modes adds no device, and the table's first
-	// entry is then a null reference: init's last resolution attempt would fault instead of failing the boot.
+	// entry is then a null reference: init's last resolution attempt would fault, so that attempt falls back to the default size.
 	if (WW3D::Get_Render_Device_Count() <= 0) return;
 	const RenderDeviceDescClass &devDesc = WW3D::Get_Render_Device_Desc(0);
 	const DynamicVectorClass<ResolutionDescClass> &resolutions = devDesc.Enumerate_Resolutions();
@@ -1117,7 +1117,9 @@ void W3DDisplay::init()
 
 			++attempt;
 		}
-		while (attempt < 3 && renderDeviceError != WW3D_ERROR_OK);
+		// GeneralsX @bugfix cemlyn007 03/10/2026 A render-headless host owns the image size, so the last attempt's fallback to the
+		// default size is not made: a size the adapter cannot back fails the boot.
+		while (attempt < (TheGlobalData->m_headlessRender ? 2 : 3) && renderDeviceError != WW3D_ERROR_OK);
 
 		if (renderDeviceError != WW3D_ERROR_OK)
 		{
