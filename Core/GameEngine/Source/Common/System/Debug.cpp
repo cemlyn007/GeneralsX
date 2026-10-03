@@ -769,7 +769,39 @@ static void TriggerMiniDump()
 // GeneralsX @feature cemlyn007 28/09/2026 Embedded mode (see FatalEngineError.h)
 static std::atomic<bool> theEngineEmbeddedMode(false);
 
+#if !RTS_ENGINE_CONTEXT
+static std::atomic<bool> theFatalErrorRaised(false);
+#endif
+
+// GeneralsX @bugfix cemlyn007 03/10/2026 See TakeEngineFatalErrorRaised (FatalEngineError.h)
+FatalEngineError::FatalEngineError(const std::string& reason)
+	: std::runtime_error(reason)
+{
+#if RTS_ENGINE_CONTEXT
+	// g_noEngine stays pristine.
+	rts::EngineContext* context = rts::ctx();
+	if (context != &rts::g_noEngine)
+		context->fatalErrorRaised = true;
+#else
+	theFatalErrorRaised.store(true);
+#endif
+}
+
 FatalEngineError::~FatalEngineError() = default;
+
+bool TakeEngineFatalErrorRaised()
+{
+#if RTS_ENGINE_CONTEXT
+	rts::EngineContext* context = rts::ctx();
+	if (context == &rts::g_noEngine)
+		return false;
+	const bool raised = context->fatalErrorRaised;
+	context->fatalErrorRaised = false;
+	return raised;
+#else
+	return theFatalErrorRaised.exchange(false);
+#endif
+}
 
 void SetEngineEmbeddedMode(bool embedded)
 {

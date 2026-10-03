@@ -135,6 +135,10 @@ struct RTS_ENGINE_CONTEXT_API EngineContext
 	// FatalEngineError.h).
 	bool engineTearingDown = false;
 
+	// Set when a FatalEngineError is constructed in this engine, cleared by TakeEngineFatalErrorRaised
+	// (see FatalEngineError.h).
+	bool fatalErrorRaised = false;
+
 	// Set while this engine boots from names another engine primed, until its upgrades are loaded: it
 	// must intern no new NameKey then (NameKeyGenerator::PrimingLatch, PLAN-023 Decision 2).
 	bool nameKeysFrozen = false;
