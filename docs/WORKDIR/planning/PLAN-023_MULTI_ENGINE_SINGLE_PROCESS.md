@@ -366,7 +366,7 @@ The two-engine harness (rlgenerals' `multi_engine_test`, 1,500 frames per engine
 
 ### Phase 3: Device-layer state that headless still uses
 
-**Status (Phase 3 PR): the rows below are converted and verified for two engines stepped on one thread; the phase's acceptance (below) is not yet met, and the Phase 3 entries left in the classification (`python3 scripts/cpp/engine_state_symbols.py report`) are threads only**, all with `RTS_ENGINE_CONTEXT` ON only (OFF is unchanged: rlgenerals' per-frame `crc(recalc=True)` over 3,000 frames of the seeded Hard-vs-Hard skirmish is identical OFF and ON, the same as after Phase 2). Both games are edited alike; Generals still builds OFF.
+**Status (Phase 3 PR): the rows below are converted and verified for two engines stepped on one thread; the phase's acceptance (below) is not yet met, and the Phase 3 entries left in the classification (`python3 scripts/cpp/engine_state_symbols.py report`) are threads only**, all with `RTS_ENGINE_CONTEXT` ON only (OFF is unchanged except `AudioEventRTS`'s non-copy constructors, which now set two fields upstream left unset; the CRC below predates that change: rlgenerals' per-frame `crc(recalc=True)` over 3,000 frames of the seeded Hard-vs-Hard skirmish is identical OFF and ON, the same as after Phase 2). Both games are edited alike; Generals still builds OFF.
 
 | Row | Status |
 |---|---|
@@ -404,7 +404,7 @@ Headless still builds `W3DDisplay`, `W3DTerrainVisual`, `WorldHeightMap`s and `W
 
 ### Phase 4: Caches and remaining statics
 
-**Status (Phase 4 PR): done for engines stepped on one thread; the classification's per-engine list is down to 18 symbols (Phase 3's 9 and Phase 4's 9: the 5 below and the 4 quoted-printable conversion buffers), all threads only, and nothing is unreviewed**, all with `RTS_ENGINE_CONTEXT` ON only (OFF is unchanged: rlgenerals' per-frame `crc(recalc=True)` over 3,000 frames of the seeded Hard-vs-Hard skirmish on Tournament Desert is identical OFF and ON, md5 `ebf7cb56...`). Zero Hour and Core are edited; Generals still builds OFF.
+**Status (Phase 4 PR): done for engines stepped on one thread; the classification's per-engine list is down to 18 symbols (Phase 3's 9 and Phase 4's 9: the 5 below and the 4 quoted-printable conversion buffers), all threads only, and nothing is unreviewed**, all with `RTS_ENGINE_CONTEXT` ON only (OFF is unchanged except `AudioEventRTS`'s non-copy constructors, which now set two fields upstream left unset; the CRC below predates that change: rlgenerals' per-frame `crc(recalc=True)` over 3,000 frames of the seeded Hard-vs-Hard skirmish on Tournament Desert is identical OFF and ON, md5 `ebf7cb56...`). Zero Hour and Core are edited; Generals still builds OFF.
 
 | Row | Status |
 |---|---|
