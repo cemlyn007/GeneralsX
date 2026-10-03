@@ -457,9 +457,10 @@ void GameStateMap::xfer( Xfer *xfer )
 		// GeneralsX @bugfix cemlyn007 03/10/2026 The std::find guard below is load-bearing, not
 		// purely defensive: clearScratchPadMaps keeps a path whose DeleteFile failed while the
 		// file is still on disk (for retry), so this vector can already hold entries when a load
-		// starts. If this load's map leaf matches a kept path, the guard stops it being tracked
-		// twice, which would otherwise print a spurious delete failure for the second entry once
-		// the first DeleteFile of that leaf succeeds.
+		// starts. While a kept path stays undeletable, the guard stops each further load of the
+		// same map leaf from appending another copy of it; without the guard, the vector would
+		// grow by one per load, and every clearScratchPadMaps call would print one "Unable to
+		// delete" line per copy.
 		if( std::find( m_scratchPadMaps.begin(), m_scratchPadMaps.end(), saveGameInfo->saveGameMapName )
 		    == m_scratchPadMaps.end() )
 			m_scratchPadMaps.push_back( saveGameInfo->saveGameMapName );
