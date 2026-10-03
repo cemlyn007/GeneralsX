@@ -15,9 +15,12 @@ garbage in the members its constructor skips when it is built:
   (rlgenerals' `libgeneralsx.so` hides the engine's replaceable `operator new` overloads since
   PR #11, and those four macros still expand to a plain `new` in Null mode, so they reach the
   host's non-zeroing `new`). Since 11ed61c87, `NEW`, `MSGNEW`, `newInstance` and
-  `newInstanceDesc` expand to `new(__FILE__, __LINE__)` in Null mode instead, which always
-  resolves to the engine's exported `(size_t, const char *, int)` overload, so a host's
-  `NEW SkirmishGameInfo` is zero-filled again, the same as an engine-built object,
+  `newInstanceDesc` expand in Null mode to a call on the engine's exported
+  `(size_t, const char *, int)` overload instead, so a host's `NEW SkirmishGameInfo` is
+  zero-filled again, the same as an engine-built object. That overload originally took
+  `__FILE__, __LINE__`; since 02/10/2026 it instead passes constant tag arguments
+  (`new(static_cast<const char *>(nullptr), 0)`), since the Null-mode overload discards them
+  either way (`GameMemoryNull.h`) and the zero-fill routing this audit cares about is unaffected,
 - on the stack or in static storage with a non-trivial constructor,
 - under a non-zeroing allocator (`LD_PRELOAD=libjemalloc.so.2`).
 

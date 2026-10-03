@@ -27,9 +27,10 @@
 // No other library defines this overload, so these always reach the engine's zero-filling new.
 // GeneralsX @bugfix cemlyn007 02/10/2026 Pass constant tag arguments instead of __FILE__/__LINE__: these
 // Null-mode (size_t, const char *, int) overloads (GameMemoryNull.cpp) discard both, same as the pooled
-// debug build's NEW does with its ARGLITERAL. Materialising an absolute compile-time path string at every
-// NEW/newInstance/MSGNEW call site only grew libgeneralsx.so's .rodata and made the sandbox's build path
-// (rules_foreign_cc numbers its sandbox slot) leak into otherwise-identical builds for no observable benefit.
+// non-debug build's newInstanceDesc already discards its own ARGLITERAL (GameMemory.h). Materialising an
+// absolute compile-time path string at every NEW/newInstance/MSGNEW call site only grew libgeneralsx.so's
+// .rodata and made the sandbox's build path (rules_foreign_cc numbers its sandbox slot) leak into
+// otherwise-identical builds for no observable benefit.
 #ifndef DISABLE_GAMEMEMORY_NEW_OPERATORS
 #define newInstanceDesc(ARGCLASS,ARGLITERAL)        new(static_cast<const char *>(nullptr), 0) ARGCLASS
 #define newInstance(ARGCLASS)                       new(static_cast<const char *>(nullptr), 0) ARGCLASS
