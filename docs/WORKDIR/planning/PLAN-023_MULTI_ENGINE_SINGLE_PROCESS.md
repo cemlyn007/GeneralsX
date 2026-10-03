@@ -322,7 +322,7 @@ The first two engines alive at once, stepped alternately on one thread (rlgenera
 
 ### Phase 2: Simulation statics that must become per-engine
 
-**Status (Phase 2 PR): done; the classification has no Phase 2 per-engine entries left**, all with `RTS_ENGINE_CONTEXT` ON only apart from the `INIException` fix and the threads-only statics made `thread_local` or local (unconditional, both games; one sim thread sees the same values); OFF is unchanged (rlgenerals: per-frame `crc(recalc=True)` over 3,000 frames of a seeded Hard-vs-Hard skirmish is identical OFF before and after, and ON after equals OFF).
+**Status (Phase 2 PR): done for engines stepped alternately on one thread; the different-thread acceptance below is open** (`python3 scripts/cpp/engine_state_symbols.py report` lists what the classification still has per phase), all with `RTS_ENGINE_CONTEXT` ON only apart from the `INIException` fix and the threads-only statics made `thread_local` or local (unconditional, both games; one sim thread sees the same values); OFF is unchanged (rlgenerals: per-frame `crc(recalc=True)` over 3,000 frames of a seeded Hard-vs-Hard skirmish is identical OFF before and after, and ON after equals OFF).
 
 | Row | Status |
 |---|---|
@@ -333,7 +333,7 @@ The first two engines alive at once, stepped alternately on one thread (rlgenera
 | `PathfindCellInfo::s_infoArray`/`s_firstFree` | `EngineContext` fields (the Decision 1 sketch's "pathfinder pool" field) rather than `Pathfinder` members reached through `TheAI->pathfinder()`, as the table below proposed: the pool's static functions run while `TheAI` is being built, so that route would need more upstream edits. The pool is still one per engine and freed by that engine's `Pathfinder`; a deliberate deviation from the table. |
 | `PolygonTrigger` list and `s_currentID`, `MapObject` list and world `Dict` | Fields (the dict a PER_ENGINE_STATIC); `TerrainLogic`/`WorldHeightMap` still free them as before. |
 | `TheContactList`, `getClosestObjects()::theIterFlag` | Fields (per engine, not `thread_local`). |
-| `ScriptList::s_readLists`/`s_numInReadList`/`m_curId`, `s_mtScript`/`s_mtGroup`, `static_readPlayerNames`, `s_failedMapLookups`, `s_transportStatuses`, the build plan, the 8 `AIDecisionObserver` statics, the recorder's `startTime`, `REPLAY_CRC_INTERVAL` | Per engine. `setAIDecisionObserver` installs the observer on the current engine only (rlgenerals keeps one decisions recorder per engine). `Recorder::updateRecord()::lastFrame` is written and never read, so it is left. |
+| `ScriptList::s_readLists`/`s_numInReadList`/`m_curId`, `s_mtScript`/`s_mtGroup`, `static_readPlayerNames`, `s_failedMapLookups`, `s_transportStatuses`, the build plan, the 8 `AIDecisionObserver` statics, the recorder's `startTime`, `REPLAY_CRC_INTERVAL` | Per engine. `clearGameData` resets the build plan, and the engine's `s_mtScript`/`s_mtGroup` are freed with its slot. `setAIDecisionObserver` installs the observer on the current engine only (rlgenerals keeps one decisions recorder per engine). `Recorder::updateRecord()::lastFrame` is written and never read, so it is left. |
 | `rand4`, `CameraShakerSystem` (Phase 3, pulled forward) | PER_ENGINE_STATICs. |
 | `m_weather`/`m_timeOfDay` | Already per engine: `WorldHeightMap` writes them into the engine's `TheWritableGlobalData`. |
 | `TerrainLogic::m_gridWaterHandle` | Reclassified process-global: an address-only sentinel, compared by address and never written. |
@@ -360,7 +360,7 @@ The two-engine harness (rlgenerals' `multi_engine_test`, 1,500 frames per engine
 
 **From the classification (Phase 1):** 50 per-engine entries, 44 for this delivery and 6 threads only. Besides the rows above (the pathfinder pool, polygon triggers, map objects and world dict, the four seeds, `TheContactList`/`theIterFlag`, the script and sides parse scratch, the MapUtil parse scratch and `s_failedMapLookups`, the xfer buffers, `s_transportStatuses`, the build plan, the eight `AIDecisionObserver` statics, `REPLAY_CRC_INTERVAL` and the recorder's `startTime`), it found `TerrainLogic::m_gridWaterHandle` (the grid-water handle every `TerrainLogic` hands out) and `ScriptList::m_curId` (script IDs continue from the previous engine's map load). Threads only: both `checkfortransitionsnum`, `inCRCGen`, `PathNode::computeDirectionVector`'s returned scratch and the two `XferLoad` buffers (a load runs to completion on one thread). `thePlanSubject[]` and `Recorder::updateRecord()::lastFrame` are not in the library (optimised out); fix them with their neighbours anyway. `GlobalData::m_theOriginal` is done (Phase 1b). `python3 scripts/cpp/engine_state_symbols.py report` prints the list with sources.
 
-**Acceptance:** 2 headless engines running concurrently on different threads, each matching its solo run per frame, including staggered concurrent resets.
+**Acceptance:** 2 headless engines running concurrently on different threads, each matching its solo run per frame, including staggered concurrent resets. Not yet met: the harness steps both engines on one thread, and some process-wide state that matters only across threads remains (for example `getClosestObjects()`'s debug `theEntrancyCount`).
 
 ### Phase 3: Device-layer state that headless still uses
 
