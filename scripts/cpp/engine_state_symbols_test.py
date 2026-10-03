@@ -66,6 +66,29 @@ class RuleConstObjectTest(unittest.TestCase):
     def test_const_pointer_with_literal_initializer_is_safe(self):
         self.assert_const("static Foo* const p = &kDefault;", True)
 
+    def test_const_pointer_with_address_of_an_engine_singleton_is_not_safe(self):
+        # Every EngineSingletonMacros.h macro (`The[A-Z]...`) expands to a read through the current
+        # RTS_ENGINE_CONTEXT: its address is a per-engine slot's address, the same first-engine-wins
+        # pointer cache as a bare copy of the macro, just spelled with `&`.
+        self.assert_const("static ThingFactory** const s_pp = &TheThingFactory;", False)
+
+    def test_const_pointer_with_address_of_a_writable_global_is_not_safe(self):
+        writable = {"s_counter": make_symbol("s_counter", [], sections={".bss"})}
+        self.assert_const(
+            "static Int* const p = &s_counter;", False, symbols=writable
+        )
+
+    def test_const_pointer_with_address_of_an_unqualified_writable_class_static_is_not_safe(self):
+        writable = {"Foo::s_counter": make_symbol("Foo::s_counter", [], sections={".bss"})}
+        self.assert_const(
+            "static Int* const p = &s_counter;", False, symbols=writable
+        )
+
+    def test_const_pointer_with_address_of_a_cast_engine_singleton_is_not_safe(self):
+        self.assert_const(
+            "static const GlobalData* const p = (GlobalData*)&TheGlobalData;", False
+        )
+
     def test_const_pointer_with_lookup_initializer_is_not_safe(self):
         # The per-engine pointer-cache shape (ActiveBody, WaveGuideUpdate, ...): never written again, but the
         # one-time lookup differs per engine.

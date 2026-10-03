@@ -1089,31 +1089,44 @@ def _by_value_init_is_safe(init, type_name, writable_names):
 
 # The address of a named value (`&kDefault`), optionally scoped: the only way this codebase's safe pointer
 # initialisers take an address, as opposed to copying another pointer.
-POINTER_ADDR_RE = re.compile(r"^&[A-Za-z_]\w*(?:::[A-Za-z_]\w*)*$")
+POINTER_ADDR_RE = re.compile(r"^&([A-Za-z_]\w*(?:::[A-Za-z_]\w*)*)$")
+# An engine-singleton macro's own name (`TheGlobalData`, `TheThingFactory`, ...): every one of
+# EngineSingletonMacros.h's macros expands to a read through the current RTS_ENGINE_CONTEXT, so its
+# address is always a per-engine slot's address, never a fixed one, whatever symbol table is at hand to
+# check it against (these are preprocessor macros, never themselves linker symbols).
+ENGINE_SINGLETON_RE = re.compile(r"^The[A-Z]\w*$")
 
 
-def _pointer_init_is_safe(init):
+def _pointer_init_is_safe(init, writable_names):
     """True when a `T* const` pointer's by-value initialiser is provably never a per-engine read: an
     allow-list, not a deny-list of only `->` and a call (which a bare copy of a per-engine global pointer,
     `static ThingFactory* const s_factory = TheThingFactory;`, matches neither of, and so would pass).
     Only nullptr/NULL, a literal (a null pointer's own `0`, or a string literal for a `const char* const`),
-    the address of a named value, and a cast of one of these are safe; a bare identifier (a copy of another
-    pointer, per-engine or not), a subscript and any call are rejected, the same per-engine pointer-cache
-    defect as a reassignable pointer's own `TheX->find(...)` shape."""
+    the address of a named value that is not itself a writable symbol or an engine-singleton macro
+    (`&TheGlobalData` is the same first-engine-wins pointer cache as a bare copy, just spelled with `&`),
+    and a cast of one of these are safe; a bare identifier (a copy of another pointer, per-engine or not),
+    a subscript and any call are rejected, the same per-engine pointer-cache defect as a reassignable
+    pointer's own `TheX->find(...)` shape."""
     init = init.strip()
     if init[:1] == "(" and init[-1:] == ")" and _fully_parenthesized(init):
-        return _pointer_init_is_safe(init[1:-1])
+        return _pointer_init_is_safe(init[1:-1], writable_names)
     m = _CAST_RE.match(init)
     if m and m.group("rest")[:1] != "(":
-        return _pointer_init_is_safe(m.group("rest"))
+        return _pointer_init_is_safe(m.group("rest"), writable_names)
     m = _STATIC_CAST_RE.match(init)
     if m:
-        return _pointer_init_is_safe(m.group("rest"))
+        return _pointer_init_is_safe(m.group("rest"), writable_names)
     if init in ("nullptr", "NULL"):
         return True
     if LITERAL_RE.match(init):
         return True
-    return bool(POINTER_ADDR_RE.match(init))
+    m = POINTER_ADDR_RE.match(init)
+    if not m:
+        return False
+    name = m.group(1)
+    if _is_writable_name(name, writable_names) or ENGINE_SINGLETON_RE.match(name.rsplit("::", 1)[-1]):
+        return False
+    return True
 
 
 def _is_balanced(text):
@@ -1197,10 +1210,11 @@ def rule_const_object(sym, symbols=None):
     initialisation. A reference is never safe here (it can alias per-engine state at any type). A pointer is
     safe only when the pointer itself cannot be reseated (`T* const name`, not `const T*`, whatever the
     pointee type) and its initialiser is provably built from nothing but nullptr/NULL, a literal, the
-    address of a named value, and casts of these (`_pointer_init_is_safe`'s allow-list): a per-engine
-    pointer cache can fill the slot from either a one-time lookup (`T* const name = TheX->find(...)`) or a
-    bare copy of another per-engine global pointer (`T* const name = TheGlobalData`), and both are
-    rejected. A by-value const must have its whole initialiser provably built from pure
+    address of a named value that is not itself a writable symbol or an engine-singleton macro, and casts
+    of these (`_pointer_init_is_safe`'s allow-list): a per-engine pointer cache can fill the slot from a
+    one-time lookup (`T* const name = TheX->find(...)`), a bare copy of another per-engine global pointer
+    (`T* const name = TheGlobalData`), or the address of one (`T* const name = &TheGlobalData`), and all
+    three are rejected. A by-value const must have its whole initialiser provably built from pure
     values and nothing else (`_by_value_init_is_safe`'s allow-list: literals, named constants, casts and
     allow-listed/own-type constructor calls, none of them a read of a symbol `_writable_global_names`
     reports as writable): any way of reading or changing per-engine state is rejected, whether a `->` read
@@ -1228,7 +1242,7 @@ def rule_const_object(sym, symbols=None):
         if GLOBAL_LOOKUP_RE.search(init):
             return None
         if "*" in decl:
-            if not CONST_PTR_DECL_RE.search(decl) or not _pointer_init_is_safe(init):
+            if not CONST_PTR_DECL_RE.search(decl) or not _pointer_init_is_safe(init, writable_names):
                 return None
         else:
             if not CONST_DECL_RE.match(decl):
