@@ -46,7 +46,7 @@ DX8Backend::~DX8Backend()
     // branch, but Init's Create_Render_State() runs unconditionally, before the `lite` check: a lite
     // backend still owns a W3DRenderState, and Shutdown is the only thing that frees it. Shutdown is
     // self-guarded on D3DDevice/D3DInterface/CurrentCaps, so calling it for a lite backend (which set
-    // none of those) is safe either way (review fix for the leak this skipped).
+    // none of those) is safe either way.
     DX8Wrapper::Shutdown();
 #else
     if (!Lite)

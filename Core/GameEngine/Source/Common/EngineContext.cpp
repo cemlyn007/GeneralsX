@@ -388,7 +388,7 @@ bool noEngineIsPristine()
 		// GeneralsX @bugfix cemlyn007 02/10/2026 dx8HeadlessRender/dx8PreserveFPU (EngineContext.h): a host that
 		// still writes DX8Wrapper_HeadlessRender/DX8Wrapper_PreserveFPU before entering a Scope lands on
 		// g_noEngine instead of the engine it meant, so a non-default value here means state leaked outside
-		// every Scope, same as the checks above (PLAN-023 Phase 8, stage RR2a-1 review).
+		// every Scope, same as the checks above (PLAN-023 Phase 8, stage RR2a-1).
 		&& !g_noEngine.dx8HeadlessRender && g_noEngine.dx8PreserveFPU == 0;
 }
 

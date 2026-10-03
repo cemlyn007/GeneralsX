@@ -740,7 +740,7 @@ bool DX8Wrapper::Init(void * hwnd, bool lite)
 		if (D3D8Lib == nullptr || Direct3DCreate8Ptr == nullptr) {
 #if RTS_ENGINE_CONTEXT
 			// GeneralsX @bugfix cemlyn007 02/10/2026 Create_Render_State() above already allocated this
-			// engine's state; nothing else frees it on this failure return (review fix).
+			// engine's state; nothing else frees it on this failure return.
 			Free_Render_State();
 #endif
 			return false;	// Return false at this point if init failed
@@ -764,7 +764,7 @@ bool DX8Wrapper::Init(void * hwnd, bool lite)
 			fprintf(stderr, "ERROR: DX8Wrapper::Init() - Direct3DCreate8 returned NULL (DXVK failed to create D3D8 interface)\n");
 #if RTS_ENGINE_CONTEXT
 			// GeneralsX @bugfix cemlyn007 02/10/2026 Same as the D3D8Lib failure above: free what
-			// Create_Render_State() allocated before this engine gives up on a device (review fix).
+			// Create_Render_State() allocated before this engine gives up on a device.
 			Free_Render_State();
 #endif
 			return(false);

@@ -1,26 +1,21 @@
 #!/usr/bin/env python3
-# GeneralsX @feature cemlyn007 02/10/2026 Tests for engine_context_standins.py's uses() (PLAN-023 Phase 8, stage
-# RR2a-1: the sizeof/& gate must catch a cast before unary `&`, `&&` before unary `&`,
-# `std::addressof`, and a stand-in passed bare through a variadic logger). cemlyn007 02/10/2026: a
-# multi-word cast (`(unsigned char*)&name`) and the variadic check's false positives on a converted
-# argument (`(int)name`, `static_cast<int>(name)`, `name == 32`, `f(name)`) are covered too.
-# A later pass widened the variadic-logger list to DEBUG_LOG_RAW, DEBUG_LOG_LEVEL_RAW, WWRELEASE_SAY,
-# WWDEBUG_ERROR and CRCDEBUG_LOG, and added Format/format (StringClass::Format and AsciiString::format/
-# UnicodeString::format are printf-style variadics too, matched by method name alone). A further pass
-# replaced that enumerated macro-name list with a generic doubled-parens detector: a stand-in passed bare
-# inside a parenthesised, string-literal-led argument list is flagged under any macro name at all
-# (SNAPSHOT_SAY, WWRELEASE_WARNING/ERROR, SHATTER_DEBUG_SAY, SLOTLIST_DEBUG_LOG, and any later one), and
-# the direct variadic-function list grew DebugLog, DebugLogRaw, DebugCrash, WWDebug_Printf and its
-# Warning/Error siblings, _snprintf, swprintf and vswprintf.
+# GeneralsX @feature cemlyn007 02/10/2026 Tests for engine_context_standins.py (PLAN-023 Phase 8, stage RR2a-1).
+# UsesTest covers uses(): a unary `&` after a C-style pointer cast (including a multi-word one such as
+# `(unsigned char*)&name`) or after `&&`, `std::addressof`, and a stand-in passed bare to a direct variadic
+# function (the printf family, DebugLog, WWDebug_Printf, ...), to Format/format (matched by method name
+# alone), or as an element of a doubled-parens message list under any macro name (the list is recognised by
+# its shape, a parenthesised, string-literal-led argument, not by an enumerated name). A converted argument
+# (`(int)name`, `static_cast<int>(name)`, `name == 32`, `f(name)`) and a two-argument macro's condition or
+# level argument are not flagged.
 # MainTest covers main() end to end: a stand-in whose class's members are defined in a differently named
-# file (the MapObject/WorldHeightMap.cpp gap, found by content now, not by file name), a violation in an
-# `--extra-dir` tree (a consumer's own C++ outside Core/Generals/GeneralsMD), and the own-file detection's
-# own edge cases: a bare
-# call statement, a `return C::member(...)` call, a ternary's `cond ? C::member() : x` and a case label's
-# `case C::member():` must not make a file C's own (none of them are definitions, and `:` is a definition's
-# own shape only for a constructor's initialiser list), while `T *C::member()`/`T* C::member()`, a return
-# type on the line above, a constructor's initialiser-list `:` and a trailing `const` must, and so must a
-# file that defines only a member of a class deriving (directly or transitively) from a stand-in's class.
+# file (found by content, not by file name), a violation in an `--extra-dir` tree (a consumer's own C++
+# outside Core/Generals/GeneralsMD), a stand-in scoped to the game it is declared in, and the own-file
+# detection's edge cases: a bare call statement, a `return C::member(...)` call, a ternary's
+# `cond ? C::member() : x` and a case label's `case C::member():` must not make a file C's own (none of them
+# are definitions, and `:` is a definition's own shape only for a constructor's initialiser list), while
+# `T *C::member()`/`T* C::member()`, a return type on the line above, a constructor's initialiser-list `:`
+# and a trailing `const` must, and so must a file that defines only a member of a class deriving (directly
+# or transitively) from a stand-in's class.
 #
 # Usage: python3 engine_context_standins_test.py
 
