@@ -94,7 +94,7 @@ HAND = [
     (PER, 3, "WW3DAssetManager::TheInstance", "the asset manager (bones and meshes headless): change only Get_Instance/Delete_This"),
     (PER, 3, "TheDX8MeshRenderer", "mutated on every map load (Free_Assets_With_Exclusion_List) and mesh destruction: per engine (T3: not a T* field)"),
     (PER, 3, "re:_RegisteredMeshList|texture_category_delete_list|fvf_category_container_delete_list", "TheDX8MeshRenderer's file-static lists: per engine with it"),
-    (PER, 3, "re:_TempVertexBuffer|_TempNormalBuffer", "threads only: one pair per TU (dx8renderer.cpp's skinned-mesh deform scratch, cleared by TheDX8MeshRenderer's teardown; mesh.cpp's ray-cast/decal skin scratch; decalmsh.cpp's decal scratch; meshmdl.cpp's unused pair), each resized, filled and consumed within one call"),
+    (PER, 3, "re:_TempVertexBuffer|_TempNormalBuffer", "threads only: one per TU (dx8renderer.cpp's skinned-mesh deform scratch, cleared by TheDX8MeshRenderer's teardown; decalmsh.cpp's decal scratch; meshmdl.cpp's unused vertex/normal pair; and mesh.cpp's lone _TempVertexBuffer, no _TempNormalBuffer there, its decal/special-render skin scratch), each resized, filled and consumed within one call"),
     (PER, 3, "WorldHeightMap::m_alphaTiles", "built lazily from the first map's tiles: build once and make immutable, or a member"),
     (PER, 3, "re:s_buffer|s_blendBuffer", "threads only: WorldHeightMap tile scratch, filled and consumed in one call"),
     (PER, 3, "re:filtertable|table_valid", "motchan's lazily built filter table (animation decompression, headless too): std::call_once"),
