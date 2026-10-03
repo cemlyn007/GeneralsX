@@ -787,13 +787,13 @@ void GameEngine::init()
 
 		initSubsystem(TheUpgradeCenter,"TheUpgradeCenter", MSGNEW("GameEngineSubsystem") UpgradeCenter, &xferCRC, "Data\\INI\\Default\\Upgrade", "Data\\INI\\Upgrade");
 #if RTS_ENGINE_CONTEXT
-		// GeneralsX @feature cemlyn007 28/09/2026 Every name key a later engine needs to share with
-		// the priming engine (the science and upgrade keys that orders carry) is interned by now
-		// Test hook (embedded mode only, like GENERALSX_TEST_FAULT_IN_INIT): a later engine looks up the
-		// given name inside its frozen window.
+		// GeneralsX @feature cemlyn007 03/10/2026 Test hook (embedded mode only, like
+		// GENERALSX_TEST_FAULT_IN_INIT): a later engine looks up the given name inside its frozen window.
 		if (IsEngineEmbeddedMode() && rts::ctx()->nameKeysFrozen)
 			if (const char* name = std::getenv("GENERALSX_TEST_INTERN_IN_FROZEN_WINDOW"))
 				TheNameKeyGenerator->nameToKey(name);
+		// GeneralsX @feature cemlyn007 28/09/2026 Every name key a later engine needs to share with
+		// the priming engine (the science and upgrade keys that orders carry) is interned by now.
 		primingLatch.endFrozenNames();
 #endif
 		initSubsystem(TheGameClient,"TheGameClient", createGameClient(), nullptr);
