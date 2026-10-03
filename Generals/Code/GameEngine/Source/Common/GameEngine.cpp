@@ -28,6 +28,8 @@
 
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
+#include <cstdlib>  // std::getenv (GENERALSX_TEST_FAULT_IN_INIT)
+
 #include "Common/ActionManager.h"
 #include "Common/AudioAffect.h"
 #include "Common/BuildAssistant.h"
@@ -270,7 +272,7 @@ GameEngine::GameEngine()
 //-------------------------------------------------------------------------------------------------
 GameEngine::~GameEngine()
 {
-	// GeneralsX @bugfix cemlyn007 28/09/2026 From here on a fatal error with no TheGlobalData does not
+	// GeneralsX @bugfix cemlyn007 28/09/2026 From here on an embedded-mode fatal error does not
 	// throw (see FatalEngineError.h)
 	SetEngineTearingDown(true);
 
@@ -369,6 +371,18 @@ void GameEngine::init()
 	try {
 		//create an INI object to use for loading stuff
 		INI ini;
+
+		// GeneralsX @feature cemlyn007 02/10/2026 Test-only fault injection, so an embedded-mode
+		// host's tests can exercise this function's own `catch (const FatalEngineError&) { throw; }`
+		// rethrow site below, not only a throw site a test calls directly (RELEASE_CRASH called
+		// from outside init(), e.g. a host's own unsafe test hook, never passes through this catch
+		// block). Gated on IsEngineEmbeddedMode(), not just the env var: a retail or stock build
+		// never calls SetEngineEmbeddedMode(true), so this is unreachable there regardless of
+		// environment. Checked once per init() call, not cached, since it is an uncached getenv
+		// like any other and init() itself may run more than once per process (rlgenerals'
+		// MULTI_ENGINE_CONSUMER.md stage R1 calls create/destroy/create in one process).
+		if (IsEngineEmbeddedMode() && std::getenv("GENERALSX_TEST_FAULT_IN_INIT"))
+			RELEASE_CRASH("test fault inside GameEngine::init (GENERALSX_TEST_FAULT_IN_INIT)");
 
 		if (TheVersion)
 		{
