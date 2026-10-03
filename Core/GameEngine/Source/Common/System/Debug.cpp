@@ -768,11 +768,12 @@ static void TriggerMiniDump()
 // <atomic> guard above); a plain volatile Bool is the same fallback WWLib/mutex.h uses for its
 // FastCriticalSectionClass flag on those presets. The only host that ever stores true,
 // rlgenerals' launcher, does so from its own single boot/engine thread: once before init() and
-// again, storing false, before a normal teardown (ReleaseCrash itself reads the flag up to four
-// times per crash, and the host's own test hooks read it on every init()/loadGame(), but always
-// from that same thread). A VC6/retail build links no embedded host at all, so this flag there
-// is read-only in practice (always false); the volatile bool fallback exists so such presets
-// still link, not because they observe the flag from a second thread.
+// again, storing false, before a normal teardown (ReleaseCrash reads the flag up to twice per
+// crash and ReleaseCrashLocalized up to four times, and the host's own test hooks read it on
+// every init()/loadGame(), but always from that same thread). A VC6/retail build links no
+// embedded host at all, so this flag there is read-only in practice (always false); the
+// volatile bool fallback exists so such presets still link, not because they observe the flag
+// from a second thread.
 #if !(defined(_MSC_VER) && _MSC_VER < 1300)
 static std::atomic<bool> theEngineEmbeddedMode(false);
 #else
