@@ -948,6 +948,17 @@ void ReleaseCrashLocalized(const AsciiString& p, const AsciiString& m)
 		return;
 	}
 
+	// GeneralsX @bugfix cemlyn007 03/10/2026 Take the minidump here, before the two
+	// TheGameText->fetch() calls and the translate() below, not after: those can themselves fault
+	// on corrupt state (a damaged string table, heap corruption), and the dump exists to capture
+	// state at the point of the original fatal error, not whatever is left once two more lookups
+	// and a string translation have run on top of it. This restores ReleaseCrash's own ordering
+	// and main's; only the MessageBox/ShowWindow/stderr block below needs the fetched text, so that
+	// part alone stays after the fetches, inside its own embedded-mode check.
+	if (!IsEngineEmbeddedMode()) {
+		TriggerMiniDump();
+	}
+
 	UnicodeString prompt = TheGameText->fetch(p);
 	UnicodeString mesg = TheGameText->fetch(m);
 
@@ -956,11 +967,10 @@ void ReleaseCrashLocalized(const AsciiString& p, const AsciiString& m)
 
 	/// do additional reporting on the crash, if possible
 
-	// GeneralsX @bugfix cemlyn007 02/10/2026 Embedded mode: skip the process-wide UI and minidump
-	// side effects entirely, same reasoning as ReleaseCrash above.
+	// GeneralsX @bugfix cemlyn007 02/10/2026 Embedded mode: skip the process-wide UI side effects
+	// entirely, same reasoning as ReleaseCrash above (the minidump itself is taken above, before
+	// the fetches, which embedded mode also skips).
 	if (!IsEngineEmbeddedMode()) {
-		TriggerMiniDump();
-
 		// GeneralsX @build BenderAI 12/02/2026 Platform-specific crash reporting
 		// Windows: Native MessageBox dialogs
 		// Linux: Console output (crash dialogs would need SDL_ShowSimpleMessageBox)
