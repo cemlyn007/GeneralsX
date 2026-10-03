@@ -40,6 +40,8 @@
 // for now we maintain old legacy files
 // #define MAINTAIN_LEGACY_FILES
 
+#include <cstdio>
+
 #include "Common/ArchiveFile.h"
 #include "Common/Debug.h"
 #include "Common/file.h"
@@ -535,10 +537,14 @@ W3DFileSystem::W3DFileSystem()
 	FileFactoryClass *factory = engineW3DFileFactory();
 	if (_TheFileFactory != factory)
 	{
-		DEBUG_ASSERTCRASH(_TheFileFactory == static_cast<FileFactoryClass *>(_TheSimpleFileFactory),
-			("W3DFileSystem - another file factory is installed process-wide; the engine's is refused"));
 		if (_TheFileFactory == static_cast<FileFactoryClass *>(_TheSimpleFileFactory))
 			_TheFileFactory = factory;
+		else
+		{
+			fprintf(stderr, "W3DFileSystem - another file factory is installed process-wide; the engine's is refused\n");
+			fflush(stderr);
+			DEBUG_CRASH(("W3DFileSystem - another file factory is installed process-wide; the engine's is refused"));
+		}
 	}
 #else
 	_TheFileFactory = this; // override the w3d file factory.
