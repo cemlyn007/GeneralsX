@@ -30,6 +30,7 @@
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
 #include "PreRTS.h"
 #include <cstdio>
+#include <cstdlib>  // std::getenv (GENERALSX_TEST_FAULT_IN_LOADGAME)
 #ifndef _WIN32
 #include <filesystem>
 #include "socket_compat.h"
@@ -707,6 +708,19 @@ SaveCode GameState::loadGame( AvailableGameInfo gameInfo )
 	Bool error = FALSE;
 	try
 	{
+
+		// GeneralsX @bugfix cemlyn007 03/10/2026 Test-only fault hook: raise a fault from inside
+		// this try block, before xferSaveData runs, so a host's test can exercise *this*
+		// function's own `catch (const FatalEngineError&) { throw; }` rethrow site below
+		// specifically, the same way GameEngine::init's GENERALSX_TEST_FAULT_IN_INIT hook covers
+		// that function's rethrow site. Without this, every fault test that reaches a real
+		// RELEASE_CRASH does so from outside any engine-side try block (a host's own unsafe test
+		// hook, or GameEngine::init's own hook), so none of them tell this rethrow site apart from
+		// one a later edit moved `catch (...)` ahead of. Gated on IsEngineEmbeddedMode(), not just
+		// the env var, so a retail or stock build (which never calls SetEngineEmbeddedMode(true))
+		// can never reach this regardless of environment.
+		if (IsEngineEmbeddedMode() && std::getenv("GENERALSX_TEST_FAULT_IN_LOADGAME"))
+			RELEASE_CRASH("test fault inside GameState::loadGame (GENERALSX_TEST_FAULT_IN_LOADGAME)");
 
 		// load file
 		xferSaveData( &xferLoad, SNAPSHOT_SAVELOAD );
