@@ -529,6 +529,17 @@ void GameStateMap::clearScratchPadMaps()
 	// directory would remove that map out from under it (its next embedInUseMap would then fail with
 	// SC_INVALID_DATA). This also only ever matches exact paths this instance wrote, so it cannot
 	// be fooled by a case-variant name the way a case-insensitive directory listing could.
+	//
+	// GeneralsX @bugfix cemlyn007 03/10/2026 Keep an entry whose DeleteFile below failed while the
+	// file is still on disk, instead of unconditionally clearing the whole vector afterwards.
+	// Before per-instance tracking, the whole-directory sweep ran again on every loadGame and in
+	// ~GameStateMap, so a map that failed to delete once (a transient sharing violation on
+	// Windows, or EBUSY/EPERM on Linux) was retried on the next sweep. Clearing the vector
+	// regardless of DeleteFile's result drops that retry: the path joins the "tracked by nobody"
+	// set GameStateMap.h documents for killed or faulted engines, except now a live engine that
+	// never crashed can land it there too. A later clearScratchPadMaps call, or this instance's
+	// own destructor, retries whatever is left in m_scratchPadMaps.
+	std::vector<AsciiString> stillPending;
 	for( std::vector<AsciiString>::const_iterator it = m_scratchPadMaps.begin(); it != m_scratchPadMaps.end(); ++it )
 	{
 
@@ -537,10 +548,15 @@ void GameStateMap::clearScratchPadMaps()
 		{
 			fprintf( stderr, "GameStateMap::clearScratchPadMaps - Unable to delete scratch pad map '%s'\n", it->str() );
 			fflush( stderr );
+
+			// only retry a path that is genuinely still there; a DeleteFile failure on one that is
+			// already gone (another thread or process beat us to it) needs no retry
+			if( TheLocalFileSystem != nullptr && TheLocalFileSystem->doesFileExist( it->str() ) )
+				stillPending.push_back( *it );
 		}
 
 	}
 
-	m_scratchPadMaps.clear();
+	m_scratchPadMaps.swap( stillPending );
 
 }
