@@ -171,7 +171,7 @@ Option C (hash-derived IDs) is rejected. `Dict` packs keys into 23 bits, and 23-
 
 ## Decision 3: Allocator: keep one shared malloc
 
-- Keep `RTS_GAMEMEMORY_ENABLE=OFF`. rlgenerals already builds `GameMemoryNull`, so no per-class pool state exists, and the global `operator new` zero-fills via calloc.
+- Keep `RTS_GAMEMEMORY_ENABLE=OFF`. rlgenerals already builds `GameMemoryNull`, so no per-class pool state exists, and the global `operator new` zero-fills: it allocates through the process's own `operator new` (found with `dlsym`) or `malloc` as a fallback, then `memset`s the block (`GameMemoryNull.cpp`'s `allocateZeroed`).
 - A pointer-order audit (clang-query over 926 TUs) found **no heap-address dependence** in simulation or CRC. There are three pointer-keyed containers:
   - `ScriptEngine::AttackPriorityMap` and `ScoreKeeper::ObjectCountMap` are lookup/sum-only. Only their save-game xfer order depends on addresses.
   - `InGameUI::selectMatchingAcrossRegion` orders a `std::set<const ThingTemplate*>`. That affects the simulation, but only for live human input.
