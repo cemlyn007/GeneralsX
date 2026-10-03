@@ -1453,7 +1453,8 @@ bool DX8Wrapper::Set_Render_Device(int dev, int width, int height, int bits, int
 
 		// GeneralsX @feature cemlyn007 30/09/2026 A windowless device has no desktop to match: if the
 		// adapter reports no display mode, take the 32-bit format the promotion below expects from a
-		// desktop, so it keeps the same back buffer as a windowed one (PLAN-023 Phase 8, stage RR0c).
+		// desktop, so it keeps the same back buffer as a windowed one. No driver tested (NVIDIA, lavapipe)
+		// reports no mode, so this fallback has not been run (PLAN-023 Phase 8, stage RR0c).
 		if (_Hwnd == nullptr && (FAILED(display_mode_result) || desktop_mode.Format == D3DFMT_UNKNOWN))
 			desktop_mode.Format = D3DFMT_X8R8G8B8;
 
