@@ -2012,6 +2012,12 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 			}
 
 		}
+
+		// GeneralsX @bugfix cemlyn007 03/10/2026 An embed host never calls TheFramePacer->update() again, so
+		// the last wall-clock measurement of the fade loop would scale the draw path's per-frame adjustments
+		// (camera zoom, pivot) for the rest of the game: restart the pacer's nominal step instead.
+		if (TheGlobalData->m_headless)
+			TheFramePacer->reset();
 	}
 
 	if(m_loadScreen)
