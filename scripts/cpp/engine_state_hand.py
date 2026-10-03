@@ -130,7 +130,8 @@ HAND = [
     (GLOBAL, "", "re:ParticleSystem::(computePointOnUnitSphere|computeParticleVelocity|computeParticlePosition)\\(.*\\)::\\w+", "thread_local returned-by-pointer scratch, consumed at once (PLAN-023 Phase 5b): per thread by design"),
     # ---------------------------------------------------------------------------------------------------
     # Process-global on purpose.
-    (GLOBAL, "", "re:rts::t_engine|rts::g_noEngine|rts::\\(anonymous namespace\\)::(theNextSlotIndex|theEngineFloatingPointMode)", "the EngineContext mechanism itself (PLAN-023 Decision 1; the engines' floating-point mode, learnt from setFPMode() and atomic, Phase 5b)"),
+    (GLOBAL, "", "re:rts::t_engine|rts::g_noEngine|rts::\\(anonymous namespace\\)::theNextSlotIndex", "the EngineContext mechanism itself (PLAN-023 Decision 1)"),
+    (GLOBAL, "", "rts::(anonymous namespace)::theEngineFloatingPointMode", "the engines' floating-point mode (x87 control word and MXCSR) learnt from setFPMode() by the first Scope, and atomic (PLAN-023 Phase 5b)"),
     (GLOBAL, "", "re:rts::\\(anonymous namespace\\)::(t_engineLocale|threadEngineLocaleKey\\(\\)::key)", "the Scope's per-thread engine locale (thread_local, per thread by design) and the pthread key that frees it at thread exit, made once (PLAN-023 Phase 5b)"),
     (GLOBAL, "", "re:TheNameKeyGenerator|\\(anonymous namespace\\)::thePriming(Mutex|State|Failure)|NameKeyGenerator::perturbForTesting\\(.*\\)::calls", "shared immortal NameKey generator and its priming latch (PLAN-023 Decision 2)"),
     (GLOBAL, "", "re:.*::(key_\\w+|jetKey)", "cached NameKeyType (a NAMEKEY(...) in an inline function): process-wide by PLAN-023 Decision 2"),
@@ -153,7 +154,8 @@ HAND = [
     (GLOBAL, "", "OurLanguage", "the installation's language, the same for every engine"),
     (GLOBAL, "", "re:GetRegistryLanguage\\(\\)::(once|val)", "the installation's language string: with RTS_ENGINE_CONTEXT written exactly once, under std::call_once, and never mutated afterwards (PLAN-023 Phase 4's process-global string rule); every engine reads the same install"),
     (GLOBAL, "", "UnicodeString::format_va(wchar_t const*, __va_list_tag*)::s_utf8_locale", "a UTF-8 locale handle, created once"),
-    (GLOBAL, "", "s_assetFallbackPath", "the install's asset fallback root: every engine's boot (StdBIGFileSystem::init) sets it, but setAssetRootPath writes only a change, and with RTS_ENGINE_CONTEXT only while it is unset (another root from a later boot is refused with a DEBUG_CRASH): the engines of a process share one install, so only the first boot writes while later engines' file lookups read it (PLAN-023 Phase 5b)"),
+    (GLOBAL, "", "s_assetFallbackPath", "the install's asset fallback root: every engine's boot (StdBIGFileSystem::init) sets it, but setAssetRootPath writes only a change, and with RTS_ENGINE_CONTEXT only by the first boot, which settles it even when it resolves no root (another root from a later boot is refused with a stderr message and a DEBUG_CRASH): the engines of a process share one install, so only the first boot writes while later engines' file lookups read it (PLAN-023 Phase 5b)"),
+    (GLOBAL, "", "StdLocalFileSystem::setAssetRootPath(AsciiString const&)::s_assetRootSettled", "std::atomic flag: set by the first boot's setAssetRootPath (even with no root), after which a different root is refused (PLAN-023 Phase 5b)"),
     (GLOBAL, "", "re:s_thread|s_done|s_hasUpdate|s_latestTag", "update checker (menus), one per process"),
     (GLOBAL, "", "re:thread_id_map(_mutex)?|next_thread_id", "pthread-to-Win32 thread id map (CompatLib), process-wide by nature"),
     (CONST, "", "GameSpyColorDefaults", "the online chat colors' defaults (Chat.cpp), which each engine's GameSpyColor (a PER_ENGINE_STATIC, PLAN-023 Phase 5b) starts from; never written"),
