@@ -407,6 +407,24 @@ class RuleConstObjectTest(unittest.TestCase):
         writable = {"REPLAY_CRC_INTERVAL": make_symbol("REPLAY_CRC_INTERVAL", [], sections={".data"})}
         self.assert_const("static const Int s = REPLAY_CRC_INTERVAL;", False, symbols=writable)
 
+    def test_by_value_const_initialized_from_a_partially_qualified_writable_class_static_is_not_safe(self):
+        # The writable key is `Outer::Foo::BAR` (code inside namespace `Outer` could reach it by writing
+        # just `Foo::BAR`); the full key and the bare `BAR` are both in `writable_names`, but neither
+        # equals this partial qualification outright. The ALL_CAPS allow-list must still reject it by
+        # falling back to its own final segment, the same bare form a writable symbol's unqualified
+        # reference is already checked against.
+        writable = {"Outer::Foo::BAR": make_symbol("Outer::Foo::BAR", [], sections={".bss"})}
+        self.assert_const("static const Int s = Foo::BAR;", False, symbols=writable)
+
+    def test_by_value_const_initialized_from_a_derived_class_spelling_of_a_base_writable_static_is_not_safe(
+        self,
+    ):
+        # `Base::COUNT` is the writable key; a reference through a derived class (`Derived::COUNT`) is the
+        # same static, textually unrelated to `Base` but sharing the bare segment `COUNT` that
+        # `writable_names` already records.
+        writable = {"Base::COUNT": make_symbol("Base::COUNT", [], sections={".bss"})}
+        self.assert_const("static const Int s = Derived::COUNT;", False, symbols=writable)
+
     def test_by_value_const_initialized_from_an_all_caps_object_like_macro_is_not_safe(self):
         # IS_FRAME_OK_TO_LOG (CRCDebug.cpp) is an ALL_CAPS object-like macro that expands to a per-engine
         # read and never appears in the symbol table at all, so `_writable_global_names` alone cannot

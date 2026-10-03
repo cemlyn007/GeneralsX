@@ -1085,14 +1085,23 @@ def _has_unsafe_operator(expr):
 
 def _is_writable_name(name, writable_names):
     """True when `name` (an identifier with no leading `&`, bare or `::`-scoped) cannot be proven free of
-    per-engine state: it is exactly a writable symbol's own key, or it is the bare, unqualified form a
-    reference inside that symbol's own scope would use. `writable_names` (`_writable_global_names`'s
-    result) already holds both forms for every writable key, including a function-local static's
-    `func(args)::name` key and a class or anonymous-namespace static's `Scope::name` key, so a single
-    membership test on `name` itself catches a qualified reference (`View::m_idNext`), the bare reference
-    an unqualified use inside that same scope would spell (`m_idNext`), and a top-level global either
-    way."""
-    return name in writable_names
+    per-engine state: it is exactly a writable symbol's own key, or its final `::`-segment is the bare,
+    unqualified form a reference inside that symbol's own scope would use. `writable_names`
+    (`_writable_global_names`'s result) already holds both forms for every writable key, including a
+    function-local static's `func(args)::name` key and a class or anonymous-namespace static's
+    `Scope::name` key, so a membership test on `name` itself catches a fully qualified reference
+    (`View::m_idNext`), the bare reference an unqualified use inside that same scope would spell
+    (`m_idNext`), and a top-level global either way. A `::`-qualified `name` that matches neither form
+    outright still has its own final segment checked against `writable_names` as a fallback: this catches
+    a partial qualification such as `Foo::BAR` for the writable key `Outer::Foo::BAR` (as code inside
+    namespace `Outer` could spell it) and a derived-class spelling such as `Derived::COUNT` for a base
+    class's static `Base::COUNT`, both of which the bare segment (`BAR`, `COUNT`) is already in the set
+    for. That is the same fail-closed trade-off the bare form already makes for an unqualified reference:
+    it also excludes an unrelated same-named symbol in some other scope, which a textual rule has no way
+    to tell apart from the real one anyway."""
+    if name in writable_names:
+        return True
+    return "::" in name and name.rsplit("::", 1)[-1] in writable_names
 
 
 def _is_safe_value_expr(expr, type_name, writable_names, is_function_name=None):
