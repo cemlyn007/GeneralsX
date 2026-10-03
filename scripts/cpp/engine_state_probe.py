@@ -10,15 +10,12 @@
 # A written symbol is judged by name, never by its class alone:
 #
 #   worklist     classified render-per-engine or render-scratch (state known to change as an engine draws,
-#                which PLAN-023 Phase 8 moves into the engine), or render-const with a phase (a constant
-#                today that the named stage still changes: the row's note says whether it builds once for
-#                the process what a render boot rewrites, makes const what is only copied, or moves a
-#                pointer table with the per-engine objects it points to). Only the rows REWRITTEN names
-#                are written by a render boot today; a write to any other phased render-const row is
-#                unexpected;
+#                which PLAN-023 Phase 8 moves into the engine), or one of the phased render-const rows
+#                REWRITTEN names (constants a render boot rewrites with the same value until the named
+#                stage builds them once). A write to any other phased render-const row is unexpected;
 #   allowed      named in the explicit allowlist (ALLOWLIST below, or the caller's), each with its reason: a
 #                process-wide counter, pool or cache that is written on purpose and safe to share;
-#   unexpected   anything else: a symbol the list calls constant, render-const without a phase, render-process, debug-only,
+#   unexpected   anything else: a symbol the list calls constant, render-const without a phase or not in REWRITTEN, render-process, debug-only,
 #                process-global or render-only (UI) that the engine wrote all the same. Either the list is
 #                wrong (classify it again) or the write is a bug.
 #
