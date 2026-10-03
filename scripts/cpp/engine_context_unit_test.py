@@ -32,7 +32,7 @@ class EngineContextUnitTest(unittest.TestCase):
             binary = os.path.join(work, "engine_context_unit_test")
             subprocess.run(
                 [
-                    "g++", "-std=c++20", "-g", "-fsanitize=address,undefined", "-DRTS_ENGINE_CONTEXT=1",
+                    "g++", "-std=c++20", "-g", "-fsanitize=address,undefined", "-fno-sanitize-recover=all", "-DRTS_ENGINE_CONTEXT=1",
                     "-I" + work, "-I" + INCLUDE, "-I" + os.path.join(INCLUDE, "Common"),
                     os.path.join(HERE, "engine_context_unit_test.cpp"), SOURCE, "-o", binary,
                 ],

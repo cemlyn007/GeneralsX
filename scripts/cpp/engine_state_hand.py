@@ -165,8 +165,8 @@ HAND = [
     (GLOBAL, "", "s_assetFallbackPath", "the install's asset fallback root, set once from the environment (PLAN-023 Phase 5 BootConfig)"),
     (GLOBAL, "", "re:s_thread|s_done|s_hasUpdate|s_latestTag", "update checker (menus), one per process"),
     (GLOBAL, "", "re:thread_id_map(_mutex)?|next_thread_id", "pthread-to-Win32 thread id map (CompatLib), process-wide by nature"),
-    (GLOBAL, "", "GameSpyColor", "the online chat colours: every engine's boot parses them (INI's OnlineChatColors block) with the install's values, the same for every engine; only the online menus read them"),
-    (GLOBAL, "", "NGMP_OnlineServicesManager::getInstance()::instance", "the process's GeneralsOnline session, logged into from the online menus of the one UI engine: with RTS_ENGINE_CONTEXT only a non-headless engine initialises it (GameEngine::init) or shuts it down (~GameEngine), so a headless engine never touches the session"),
+    (GLOBAL, "", "GameSpyColor", "the online chat colors: every engine's boot parses them (INI's OnlineChatColors block) with the install's values, the same for every engine; only the online menus read them"),
+    (GLOBAL, "", "NGMP_OnlineServicesManager::getInstance()::instance", "the process's GeneralsOnline session, logged into from the online menus of the one UI engine: with RTS_ENGINE_CONTEXT only a non-headless engine initializes it (GameEngine::init) or shuts it down (~GameEngine), so a headless engine never touches the session"),
     (GLOBAL, "", "re:theLobbyFilter|isThreadHosting|NET_CRC_INTERVAL|MIN_LOGIC_FRAMES|MAX_FRAMES_AHEAD|MIN_RUNAHEAD|FRAME_DATA_LENGTH|FRAMES_TO_KEEP|commandsReadyDebugSpewage", NET),
     # Not the whole of GameNetwork/: GameInfo.cpp (skirmish setup), LANGameInfo.cpp, GameMessageParser.cpp and
     # NetworkUtil.cpp are reached without a network, so their statics are classified by name.

@@ -92,7 +92,7 @@ static void testGetInitializeCleansUpWhenItThrows()
 	bool threw = false;
 	try
 	{
-		theThrowing.get([](Counter&) { throw std::runtime_error("initialiser"); });
+		theThrowing.get([](Counter&) { throw std::runtime_error("initializer"); });
 	}
 	catch (const std::runtime_error&)
 	{
