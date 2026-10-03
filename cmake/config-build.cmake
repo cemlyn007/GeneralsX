@@ -33,14 +33,24 @@ option(SAGE_USE_MOLTENVK "Use MoltenVK for Vulkan on macOS (Phase 5 macOS port)"
 # that is loaded via DYLD_INSERT_LIBRARIES (macOS) / LD_PRELOAD (Linux) at runtime.
 option(RTS_BUILD_OPTION_SAGE_PATCH "Build SagePatch QoL extras (macOS/Linux, requires SDL3)" ON)
 
-# GeneralsX @bugfix cemlyn007 03/10/2026 RTS_ENGINE_CONTEXT builds Zero Hour only (see its block below). Decided
-# here, before the game selection and the feature summary read these two options.
+# GeneralsX @bugfix cemlyn007 03/10/2026 RTS_ENGINE_CONTEXT builds Zero Hour only and no tools (see its block
+# below). Decided here, before the game selection, the option() calls for the per-game tools and the feature
+# summary read these options. The normal variables set here win over the later option() calls (CMP0077).
 if(RTS_ENGINE_CONTEXT)
     if(RTS_BUILD_GENERALS)
         message(STATUS "RTS_ENGINE_CONTEXT: not building Generals (its singletons are not guarded yet); Zero Hour only")
     endif()
+    if(NOT RTS_BUILD_ZEROHOUR)
+        message(STATUS "RTS_ENGINE_CONTEXT: building Zero Hour, the only game it supports")
+    endif()
+    message(STATUS "RTS_ENGINE_CONTEXT: tools and extras off (they do not enter an engine context)")
     set(RTS_BUILD_GENERALS OFF)
     set(RTS_BUILD_ZEROHOUR ON)
+    foreach(_rts_tools_option
+            RTS_BUILD_ZEROHOUR_TOOLS RTS_BUILD_ZEROHOUR_EXTRAS RTS_BUILD_GENERALS_TOOLS RTS_BUILD_GENERALS_EXTRAS
+            RTS_BUILD_CORE_TOOLS RTS_BUILD_CORE_EXTRAS)
+        set(${_rts_tools_option} OFF)
+    endforeach()
 endif()
 
 if(NOT RTS_BUILD_ZEROHOUR AND NOT RTS_BUILD_GENERALS)
@@ -184,14 +194,6 @@ if(RTS_ENGINE_CONTEXT)
     if(IS_VS6_BUILD)
         message(FATAL_ERROR "RTS_ENGINE_CONTEXT requires C++20 and cannot be used with VC6")
     endif()
-    foreach(_rts_tools_option
-            RTS_BUILD_ZEROHOUR_TOOLS RTS_BUILD_ZEROHOUR_EXTRAS RTS_BUILD_GENERALS_TOOLS RTS_BUILD_GENERALS_EXTRAS
-            RTS_BUILD_CORE_TOOLS RTS_BUILD_CORE_EXTRAS)
-        if(${_rts_tools_option})
-            message(STATUS "RTS_ENGINE_CONTEXT: ${_rts_tools_option} off (the tools do not enter an engine context)")
-            set(${_rts_tools_option} OFF)
-        endif()
-    endforeach()
     set(RTS_ENGINE_CONTEXT_HEADER "${CMAKE_CURRENT_LIST_DIR}/../Core/GameEngine/Include/Common/EngineContext.h")
     cmake_path(NORMAL_PATH RTS_ENGINE_CONTEXT_HEADER)
     target_compile_definitions(core_config INTERFACE RTS_ENGINE_CONTEXT=1)
