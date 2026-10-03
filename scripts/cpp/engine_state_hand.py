@@ -166,7 +166,13 @@ HAND = [
     (GLOBAL, "", "re:Return_Buffer|Temp_Buffer", "password encryption for the online login menu: " + NET),
     (GLOBAL, "", "re:TheLobbyQueuedUTMs.*", "GameSpy lobby menu queue (menu state; one UI engine per process)"),
     (GLOBAL, "", "re:CPUDetectClass::\\w+|Windows9xVersionTable", "CPU/OS detection, done once per process at static initialisation"),
-    (GLOBAL, "", "re:WideStringClass::m_\\w+|StringClass::(m_Mutex|m_NullChar|m_EmptyString|m_TempStrings|ReservedMask)", "WWLib string temp-buffer pool, guarded by its own mutex: process-wide by design"),
+    (GLOBAL, "", "re:WideStringClass::(m_NullChar|m_UsedTempStringCount|m_ResTempPtr)", "known unsynchronised race, not fixed here: the constructor writes the shared m_NullChar with no lock (widestring.h), Get_String reads m_UsedTempStringCount outside m_TempMutex (widestring.cpp), and Free_String scans every m_ResTempPtr[index] against m_Buffer before taking m_TempMutex, racing Get_String's and Free_String's own locked writes to the same slots (widestring.cpp); the threaded driver never calls Get_Wide_String or renders text on more than one thread, so TSan does not catch any of them, and the fix is deferred to the string-lock work (PLAN-023 Phase 5b, \"Known, not fixed here\")"),
+    (GLOBAL, "", "WideStringClass::m_EmptyString", "never written after static initialisation: every constructor and Get_String/Free_String path only reads it to recognise or restore the shared empty buffer (widestring.cpp)"),
+    (GLOBAL, "", "re:WideStringClass::(m_TempMutex|m_TempString[1-4]|m_FreeTempPtr)", "WWLib string temp-buffer pool, guarded by its own mutex: process-wide by design"),
+    (GLOBAL, "", "StringClass::m_NullChar", "never written at runtime: a zero-length, non-temporary StringClass is m_EmptyString, and every write path skips m_Buffer[0] when m_Buffer equals m_EmptyString (RT3 fix)"),
+    (GLOBAL, "", "StringClass::m_EmptyString", "never written after static initialisation: every constructor and write path only reads it to recognise or restore the shared empty buffer (wwstring.cpp)"),
+    (GLOBAL, "", "StringClass::ReservedMask", "std::atomic<unsigned>: the pre-lock check is a relaxed, lock-free early-out hint only, and the authoritative test-and-set still runs under m_Mutex (RT3 fix, found in review)"),
+    (GLOBAL, "", "re:StringClass::(m_Mutex|m_TempStrings)", "WWLib string temp-buffer pool, guarded by its own mutex: process-wide by design"),
     (GLOBAL, "", "re:generalAllocator|FastAllocatorGeneral::Alloc\\(unsigned int\\)::re_entrancy", "WWLib fast allocator, process-wide like malloc"),
     (GLOBAL, "", "re:AutoPoolClass<.*>::Allocator\\(\\)::allocator", "WWLib object pool per type, process-wide like malloc"),
     (GLOBAL, "", "re:RegistryClass::IsLocked|\\(anonymous namespace\\)::GetRegistryPaths\\(\\)::paths", "registry emulation (the process's settings files)"),
@@ -204,9 +210,15 @@ HAND = [
     # them: they are a PER_ENGINE_STATIC now (PLAN-023 Phase 5b, found by the TSan build), so gone from the
     # library; the slot index is rule:per-engine-static.
     (DEBUG, "", "re:_writeSingleParticleSystem\\(.*\\)::buff[1-4]|_reloadParticleSystemFromINI\\(.*\\)::linebuff|_getParticleSystemName\\(\\)::buff", "particle-editor writer/reader buffers (debug DLL)"),
-    (DEBUG, "", "ScriptEngine::getTeamNamed(AsciiString const&)::warnCount", "debug-message limiter"),
-    (DEBUG, "", "re:Object::setTriggerAreaFlagsForChangeInPosition\\(\\)::didWarn|PathfindCell::~PathfindCell\\(\\)::warn", "warn-once flag"),
-    (DEBUG, "", "re:s_totalOpen", "open-file counter for a debug assert"),
+    # ScriptEngine::getTeamNamed(AsciiString const&)::warnCount, Object::setTriggerAreaFlagsForChangeInPosition()::
+    # didWarn and PathfindCell::~PathfindCell()::warn were listed here as debug-only "warn-once" flags, but each
+    # is written on a release sim path by every engine's own thread (getTeamNamed's own script-evaluation thread,
+    # the object update that changes trigger-area membership, or the pathfinder freeing its cells): they are
+    # PER_ENGINE_STATICs now (02/10/2026, found in review), so gone from the library as function-local
+    # statics; the slot index is rule:per-engine-static (same treatment as the st_* hooks above). The same
+    # audit found LocalFile.cpp's s_totalOpen and ParticleBufferClass::TotalActiveCount had no reader (the
+    # former a commented-out DEBUG_LOG, the latter a getter with no caller) and no debug assert either, so
+    # both were deleted rather than reclassified; they are gone from the library too.
     (DEBUG, "", "re:DebugDisplay::printf\\(.*\\)::text", "debug display text buffer"),
     (DEBUG, "", "re:CommandTranslator::translateGameMessage\\(.*\\)::old\\w+", "debug-command toggles (MSG_META_DEMO_*)"),
     (DEBUG, "", "file:/WWDebug/", "WW memory log"),
@@ -254,7 +266,6 @@ HAND = [
     (RENDER, "", "re:_TempTransformedVertexBuffer|_TempClipFlagBuffer", "MeshModelClass::Shadow_Render scratch (the clip-flag buffer is unused)"),
     (RENDER, "", "re:ParticleBufferClass::Render_Line\\(RenderInfoClass&\\)::tmp_(points|diffuse|id)", "ParticleBufferClass::Render_Line scratch: draw only"),
     (DEBUG, "", "statistics_requested", "DX8 mesh-renderer statistics request (debug display)"),
-    (DEBUG, "", "ParticleBufferClass::TotalActiveCount", "particle-buffer statistics counter; its getter Get_Total_Active_Count has no caller"),
     (DEBUG, "", "RenderObjPersistFactoryClass::Load(ChunkLoadClass&) const::count", "warning limiters (two in the function)"),
     (CONST, "", "DX8TextureCategoryClass::m_gForceMultiply", "never written: SetForceMultiply has no caller"),
     (CONST, "", "MeshClass::Legacy_Meshes_Fogged", "never written"),
