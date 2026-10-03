@@ -59,6 +59,7 @@
 
 
 //-------------------------------------------------------------------------------------------------
+// GeneralsX @bugfix cemlyn007 03/10/2026 The non-copy constructors set m_portionToPlayNext and the owner id, which upstream left unset: a per-engine event must not depend on zero-fill (PLAN-023 Phase 4)
 AudioEventRTS::AudioEventRTS()
 									: m_eventName(AsciiString::TheEmptyString),
 										m_priority(AP_NORMAL),

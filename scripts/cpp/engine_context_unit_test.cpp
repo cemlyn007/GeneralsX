@@ -43,6 +43,7 @@ struct Counter
 
 rts::PerEngineStatic<Counter> theCounter;
 rts::PerEngineStatic<Counter> theOther;
+rts::PerEngineStatic<Counter> theThird;
 rts::PerEngineStatic<Counter> theThrowing;
 int theConstructorRuns = 0;
 rts::PerEngineStatic<Counter> theWithConstructorInitializer([](Counter& counter) {
@@ -150,16 +151,17 @@ static void testSlotsAreDestroyedNewestFirstWithTheContext()
 	{
 		rts::EngineContext context;
 		rts::Scope scope(&context);
-		// theOther's slot index is the higher one (defined second), so creating it first keeps creation
-		// order and descending index order apart.
+		// theCounter, theOther and theThird have ascending slot indices. Creating theOther, theThird, then
+		// theCounter matches neither ascending nor descending index order, so only newest-first passes.
 		theOther.get().value = 1;
-		theCounter.get().value = 2;
-		CHECK(theLiveCounters == before + 2);
+		theThird.get().value = 2;
+		theCounter.get().value = 3;
+		CHECK(theLiveCounters == before + 3);
 	}
 	CHECK(theLiveCounters == before);
-	CHECK(theDestroyed.size() == 2);
-	if (theDestroyed.size() == 2)
-		CHECK(theDestroyed[0] == 2 && theDestroyed[1] == 1);
+	CHECK(theDestroyed.size() == 3);
+	if (theDestroyed.size() == 3)
+		CHECK(theDestroyed[0] == 3 && theDestroyed[1] == 2 && theDestroyed[2] == 1);
 }
 
 int main()
