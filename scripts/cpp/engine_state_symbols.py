@@ -967,16 +967,31 @@ def _has_unsafe_operator(expr):
     return False
 
 
+def _is_writable_name(name, writable_names):
+    """True when `name` (an identifier with no leading `&`, bare or `::`-scoped) cannot be proven free of
+    per-engine state: it is exactly a writable symbol's own key, or it is the bare, unqualified form a
+    reference inside that symbol's own scope would use. `writable_names` (`_writable_global_names`'s
+    result) already holds both forms for every writable key, including a function-local static's
+    `func(args)::name` key and a class or anonymous-namespace static's `Scope::name` key, so a single
+    membership test on `name` itself catches a qualified reference (`View::m_idNext`), the bare reference
+    an unqualified use inside that same scope would spell (`m_idNext`), and a top-level global either
+    way."""
+    return name in writable_names
+
+
 def _is_safe_value_expr(expr, type_name, writable_names):
     """True when `expr` (a whole by-value initialiser, or one brace-list element / call argument of one)
     is provably a pure value: a literal, an ALL_CAPS named constant or enumerator that is not itself a
     writable symbol, `true`/`false`/`nullptr`, a cast of another pure value, a call to an allow-listed pure
     value constructor or to the declared type's own name (each of its arguments checked the same way,
-    except a lower-case-led function name, bare, `&`-taken or scoped, is accepted as a direct argument of
-    the type's own constructor only when it does not itself name a writable symbol: a function-pointer
-    field, such as StateConditionInfo's callback members, not a functional-style cast of a per-engine
-    variable), or a `{...}` list of pure values. `writable_names` is `_writable_global_names`'s result: every
-    name this initialiser must not be allowed to read, however it is spelled."""
+    except that the call's first argument is additionally accepted, when the callee is the declared type's
+    own name, as a lower-case-led function name (bare, `&`-taken or scoped) that does not itself name a
+    writable symbol: a function-pointer field in the type's own constructor, such as StateConditionInfo's
+    `test` callback, never a functional-style cast of a per-engine variable, and never a later argument,
+    such as StateConditionInfo's own `void* userData`, which this codebase never fills from a function
+    name but could fill from an arbitrary per-engine value), or a `{...}` list of pure values.
+    `writable_names` is `_writable_global_names`'s result: every name this initialiser must not be allowed
+    to read, qualified or bare."""
     expr = expr.strip()
     if not expr:
         return True
@@ -985,7 +1000,7 @@ def _is_safe_value_expr(expr, type_name, writable_names):
     if LITERAL_RE.match(expr) or expr in ("true", "false", "nullptr", "NULL"):
         return True
     if ALL_CAPS_RE.match(expr) and expr.rsplit("::", 1)[-1].isupper():
-        return expr not in writable_names and expr.rsplit("::", 1)[-1] not in writable_names
+        return not _is_writable_name(expr, writable_names)
     m = _STATIC_CAST_RE.match(expr)
     if m:
         return _is_safe_value_expr(m.group("rest"), type_name, writable_names)
@@ -1016,13 +1031,18 @@ def _is_safe_value_expr(expr, type_name, writable_names):
         return all(
             _is_safe_value_expr(a, type_name, writable_names)
             or (
-                call.group(1) == type_name
+                # Only the first argument may be a function-pointer field (StateConditionInfo's `test`):
+                # every other position is a plain value (StateConditionInfo's own `toStateID`/`userData`),
+                # so letting any lower-case-led, non-writable identifier through in a later position would
+                # also accept a per-engine value threaded through as a constructor argument, not a
+                # callback.
+                i == 0
+                and call.group(1) == type_name
                 and FUNC_PTR_ARG_RE.match(a)
                 and a.lstrip("&").rsplit("::", 1)[-1][:1].islower()
-                and a.lstrip("&") not in writable_names
-                and a.lstrip("&").rsplit("::", 1)[-1] not in writable_names
+                and not _is_writable_name(a.lstrip("&"), writable_names)
             )
-            for a in args
+            for i, a in enumerate(args)
         )
     return False
 
@@ -1032,24 +1052,34 @@ _writable_names_cache = {}
 
 def _writable_global_names(symbols):
     """Every writable symbol's own key (a global, namespaced global or function-local static, in
-    `.bss`/`.data`/`.tbss`/`.tdata`): every name a by-value const's initialiser must not be allowed to
-    read, however it is spelled. This codebase is not consistent about reserving ALL_CAPS for named
-    constants (REPLAY_CRC_INTERVAL, NET_CRC_INTERVAL and MIN_RUNAHEAD are all writable globals) or about
-    camelCase always meaning a function (a function-pointer argument's own exemption, read literally, also
-    accepts a functional-style cast of a plain variable such as `UnsignedInt(startTime)`), so this rule's
-    by-value allow-list checks every name it would otherwise accept against this set. Matching is by exact
-    key, with no scope resolution: a textual rule has no way to tell, from the initialiser text alone,
-    which of several same-named symbols in different scopes it means, so an unrelated same-named local is
-    (harmlessly) excluded too. `symbols` may be `None` or empty (a direct unit test of the expression
-    checker, which classifies no library): that never counts as a writable name, so it only narrows what a
-    test must supply to exercise this check, never what production code (which always classifies from a
-    real symbol table) accepts."""
+    `.bss`/`.data`/`.tbss`/`.tdata`), together with that key's own bare, unqualified last `::` segment: the
+    set of names a by-value const's initialiser must not be allowed to read, qualified or bare. The bare
+    form matters because a function-local static's key is scoped as `func(args)::name` (source text can
+    never spell that scope back), and a class or anonymous-namespace static is routinely referenced
+    unqualified from inside its own scope, so a reference naming only the final segment is at least as
+    common as one naming the full key. This codebase is also not consistent about reserving ALL_CAPS for
+    named constants (REPLAY_CRC_INTERVAL, NET_CRC_INTERVAL and MIN_RUNAHEAD are all writable globals) or
+    about camelCase always meaning a function (a function-pointer argument's own exemption, read literally,
+    also accepts a functional-style cast of a plain variable such as `UnsignedInt(startTime)`), so this
+    rule's by-value allow-list checks every name it would otherwise accept against this set. Matching an
+    unqualified name is still by bare key only, with no scope resolution: a textual rule has no way to
+    tell, from the initialiser text alone, which of several same-named symbols in different scopes it
+    means, so an unrelated same-named local is (harmlessly) excluded too, as is a same-named object-like
+    macro (this rule has no macro table to consult). `symbols` may be `None` or empty (a direct unit test
+    of the expression checker, which classifies no library): that never counts as a writable name, so it
+    only narrows what a test must supply to exercise this check, never what production code (which always
+    classifies from a real symbol table) accepts."""
     if not symbols:
         return frozenset()
     cached = _writable_names_cache.get(id(symbols))
     if cached is not None and cached[0] == len(symbols):
         return cached[1]
-    names = frozenset(key for key, sym in symbols.items() if sym.sections & WRITABLE_SECTIONS)
+    names = set()
+    for key, sym in symbols.items():
+        if sym.sections & WRITABLE_SECTIONS:
+            names.add(key)
+            names.add(key.rsplit("::", 1)[-1])
+    names = frozenset(names)
     _writable_names_cache[id(symbols)] = (len(symbols), names)
     return names
 

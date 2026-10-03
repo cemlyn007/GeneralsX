@@ -251,11 +251,22 @@ class RuleConstObjectTest(unittest.TestCase):
     def test_by_value_const_initialized_from_its_own_constructor_with_a_function_pointer_argument_is_safe(
         self,
     ):
-        # The StateConditionInfo shape: a bare lower-case identifier is accepted only as a direct argument
-        # of the declared type's own constructor (a function-pointer field), never as a read on its own.
+        # The StateConditionInfo shape (test, toStateID, userData): a bare lower-case identifier is
+        # accepted only as the constructor's first argument (a function-pointer field), never as a read on
+        # its own.
         self.assert_const(
-            "static const StateConditionInfo s_info = StateConditionInfo(isConditionTrue, someLowerFunc);",
+            "static const StateConditionInfo s_info = StateConditionInfo(isConditionTrue, MY_STATE, nullptr);",
             True,
+        )
+
+    def test_by_value_const_initialized_from_a_lowercase_identifier_in_a_later_argument_is_not_safe(self):
+        # The exemption covers only the constructor's first (function-pointer) argument: a bare lower-case
+        # identifier in a later position (StateConditionInfo's own `void* userData`) is a plain value, not
+        # a callback, and this codebase never fills it from a function name, only from nullptr or a cast
+        # constant; a per-engine object pointer threaded through this position must not be waved through.
+        self.assert_const(
+            "static const StateConditionInfo s_info = StateConditionInfo(isConditionTrue, MY_STATE, obj);",
+            False,
         )
 
     def test_by_value_const_initialized_from_a_bare_lowercase_identifier_is_not_safe(self):
@@ -358,6 +369,37 @@ class RuleConstObjectTest(unittest.TestCase):
         # Without a symbol table saying otherwise, a lower-case-led argument of the declared type's own
         # constructor is still accepted as a callback field (the StateConditionInfo shape).
         self.assert_const("static const Coord3D c = Coord3D(s_lastX, 0.0f, 0.0f);", True)
+
+    def test_by_value_const_initialized_from_a_scoped_writable_global_is_not_safe(self):
+        # The writable key itself is `::`-scoped (a namespaced global, not a top-level one): the exact-key
+        # match must still catch a reference that spells the same scope.
+        writable = {"View::m_idNext": make_symbol("View::m_idNext", [], sections={".bss"})}
+        self.assert_const(
+            "static const UnsignedInt s_firstId = UnsignedInt(View::m_idNext);", False, symbols=writable
+        )
+
+    def test_by_value_const_initialized_from_an_unqualified_reference_to_a_scoped_writable_global_is_not_safe(
+        self,
+    ):
+        # A class or anonymous-namespace static is routinely referenced unqualified from inside its own
+        # scope: the initialiser text has no way to spell the writable key's own scope back, so the bare,
+        # unqualified name must be rejected too, not just the fully qualified form.
+        writable = {"View::m_idNext": make_symbol("View::m_idNext", [], sections={".bss"})}
+        self.assert_const(
+            "static const UnsignedInt s_firstId = UnsignedInt(m_idNext);", False, symbols=writable
+        )
+
+    def test_by_value_const_initialized_from_an_unqualified_reference_to_a_writable_function_local_static_is_not_safe(
+        self,
+    ):
+        # A function-local static's writable key is scoped as `func(args)::name`: source code can never
+        # spell that scope back, so only the bare, unqualified name can ever match it.
+        writable = {
+            "Shell::update()::lastUpdate": make_symbol("Shell::update()::lastUpdate", [], sections={".bss"})
+        }
+        self.assert_const(
+            "static const UnsignedInt s_start = UnsignedInt(lastUpdate);", False, symbols=writable
+        )
 
 
 class RuleNamekeyTest(unittest.TestCase):
