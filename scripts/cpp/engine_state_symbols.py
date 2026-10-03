@@ -915,7 +915,6 @@ _STATIC_CAST_RE = re.compile(
 FUNC_PTR_ARG_RE = re.compile(r"^&?[A-Za-z_]\w*(?:::[A-Za-z_]\w*)*$")
 
 
-
 def _declared_type_name(decl):
     """The declared type's own bare name (`WaypointMap` from `static const WaypointMap s_emptyWaypoints`):
     the declaration's last identifier is the variable being declared, so the one before it is its type."""

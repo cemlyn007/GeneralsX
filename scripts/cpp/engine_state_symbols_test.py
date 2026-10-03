@@ -40,17 +40,21 @@ class RuleConstObjectTest(unittest.TestCase):
         self.assert_const("static const int x = 5;", True)
 
     def test_const_pointer_to_single_word_type_is_not_safe(self):
-        # A pointer-to-const (the pointer itself is reassignable) is never a const *object*.
-        self.assert_const("static const unsigned int* p", False)
+        # A pointer-to-const (the pointer itself is reassignable) is never a const *object*. The trailing
+        # `;` matters here: without one this declaration would be rejected outright by the "must end in
+        # `;`" guard before ever reaching the pointer-declarator check this test means to exercise; the
+        # `= nullptr` initialiser (itself always safe) keeps that declarator check, not the initialiser
+        # check, the sole reason this stays unsafe.
+        self.assert_const("static const unsigned int* p = nullptr;", False)
 
     def test_const_pointer_to_qualified_type_is_not_safe(self):
-        self.assert_const("static const Foo::Bar* p", False)
+        self.assert_const("static const Foo::Bar* p = nullptr;", False)
 
     def test_const_pointer_to_template_type_is_not_safe(self):
-        self.assert_const("static const std::vector<int>* p", False)
+        self.assert_const("static const std::vector<int>* p = nullptr;", False)
 
     def test_const_pointer_to_struct_is_not_safe(self):
-        self.assert_const("static const struct Foo* p", False)
+        self.assert_const("static const struct Foo* p = nullptr;", False)
 
     def test_const_pointer_to_char_is_not_safe(self):
         # `const char*` is a mutable pointer variable, whatever the pointee; not `* const`.
@@ -125,14 +129,17 @@ class RuleConstObjectTest(unittest.TestCase):
     def test_by_value_const_with_initializer_on_a_later_source_line_is_not_safe(self):
         # The recorded declaration is one source line; when the initialiser starts on the next one, the
         # line this rule sees ends at a bare `=` and must not be read as having no (so trivially safe)
-        # initialiser at all.
-        self.assert_const("static const Int pick =", False)
+        # initialiser at all. The trailing `;` here closes the *statement* this probe stands in for (its
+        # own initialiser is still on the next line, past what `d` holds): without it, the declaration
+        # would be rejected by the "must end in `;`" guard before reaching `_split_initializer` at all,
+        # the same guard `test_split_initializer_*` below exercises directly on the unterminated text.
+        self.assert_const("static const Int pick =;", False)
 
     def test_by_value_const_with_unclosed_direct_initializer_is_not_safe(self):
-        self.assert_const("static const Int pick(GameLogicRandomValue(0, 3)", False)
+        self.assert_const("static const Int pick(GameLogicRandomValue(0, 3);", False)
 
     def test_by_value_const_with_unclosed_brace_initializer_is_not_safe(self):
-        self.assert_const("static const Real r{TheGlobalData->m_maxCameraHeight", False)
+        self.assert_const("static const Real r{TheGlobalData->m_maxCameraHeight;", False)
 
     def test_by_value_const_with_no_initializer_is_still_safe(self):
         # A default-constructed const (no `=`, `(` or `{` at all) has no initialiser to distrust.
@@ -141,9 +148,30 @@ class RuleConstObjectTest(unittest.TestCase):
     def test_every_tu_must_qualify(self):
         sym = make_symbol(
             "s",
-            ["static const int x = 1;", "static const Foo::Bar* p"],
+            ["static const int x = 1;", "static const Foo::Bar* p = nullptr;"],
         )
         self.assertIsNone(m.rule_const_object(sym))
+
+    def test_split_initializer_returns_none_for_a_bare_trailing_equals(self):
+        # Independent of the `;` guard in `rule_const_object` (see the tests above, which must append a
+        # `;` to reach this code at all): the initialiser boundary scan itself must fail closed, not read
+        # a bare `=` at the end of the recorded text as "no initialiser" (a trivially safe, default
+        # construction).
+        self.assertEqual(m._split_initializer("static const Int pick ="), ("static const Int pick", None))
+
+    def test_split_initializer_returns_none_for_an_unclosed_direct_initializer(self):
+        self.assertIsNone(m._split_initializer("static const Int pick(GameLogicRandomValue(0, 3)")[1])
+
+    def test_split_initializer_returns_none_for_an_unclosed_brace_initializer(self):
+        self.assertIsNone(m._split_initializer("static const Real r{TheGlobalData->m_maxCameraHeight")[1])
+
+    def test_split_initializer_returns_none_for_an_unclosed_array_bound(self):
+        self.assertIsNone(m._split_initializer("static const Int s_t[1 << 4")[1])
+
+    def test_split_initializer_returns_none_for_an_unbalanced_copy_initializer(self):
+        # The recorded text ran out mid-expression (an unclosed `{` after the `=`): not a complete,
+        # literal-looking initialiser.
+        self.assertIsNone(m._split_initializer("static const Int s_t[4] = { 1, 2")[1])
 
     def test_array_with_a_call_bound_reading_a_global_pointer_is_not_safe(self):
         # The bound's own `(...)` (ARRAY_SIZE(x)) must never be mistaken for the real `= {...}` initialiser
