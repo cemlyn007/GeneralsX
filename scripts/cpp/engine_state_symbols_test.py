@@ -194,8 +194,9 @@ class RuleConstObjectTest(unittest.TestCase):
     def test_by_value_const_cast_of_a_reviewed_value_to_an_unreviewed_declared_type_is_not_safe(self):
         # `(Int)5` casts to a reviewed-pure target, so `_cast_target_is_safe` and the recursive
         # `_is_safe_value_expr` check on the operand both pass it. The result still copy-initialises the
-        # unreviewed declared type `Lit`, which only the declared-type gate above catches: this is the one
-        # shape that gate alone guards, since the cast-target check never sees the unreviewed type.
+        # unreviewed declared type `Lit`, which only the declared-type gate above catches: like
+        # copy-initialisation from a literal (the test above), this shape never shows the unreviewed type
+        # to any check but the gate, since the cast-target check only sees `Int`.
         self.assert_const('static const Lit c = (Int)5;', False)
 
     def test_by_value_const_initialized_from_an_unreviewed_template_id_is_not_safe(self):
