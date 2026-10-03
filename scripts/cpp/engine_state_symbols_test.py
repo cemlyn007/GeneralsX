@@ -78,11 +78,25 @@ class RuleConstObjectTest(unittest.TestCase):
     def test_reseatable_pointer_with_literal_initializer_is_not_safe(self):
         self.assert_const("static Foo* p = nullptr;", False)
 
+    def test_const_pointer_initialized_from_nullptr_is_safe(self):
+        self.assert_const("static Foo* const p = nullptr;", True)
+
+    def test_const_pointer_initialized_from_null_is_safe(self):
+        self.assert_const("static Foo* const p = NULL;", True)
+
+    def test_const_pointer_initialized_from_a_cast_null_literal_is_safe(self):
+        self.assert_const("static Foo* const p = (Foo*)0;", True)
+
+    def test_const_pointer_to_char_initialized_from_a_string_literal_is_safe(self):
+        self.assert_const('static const char* const s = "x";', True)
+
     def test_const_pointer_with_address_of_a_name_the_symbol_table_does_not_list_is_not_safe(self):
         # `&name`'s safety used to depend on what `name` is (rejected only for a writable symbol or an
-        # engine-singleton macro); taking a reseatable pointer's address off that allow-list means a
-        # per-engine member, local or context-scoped macro the symbol table has no entry for is no longer
-        # waved through just because it is absent from `writable_names`.
+        # engine-singleton macro); a `T* const` pointer initialised with `&name` is now rejected whatever
+        # `name` is, since a per-engine member, local or context-scoped macro the symbol table has no entry
+        # for is no longer waved through just because it is absent from `writable_names`. The pointer's own
+        # address was never on the allow-list (see the positive cases above): what moved off it is `&name`,
+        # the address-of initialiser.
         self.assert_const("static Foo* const p = &kDefault;", False)
 
     def test_const_pointer_with_address_of_an_engine_singleton_is_not_safe(self):
@@ -432,10 +446,25 @@ class RuleConstObjectTest(unittest.TestCase):
 
     def test_by_value_const_initialized_from_a_functional_cast_of_an_unknown_name_is_still_safe(self):
         # With no `is_function_name` lookup supplied at all (a direct unit test of this checker, never how
-        # `classify` calls it), a lower-case-led argument of the declared type's own constructor is still
-        # accepted as a callback field (the StateConditionInfo shape): see the fail-closed cases below for
-        # what happens once a real lookup is supplied and says the name is not a function.
-        self.assert_const("static const Coord3D c = Coord3D(s_lastX, 0.0f, 0.0f);", True)
+        # `classify` calls it), a lower-case-led first argument of a `StateConditionInfo` initialiser is
+        # still accepted as a callback field: see the fail-closed cases below for what happens once a real
+        # lookup is supplied and says the name is not a function.
+        self.assert_const(
+            "static const StateConditionInfo s_info = StateConditionInfo(unknownName, MY_STATE, nullptr);",
+            True,
+        )
+
+    def test_by_value_const_initialized_from_a_functional_cast_of_an_unknown_name_on_another_type_is_not_safe(
+        self,
+    ):
+        # The function-pointer-argument exemption is restricted to `StateConditionInfo`, the only type in
+        # this codebase whose constructor ever takes a callback: every other type's own-constructor call
+        # (`Coord3D`, `Real`, `AsciiString`, ...) never gets it, with or without a real `is_function_name`
+        # lookup, because `is_function_name` is a tree-wide, scope-blind text search (see its own
+        # docstring) that cannot tell a real callback apart from an unrelated same-named function, member
+        # or parameter elsewhere in the tree; restricting the exemption to the one type that can actually
+        # use it closes that gap without needing scope information `is_function_name` cannot provide.
+        self.assert_const("static const Coord3D c = Coord3D(s_lastX, 0.0f, 0.0f);", False)
 
     def test_by_value_const_initialized_from_a_scoped_writable_global_is_not_safe(self):
         # The writable key itself is `::`-scoped (a namespaced global, not a top-level one): the exact-key
@@ -511,6 +540,19 @@ class RuleConstObjectTest(unittest.TestCase):
             "static const AsciiString s_name = AsciiString(g_mapBuffer);",
             False,
             is_function_name=lambda name: False,
+        )
+
+    def test_by_value_const_initialized_from_a_name_that_collides_with_an_unrelated_function_is_not_safe(
+        self,
+    ):
+        # `is_function_name` is a tree-wide, scope-blind text search: it reports True for any name defined
+        # as a function ANYWHERE in the tree, including one that collides with this declaration's own
+        # member/parameter/local of the same name (`value`, `scale`, `width`, ... each collide with a real
+        # function somewhere in the real engine tree). Even a lookup that says "yes, this is a function"
+        # must not accept the exemption on a type other than StateConditionInfo, since no other type's
+        # constructor ever has a function-pointer field to fill.
+        self.assert_const(
+            "static const Real s_v = Real(value);", False, is_function_name=lambda name: True
         )
 
     def test_by_value_const_initialized_from_its_own_constructor_with_a_real_function_argument_is_safe(
@@ -1110,6 +1152,27 @@ class SourceIndexIsFunctionNameTest(unittest.TestCase):
             "};\n",
         )
         self.assertFalse(self.index().is_function_name("y"))
+
+    def test_an_initializer_list_entry_separated_from_the_previous_one_by_a_preprocessor_line_is_not_a_function(
+        self,
+    ):
+        # Template::Template() in Scripts.cpp: m_uiName(...) follows a bare #endif with no code between,
+        # so the bare `,` that actually precedes it (from m_numParameters(0),) is not the character
+        # immediately before `m_uiName` in the text; the directive line must be skipped, not mistaken for
+        # the real prefix, or this is read as a definition the same way the production bug was.
+        self.write(
+            "scripts.cpp",
+            "Template::Template() :\n"
+            "m_numUiStrings(0),\n"
+            "m_numParameters(0),\n"
+            "#ifdef COUNT_SCRIPT_USAGE\n"
+            "m_numTimesUsed(0),\n"
+            "#endif\n"
+            'm_uiName("UNUSED/(placeholder)/placeholder")\n'
+            "{\n"
+            "}\n",
+        )
+        self.assertFalse(self.index().is_function_name("m_uiName"))
 
     def test_a_call_inside_an_if_condition_is_not_a_function_even_nested_in_a_larger_expression(self):
         self.write(

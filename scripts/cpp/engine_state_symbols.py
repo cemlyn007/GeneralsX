@@ -333,6 +333,12 @@ PP_IF_RE = re.compile(r"^[ \t]*#\s*(?:if|ifdef|ifndef)\b", re.M)
 PP_ELSE_RE = re.compile(r"^[ \t]*#\s*(?:elif|else)\b", re.M)
 PP_ENDIF_RE = re.compile(r"^[ \t]*#\s*endif\b", re.M)
 
+# One of the above, but anchored to the END of whatever text it is searched in: used to look past a
+# conditional line sitting between a member-initialiser-list entry and the next one (`Template::Template()`
+# in Scripts.cpp, whose `m_uiName(...)` follows a bare `#endif` with no code between), so that line is not
+# mistaken for the code that actually precedes a name.
+PP_DIRECTIVE_TAIL_RE = re.compile(r"(?:^|\n)[ \t]*#\s*(?:if|ifdef|ifndef|elif|else|endif)\b[^\n]*\Z", re.M)
+
 # A macro definition's own name, and (group 2) whichever single character immediately follows it: `(` with
 # no space before it means a function-like macro (`#define FOO(x) ...`), anything else (a space, a tab, or
 # nothing at all before the line ends) means an object-like one (`#define FOO x`, `#define FOO`), per the C
@@ -451,14 +457,23 @@ class SourceIndex:
         `name`'s matching `)` this way means a real definition's own `{` must follow immediately (past
         `const`), while a condition's call is instead followed by the condition's own closing `)` and a
         member-initialiser's by `,` or the initialiser list's next entry, never the body's `{` directly.
-        What immediately precedes `name`, past any `Class::` prefix, tells apart the two remaining shapes: a
-        member-initialiser entry or a later constructor argument is always preceded there by a bare `:`
-        (not `::`) or a `,`, where a real definition's return type, scope qualifier or (for a destructor)
-        `~` never is. A match right after one of those, or whose own closing `)` is not immediately
-        followed by `{`, is skipped, not treated as a definition; scanning continues over the rest of that
-        file and the tree for a later, real one. A name whose only definition lives outside `SCAN_ROOTS`/
-        `SKIP_DIRS`, or that this shape does not match at all, is not found: that fails closed (rejected as
-        not provably a function), never the reverse."""
+        What immediately precedes `name`, past any `Class::` prefix and past any `#if`/`#ifdef`/`#ifndef`/
+        `#elif`/`#else`/`#endif` line sitting there with no code of its own (an initialiser list can
+        straddle one of these, as `Template::Template()` in Scripts.cpp does around `m_uiName`, with no
+        comma or colon literally adjacent to `name` once the directive line is between), tells apart the two
+        remaining shapes: a member-initialiser entry or a later constructor argument is always preceded
+        there by a bare `:` (not `::`) or a `,`, where a real definition's return type, scope qualifier or
+        (for a destructor) `~` never is. A match right after one of those, or whose own closing `)` is not
+        immediately followed by `{`, is skipped, not treated as a definition; scanning continues over the
+        rest of that file and the tree for a later, real one. A name whose only definition lives outside
+        `SCAN_ROOTS`/`SKIP_DIRS`, or that this shape does not match at all, is not found: that fails closed
+        (rejected as not provably a function), never the reverse. This is still a tree-wide, scope-blind
+        search: it has no notion of which function a particular call site can actually reach, so it also
+        returns True for a name that is a real function somewhere in the tree but, at the call site being
+        checked, is actually an unrelated member, parameter or local of the same name (`value`, `scale`,
+        `width`, ... each collide with some real function in this codebase). `_is_safe_value_expr` does not
+        rely on this function alone to rule that out; it also restricts the call site this function's
+        answer can affect to the one type that ever actually has a function-pointer field."""
         cached = self._is_function_cache.get(name)
         if cached is not None:
             return cached
@@ -473,6 +488,14 @@ class SourceIndex:
                     # larger call or condition (`if (... name(x) ...)  {`), not as a definition.
                     continue
                 prefix = text[: mo.start()].rstrip()
+                while True:
+                    pm = PP_DIRECTIVE_TAIL_RE.search(prefix)
+                    if not pm:
+                        break
+                    # A conditional line with no code of its own between the previous initialiser-list
+                    # entry (or the member list's opening `:`) and this one: skip past it so the check
+                    # below sees the `,`/`:` that is actually there, not the directive's own last character.
+                    prefix = prefix[: pm.start()].rstrip()
                 if prefix and (prefix[-1] in ",(" or (prefix[-1] == ":" and not prefix.endswith("::"))):
                     # A member-initialiser-list entry or a later constructor argument: never a definition.
                     continue
@@ -1070,26 +1093,31 @@ def _is_safe_value_expr(expr, type_name, writable_names, is_function_name=None):
     is provably a pure value: a literal, an ALL_CAPS named constant or enumerator that is neither itself a
     writable symbol nor an object-like macro (see below), `true`/`false`/`nullptr`, a cast of another pure
     value, a call to an allow-listed pure value constructor or to the declared type's own name (each of its
-    arguments checked the same way, except that the call's first argument is additionally accepted, when
-    the callee is the declared type's own name, as a lower-case-led function name (bare, `&`-taken or
-    scoped) that `is_function_name` (when given) confirms is actually defined as a function somewhere in
-    the scanned tree, and that does not itself name a writable symbol: a function-pointer field in the
-    type's own constructor, such as StateConditionInfo's `test` callback, never a functional-style cast of
-    a per-engine variable (this codebase passes every one of these callbacks by bare, unqualified or
-    `Class::`-qualified name, never by `&`, so FUNC_PTR_ARG_RE's shape alone cannot tell a callback from a
-    same-shaped variable read: only `is_function_name`, a real lookup against the source tree, can), and
-    never a later argument, such as StateConditionInfo's own `void* userData`, which this codebase never
-    fills from a function name but could fill from an arbitrary per-engine value), or a `{...}` list of
-    pure values. `writable_names` is `_writable_global_names`'s result: every name this initialiser must
-    not be allowed to read, qualified or bare. `is_function_name` is `None` only for a direct unit test of
-    this checker in isolation (no source tree to check against: the function-pointer-argument exemption
-    then stays as permissive as the bare FUNC_PTR_ARG_RE/lower-case shape allows, and the ALL_CAPS branch
-    cannot see an object-like macro either, which only narrows what such a test must supply, never what
-    production code accepts); `classify` always supplies `FunctionLookup(index)`, a callable wrapping
-    `SourceIndex` that is also used for the macro check, so both exemptions are fail-closed there: a name
-    that is not provably a function (a member, a parameter, or a per-engine variable the symbol table
-    happens to miss) is rejected, not assumed to be a callback, and an ALL_CAPS name that is defined as an
-    object-like macro is rejected too, not assumed to be a named constant, however its expansion reads."""
+    arguments checked the same way, except that, when the declared type is `StateConditionInfo` (the only
+    type in this codebase whose constructor ever takes a function-pointer field) and the callee is that
+    same name, the call's first argument is additionally accepted as a lower-case-led function name (bare,
+    `&`-taken or scoped) that `is_function_name` (when given) confirms is actually defined as a function
+    somewhere in the scanned tree, and that does not itself name a writable symbol: a function-pointer
+    field in the type's own constructor (StateConditionInfo's `test` callback), never a functional-style
+    cast of a per-engine variable (this codebase passes every one of these callbacks by bare, unqualified
+    or `Class::`-qualified name, never by `&`, so FUNC_PTR_ARG_RE's shape alone cannot tell a callback from
+    a same-shaped variable read: only `is_function_name`, a real lookup against the source tree, can; and
+    that lookup is a tree-wide, scope-blind text search, so it alone cannot tell a real callback from an
+    unrelated same-named function elsewhere in the tree either, which is why the exemption is also
+    restricted to the one type that is ever actually a function-pointer field), and never a later argument,
+    such as StateConditionInfo's own `void* userData`, which this codebase never fills from a function name
+    but could fill from an arbitrary per-engine value), or a `{...}` list of pure values. `writable_names`
+    is `_writable_global_names`'s result: every name this initialiser must not be allowed to read,
+    qualified or bare. `is_function_name` is `None` only for a direct unit test of this checker in
+    isolation (no source tree to check against: the function-pointer-argument exemption then stays as
+    permissive as the bare FUNC_PTR_ARG_RE/lower-case shape allows on a StateConditionInfo declaration, and
+    the ALL_CAPS branch cannot see an object-like macro either, which only narrows what such a test must
+    supply, never what production code accepts); `load_library` always supplies `classify` with
+    `FunctionLookup(index)`, a callable wrapping `SourceIndex` that is also used for the macro check, so
+    both exemptions are fail-closed there: a name that is not provably a function (a member, a parameter,
+    or a per-engine variable the symbol table happens to miss) is rejected, not assumed to be a callback,
+    and an ALL_CAPS name that is defined as an object-like macro is rejected too, not assumed to be a named
+    constant, however its expansion reads."""
     expr = expr.strip()
     if not expr:
         return True
@@ -1137,12 +1165,18 @@ def _is_safe_value_expr(expr, type_name, writable_names, is_function_name=None):
         return all(
             _is_safe_value_expr(a, type_name, writable_names, is_function_name)
             or (
-                # Only the first argument may be a function-pointer field (StateConditionInfo's `test`):
-                # every other position is a plain value (StateConditionInfo's own `toStateID`/`userData`),
-                # so letting any lower-case-led, non-writable identifier through in a later position would
-                # also accept a per-engine value threaded through as a constructor argument, not a
-                # callback.
+                # Only the first argument may be a function-pointer field, and only StateConditionInfo
+                # actually has one (`test`): every other type that reaches this branch (`Real`, `AsciiString`,
+                # ...) takes no callback at all, so a same-shaped lower-case-led identifier there is always a
+                # value, never a function, whatever `is_function_name` (a tree-wide, scope-blind text search:
+                # see its own docstring) says about some unrelated same-named function elsewhere in the tree.
+                # Restricting this branch to the one type that is ever actually a function-pointer field
+                # closes that gap without needing `is_function_name` to prove scope, which it cannot.
+                # StateConditionInfo's own later positions (`toStateID`/`userData`) are plain values too, so
+                # letting any lower-case-led, non-writable identifier through there would also accept a
+                # per-engine value threaded through as a constructor argument, not a callback.
                 i == 0
+                and type_name == "StateConditionInfo"
                 and call.group(1) == type_name
                 and FUNC_PTR_ARG_RE.match(a)
                 and a.lstrip("&").rsplit("::", 1)[-1][:1].islower()
