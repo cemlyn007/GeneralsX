@@ -469,6 +469,20 @@ class RuleConstObjectTest(unittest.TestCase):
         # the second table's: nothing about the second call may leak into the first table's result.
         self.assertEqual(m._writable_global_names(first), frozenset({"REPLAY_CRC_INTERVAL"}))
 
+    def test_writable_global_names_is_not_fooled_by_a_colliding_object_id(self):
+        # Keeping `first` alive while querying `second` (as the test above does) never exercises an
+        # id()-keyed cache's own defect: two live objects never share an id(), so such a cache could not
+        # confuse them even if one were reintroduced. This instead patches `id` itself to force the
+        # collision an allocator reusing a freed table's address would produce, which is exactly what an
+        # id()-keyed cache (keyed on `id(symbols)`, staleness-checked only by `len(symbols)`) had no other
+        # guard against: this fails against that cache (a same-length `second` gets `first`'s answer back)
+        # and passes now only because `_writable_global_names` no longer calls `id` at all.
+        first = {"REPLAY_CRC_INTERVAL": make_symbol("REPLAY_CRC_INTERVAL", [], sections={".data"})}
+        second = {"startTime": make_symbol("startTime", [], sections={".bss"})}
+        with mock.patch.object(m, "id", lambda obj: 0, create=True):
+            self.assertEqual(m._writable_global_names(first), frozenset({"REPLAY_CRC_INTERVAL"}))
+            self.assertEqual(m._writable_global_names(second), frozenset({"startTime"}))
+
     def test_by_value_const_initialized_from_an_unqualified_reference_to_a_writable_function_local_static_is_not_safe(
         self,
     ):
@@ -484,11 +498,12 @@ class RuleConstObjectTest(unittest.TestCase):
     def test_by_value_const_initialized_from_a_functional_cast_of_a_name_not_known_to_be_a_function_is_not_safe(
         self,
     ):
-        # The finding this guards against: without a real lookup, a bare, lower-case-led identifier that
-        # is not itself a listed writable symbol (a member, a parameter, or a per-engine variable the
-        # symbol table happens to miss) was waved through as though it had to be a function-pointer field.
-        # With a real `is_function_name` supplied (as `classify` always does) and reporting "not a
-        # function", the exemption must now be refused instead of assumed.
+        # A bare, lower-case-led identifier that is not itself a listed writable symbol (a member, a
+        # parameter, or a per-engine variable the symbol table happens to miss) must not be accepted as a
+        # callback once a real `is_function_name` lookup says it is not a function: with no such lookup
+        # supplied, the shape alone would otherwise wave it through as though it had to be a
+        # function-pointer field. With a real `is_function_name` supplied (as `classify` always does) and
+        # reporting "not a function", the exemption must be refused instead of assumed.
         self.assert_const(
             "static const Real s_scale = Real(s_baseScale);", False, is_function_name=lambda name: False
         )
