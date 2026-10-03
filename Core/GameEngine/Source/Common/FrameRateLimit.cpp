@@ -131,7 +131,7 @@ void FrameRateLimit::reset()
 	QueryPerformanceCounter(&tick);
 	m_start = tick.QuadPart;
 #else
-	// Linux: anchor in the same nanosecond unit the constructor and wait() use.
+	// GeneralsX @bugfix cemlyn007 03/10/2026 reset() anchored in QueryPerformanceCounter's 100 ns ticks while the constructor and wait() use CLOCK_MONOTONIC nanoseconds; anchor in nanoseconds too.
 	struct timespec tick;
 	clock_gettime(CLOCK_MONOTONIC, &tick);
 	m_start = static_cast<Int64>(tick.tv_sec) * 1000000000 + tick.tv_nsec;
