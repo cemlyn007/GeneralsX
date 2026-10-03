@@ -92,6 +92,12 @@
 #include <system_error>  // std::error_code
 #endif
 
+// GeneralsX @feature cemlyn007 02/10/2026 isUserDataDirectoryWritable (below) reports the real
+// reason its probe fopen() failed, so a descriptor-limit or quota error is not misreported as a
+// permissions problem.
+#include <cerrno>   // errno
+#include <cstring>  // strerror()
+
 // PUBLIC DATA ////////////////////////////////////////////////////////////////////////////////////
 #if !RTS_ENGINE_CONTEXT
 GlobalData* TheWritableGlobalData = nullptr;				///< The global data singleton
@@ -1486,13 +1492,22 @@ static Bool createUserDataDirectory(const std::filesystem::path &path, const cha
 // diverge from what an actual open does, and on Windows _access() only looks at the read-only
 // attribute bit, not ACLs, so it can report writable for a directory an ACL-denied write would
 // reject.
-static Bool isUserDataDirectoryWritable(const AsciiString &pathWithSeparator)
+// GeneralsX @feature cemlyn007 02/10/2026 Takes an out-param rather than just returning FALSE, so a
+// caller can report why the probe write failed: the first descriptor-consuming call on an
+// explicit-directory boot (create_directories()/is_directory() above need no fd, and the .big
+// archives are not open yet), so EMFILE/ENFILE -- PLAN-023 Phase 5's own per-engine .big-handle limit
+// -- or ENOSPC/EDQUOT are at least as likely a cause as an actual permissions problem.
+static Bool isUserDataDirectoryWritable(const AsciiString &pathWithSeparator, int *outErrno)
 {
 	AsciiString probe = pathWithSeparator;
 	probe.concat(".generalsx_write_probe");
 	FILE *fp = fopen(probe.str(), "wb");
 	if (fp == nullptr)
+	{
+		if (outErrno)
+			*outErrno = errno;
 		return FALSE;
+	}
 	fclose(fp);
 	remove(probe.str());
 	return TRUE;
@@ -1585,9 +1600,11 @@ Bool GlobalData::setPath_UserData(const AsciiString &dir)
 	if (!createUserDataDirectoryWin32(path))
 		return FALSE;
 #endif
-	if (!isUserDataDirectoryWritable(path))
+	int probeErrno = 0;
+	if (!isUserDataDirectoryWritable(path, &probeErrno))
 	{
-		fprintf(stderr, "GlobalData::setPath_UserData: cannot use \"%s\" as the user data directory (not writable)\n", path.str());
+		fprintf(stderr, "GlobalData::setPath_UserData: cannot use \"%s\" as the user data directory (write probe failed: %s)\n",
+			path.str(), strerror(probeErrno));
 		fflush(stderr);
 		return FALSE;
 	}
