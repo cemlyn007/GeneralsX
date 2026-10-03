@@ -2173,6 +2173,27 @@ class HandMatchesTest(unittest.TestCase):
         self.assertFalse(h.matches(make_symbol("k", [], source="a/GUI/x.cpp:1;b/Logic/y.cpp:2")))
 
 
+class CheckedInTsvMatchesHandListTest(unittest.TestCase):
+    """The checked-in list's by-hand and by-file rows must agree with the hand list, so a merge of two
+    branches' edits to one of them cannot leave `check` failing on a changed class (it needs no library)."""
+
+    def test_every_hand_row_matches_its_entry(self):
+        root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        rows = m.read_tsv(os.path.join(root, m.TSV))
+        checked = 0
+        for key, row in rows.items():
+            if row["by"] not in ("hand", "file"):
+                continue
+            sym = make_symbol(key, [], source=row["source"])
+            hand = next((h for h in m.HAND if h.matches(sym)), None)
+            self.assertIsNotNone(hand, f"{key}: no hand entry matches")
+            self.assertEqual(
+                (row["class"], row["phase"], row["note"]), (hand.cls, hand.phase, m.clean(hand.note)), key
+            )
+            checked += 1
+        self.assertGreater(checked, 0)
+
+
 class NewSymbolErrorTest(unittest.TestCase):
     def test_unreviewed_symbol_is_an_error(self):
         sym = make_symbol("k", [])

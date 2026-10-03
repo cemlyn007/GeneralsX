@@ -322,7 +322,7 @@ The first two engines alive at once, stepped alternately on one thread (rlgenera
 
 ### Phase 2: Simulation statics that must become per-engine
 
-**Status (Phase 2 PR): done for engines stepped alternately on one thread; the different-thread acceptance below is open** (`python3 scripts/cpp/engine_state_symbols.py report` lists what the classification still has per phase), all with `RTS_ENGINE_CONTEXT` ON only apart from the `INIException` fix and the threads-only statics made `thread_local` or local (unconditional, both games; one sim thread sees the same values); OFF is unchanged (rlgenerals: per-frame `crc(recalc=True)` over 3,000 frames of a seeded Hard-vs-Hard skirmish is identical OFF before and after, and ON after equals OFF).
+**Status (Phase 2 PR): done for engines stepped alternately on one thread; the different-thread acceptance below is open** (the classification has no Phase 2 per-engine entries left; `python3 scripts/cpp/engine_state_symbols.py report` lists the rest per phase), all with `RTS_ENGINE_CONTEXT` ON only apart from the `INIException` fix, the threads-only statics made `thread_local` or local (unconditional, both games; one sim thread sees the same values) and `clearGameData`'s build-plan reset (unconditional; it changes OFF only when a path build is left open at the end of a game); otherwise OFF is unchanged (rlgenerals: per-frame `crc(recalc=True)` over 3,000 frames of a seeded Hard-vs-Hard skirmish is identical OFF before and after, and ON after equals OFF).
 
 | Row | Status |
 |---|---|
