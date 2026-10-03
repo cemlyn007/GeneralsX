@@ -154,8 +154,9 @@ public:
 	// engine's init fails partway: that leaves process-wide state half built, and ~GameEngine cannot
 	// tear a partly initialised engine down, so the host must leak it (never delete it).
 	//
-	// No refusal here returns. The frozen-window ones (and GameEngine::init's stopped-partway failure) end through ReleaseCrashNoReturn
-	// (FatalEngineError when embedded, otherwise ReleaseCrash's own exit, or abort() if it returned).
+	// The frozen-window refusals, and in embedded mode GameEngine::init's stopped-partway failure, end
+	// through ReleaseCrashNoReturn (FatalEngineError when embedded, otherwise ReleaseCrash's own exit,
+	// or abort() if it returned); the game executable carries on after a swallowed init error, as upstream does.
 	// The refusals that repeat an earlier failure or are host usage errors (init while another engine
 	// is priming, outside every context, or in an already poisoned process) raise FatalEngineError (or
 	// abort()) directly, leaving the crash report alone.
