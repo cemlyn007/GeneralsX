@@ -63,3 +63,27 @@ FATAL_ENGINE_ERROR_API bool IsEngineEmbeddedMode();
 // constructor clears it. Outside every engine context it reads as set (nothing to hand an error to).
 FATAL_ENGINE_ERROR_API void SetEngineTearingDown(bool tearingDown);
 FATAL_ENGINE_ERROR_API bool IsEngineTearingDown();
+
+// GeneralsX @feature cemlyn007 02/10/2026 Sticky fault latch: fault delivery to the host otherwise
+// depends on every catch (...) between RELEASE_CRASH and the host having a
+// catch (const FatalEngineError&) { throw; } in front of it. Something that swallows the
+// exception anyway (a catch (...) added later, upstream or in a merge) still sets this latch
+// first, so a host that polls HasEngineFaulted() after each call into the engine can detect the
+// fault even when the exception itself never reaches it.
+//
+// The flag is process-wide, like IsEngineEmbeddedMode() above, and nothing in this engine ever
+// clears it: the engine that set it is corrupt and the host must not call back into it to ask.
+// Clearing it is therefore entirely the host's job, and the host must do it as soon as it has
+// recorded a fault, not only when it found one by polling. A host that catches FatalEngineError
+// directly (for example at a boot-time try/catch) and does not also call ClearEngineFault() there
+// leaves the latch set, so the very next poll -- after an unrelated, successful call, to this
+// engine or, worse, to a different one -- misreports a fault that was already handled. A host
+// with more than one EngineContext alive must poll this latch after every entry into every
+// engine (it cannot yet tell which engine set it) and must clear it at every point it handles a
+// FatalEngineError, caught or polled, for the same reason: this one flag cannot distinguish "no
+// engine has faulted since the last clear" from "an engine faulted and the host already dealt
+// with it". A host that truly needs to tell those two apart per engine, or that cannot guarantee
+// it clears the latch at every catch site, needs a per-EngineContext latch instead of this
+// process-wide one.
+FATAL_ENGINE_ERROR_API bool HasEngineFaulted();
+FATAL_ENGINE_ERROR_API void ClearEngineFault();
