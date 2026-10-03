@@ -440,27 +440,33 @@ class RuleConstObjectTest(unittest.TestCase):
         # `startTime` matches the function-pointer-argument exemption's own regex (a bare, lower-case-led
         # identifier as the declared type's first constructor argument), but it is a read of a per-engine
         # variable, not a callback field: the exemption must not accept a name that is itself a writable
-        # symbol. `is_function_name` answers True for every name here (`StateConditionInfo` is the only
+        # symbol. `is_function_name` answers True for `startTime` here (`StateConditionInfo` is the only
         # type the exemption can reach at all: see the gate test below), so only the writable-name clause
-        # itself can be the thing rejecting this.
+        # itself can be the thing rejecting this. A `FakeLookup` (not a bare callable) is used even though
+        # this test expects to reject on the writable-name clause before the `MY_STATE` argument is ever
+        # reached, so that this stays true, rather than merely passing because `all()` stopped early, if
+        # the argument order or the writable-name clause ever changes.
         writable = {"startTime": make_symbol("startTime", [], sections={".bss"})}
         self.assert_const(
             "static const StateConditionInfo s = StateConditionInfo(startTime, MY_STATE, nullptr);",
             False,
             symbols=writable,
-            is_function_name=lambda name: True,
+            is_function_name=FakeLookup(functions={"startTime"}),
         )
 
     def test_by_value_const_initialized_from_an_ampersand_taken_writable_global_is_not_safe(self):
         # FUNC_PTR_ARG_RE accepts a `&`-taken identifier too (see test_by_value_const_initialized_from_an_
         # ampersand_taken_function_pointer_is_safe): the writable-name clause must strip the `&` before
-        # matching, not treat an address-of form as exempt from it.
+        # matching, not treat an address-of form as exempt from it. A `FakeLookup` (not a bare callable) is
+        # used for the same reason as the test above: it still exposes `is_macro_name`, so a regression
+        # that lets `MY_STATE` actually get evaluated fails on the classification this test targets, not on
+        # a lookup shape production code would reject outright.
         writable = {"startTime": make_symbol("startTime", [], sections={".bss"})}
         self.assert_const(
             "static const StateConditionInfo s = StateConditionInfo(&startTime, MY_STATE, nullptr);",
             False,
             symbols=writable,
-            is_function_name=lambda name: True,
+            is_function_name=FakeLookup(functions={"startTime"}),
         )
 
     def test_by_value_const_initialized_from_a_functional_cast_of_an_unknown_name_is_still_safe(self):
@@ -477,9 +483,10 @@ class RuleConstObjectTest(unittest.TestCase):
         self,
     ):
         # The function-pointer-argument exemption is restricted to `StateConditionInfo`, the only type
-        # that any `static const` initialiser in this classified library ever constructs with a callback
-        # (other callback-taking types, such as `StateMachine::TransitionInfo` or `DLINK_ITERATOR`, are
-        # deliberately left out and fail closed): every other type's own-constructor call (`Coord3D`,
+        # that this classified library's own `static const` initialisers ever build, by calling the
+        # type's own name, with a callback (other callback-taking types built that way, such as
+        # `StateMachine::TransitionInfo` or `DLINK_ITERATOR`, are deliberately left out and fail closed):
+        # every other type's own-constructor call (`Coord3D`,
         # `Real`, `AsciiString`, ...) never gets it, with or without a real `is_function_name`
         # lookup, because `is_function_name` is a tree-wide, scope-blind text search (see its own
         # docstring) that cannot tell a real callback apart from an unrelated same-named function, member
@@ -490,14 +497,16 @@ class RuleConstObjectTest(unittest.TestCase):
     def test_by_value_const_initialized_from_a_scoped_writable_global_is_not_safe(self):
         # The writable key itself is `::`-scoped (a namespaced global, not a top-level one): the exact-key
         # match must still catch a reference that spells the same scope, even as the exemption's own first
-        # (callback) argument. `is_function_name` answers True for every name here, so only the
-        # writable-name clause itself can be the thing rejecting this.
+        # (callback) argument. `is_function_name` answers True for the unqualified `m_idNext` here (the
+        # only form the exemption ever looks up), via a `FakeLookup` rather than a bare callable so a
+        # regression that lets `MY_STATE` get evaluated still fails on the classification this test
+        # targets: only the writable-name clause itself can be the thing rejecting this.
         writable = {"View::m_idNext": make_symbol("View::m_idNext", [], sections={".bss"})}
         self.assert_const(
             "static const StateConditionInfo s = StateConditionInfo(View::m_idNext, MY_STATE, nullptr);",
             False,
             symbols=writable,
-            is_function_name=lambda name: True,
+            is_function_name=FakeLookup(functions={"m_idNext"}),
         )
 
     def test_by_value_const_initialized_from_an_unqualified_reference_to_a_scoped_writable_global_is_not_safe(
@@ -506,13 +515,13 @@ class RuleConstObjectTest(unittest.TestCase):
         # A class or anonymous-namespace static is routinely referenced unqualified from inside its own
         # scope: the initialiser text has no way to spell the writable key's own scope back, so the bare,
         # unqualified name must be rejected too, not just the fully qualified form, even as the exemption's
-        # own first argument.
+        # own first argument. A `FakeLookup` is used for the same reason as the test above.
         writable = {"View::m_idNext": make_symbol("View::m_idNext", [], sections={".bss"})}
         self.assert_const(
             "static const StateConditionInfo s = StateConditionInfo(m_idNext, MY_STATE, nullptr);",
             False,
             symbols=writable,
-            is_function_name=lambda name: True,
+            is_function_name=FakeLookup(functions={"m_idNext"}),
         )
 
     def test_writable_global_names_does_not_confuse_two_same_length_tables_in_a_row(self):
@@ -547,7 +556,8 @@ class RuleConstObjectTest(unittest.TestCase):
     ):
         # A function-local static's writable key is scoped as `func(args)::name`: source code can never
         # spell that scope back, so only the bare, unqualified name can ever match it, even as the
-        # exemption's own first argument. `is_function_name` answers True for every name here, so only the
+        # exemption's own first argument. `is_function_name` answers True for `lastUpdate` here, via a
+        # `FakeLookup` rather than a bare callable for the same reason as the tests above, so only the
         # writable-name clause itself can be the thing rejecting this.
         writable = {
             "Shell::update()::lastUpdate": make_symbol("Shell::update()::lastUpdate", [], sections={".bss"})
@@ -556,7 +566,7 @@ class RuleConstObjectTest(unittest.TestCase):
             "static const StateConditionInfo s = StateConditionInfo(lastUpdate, MY_STATE, nullptr);",
             False,
             symbols=writable,
-            is_function_name=lambda name: True,
+            is_function_name=FakeLookup(functions={"lastUpdate"}),
         )
 
     def test_by_value_const_initialized_from_a_functional_cast_of_a_name_not_known_to_be_a_function_is_not_safe(
@@ -569,16 +579,19 @@ class RuleConstObjectTest(unittest.TestCase):
         # function-pointer field. With a real `is_function_name` supplied (as `load_library` always does)
         # and reporting "not a function", the exemption must be refused instead of assumed. StateConditionInfo
         # is the only type the exemption can reach at all (see the gate test above), so both cases below
-        # declare one, not an unrelated type the gate would reject before the lookup clause ever ran.
+        # declare one, not an unrelated type the gate would reject before the lookup clause ever ran. A
+        # `FakeLookup` with no functions registered is used rather than a bare callable so that, if a
+        # regression ever lets `MY_STATE` get evaluated too, the test still fails on the classification it
+        # targets rather than on a lookup shape production code would reject outright.
         self.assert_const(
             "static const StateConditionInfo s = StateConditionInfo(s_baseScale, MY_STATE, nullptr);",
             False,
-            is_function_name=lambda name: False,
+            is_function_name=FakeLookup(),
         )
         self.assert_const(
             "static const StateConditionInfo s = StateConditionInfo(g_mapBuffer, MY_STATE, nullptr);",
             False,
-            is_function_name=lambda name: False,
+            is_function_name=FakeLookup(),
         )
 
     def test_by_value_const_initialized_from_a_name_that_collides_with_an_unrelated_function_is_not_safe(
@@ -588,8 +601,9 @@ class RuleConstObjectTest(unittest.TestCase):
         # as a function ANYWHERE in the tree, including one that collides with this declaration's own
         # member/parameter/local of the same name (`value`, `scale`, `width`, ... each collide with a real
         # function somewhere in the real engine tree). Even a lookup that says "yes, this is a function"
-        # must not accept the exemption on a type other than StateConditionInfo, since no other type any
-        # `static const` initialiser here ever constructs has a function-pointer field to fill.
+        # must not accept the exemption on a type other than StateConditionInfo, since no other type this
+        # library's own `static const` initialisers ever build, by calling the type's own name, has a
+        # function-pointer field to fill.
         self.assert_const(
             "static const Real s_v = Real(value);", False, is_function_name=lambda name: True
         )
@@ -611,10 +625,12 @@ class RuleConstObjectTest(unittest.TestCase):
     def test_by_value_const_initialized_from_a_scoped_name_not_known_to_be_a_function_is_not_safe(self):
         # A `Class::method`-qualified spelling is not automatically trusted either: it must still resolve
         # through `is_function_name` (on the unqualified name, the only form a definition search can find).
+        # A `FakeLookup` with no functions registered is used rather than a bare callable for the same
+        # reason as the tests above.
         self.assert_const(
             "static const StateConditionInfo s_info = StateConditionInfo(Foo::bar, MY_STATE, nullptr);",
             False,
-            is_function_name=lambda name: False,
+            is_function_name=FakeLookup(),
         )
 
 

@@ -473,10 +473,13 @@ class SourceIndex:
         checked, is actually an unrelated member, parameter or local of the same name (`value`, `scale`,
         `width`, ... each collide with some real function in this codebase). `_is_safe_value_expr` does not
         rely on this function alone to rule that out; it also restricts the call site this function's
-        answer can affect to the one type (`StateConditionInfo`) that any `static const` initialiser in
-        this classified library ever constructs with a function-pointer field (other callback-taking
-        types, such as `StateMachine::TransitionInfo` or `DLINK_ITERATOR`, are never built that way, so
-        restricting the exemption to `StateConditionInfo` costs nothing here, though it does not mean
+        answer can affect to the one type (`StateConditionInfo`) that this classified library's own
+        `static const` initialisers ever build by calling the declared type's own name (`T(args)`,
+        direct-initialisation) with a function-pointer field in that call's first argument. Other
+        callback-taking types (`StateMachine::TransitionInfo`, `DLINK_ITERATOR`) are never the target of
+        a `static const` here at all, and a brace-initialised aggregate with a callback field (a
+        `FieldParse` table's rows, for instance) never reaches this call-shaped check in the first place,
+        so restricting the exemption to `StateConditionInfo` costs nothing here, though it does not mean
         `StateConditionInfo` is the only type in the codebase whose constructor ever takes one)."""
         cached = self._is_function_cache.get(name)
         if cached is not None:
@@ -1098,20 +1101,22 @@ def _is_safe_value_expr(expr, type_name, writable_names, is_function_name=None):
     writable symbol nor an object-like macro (see below), `true`/`false`/`nullptr`, a cast of another pure
     value, a call to an allow-listed pure value constructor or to the declared type's own name (each of its
     arguments checked the same way, except that, when the declared type is `StateConditionInfo` (the only
-    callback-taking type that any `static const` initialiser in this classified library constructs: other
-    callback-taking types, such as `StateMachine::TransitionInfo` or `DLINK_ITERATOR`, are deliberately
-    left out and fail closed until someone reviews them and adds them) and the callee is that
-    same name, the call's first argument is additionally accepted as a lower-case-led function name (bare,
-    `&`-taken or scoped) that `is_function_name` (when given) confirms is actually defined as a function
-    somewhere in the scanned tree, and that does not itself name a writable symbol: a function-pointer
-    field in the type's own constructor (StateConditionInfo's `test` callback), never a functional-style
-    cast of a per-engine variable (this codebase passes every one of these callbacks by bare, unqualified
-    or `Class::`-qualified name, never by `&`, so FUNC_PTR_ARG_RE's shape alone cannot tell a callback from
-    a same-shaped variable read: only `is_function_name`, a real lookup against the source tree, can; and
-    that lookup is a tree-wide, scope-blind text search, so it alone cannot tell a real callback from an
-    unrelated same-named function elsewhere in the tree either, which is why the exemption is also
-    restricted to the one type that any such initialiser here ever builds with a function-pointer field),
-    and never a later argument,
+    type that this classified library's own `static const` initialisers ever build, by calling the
+    declared type's own name, with a function-pointer field in that call: other callback-taking types
+    built that way, such as `StateMachine::TransitionInfo` or `DLINK_ITERATOR`, are deliberately left out
+    and fail closed until someone reviews them and adds them; a brace-initialised aggregate with a
+    callback field, such as a `FieldParse` table's rows, never reaches this call-shaped check at all) and
+    the callee is that same name, the call's first argument is additionally accepted as a lower-case-led
+    function name (bare, `&`-taken or scoped) that `is_function_name` (when given) confirms is actually
+    defined as a function somewhere in the scanned tree, and that does not itself name a writable symbol:
+    a function-pointer field in the type's own constructor (StateConditionInfo's `test` callback), never a
+    functional-style cast of a per-engine variable (this codebase passes every one of these callbacks by
+    bare, unqualified or `Class::`-qualified name, never by `&`, so FUNC_PTR_ARG_RE's shape alone cannot
+    tell a callback from a same-shaped variable read: only `is_function_name`, a real lookup against the
+    source tree, can; and that lookup is a tree-wide, scope-blind text search, so it alone cannot tell a
+    real callback from an unrelated same-named function elsewhere in the tree either, which is why the
+    exemption is also restricted to the one type that any such initialiser here ever builds this way with
+    a function-pointer field), and never a later argument,
     such as StateConditionInfo's own `void* userData`, which this codebase never fills from a function name
     but could fill from an arbitrary per-engine value), or a `{...}` list of pure values. `writable_names`
     is `_writable_global_names`'s result: every name this initialiser must not be allowed to read,
