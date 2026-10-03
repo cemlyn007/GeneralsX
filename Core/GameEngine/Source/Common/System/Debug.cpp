@@ -737,7 +737,9 @@ double SimpleProfiler::getAverageTime()
 	#define RELEASECRASH_FILE_NAME				"ReleaseCrashInfo.txt"
 	#define RELEASECRASH_FILE_NAME_PREV		"ReleaseCrashInfoPrev.txt"
 
-	static FILE *theReleaseCrashLogFile = nullptr;
+	// GeneralsX @bugfix cemlyn007 03/10/2026 Per thread: engines fault on their own threads, and a shared handle
+	// would be opened, written and closed by two faulting engines at once.
+	static THREAD_LOCAL FILE *theReleaseCrashLogFile = nullptr;
 
 	static void releaseCrashLogOutput(const char *buffer)
 	{
