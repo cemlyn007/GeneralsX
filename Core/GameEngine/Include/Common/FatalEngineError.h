@@ -64,12 +64,16 @@ public:
 FATAL_ENGINE_ERROR_API void SetEngineEmbeddedMode(bool embedded);
 FATAL_ENGINE_ERROR_API bool IsEngineEmbeddedMode();
 
-// GeneralsX @bugfix cemlyn007 03/10/2026 Whether a fatal error was raised (a FatalEngineError constructed,
-// or the fatal error returned instead of throwing, see the teardown window above) in the current
-// engine (with RTS_ENGINE_CONTEXT, in the current engine context, never outside every one; without it,
-// in the process) since the last call, which clears it. A host that enters an engine around its calls
-// reads it as the call ends, to tell an exception leaving the engine that is a fatal error from one that
-// is not, before it can have caught the exception.
+// GeneralsX @bugfix cemlyn007 03/10/2026 The engine's own record of a fatal error (with RTS_ENGINE_CONTEXT, in
+// the current engine context, never outside every one; without it, in the process). Two kinds, each cleared
+// by its read:
+// - TakeEngineFatalErrorThrown: a FatalEngineError was constructed since the last call. A host that enters
+//   an engine around its calls reads it as the call ends, to tell an exception leaving the engine that is a
+//   fatal error from one that is not, before it can have caught the exception.
+// - TakeEngineFatalErrorRaised: either kind, that or a fatal error that returned instead of throwing (see the
+//   teardown window above), which is no FatalEngineError and so says nothing about the exception leaving the
+//   engine, if there is one. It clears both.
+FATAL_ENGINE_ERROR_API bool TakeEngineFatalErrorThrown();
 FATAL_ENGINE_ERROR_API bool TakeEngineFatalErrorRaised();
 
 // Per engine (per engine context with RTS_ENGINE_CONTEXT): GameEngine's destructor sets it and its
