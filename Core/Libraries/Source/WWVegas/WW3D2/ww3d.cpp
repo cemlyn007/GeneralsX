@@ -164,7 +164,9 @@ const char* DAZZLE_INI_FILENAME="DAZZLE.INI";
 **
 ***********************************************************************************/
 
-#if !RTS_ENGINE_CONTEXT
+#if RTS_ENGINE_CONTEXT
+static_assert(WWSyncPerSecond == 30, "EngineContext::ww3dLogicFrameTimeMs starts at 1000.0f / 30");
+#else
 float														WW3D::LogicFrameTimeMs = 1000.0f / WWSyncPerSecond; // initialized to something to avoid division by zero on first use
 float															WW3D::FractionalSyncMs = 0.0f;
 unsigned int											WW3D::SyncTime = 0;

@@ -1119,6 +1119,12 @@ GlobalData *GlobalData::newOverride()
 	// copy the data from the latest override (TheWritableGlobalData) to the newly created instance
 	DEBUG_ASSERTCRASH( TheWritableGlobalData, ("GlobalData::newOverride() - no existing data") );
 	*overrideData = *TheWritableGlobalData;
+	// GeneralsX @bugfix cemlyn007 02/10/2026 operator= above is an unimplemented DEBUG_CRASH stub on
+	// VC6 (see GlobalData.h), so it copies nothing there: parseGameDataDefinition's guard (below) relies
+	// on this copy to give every override its user-data directory, since it only derives/creates the
+	// default for the original instance. Set it explicitly so a VC6 override is not left with an empty
+	// m_userDataDir; redundant on compilers where the memberwise copy above already did it.
+	overrideData->m_userDataDir = TheWritableGlobalData->m_userDataDir;
 
 	//
 	// link the override to the previously created one, the link order is important here
@@ -1203,12 +1209,27 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 	// parse the ini weapon definition
 	ini->initFromINI( TheWritableGlobalData, s_GlobalDataFieldParseTable );
 
-	TheWritableGlobalData->m_userDataDir.clear();
+	// GeneralsX @bugfix cemlyn007 02/10/2026 Only the original instance derives and creates the
+	// default: newOverride() above has already copied m_userDataDir from the previous
+	// TheWritableGlobalData into this override (a memberwise copy, not implemented on VC6 -- see
+	// newOverride()), so re-deriving and re-creating it here for an override would discard that copy
+	// and just re-read $XDG_DATA_HOME/$HOME, redundantly re-creating the same directory on every
+	// map.ini/solo.ini GameData block (and, while the default cannot be created, e.g. a read-only
+	// $HOME, re-printing createUserDataDirectory's stderr diagnostic each time). Generals has no setPath_UserData, so
+	// unlike GeneralsMD's matching constructor guard there is no separately-set, already-working
+	// directory this could clobber -- it is simply wasted work. One side effect: on Windows,
+	// an override's own UserDataLeafName INI field (parsed into TheWritableGlobalData->m_userDataLeafName
+	// just above by initFromINI) no longer moves that override's user-data directory, because
+	// BuildUserDataPathFromIni (which reads it) is not called for overrides any more.
+	if (TheWritableGlobalData == GlobalData::m_theOriginal)
+	{
+		TheWritableGlobalData->m_userDataDir.clear();
 
-	// GeneralsX @feature Bender 01/04/2026 Cross-platform user data directory handling
-	// Adopts upstream refactoring with extended cross-platform support
-	TheWritableGlobalData->m_userDataDir = BuildUserDataPathFromIni();
-	CreateDirectory(TheWritableGlobalData->m_userDataDir.str(), nullptr);
+		// GeneralsX @feature Bender 01/04/2026 Cross-platform user data directory handling
+		// Adopts upstream refactoring with extended cross-platform support
+		TheWritableGlobalData->m_userDataDir = BuildUserDataPathFromIni();
+		CreateDirectory(TheWritableGlobalData->m_userDataDir.str(), nullptr);
+	}
 
 	// override INI values with user preferences
 	OptionPreferences optionPref;
@@ -1349,6 +1370,29 @@ UnsignedInt GlobalData::generateExeCRC()
 	return exeCRC.get();
 }
 
+// GeneralsX @refactor cemlyn007 02/10/2026 One place for "make this directory (recursively) and say
+// so on stderr if it cannot be used", instead of the create+report sequence copied at both
+// non-Windows branches below (GeneralsMD's twin of this helper covers its own
+// branches plus setPath_UserData, which Generals does not have).
+// GeneralsX @feature cemlyn007 02/10/2026 Guarded to non-Windows, matching this file's own
+// '#include <filesystem>' above: only the __APPLE__ and Linux branches below call this helper, and
+// its std::filesystem::path parameter and body reference a type this TU never declares on Windows,
+// the same gap GeneralsMD's twin of this helper guards against too.
+#ifndef _WIN32
+static Bool createUserDataDirectory(const std::filesystem::path &path)
+{
+	std::error_code ec;
+	std::filesystem::create_directories(path, ec);
+	if (ec)
+	{
+		fprintf(stderr, "GlobalData: cannot create user data directory %s: %s\n",
+			path.string().c_str(), ec.message().c_str());
+		fflush(stderr);
+	}
+	return ec ? FALSE : TRUE;
+}
+#endif
+
 AsciiString GlobalData::BuildUserDataPathFromIni()
 {
 	AsciiString userDataDir;
@@ -1411,7 +1455,13 @@ AsciiString GlobalData::BuildUserDataPathFromIni()
 		const char* home = getenv("HOME");
 		if (home) {
 			std::filesystem::path path = std::filesystem::path(home) / "Library" / "Application Support" / "GeneralsX" / "Generals";
-			std::filesystem::create_directories(path);
+			// GeneralsX @bugfix cemlyn007 02/10/2026 Backport of GeneralsMD's fix: the throwing overload
+			// crashed parseGameDataDefinition (the GameData INI parse, the only caller of this function --
+			// Generals' constructor never derives the default) whenever the default could not be created,
+			// e.g. a read-only $HOME, faulting the whole engine boot. createUserDataDirectory's error_code
+			// call lets the game boot anyway; it reports the failure on stderr, since DEBUG_LOG compiles out
+			// of release builds.
+			createUserDataDirectory(path);
 			userDataDir = path.string().c_str();
 			if (!userDataDir.endsWith("/"))
 				userDataDir.concat('/');
@@ -1437,7 +1487,11 @@ AsciiString GlobalData::BuildUserDataPathFromIni()
 		}
 
 		path = path / "GeneralsX" / "Generals";
-		std::filesystem::create_directories(path);
+		// GeneralsX @bugfix cemlyn007 02/10/2026 Backport of GeneralsMD's fix: as the macOS branch above, do
+		// not let an uncreatable default (a read-only $HOME) throw out of parseGameDataDefinition (the
+		// GameData INI parse -- Generals' constructor never derives the default) and fault the whole engine;
+		// createUserDataDirectory reports the failure on stderr so it is visible in release builds.
+		createUserDataDirectory(path);
 		userDataDir = path.string().c_str();
 		if (!userDataDir.endsWith("/"))
 			userDataDir.concat('/');
