@@ -2720,7 +2720,7 @@ void Object::setTriggerAreaFlagsForChangeInPosition()
 				// Shouldn't happen.
 				// GeneralsX @bugfix cemlyn007 02/10/2026 Not debug-only: every engine's own simulation thread
 				// writes this on the release sim path, the same misclassification RT3 fixed for ScriptEngine's
-				// st_* hooks and review fixed for getTeamNamed's warnCount.
+				// st_* hooks and getTeamNamed's warnCount.
 #if RTS_ENGINE_CONTEXT
 				static rts::PerEngineStatic<Bool> didWarn_perEngine;
 				Bool &didWarn = didWarn_perEngine.get();

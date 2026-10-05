@@ -117,7 +117,6 @@ protected:
 #if RTS_ENGINE_CONTEXT
 	// GeneralsX @feature cemlyn007 28/09/2026 Per engine: the decal ID counter (PLAN-023 Phase 3).
 	static rts::PerEngineStatic<uint32> DecalIDGenerator_perEngine;
-#define DecalIDGenerator (DecalIDGenerator_perEngine.get())
 #else
 	static uint32							DecalIDGenerator;
 #endif

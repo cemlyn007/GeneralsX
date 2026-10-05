@@ -181,7 +181,7 @@ private:
 	////////////////////////////////////////////////////////////
 	// GeneralsX @bugfix cemlyn007 02/10/2026 atomic<unsigned> (not just unsigned) so Get_String can take a
 	// lock-free relaxed-load early-out when every temp buffer is in use, instead of taking m_Mutex on that
-	// path too; the authoritative test-and-set under m_Mutex is unaffected (found in review).
+	// path too; the authoritative test-and-set under m_Mutex is unaffected.
 	static std::atomic<unsigned> ReservedMask;
 	static char m_TempStrings[];
 
