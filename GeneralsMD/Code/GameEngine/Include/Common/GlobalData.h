@@ -605,9 +605,20 @@ public:
 	// GeneralsX @feature cemlyn007 28/09/2026 An embedding host's per-engine user data directory (PLAN-023
 	// Phase 5's user-data root): a host with several engines in one process gives each its own, so their
 	// replays, SagePatch.ini and MapCache.ini do not overwrite each other. Set on the original instance
-	// right after the startup parse creates it, before GameEngine::init reads the path; `dir` ends with the
-	// path separator and exists. Nothing upstream calls it, so an engine that is not embedded is unchanged.
-	void setPath_UserData(const AsciiString &dir) { m_userDataDir = dir; }
+	// right after the startup parse creates it, before GameEngine::init reads the path; `dir` need not end
+	// with the path separator or already exist (the setter appends the separator and creates the directory
+	// itself, as the constructor's default does). Nothing upstream calls it, so an engine that is not
+	// embedded is unchanged.
+	// GeneralsX @feature cemlyn007 02/10/2026 Returns FALSE (and leaves the directory unchanged) for an
+	// empty `dir`, which would otherwise resolve to the filesystem root, or one that cannot be
+	// made/used as a directory, instead of silently accepting it. Callers that want a refused boot,
+	// rather than one that silently loses every later write, must check the return value.
+	// GeneralsX @feature cemlyn007 02/10/2026 `dir` is also an input, not only an output location:
+	// GlobalData::parseGameDataDefinition reads <dir>/Options.ini (OptionPreferences) and
+	// GameEngine::init reads <dir>/SagePatch.ini, both overriding GameData, so a host that wants
+	// identical play across engines must seed the directory (as rlgenerals does for its automatic
+	// per-engine ones) or accept that an empty or differently-seeded directory changes gameplay settings.
+	Bool setPath_UserData(const AsciiString &dir);
 
 private:
 
@@ -615,6 +626,12 @@ private:
 
 	static const FieldParse s_GlobalDataFieldParseTable[];
 
+	// GeneralsX @feature cemlyn007 02/10/2026 No longer true upstream: an embedding host may replace
+	// it once, on the original instance, through setPath_UserData (above) before GameEngine::init
+	// reads it (rlgenerals does so for every engine that does not hold the process default; one that
+	// does keeps the registry/XDG default instead). Apart from GlobalData's own constructor and
+	// newOverride()'s copy of the current directory onto a new override, only setPath_UserData writes
+	// it.
 	// this is private, since we read the info from Windows and cache it for
 	// future use. No one is allowed to change it, ever. (srj)
 	AsciiString m_userDataDir;

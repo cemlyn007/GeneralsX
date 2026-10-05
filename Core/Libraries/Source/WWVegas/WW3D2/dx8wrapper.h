@@ -591,8 +591,7 @@ public:
 
 #if RTS_ENGINE_CONTEXT
 	// GeneralsX @bugfix cemlyn007 30/09/2026 Null for an engine that did not create the device (see Is_Initted),
-	// as in a headless solo run: its texture format choices (Get_Valid_Texture_Format, the texture loader)
-	// then match its solo run's, and it never reads the renderer's caps, which DX8Wrapper::Shutdown frees.
+	// as in a headless solo run, so it never reads the renderer's caps, which DX8Wrapper::Shutdown frees.
 	static const DX8Caps*	Get_Current_Caps()
 	{
 		const DX8Caps* caps = ::rts::ctx()->ownsRenderDevice ? CurrentCaps : nullptr;

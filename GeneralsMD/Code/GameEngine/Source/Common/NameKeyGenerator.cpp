@@ -41,6 +41,9 @@ NameKeyGenerator::NameKeyGenerator()
 
 	m_nextID = (UnsignedInt)NAMEKEY_INVALID;  // uninitialized system
 	m_descendingID = 0;  // GeneralsX @feature cemlyn007 28/09/2026 upwards (perturbForTesting)
+#if RTS_ENGINE_CONTEXT
+	m_primed = false;
+#endif
 
 	for (Int i = 0; i < SOCKET_COUNT; ++i)
 		m_sockets[i] = nullptr;
@@ -65,6 +68,9 @@ void NameKeyGenerator::init()
 	freeSockets();
 	m_nextID = 1;
 	m_descendingID = 0;  // GeneralsX @feature cemlyn007 28/09/2026 upwards (perturbForTesting)
+#if RTS_ENGINE_CONTEXT
+	m_primed = false;
+#endif
 
 }
 
@@ -74,6 +80,9 @@ void NameKeyGenerator::reset()
 	freeSockets();
 	m_nextID = 1;
 	m_descendingID = 0;  // GeneralsX @feature cemlyn007 28/09/2026 upwards (perturbForTesting)
+#if RTS_ENGINE_CONTEXT
+	m_primed = false;
+#endif
 
 }
 
@@ -155,6 +164,37 @@ void NameKeyGenerator::verifyNameKeyID(UnsignedInt expectedNextID) const
 }
 #endif
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 03/10/2026 The key of a name already interned
+#define RTS_KEY_OF_EXISTING(b) keyOfExisting(b)
+
+namespace
+{
+[[noreturn]] void failFrozenName(const char* name, bool internedAfterPriming)
+{
+	AsciiString reason;
+	if (internedAfterPriming)
+		reason.format("NameKey '%s' was first interned after the priming engine's frozen window ended (by any engine), "
+			"so its key differs from a fresh process's while a later engine boots", name);
+	else
+		reason.format("NameKey '%s' is new to this process while a later engine boots: its data differs from the "
+			"first engine's, so the name keys it shares with it (sciences, upgrades) cannot be trusted", name);
+	// Never returns: the name must not be interned (ReleaseCrash alone returns with no TheGlobalData)
+	ReleaseCrashNoReturn(reason.str());
+}
+}
+
+// A name interned after the priming engine's frozen window ended is new to a later engine's frozen window.
+NameKeyType NameKeyGenerator::keyOfExisting(const Bucket* b) const
+{
+	if (b->m_afterPriming && rts::ctx()->nameKeysFrozen)
+		failFrozenName(b->m_nameString.str(), true);
+	return b->m_key;
+}
+#else
+#define RTS_KEY_OF_EXISTING(b) ((b)->m_key)
+#endif
+
 //-------------------------------------------------------------------------------------------------
 NameKeyType NameKeyGenerator::nameToKey(const AsciiString& name)
 {
@@ -165,7 +205,7 @@ NameKeyType NameKeyGenerator::nameToKey(const AsciiString& name)
 	for (b = m_sockets[hash]; b; b = b->m_nextInSocket)
 	{
 		if (name.compare(b->m_nameString) == 0)
-			return b->m_key;
+			return RTS_KEY_OF_EXISTING(b);
 	}
 
 	// nope, guess not. let's allocate it.
@@ -182,7 +222,7 @@ NameKeyType NameKeyGenerator::nameToLowercaseKey(const AsciiString& name)
 	for (b = m_sockets[hash]; b; b = b->m_nextInSocket)
 	{
 		if (name.compareNoCase(b->m_nameString) == 0)
-			return b->m_key;
+			return RTS_KEY_OF_EXISTING(b);
 	}
 
 	// nope, guess not. let's allocate it.
@@ -203,7 +243,7 @@ NameKeyType NameKeyGenerator::nameToKey(const char* name)
 	for (b = m_sockets[hash]; b; b = b->m_nextInSocket)
 	{
 		if (strcmp(name, b->m_nameString.str()) == 0)
-			return b->m_key;
+			return RTS_KEY_OF_EXISTING(b);
 	}
 
 	// nope, guess not. let's allocate it.
@@ -220,7 +260,7 @@ NameKeyType NameKeyGenerator::nameToLowercaseKey(const char *name)
 	for (b = m_sockets[hash]; b; b = b->m_nextInSocket)
 	{
 		if (_stricmp(name, b->m_nameString.str()) == 0)
-			return b->m_key;
+			return RTS_KEY_OF_EXISTING(b);
 	}
 
 	// nope, guess not. let's allocate it.
@@ -235,36 +275,36 @@ NameKeyType NameKeyGenerator::nameToLowercaseKey(const char *name)
 NameKeyType NameKeyGenerator::createNameKey(UnsignedInt hash, const AsciiString& name)
 {
 #if RTS_ENGINE_CONTEXT
-	// GeneralsX @feature cemlyn007 28/09/2026 A later engine booting from the priming engine's data
-	// interns nothing new before its upgrades are loaded (see PrimingLatch)
-	if (rts::ctx()->nameKeysFrozen)
-	{
-		AsciiString reason;
-		reason.format("NameKey '%s' is new to this process while a later engine boots: its data differs from the "
-			"first engine's, so the name keys it shares with it (sciences, upgrades) cannot be trusted", name.str());
-		// Never returns: the name must not be interned (ReleaseCrash alone returns with no TheGlobalData)
-		ReleaseCrashNoReturn(reason.str());
-	}
-
 	std::lock_guard<std::mutex> lock(m_insertMutex);
 
 	// Another thread may have inserted it since the lock-free lookup missed.
 	for (const Bucket *existing = m_sockets[hash]; existing; existing = existing->m_nextInSocket)
 	{
 		if (name.compare(existing->m_nameString) == 0)
-			return existing->m_key;
+			return keyOfExisting(existing);
 	}
+
+	// GeneralsX @feature cemlyn007 28/09/2026 A later engine booting from the priming engine's data
+	// interns nothing new before its upgrades are loaded (see PrimingLatch)
+	if (rts::ctx()->nameKeysFrozen)
+		failFrozenName(name.str(), false);
 #endif
 
 	// GeneralsX @feature cemlyn007 28/09/2026 Downwards once perturbForTesting asked for it. The keys
 	// handed out downwards would meet those handed out upwards (a duplicate key) or, reaching 0, turn
-	// back into upwards ones: a hard failure in every build. (perturbForTesting keeps
+	// back into upwards ones: a hard failure in every build, like running out of keys upwards. (perturbForTesting keeps
 	// NAMEKEY_PERTURB_RESERVE keys between the two, so only a test hook's misuse gets here.)
 	if (m_descendingID != 0 && m_descendingID <= m_nextID)
 		ReleaseCrashNoReturn("NameKey space exhausted: the keys handed out downwards (perturbForTesting) met "
 			"those handed out upwards");
+	// Upwards, the keys must keep fitting into the bits the code that stores them relies on.
+	if (m_descendingID == 0 && m_nextID >= (UnsignedInt)NAMEKEY_MAX)
+		ReleaseCrashNoReturn("NameKey space exhausted: the keys handed out upwards reached NAMEKEY_MAX");
 	Bucket *b = newInstance(Bucket);
 	b->m_key = (NameKeyType)(m_descendingID != 0 ? m_descendingID-- : m_nextID++);
+#if RTS_ENGINE_CONTEXT
+	b->m_afterPriming = m_primed;
+#endif
 	b->m_nameString = name;
 	b->m_nextInSocket = m_sockets[hash];
 	// With RTS_ENGINE_CONTEXT, publishes the finished bucket (an atomic store) to lock-free readers.
@@ -347,6 +387,19 @@ NameKeyGenerator::PrimingState thePrimingState = NameKeyGenerator::PRIMING_NOT_S
 const char* thePrimingFailure = nullptr;
 }
 
+// GeneralsX @bugfix cemlyn007 03/10/2026 A refusal that poisons nothing new (a host usage error, or
+// a repeat of the failure that already poisoned the process) is not a crash: ReleaseCrash would rotate
+// and rewrite the crash report for it, so it raises the error directly. It deliberately does not set
+// the fault latch (FatalEngineError.h): no engine faulted.
+[[noreturn]] static void refuseInit(const char* reason)
+{
+	fprintf(stderr, "GeneralsX: GameEngine::init refused: %s\n", reason);
+	fflush(stderr);
+	if (IsEngineEmbeddedMode())
+		throw FatalEngineError(reason);
+	abort();
+}
+
 NameKeyGenerator::PrimingState NameKeyGenerator::getPrimingState()
 {
 	std::lock_guard<std::mutex> lock(thePrimingMutex);
@@ -358,9 +411,10 @@ NameKeyGenerator::PrimingLatch::PrimingLatch() : m_priming(FALSE), m_completed(F
 	// Engine state (nameKeysFrozen, the singletons init sets) is per engine context; g_noEngine must
 	// stay pristine.
 	if (rts::ctx() == &rts::g_noEngine)
-		ReleaseCrashNoReturn("GameEngine::init was called outside every engine context: enter one (rts::Scope) first");
+		refuseInit("GameEngine::init was called outside every engine context: enter one (rts::Scope) first");
 
 	const char* refusal = nullptr;
+	bool inProgress = false;
 	{
 		std::lock_guard<std::mutex> lock(thePrimingMutex);
 		switch (thePrimingState)
@@ -377,8 +431,7 @@ NameKeyGenerator::PrimingLatch::PrimingLatch() : m_priming(FALSE), m_completed(F
 				m_priming = TRUE;
 				break;
 			case PRIMING_IN_PROGRESS:
-				refusal = "another engine is still priming this process (the first engine must complete "
-					"GameEngine::init alone)";
+				inProgress = true;
 				break;
 			case PRIMED:
 				break;
@@ -387,10 +440,12 @@ NameKeyGenerator::PrimingLatch::PrimingLatch() : m_priming(FALSE), m_completed(F
 				break;
 		}
 	}
-	// Never returns: ReleaseCrash alone returns when there is no TheGlobalData (a host that called init
-	// before its startup parse, say), and init must not run on then.
+	if (inProgress)
+		refuseInit("another engine is still priming this process (the first engine must complete "
+			"GameEngine::init alone)");
+	// The failure that poisoned the process already wrote the crash report and set the fault latch.
 	if (refusal != nullptr)
-		ReleaseCrashNoReturn(refusal);
+		refuseInit(refusal);
 	if (!m_priming)
 		rts::ctx()->nameKeysFrozen = true;
 }
@@ -419,6 +474,12 @@ NameKeyGenerator::PrimingLatch::~PrimingLatch()
 void NameKeyGenerator::PrimingLatch::endFrozenNames()
 {
 	rts::ctx()->nameKeysFrozen = false;
+	if (m_priming)
+	{
+		// Every name interned from here on is one a later engine's frozen window must not meet.
+		std::lock_guard<std::mutex> lock(TheNameKeyGenerator->m_insertMutex);
+		TheNameKeyGenerator->m_primed = true;
+	}
 }
 
 void NameKeyGenerator::PrimingLatch::complete()

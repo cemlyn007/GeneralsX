@@ -97,6 +97,15 @@ static void _writeOutINI();
 extern void _writeSingleParticleSystem( File *out, ParticleSystemTemplate *particleTemplate );
 static void _reloadTextures();
 
+#if defined(RTS_DEBUG)
+	#define DO_VTUNE_STUFF
+#endif
+
+#ifdef DO_VTUNE_STUFF
+//typedef __declspec(dllimport) void __cdecl (*VTProc)();
+	typedef void (*VTProc)();
+#endif
+
 #if RTS_ENGINE_CONTEXT
 // GeneralsX @bugfix cemlyn007 29/09/2026 The debugger-window and particle-editor hooks per engine (PLAN-023 Phase 5b, TSan)
 // Not debug-only: every ScriptEngine's constructor and init() write them (the DLL handles to nullptr on a
@@ -114,6 +123,19 @@ struct ScriptEngineDebugHooks
 	HMODULE particleDLL;
 	ParticleSystem *particleSystem;
 	Bool particleSystemNeedsStopping; ///< Set along with particleSystem if the particle system has infinite life
+	int getTeamNamedWarnCount; ///< GeneralsX @bugfix cemlyn007 02/10/2026 sim-path writer, not debug-only (see below)
+#ifdef DO_VTUNE_STUFF
+	// GeneralsX @bugfix cemlyn007 02/10/2026 The VTune handles have the same cross-engine write pattern RT3
+	// fixed for the hooks above: _initVTune/_cleanUpVTune/_updateVTune run on every
+	// ScriptEngine's own init()/destructor/update(), so with DO_VTUNE_STUFF (RTS_DEBUG) and engines on
+	// several threads a later boot or teardown raced with a stepping engine's reads: one engine's
+	// _cleanUpVTune could null VTPause/VTResume between another engine's null check and its call in
+	// _updateVTune, and the module reference of every engine but the first to tear down leaked.
+	Bool enableVTune;
+	HMODULE vTuneDLL;
+	VTProc vTPause;
+	VTProc vTResume;
+#endif
 };
 static rts::PerEngineStatic<ScriptEngineDebugHooks> s_scriptEngineDebugHooks_perEngine;
 #define st_LastCurrentFrame (s_scriptEngineDebugHooks_perEngine.get().lastCurrentFrame)
@@ -124,34 +146,38 @@ static rts::PerEngineStatic<ScriptEngineDebugHooks> s_scriptEngineDebugHooks_per
 #define st_ParticleDLL (s_scriptEngineDebugHooks_perEngine.get().particleDLL)
 #define st_particleSystem (s_scriptEngineDebugHooks_perEngine.get().particleSystem)
 #define st_particleSystemNeedsStopping (s_scriptEngineDebugHooks_perEngine.get().particleSystemNeedsStopping)
+// GeneralsX @bugfix cemlyn007 02/10/2026 getTeamNamed's team-instance warning counter is not debug-only
+// either: it is read and incremented by every engine's own script-evaluation thread on the release sim path
+// (ScriptEngine::getTeamNamed below), the same misclassification RT3 fixed for st_* above.
+#define getTeamNamed_warnCount (s_scriptEngineDebugHooks_perEngine.get().getTeamNamedWarnCount)
+#ifdef DO_VTUNE_STUFF
+#define st_EnableVTune (s_scriptEngineDebugHooks_perEngine.get().enableVTune)
+#define st_vTuneDLL (s_scriptEngineDebugHooks_perEngine.get().vTuneDLL)
+#define VTPause (s_scriptEngineDebugHooks_perEngine.get().vTPause)
+#define VTResume (s_scriptEngineDebugHooks_perEngine.get().vTResume)
+#endif
 #else
 static HMODULE st_ParticleDLL;
 ParticleSystem *st_particleSystem;
 Bool st_particleSystemNeedsStopping = FALSE; ///< Set along with st_particleSystem if the particle system has infinite life
+static int st_getTeamNamedWarnCount = 0;
+#define getTeamNamed_warnCount st_getTeamNamedWarnCount
+#ifdef DO_VTUNE_STUFF
+	static Bool						st_EnableVTune = false;
+	static HMODULE				st_vTuneDLL = nullptr;
+	static VTProc VTPause = nullptr;
+	static VTProc VTResume = nullptr;
+#endif
 #endif
 #define ARBITRARY_BUFF_SIZE	128
 #define FORMAT_STRING "%.2f"
 #define FORMAT_STRING_LEADING_STRING		"%s%.2f"
 // That's it for particle editor
 
-#if defined(RTS_DEBUG)
-	#define DO_VTUNE_STUFF
-#endif
-
 #ifdef DO_VTUNE_STUFF
-
-//typedef __declspec(dllimport) void __cdecl (*VTProc)();
-	typedef void (*VTProc)();
-
-	static Bool						st_EnableVTune = false;
-	static HMODULE				st_vTuneDLL = nullptr;
-	static VTProc VTPause = nullptr;
-	static VTProc VTResume = nullptr;
-
 	static void _initVTune();
 	static void _updateVTune ();
 	static void _cleanUpVTune();
-
 #endif
 
 
@@ -6012,10 +6038,12 @@ Team * ScriptEngine::getTeamNamed(const AsciiString& teamName)
 		return nullptr; // team wasn't active.
 	}
 
-	static int warnCount = 0;
+	// GeneralsX @bugfix cemlyn007 02/10/2026 Per-engine, not a function-local static: every engine's own
+	// script-evaluation thread reads and increments this on the release sim path, the same misclassification
+	// RT3 fixed for the debugger-window/particle-editor st_* hooks above (PLAN-023 Phase 5b, TSan).
 	if (theTeamProto->countTeamInstances()>1) {
-		if (warnCount<10) {
-			warnCount++;
+		if (getTeamNamed_warnCount<10) {
+			getTeamNamed_warnCount++;
 			AppendDebugMessage("***Referencing multiple team by unspecific instance:***", false);
 			AppendDebugMessage(teamName, false);
 		}

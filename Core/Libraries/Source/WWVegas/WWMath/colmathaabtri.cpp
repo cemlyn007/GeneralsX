@@ -107,6 +107,8 @@ enum
 	constructor of this object and testing determined that re-using the same static
 	struct was slightly faster anyway.
 	NOTE: this makes the code not Thread-Safe!!!!
+	GeneralsX @tweak cemlyn007 03/10/2026 The context is now a stack local of CollisionMath::Collide and
+	Intersection_Test, passed to the helpers, so these routines are thread-safe again.
 
 
 ******************************************************************************************/
