@@ -907,13 +907,25 @@ bool IsEngineTearingDown()
 }
 #endif
 
-// GeneralsX @feature cemlyn007 02/10/2026 Sets the fault latch (see FatalEngineError.h).
+// GeneralsX @feature cemlyn007 02/10/2026 Sets the fault latch (see FatalEngineError.h), and the current engine's
+// own record of a fatal error (TakeEngineFatalErrorRaised): a fatal error that returns instead of throwing, in the
+// teardown window, constructs no FatalEngineError that would set it.
 static void latchEngineFault()
 {
 #if !(defined(_MSC_VER) && _MSC_VER < 1300)
 	theEngineHasFaulted.store(true);
 #else
 	theEngineHasFaulted = true;
+#endif
+#if RTS_ENGINE_CONTEXT
+	// g_noEngine stays pristine.
+	rts::EngineContext* context = rts::ctx();
+	if (context != &rts::g_noEngine)
+		context->fatalErrorRaised = true;
+#elif !(defined(_MSC_VER) && _MSC_VER < 1300)
+	theFatalErrorRaised.store(true);
+#else
+	theFatalErrorRaised = true;
 #endif
 }
 

@@ -64,7 +64,8 @@ public:
 FATAL_ENGINE_ERROR_API void SetEngineEmbeddedMode(bool embedded);
 FATAL_ENGINE_ERROR_API bool IsEngineEmbeddedMode();
 
-// GeneralsX @bugfix cemlyn007 03/10/2026 Whether a FatalEngineError was constructed in the current
+// GeneralsX @bugfix cemlyn007 03/10/2026 Whether a fatal error was raised (a FatalEngineError constructed,
+// or the fatal error returned instead of throwing, see the teardown window above) in the current
 // engine (with RTS_ENGINE_CONTEXT, in the current engine context, never outside every one; without it,
 // in the process) since the last call, which clears it. A host that enters an engine around its calls
 // reads it as the call ends, to tell an exception leaving the engine that is a fatal error from one that
