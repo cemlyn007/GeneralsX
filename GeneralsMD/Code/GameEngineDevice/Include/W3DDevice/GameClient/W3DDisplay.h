@@ -144,8 +144,9 @@ public:
 	/// @todo Need a scene abstraction
 #if RTS_ENGINE_CONTEXT
 	// GeneralsX @feature cemlyn007 28/09/2026 The scenes and the asset manager are per engine (EngineContext
-	// fields): a headless engine builds them too, and one engine's teardown reset another's scenes after
-	// they were freed (PLAN-023 Phase 3). The qualified uses are unchanged.
+	// fields): a headless engine builds only the asset manager (the scenes need a render mode), and one
+	// engine's teardown reset another's asset manager after it was freed (PLAN-023 Phase 3). The qualified
+	// uses are unchanged.
 	static constexpr rts::ContextField<RTS3DScene*, &rts::EngineContext::w3dDisplay3DScene> m_3DScene{};
 	static constexpr rts::ContextField<RTS2DScene*, &rts::EngineContext::w3dDisplay2DScene> m_2DScene{};
 	static constexpr rts::ContextField<RTS3DInterfaceScene*, &rts::EngineContext::w3dDisplay3DInterfaceScene> m_3DInterfaceScene{};

@@ -36,6 +36,7 @@ set(GAMEENGINE_SRC
 #    Include/Common/DrawModule.h
     Include/Common/DynamicAudioEventInfo.h
     Include/Common/EngineContext.h
+    Include/Common/EngineContextFields.inl
     Include/Common/EngineSingletonMacros.h
     Include/Common/EngineSingletons.inl
 #    Include/Common/encrypt.h
