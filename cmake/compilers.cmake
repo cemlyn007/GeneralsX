@@ -108,7 +108,7 @@ if(RTS_SANITIZE)
     if(RTS_SANITIZE STREQUAL "thread" AND RTS_BUILD_OPTION_ASAN)
         # GeneralsX @bugfix cemlyn007 02/10/2026 GCC/Clang refuse to link -fsanitize=thread together with
         # -fsanitize=address, but without this check configuration succeeds and the first compile fails with
-        # an error that names neither cache option (found in review).
+        # an error that names neither cache option.
         message(FATAL_ERROR "RTS_SANITIZE=thread cannot be combined with RTS_BUILD_OPTION_ASAN=ON (ThreadSanitizer and AddressSanitizer cannot be linked together)")
     endif()
     add_compile_options(-fsanitize=${RTS_SANITIZE} -fno-omit-frame-pointer -g)

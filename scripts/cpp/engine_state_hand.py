@@ -240,7 +240,7 @@ HAND = [
     # didWarn and PathfindCell::~PathfindCell()::warn were listed here as debug-only "warn-once" flags, but each
     # is written on a release sim path by every engine's own thread (getTeamNamed's own script-evaluation thread,
     # the object update that changes trigger-area membership, or the pathfinder freeing its cells): they are
-    # PER_ENGINE_STATICs now (02/10/2026, found in review), so gone from the library as function-local
+    # PER_ENGINE_STATICs now (02/10/2026), so gone from the library as function-local
     # statics; the slot index is rule:per-engine-static (same treatment as the st_* hooks above). The same
     # audit found LocalFile.cpp's s_totalOpen and ParticleBufferClass::TotalActiveCount had no reader (the
     # former a commented-out DEBUG_LOG, the latter a getter with no caller) and no debug assert either, so
