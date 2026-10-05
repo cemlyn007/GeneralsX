@@ -28,7 +28,12 @@
 # A per-engine note that starts "threads only" names state that is correct for several engines stepped on
 # ONE thread (a scratch buffer filled and consumed inside one call, a call-depth counter) and only breaks
 # once engines step concurrently: PLAN-023's delivery scope defers those, so they are listed for the
-# threaded follow-up rather than for Phases 2-4 of this delivery.
+# threaded follow-up rather than for Phases 2-4 of this delivery. A process-global note can start "threads
+# only" too: every engine writes the SAME value into a shared process-global (so it is correct, and stays
+# process-global, on one thread), but the write itself is unsynchronised, so it is a data race once engines
+# run on separate threads (Object's helper ModuleData, the ScoreKeeper/ModuleInfo KindOf masks, the
+# FunctionLexicon tables, generalAllocator's lazy, lock-free creation); the threaded follow-up gives each of
+# these a `std::call_once` or an equivalent one-time/locked write.
 
 PER = "per-engine"
 GLOBAL = "process-global"
@@ -56,13 +61,13 @@ NET = (
 # fixes): Show/HideControlBar (ControlBarCallback.cpp; no static of its own), HideQuitMenu (QuitMenu.cpp, from
 # clearGameData: the state it touches is a PER_ENGINE_STATIC; the rest only the menu writes), Shell::update
 # (Shell.cpp, from GameClient::update: its throttle is a PER_ENGINE_STATIC) and ~GameWindowManager's
-# freeStaticStrings (GameWindowManagerScript.cpp: the .wnd parse scratch, entry below).
+# freeStaticStrings (GameWindowManagerScript.cpp: the .wnd parse's callback strings, a PER_ENGINE_STATIC).
 HEADLESS_GUI = (
-    "ControlBar/|LoadScreen\\.cpp|GameWindowManager\\.cpp|"
+    "ControlBar/|LoadScreen\\.cpp|GameWindowManager\\.cpp|Shell/(Shell|ShellMenuScheme)\\.cpp|"
     "GUICallbacks/(Diplomacy|InGameChat|InGamePopupMessage|ControlBarPopupDescription)\\.cpp"
 )
 W3D_RENDER = "W3D render path (device, shaders, draw lists): only the one rendering engine per process reaches it (PLAN-023 Phase 8)"
-LOADER = "stateless W3D prototype loader/persist factory, registered once at static initialisation"
+LOADER = "stateless W3D prototype loader/persist factory, registered once at static initialization"
 
 HAND = [
     # ---------------------------------------------------------------------------------------------------
@@ -74,12 +79,10 @@ HAND = [
     # are EngineContext fields or PER_ENGINE_STATICs now (so gone from the library; their slot indexes are
     # rule:per-engine-static), as are Phase 3's TheWaterTransparency, TheWeatherSetting, WaterSettings[], rand4
     # and CameraShakerSystem.
-    # thread_local (per thread by design, so process-global here): both checkfortransitionsnum, inCRCGen,
-    # dx8renderer.cpp's DX8MeshRendererState_destroying and
+    # thread_local (per thread by design, so process-global here): both checkfortransitionsnum, inCRCGen and
     # PathNode::computeDirectionVector()'s dir. The two XferLoad buffers are locals now (so gone).
     (GLOBAL, "", "re:State::friend_check(For|ForSleep)Transitions\\(StateReturnType\\)::checkfortransitionsnum", "thread_local call-depth counter (PLAN-023 Phase 2): per thread by design"),
     (GLOBAL, "", "TerrainLogic::m_gridWaterHandle", "an address-only sentinel (the grid water's WaterHandle is compared by address and never written), the same for every engine"),
-    (GLOBAL, "", "re:\\(anonymous namespace\\)::DX8MeshRendererState_destroying", "thread_local, set only while this thread runs an engine's DX8MeshRendererState destructor (PLAN-023 Phase 3): per thread by design"),
     (GLOBAL, "", "inCRCGen", "thread_local, set only while this thread runs GameLogic::getCRC (PLAN-023 Phase 2): per thread by design"),
     (GLOBAL, "", "re:PathNode::computeDirectionVector\\(\\)::dir", "thread_local returned-by-pointer scratch, consumed at once (PLAN-023 Phase 2): per thread by design"),
     (PER, 4, "re:BuildAssistant::buildTiledLocations\\(.*\\)::tileInfo", "threads only: returned-by-pointer scratch, consumed at once"),
@@ -90,15 +93,16 @@ HAND = [
     # and its three lists, the particle buffers' rand_gen and the mesh/material/texture/decal ID counters are
     # PER_ENGINE_STATICs; WorldHeightMap::m_alphaTiles is a member (so gone from the library, the slot
     # indexes rule:per-engine-static). What is left here is process-wide by design.
-    (GLOBAL, "", "_TheFileFactory", "with RTS_ENGINE_CONTEXT, always the one permanent W3D file factory (W3DFileSystem.cpp, immortal) that forwards to the current engine's W3DFileSystem (PLAN-023 Phase 3); every W3DFileSystem stores the same pointer and none nulls it"),
+    (GLOBAL, "", "_TheFileFactory", "with RTS_ENGINE_CONTEXT, always the one permanent W3D file factory (W3DFileSystem.cpp, immortal) that forwards to the current engine's W3DFileSystem (PLAN-023 Phase 3); written once, by the factory's first use, and never nulled"),
     (GLOBAL, "", "re:(guard variable for )?\\(anonymous namespace\\)::engineW3DFileFactory\\(\\)::factory", "the one permanent W3D file factory _TheFileFactory points at (PLAN-023 Phase 3): made on first use under the static-init guard and never destroyed, the same object for every engine"),
     (GLOBAL, "", "_TheSimpleFileFactory", "never reassigned by the engine (only the tools do): always the process-global default factory"),
-    (GLOBAL, "", "re:table_once|Ring_Array_Once|Sphere_Array_Once", "std::once_flag of a table built once per process from constants (motchan's filter table, the ring/sphere LOD meshes; PLAN-023 Phase 3)"),
-    (GLOBAL, "", "re:WWMathInitMutex|WWMathInitCount", "the process-wide WWMath::Init/Shutdown count and its mutex (PLAN-023 Phase 3): the tables are built by the first Init and freed by the last Shutdown of any engine; each engine holds at most one count (EngineContext::wwMathInitialized)"),
     (GLOBAL, "", "filtertable", "motchan's filter table: built once per process under std::call_once from constants (PLAN-023 Phase 3)"),
     (GLOBAL, "", "re:(Sphere|Ring)MeshArray|(Sphere|Ring)LODCosts", "sphere/ring LOD meshes: built once per process under std::call_once from constants (PLAN-023 Phase 3); only the one rendering engine's draw re-sets their alpha/scale, right before it draws them"),
     (GLOBAL, "", "re:_Fast(Acos|Asin|Sin|InvSin)Table", "WWMath::Init tables: built by the first of the counted WWMath::Init calls (PLAN-023 Phase 3), the same values every time"),
-    (GLOBAL, "", "TheW3DFrameLengthInMsec", "every engine writes the same constant: GameClient::init calls W3DGameClient::setFrameRate(MSEC_PER_LOGICFRAME_REAL), its initial value; the unsynchronised write matters only with threads"),
+    (GLOBAL, "", "re:Ring_Array_Once|Sphere_Array_Once|table_once", "the std::call_once flag of a table built once per process from constants (the ring and sphere LOD meshes, motchan's filter table; PLAN-023 Phase 3)"),
+    (GLOBAL, "", "WWMathInitCount", "WWMath::Init's count of the engines that hold an Init, written under WWMathInitMutex (PLAN-023 Phase 3): shared by every engine on purpose: the first Init builds the _Fast* tables and the default lookup table, and the last Shutdown frees only the lookup-table manager's tables (the _Fast* tables are static and never freed)"),
+    (GLOBAL, "", "WWMathInitMutex", "guards WWMathInitCount (PLAN-023 Phase 3)"),
+    (GLOBAL, "", "TheW3DFrameLengthInMsec", "every engine writes the same constant: GameClient::init calls W3DGameClient::setFrameRate(MSEC_PER_LOGICFRAME_REAL), its initial value; the unsynchronized write matters only with threads"),
     (GLOBAL, "", "re:W3DAssetManager::Create_Render_Obj\\(.*\\)::warning_count|WW3DAssetManager::Create_Render_Obj\\(.*\\)::warning_count", "missing-asset log limiter: bounds a log message count, and no engine state depends on it"),
     (PER, 3, "AssetStatusClass::Instance", "threads only: the missing-asset report, written by every engine and read by none (the WWDEBUG destructor writes it out at exit); concurrent engines need a lock"),
     (PER, 3, "re:_TempVertexBuffer|_TempNormalBuffer", "threads only: one pair per TU (dx8renderer.cpp's skinned-mesh deform scratch, cleared by TheDX8MeshRenderer's teardown; mesh.cpp's ray-cast/decal skin scratch; decalmsh.cpp's decal scratch; meshmdl.cpp's unused pair), each resized, filled and consumed within one call"),
@@ -110,7 +114,7 @@ HAND = [
     # PLAN-023 Phase 4: caches and remaining statics.
     # Done (PLAN-023 Phase 4 PR): every function-local cache of a per-engine pointer (the seven ActiveBody
     # particle templates, the upgrade/thing template caches, muzzle, debrisTemplate, genericBridgeTemplate,
-    # the seven WaveGuideUpdate particle templates), the thirteen static AudioEventRTS (PER_ENGINE_STATICs,
+    # the seven WaveGuideUpdate particle templates), the fifteen static AudioEventRTS (PER_ENGINE_STATICs,
     # not locals: each keeps its event's sound rotation index, which a local would reset), Drawable's static
     # images, ControlBar's rank icons, the observer, diplomacy, briefing, chat and build-tooltip GUI state a
     # headless engine writes, debrisModelNamesGlobalHack, TerrainRoadCollection::m_idCounter, View::m_idNext,
@@ -132,15 +136,22 @@ HAND = [
     (GLOBAL, "", "re:TheNameKeyGenerator|\\(anonymous namespace\\)::thePriming(Mutex|State|Failure)|NameKeyGenerator::perturbForTesting\\(.*\\)::calls", "shared immortal NameKey generator and its priming latch (PLAN-023 Decision 2)"),
     (GLOBAL, "", "re:.*::(key_\\w+|jetKey)", "cached NameKeyType (a NAMEKEY(...) in an inline function): process-wide by PLAN-023 Decision 2"),
     (GLOBAL, "", "re:ControlBar::update(OCLTimer|Construction)TextDisplay\\(.*\\)::(descID|barID)", "cached window NameKey held as UnsignedInt: process-wide by PLAN-023 Decision 2"),
-    (GLOBAL, "", "re:Object::Object\\(.*\\)::\\w+ModuleData", "shared helper ModuleData: every Object writes the same (Decision 2) NameKey tag into it"),
-    (GLOBAL, "", "re:scoringBuilding(Create|Destroy)?Mask", "rewritten with the same constant KindOf bits by every ScoreKeeper"),
-    (GLOBAL, "", "re:ModuleInfo::clearCopiedFromDefaultEntries\\(.*\\)::\\w+Mask", "rewritten with the same constant KindOf bits on every call"),
-    (GLOBAL, "", "re:gameWin(System|Input|Tooltip)Table|winLayout(Init|Update|Shutdown)Table|gameWinDrawTable|layoutInitTable", "FunctionLexicon table: names and function pointers; every engine's init writes the same NameKeys into it (Decision 2)"),
+    # rule:namekey now requires the declaration itself to initialise from NAMEKEY(...) or
+    # TheNameKeyGenerator->nameToKey(...): sound for most caches, but these are declared `= NAMEKEY_INVALID`
+    # (or with no initialiser, for an array) and filled from the generator later, in a separate init function
+    # (ControlBar::initObserverControls, ShowDiplomacy, InGamePopupMessageInit, LobbyUtils, ...), so the rule
+    # no longer sees them. Still process-wide NameKey caches by PLAN-023 Decision 2.
+    (GLOBAL, "", "re:buttonOkID|buttonCancelID|buttonMuteID|buttonUnMuteID|buttonPlayerID|parentID|staticTextPlayerID|staticTextSideID|staticTextTeamID|staticTextStatusID|radioButtonInGameID|radioButtonBuddiesID|winInGameID|winBuddiesID|winSoloID|s_replayObserverNameKey", "threads only: cached NameKeyType (a window/button ID key), declared `= NAMEKEY_INVALID` and filled from TheNameKeyGenerator by a later init call (ControlBar::initObserverControls, ShowDiplomacy, ...) that every engine runs, unsynchronized: process-wide by PLAN-023 Decision 2; std::call_once or an engine-independent static initializer fixes it"),
+    (GLOBAL, "", "re:ControlBar::(updateBuildQueueDisabledImages|populateBuildQueue)\\(.*\\)::buildQueueIDs", "threads only: cached NameKeyType array, declared empty and filled from TheNameKeyGenerator in the same function under an unsynchronized check-then-set idsInitialized latch: process-wide by PLAN-023 Decision 2, with the ID statics above; std::call_once fixes it"),
+    (GLOBAL, "", "re:Object::Object\\(.*\\)::\\w+ModuleData", "threads only: shared helper ModuleData; every Object writes the same (Decision 2) NameKey tag into it, but the write is unsynchronized"),
+    (GLOBAL, "", "re:scoringBuilding(Create|Destroy)?Mask", "threads only: rewritten (a KindOfMaskType::set(), a non-atomic read-modify-write) with the same constant KindOf bits by every ScoreKeeper"),
+    (GLOBAL, "", "re:ModuleInfo::clearCopiedFromDefaultEntries\\(.*\\)::\\w+Mask", "threads only: rewritten with the same constant KindOf bits on every call, unsynchronized"),
+    (GLOBAL, "", "re:gameWin(System|Input|Tooltip)Table|winLayout(Init|Update|Shutdown)Table|gameWinDrawTable|layoutInitTable", "threads only: FunctionLexicon table (names and function pointers); every engine's init writes the same NameKeys into it (Decision 2), unsynchronized"),
     (GLOBAL, "", "re:The(AsciiString|UnicodeString|Dma|MemoryPool|DebugLog)CriticalSection", "critical section, process-wide lock (PLAN-023 Phase 1)"),
     (GLOBAL, "", "re:TheMemoryPoolFactory|TheDynamicMemoryAllocator|theMainInitFlag|theMemoryManagerUsers(Mutex)?|\\(anonymous namespace\\)::TheProcessOperators(State)?", "refcounted process-wide memory manager (PLAN-023 Phase 1b, Decision 3)"),
     (GLOBAL, "", "TheVersion", "build version, identical for every engine"),
     (GLOBAL, "", "GlobalData::m_theOriginal", "empty stand-in: the value lives in EngineContext::originalGlobalData (Phase 1b)"),
-    (GLOBAL, "", "re:theEngineEmbeddedMode|theReleaseCrashLogFile", "embedding host's fatal-error mode / release-crash log (PLAN-023 Phase 5 moves the log to per-engine output paths)"),
+    (GLOBAL, "", "re:theEngineEmbeddedMode|theEngineHasFaulted|theReleaseCrashLogFile", "embedding host's fatal-error mode / sticky fault latch / release-crash log (PLAN-023 Phase 5 moves the log to per-engine output paths)"),
     (GLOBAL, "", "theInReleaseCrashNoReturn", "thread_local re-entry guard of ReleaseCrashNoReturn: per thread by design"),
     (GLOBAL, "", "re:TheSDL3Window|ApplicationHWnd", "the process's window (at most one rendering engine per process)"),
     (GLOBAL, "", "re:__argc|__argv", "the process's argv (the executable's, set by rlgenerals' launcher; PLAN-023 Phase 5 BootConfig replaces it)"),
@@ -154,8 +165,8 @@ HAND = [
     (GLOBAL, "", "s_assetFallbackPath", "the install's asset fallback root, set once from the environment (PLAN-023 Phase 5 BootConfig)"),
     (GLOBAL, "", "re:s_thread|s_done|s_hasUpdate|s_latestTag", "update checker (menus), one per process"),
     (GLOBAL, "", "re:thread_id_map(_mutex)?|next_thread_id", "pthread-to-Win32 thread id map (CompatLib), process-wide by nature"),
-    (GLOBAL, "", "GameSpyColor", "the online chat colours: every engine's boot parses them (INI's OnlineChatColors block) with the install's values, the same for every engine; only the online menus read them"),
-    (GLOBAL, "", "NGMP_OnlineServicesManager::getInstance()::instance", "the process's GeneralsOnline session, logged into from the online menus of the one UI engine: every engine's teardown makes the (idle) instance, but with RTS_ENGINE_CONTEXT only a non-headless engine initialises it (GameEngine::init) or shuts it down (~GameEngine), so a headless engine never touches the session"),
+    (GLOBAL, "", "GameSpyColor", "the online chat colors: every engine's boot parses them (INI's OnlineChatColors block) with the install's values, the same for every engine; only the online menus read them"),
+    (GLOBAL, "", "NGMP_OnlineServicesManager::getInstance()::instance", "the process's GeneralsOnline session, logged into from the online menus of the one UI engine: with RTS_ENGINE_CONTEXT only a non-headless engine initializes it (GameEngine::init) or shuts it down (~GameEngine), so a headless engine never touches the session"),
     (GLOBAL, "", "re:theLobbyFilter|isThreadHosting|NET_CRC_INTERVAL|MIN_LOGIC_FRAMES|MAX_FRAMES_AHEAD|MIN_RUNAHEAD|FRAME_DATA_LENGTH|FRAMES_TO_KEEP|commandsReadyDebugSpewage", NET),
     # Not the whole of GameNetwork/: GameInfo.cpp (skirmish setup), LANGameInfo.cpp, GameMessageParser.cpp and
     # NetworkUtil.cpp are reached without a network, so their statics are classified by name.
@@ -165,13 +176,14 @@ HAND = [
     (PER, 4, "re:(Unicode|Ascii)StringToQuotedPrintable\\(.*\\)::dest|QuotedPrintableTo(Unicode|Ascii)String\\(.*\\)::dest", "threads only: conversion scratch, copied into the returned string at once; every engine's map cache load and save (INIMapCache, MapCache) reach it, headless too"),
     (GLOBAL, "", "re:Return_Buffer|Temp_Buffer", "password encryption for the online login menu: " + NET),
     (GLOBAL, "", "re:TheLobbyQueuedUTMs.*", "GameSpy lobby menu queue (menu state; one UI engine per process)"),
-    (GLOBAL, "", "re:CPUDetectClass::\\w+|Windows9xVersionTable", "CPU/OS detection, done once per process at static initialisation"),
+    (GLOBAL, "", "re:CPUDetectClass::\\w+|Windows9xVersionTable", "CPU/OS detection, done once per process at static initialization"),
     (GLOBAL, "", "re:WideStringClass::m_\\w+|StringClass::(m_Mutex|m_NullChar|m_EmptyString|m_TempStrings|ReservedMask)", "WWLib string temp-buffer pool, guarded by its own mutex: process-wide by design"),
-    (GLOBAL, "", "re:generalAllocator|FastAllocatorGeneral::Alloc\\(unsigned int\\)::re_entrancy", "WWLib fast allocator, process-wide like malloc"),
+    (GLOBAL, "", "re:generalAllocator|FastAllocatorGeneral::Alloc\\(unsigned int\\)::re_entrancy", "threads only: WWLib fast allocator, process-wide like malloc, but generalAllocator's lazy creation and re_entrancy's increment/decrement are both unsynchronized, lock-free reads/writes"),
     (GLOBAL, "", "re:AutoPoolClass<.*>::Allocator\\(\\)::allocator", "WWLib object pool per type, process-wide like malloc"),
     (GLOBAL, "", "re:RegistryClass::IsLocked|\\(anonymous namespace\\)::GetRegistryPaths\\(\\)::paths", "registry emulation (the process's settings files)"),
     (GLOBAL, "", "re:IndexClass<int, INI(Entry|Section)\\*>::operator\\[\\]\\(int const&\\) const::x", "default value returned for a missing index, never written"),
     (CONST, "", "BufferedFileClass::_DesiredBufferSize", "buffer-size setting, never changed"),
+    (CONST, "", "re:rts::WorkingDirectory::saveStartupWorkingDirectory\\(\\)::len", "captures the process's own startup cwd (::GetCurrentDirectory): the same OS-level value for every engine in the process, written once"),
     (GLOBAL, "", "INIClass::KeepBlankEntries", "WWLib INI parser option, never changed"),
     (GLOBAL, "", "re:_DefaultFileFactory|_DefaultWritingFileFactory|_TheWritingFileFactory", "WWLib default (raw) file factories"),
     (GLOBAL, "", "re:SaveLoadSystemClass::\\w+|DefinitionFactoryMgrClass::_FactoryListHead|_TheDefinitionMgr|DefinitionMgrClass::\\w+|text_mutex|status_text|status_count|_(alloc|load|reg)_time", "WWSaveLoad registries (persist factories registered at static init; the definition manager is used only by W3DView/tools)"),
@@ -187,7 +199,7 @@ HAND = [
     (CONST, "", "re:LZHL(De|En)coderStat::\\w+Table0", "LZHL static coding tables"),
     (CONST, "", "re:gli::.*::Table|stbiw__encode_png_line\\(.*\\)::(firstmap|mapping)|pi_lo|tiny", "table/constant in header-only third-party code"),
     (CONST, "", "re:paramsFor(Startup|EngineInit)", "command-line parameter table (names and handlers)"),
-    (CONST, "", "re:OBJECT_STATUS_MASK_NONE|DAMAGE_TYPE_FLAGS_(NONE|ALL)|DISABLEDMASK_(NONE|ALL)|KINDOFMASK_(NONE|FS)", "constant bit mask, set at static initialisation"),
+    (CONST, "", "re:OBJECT_STATUS_MASK_NONE|DAMAGE_TYPE_FLAGS_(NONE|ALL)|DISABLEDMASK_(NONE|ALL)|KINDOFMASK_(NONE|FS)", "constant bit mask, set at static initialization"),
     (CONST, "", "re:replayExtention|lastReplayFileName|PORTABLE_(SAVE|MAPS|USER_MAPS)|g_csfFile|g_strFile|statsDir|ignoredChars", "constant string, never reassigned"),
     (CONST, "", "re:Surfaces|ShakeIntensities|EMITTER_TYPE_NAMES|ReportCategoryNames", "name table, never written"),
     (CONST, "", "re:s_noSoundMarker|ThingTemplate::s_audioEventNoSound", "default-constructed 'no sound' marker, returned by const pointer"),
@@ -196,6 +208,21 @@ HAND = [
     (CONST, "", "re:CRC::_Table|CRC32_Table|Random3Class::Mix[12]|_box_normal|TwiddlerClassName", "constant table"),
     (CONST, "", "re:gameWindowFieldList|layoutScriptTable", ".wnd parse table (names and parsers)"),
     (CONST, "", "re:_\\w+(Loader|Factory)|_NullPrototype|_TwiddlerPersistFactory", LOADER),
+    (
+        CONST,
+        "",
+        "SpecialPowerTemplate::m_specialPowerFieldParse",
+        "INI FieldParse table, built once, never written; rule:fieldparse's declared-type check expects an "
+        "unqualified array name and this is an out-of-line, class-qualified definition",
+    ),
+    (
+        CONST,
+        "",
+        "s_allWeaponFireFlags",
+        "built once from MAKE_MODELCONDITION_MASK5 (Common/ModelState.h), which macro-expands to "
+        "ModelConditionFlags's own constructor applied to literal flags only; a textual rule cannot see "
+        "through the macro to confirm that",
+    ),
     # ---------------------------------------------------------------------------------------------------
     # Debug only.
     (DEBUG, "", "re:TheDebugIgnoreSyncErrors|TheCurrentIgnoreCrashPtr|g_LastErrorDump", "debug"),
@@ -215,24 +242,23 @@ HAND = [
     (RENDER, "", "re:WW3D::(IsSortingEnabled|PixelCenter[XY]|RenderBackend|IsInitted|IsRendering|IsCapturing|IsScreenUVBiased|AreDecalsEnabled|DecalRejectionDistance|AreStaticSortListsEnabled|MungeSortOnLoad|OverbrightModifyOnLoad|Movie|PauseRecord|RecordNextFrame|UserStat[0-2]|DefaultNativeScreenSize|DefaultStaticSortLists|CurrentStaticSortLists|DefaultDebugMaterial|DefaultDebugShader|LightmapDebugShader|PrelitMode|ExposePrelit|SnapshotActivated|ThumbnailEnabled|MeshDrawMode|NPatchesGapFillingMode|NPatchesLevel|IsTexturingEnabled|IsColoringEnabled|LastFrameMemoryAllocations|LastFrameMemoryFrees|TextureFilter|AnisotropyLevel|Lite)|_TextureReduction|_TextureMinDim|_LargeTextureExtraReductionEnabled|DAZZLE_INI_FILENAME", "WW3D render setting or render-loop state: only WW3D::Init, the render loop and the options code (render mode) write it; a headless engine only reads the defaults"),
     (RENDER, "", "re:LocationHash|DuplicateLocationHash|SideHash", "MeshModelClass::Init_For_NPatch_Rendering scratch (needs the render device's caps)"),
     (RENDER, "", "re:TheSupplyAndTechImageLocations", "skirmish menu map-preview markers (T3 listed it for Phase 4; only the menu reads it): " + UI),
-    (GLOBAL, "", "re:ControlBar::(updateBuildQueueDisabledImages|populateBuildQueue)\\(.*\\)::idsInitialized", "guards the fill of that function's cached NameKey array (process-wide by PLAN-023 Decision 2)"),
+    (GLOBAL, "", "re:ControlBar::(updateBuildQueueDisabledImages|populateBuildQueue)\\(.*\\)::idsInitialized", "threads only: unsynchronized check-then-set latch guarding the fill of that function's cached NameKey array (process-wide by PLAN-023 Decision 2); std::call_once replaces it"),
     (CONST, "", "commandWindowsInitialized", "never written (nothing but its definition names it)"),
     (CONST, "", "WindowLayoutCurrentVersion", "never written"),
-    (CONST, "", "re:(guard variable for )?GameWindowManager::assignDefaultGadgetLook\\(.*\\)::\\w+", "set on the first call to a fixed colour (winMakeColor of constants), the same in every engine"),
+    (CONST, "", "re:(guard variable for )?GameWindowManager::assignDefaultGadgetLook\\(.*\\)::\\w+", "set on the first call to a fixed color (winMakeColor of constants), the same in every engine"),
     (RENDER, "", "re:ControlBar::populateBuildQueue\\(.*\\)::cancel(Unit|Upgrade)Command", "cached CommandButton*, but populateBuildQueue runs only from evaluateContextUI (ControlBar::update returns at once headless): " + UI),
     (RENDER, "", "re:ControlBar::(showBuildTooltipLayout|populateBuildTooltipLayout)\\(.*\\)::\\w+", "tooltip on mouse hover over a command button (commandButtonTooltip): " + UI),
     (RENDER, "", "re:radioButton(InGame|Buddies)|win(InGame|Buddies|Solo)", "written only by ShowDiplomacy (player input) and the online buddy overlay: " + UI),
     (RENDER, "", "ToggleInGameChat(bool)::justHid", "chat toggle, set only on player input (ToggleInGameChat, from CommandXlat's chat keys): " + UI),
     (RENDER, "", "re:staticTextMessage|buttonOk|shouldPause", "InGamePopupMessageInit only: headless, InGameUI::popupMessage's layout has no init (GameWindowManagerDummy's winCreateFromScript returns no init name): " + UI),
     (RENDER, "", "re:ChallengeLoadScreen::activatePieces\\(.*\\)::textPos\\w+", "Generals' Challenge load screen teletype positions: GameLogic::getLoadScreen makes a ChallengeLoadScreen only for a challenge campaign, which only the shell's Generals' Challenge menu starts (" + UI + "); they are also reset (FRAME_TELETYPE_START) and consumed within one ChallengeLoadScreen::init call"),
-    (RENDER, "", "re:the(System|Input|Tooltip|Draw)String", "the .wnd parser's scratch names, filled and consumed within one parse (only a real GameWindowManager parses); every engine's ~GameWindowManager clears them (freeStaticStrings), which only drops a finished parse's leftovers: " + UI),
     (RENDER, "", "file:/GUI/(?!" + HEADLESS_GUI + ")", UI),
     (RENDER, "", "re:scrollDir|prevCursor|Mouse::updateMouseData\\(\\)::busy", "mouse/scroll input: headless has MouseDummy and no input"),
     (RENDER, "", "re:W3DRadar::.*", "W3DRadar: headless has RadarDummy"),
     (RENDER, "", "re:W3DDisplay::draw\\(\\)::\\w+|s_filtered(Resolutions|Dirty)", "W3DDisplay::draw returns at once headless; resolution list for the options menu"),
     (RENDER, "", "re:W3DView::update\\(\\)::followFactor", "W3DView: headless has ViewDummy"),
     (RENDER, "", "re:SmudgeSet::m_freeSmudgeList", "heat-haze smudges, drawn only"),
-    (GLOBAL, "", "DX8Wrapper_IsWindowed", "the process's assert switch (Debug.cpp's ignoringAsserts): every headless engine's command line (parseHeadless) sets it false so asserts stay off for the rest of the process, after TheGlobalData is gone too; only ever turned off, the same value from every engine"),
+    (GLOBAL, "", "DX8Wrapper_IsWindowed", "the process's assert switch (Debug.cpp's ignoringAsserts): every headless engine's command line (parseHeadless) sets it false, so asserts stay off after TheGlobalData is gone too, and a rendering engine's DX8Wrapper::Set_Render_Device sets its windowed flag; the last writer wins, and only assert handling (debug builds) reads it"),
     (RENDER, "", "file:/W3DDevice/GameClient/(Shadow|Water)/", W3D_RENDER),
     (RENDER, "", "file:W3DShaderManager\\.cpp|W3DMouse\\.cpp|W3DScene\\.cpp|W3DShroud\\.cpp|W3DStatusCircle\\.cpp|W3DTreeBuffer\\.cpp|FlatHeightMap\\.cpp|HeightMap\\.cpp|BaseHeightMap\\.cpp|W3DGhostObject\\.cpp|Win32Mouse\\.cpp", W3D_RENDER),
     # Only device-only WW3D2 files: mesh, meshmdl, meshgeometry, rendobj, texture, ww3d, dx8renderer,

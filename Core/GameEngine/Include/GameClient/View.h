@@ -319,7 +319,9 @@ protected:
 	View *m_next;																								///< List links used by the Display class
 
 	UnsignedInt m_id;																						///< The ID of this view
+#if !RTS_ENGINE_CONTEXT
 	static UnsignedInt m_idNext;																///< Used for allocating view ID's for all views
+#endif
 
 	UnsignedInt m_userControlLockedUntilFrame;									///< Locks the user control over camera until the given frame is reached
 	Bool m_isUserControlled;																		///< True if the user moved the camera last, false if the scripted camera moved the camera last

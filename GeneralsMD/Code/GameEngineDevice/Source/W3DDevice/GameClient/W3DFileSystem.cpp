@@ -491,30 +491,35 @@ W3D file factory.  */
 // GeneralsX @feature cemlyn007 28/09/2026 One permanent, process-wide W3D file factory that forwards to
 // the current engine's W3DFileSystem (PLAN-023 Phase 3). Each engine's W3DFileSystem used to install itself
 // in _TheFileFactory and null it on destruction, so a second engine's teardown left the first reading
-// through null. With no W3DFileSystem in the current engine it reads through the default factory, as
-// _TheFileFactory does before the first W3DFileSystem is made. It reads the current engine's W3DFileSystem,
-// so a thread that loads files must run in its engine's context: the texture loader thread enters each
-// task's engine (TextureLoadTaskClass::Get_Engine_Context). The factory is immortal (made on first use and
-// never destroyed) since _TheFileFactory keeps pointing at it until the process exits, past static
-// destruction.
+// through null. With no W3DFileSystem in the current engine it reads through a plain file factory of its
+// own, as _TheFileFactory does before the first W3DFileSystem is made. It reads the current engine's
+// W3DFileSystem, so a thread that loads files must run in its engine's context: the texture loader thread enters each
+// task's engine (TextureLoadTaskClass::Get_Engine_Context). The factory, and the plain one inside it, are
+// immortal (made on first use and never destroyed) since _TheFileFactory keeps pointing at it until the
+// process exits, past static destruction. Its first use installs it in _TheFileFactory, once, so no later
+// W3DFileSystem writes that global.
 namespace
 {
 class EngineW3DFileFactoryClass : public FileFactoryClass
 {
 public:
+	EngineW3DFileFactoryClass() { _TheFileFactory = this; }
 	virtual FileClass * Get_File( char const *filename ) override
 	{
 		if (TheW3DFileSystem != nullptr)
 			return TheW3DFileSystem->Get_File(filename);
-		return _TheSimpleFileFactory->Get_File(filename);
+		return m_fallback.Get_File(filename);
 	}
 	virtual void Return_File( FileClass *file ) override
 	{
 		if (TheW3DFileSystem != nullptr)
 			TheW3DFileSystem->Return_File(file);
 		else
-			_TheSimpleFileFactory->Return_File(file);
+			m_fallback.Return_File(file);
 	}
+
+private:
+	SimpleFileFactoryClass m_fallback;
 };
 
 FileFactoryClass *engineW3DFileFactory()
@@ -528,7 +533,7 @@ FileFactoryClass *engineW3DFileFactory()
 W3DFileSystem::W3DFileSystem()
 {
 #if RTS_ENGINE_CONTEXT
-	_TheFileFactory = engineW3DFileFactory();
+	engineW3DFileFactory(); // installs the one permanent factory on its first use
 #else
 	_TheFileFactory = this; // override the w3d file factory.
 #endif
