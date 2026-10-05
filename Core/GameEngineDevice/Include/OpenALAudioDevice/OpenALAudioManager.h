@@ -278,6 +278,14 @@ public:
 #if defined(_DEBUG) || defined(_INTERNAL)
 	virtual void audioDebugDisplay(DebugDisplayInterface *dd, void *, FILE *fp = NULL) override {}
 #endif
+	// GeneralsX @bugfix cemlyn007 02/10/2026 This always-0 answer only matches the real backend
+	// while no build defines SAGE_USE_FFMPEG: OpenALAudioManager::getFileLengthMS then decodes a
+	// real length through m_audioCache. Fail the build instead of silently diverging per-frame
+	// logic between muted and audible engines on the same seed if that build option is ever
+	// turned on without updating this override.
+#ifdef SAGE_USE_FFMPEG
+#error "OpenALAudioManagerDummy::getFileLengthMS must be updated to match the decoded length OpenALAudioManager::getFileLengthMS now reports under SAGE_USE_FFMPEG"
+#endif
 	virtual Real getFileLengthMS(AsciiString strToLoad) const override { return 0.0f; }
 
 	virtual void selectProvider(UnsignedInt providerNdx) override {}
@@ -291,7 +299,7 @@ public:
 	virtual void friend_forcePlayAudioEventRTS(const AudioEventRTS *eventToPlay) override {}
 	virtual void processRequestList(void) override { removeAllAudioRequests(); }
 
-	// GeneralsX @performance cemlyn007 29/09/2026 Nothing is ever playing, so client code may skip
+	// GeneralsX @performance cemlyn007 29/09/2026 No sound is ever audible (pending requests are dropped at the next audio update), so client code may skip
 	// work that only restarts sounds (PLAN-023 Phase 5b, perf2). Same in MiniAudioManagerDummy.
 	virtual Bool canPlaySounds() const override { return FALSE; }
 

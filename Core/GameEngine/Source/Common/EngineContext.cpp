@@ -28,10 +28,12 @@
 #include <atomic>
 #include <cfenv>
 #include <cstdio>
+#include <cstring>
 #include <mutex>
 #include <vector>
 
 #ifndef _WIN32
+#include <dlfcn.h>
 #include <locale.h>
 #include <pthread.h>
 #if defined(__APPLE__)
@@ -98,14 +100,16 @@ void appendLiveFieldName(const char* name, void* user)
 EngineContext::~EngineContext()
 {
 #ifdef DEBUG_CRASHING
-	if (this != &g_noEngine && (countLiveSingletons() != 0 || originalGlobalData != nullptr || wwMathInitialized))
+	if (this != &g_noEngine && (countLiveSingletons() != 0 || originalGlobalData != nullptr || wwMathInitialized
+			|| ownsRenderDevice || drawableModelLockCount != 0))
 	{
 		LiveFieldNames names;
 		const std::size_t live = forEachLiveSingleton(&appendLiveFieldName, &names);
 		DEBUG_CRASH(("EngineContext destroyed before its engine was shut down, or its shutdown left state: "
-			"%u live singleton/pointer fields (%s), originalGlobalData %s, wwMathInitialized %s",
+			"%u live singleton/pointer fields (%s), originalGlobalData %s, wwMathInitialized %s, "
+			"ownsRenderDevice %s, drawableModelLockCount %d",
 			(unsigned)live, live != 0 ? names.text : "none", originalGlobalData != nullptr ? "set" : "null",
-			wwMathInitialized ? "true" : "false"));
+			wwMathInitialized ? "true" : "false", ownsRenderDevice ? "true" : "false", drawableModelLockCount));
 	}
 #endif
 	DEBUG_ASSERTCRASH(this == &g_noEngine || noEngineIsPristine(), ("g_noEngine was written: engine state leaked outside every Scope"));
@@ -121,15 +125,16 @@ void EngineContext::destroySlots()
 	// A slot object's destructor may read engine state, which must be this engine's.
 	Scope scope(this);
 
-	// A slot object's destructor may read another slot (or create one), so destroy them newest first and
-	// clear each before its destructor runs.
+	// A slot object's destructor may read another slot (or create one), so destroy them newest first. A
+	// slot stays set while its own destructor runs, so a destructor that reaches its own static finds the
+	// object being destroyed, not a fresh one; it is cleared once the destructor returns.
 	while (!m_slots->inCreationOrder.empty())
 	{
 		EngineSlotTable::Owned owned = m_slots->inCreationOrder.back();
 		m_slots->inCreationOrder.pop_back();
-		m_slots->byIndex[owned.index] = nullptr;
 		if (owned.destroy != nullptr)
 			owned.destroy(owned.object);
+		m_slots->byIndex[owned.index] = nullptr;
 	}
 	delete m_slots;
 	m_slots = nullptr;
@@ -176,18 +181,11 @@ std::size_t EngineContext::forEachLiveSingleton(void (*visit)(const char* name, 
 #undef RTS_ENGINE_SINGLETON_STRUCT
 #undef RTS_ENGINE_SINGLETON_ZH
 	// The direct pointer fields, which the engine's teardown frees and nulls just as it does the singletons.
-#define RTS_ENGINE_CONTEXT_POINTER(n) if (n != nullptr) { ++live; visit(#n, user); }
-	RTS_ENGINE_CONTEXT_POINTER(pathfindCellInfoArray)
-	RTS_ENGINE_CONTEXT_POINTER(pathfindCellInfoFirstFree)
-	RTS_ENGINE_CONTEXT_POINTER(polygonTriggerList)
-	RTS_ENGINE_CONTEXT_POINTER(mapObjectList)
-	RTS_ENGINE_CONTEXT_POINTER(partitionContactList)
-	RTS_ENGINE_CONTEXT_POINTER(w3dDisplay3DScene)
-	RTS_ENGINE_CONTEXT_POINTER(w3dDisplay2DScene)
-	RTS_ENGINE_CONTEXT_POINTER(w3dDisplay3DInterfaceScene)
-	RTS_ENGINE_CONTEXT_POINTER(w3dDisplayAssetManager)
-	RTS_ENGINE_CONTEXT_POINTER(ww3dAssetManager)
+#define RTS_ENGINE_CONTEXT_POINTER(T, n) if (n != nullptr) { ++live; visit(#n, user); }
+#define RTS_ENGINE_CONTEXT_VALUE(T, n, init)
+#include "Common/EngineContextFields.inl"
 #undef RTS_ENGINE_CONTEXT_POINTER
+#undef RTS_ENGINE_CONTEXT_VALUE
 	return live;
 }
 
@@ -207,7 +205,7 @@ namespace
 // and MXCSR, as setFPMode() leaves them. The same for every thread, so the first Scope learns them (after its
 // setFPMode()) and later ones load them directly: fnstcw/stmxcsr to save, fldcw/ldmxcsr to set and restore, in
 // place of fegetenv, setFPMode()'s fesetenv(FE_DFL_ENV) and friends, and fesetenv. A thread already in the mode
-// skips even that. Neither exception flags (masked, so they change no result) nor the empty x87 stack (empty at
+// loads nothing at entry (its exit reloads only if the Scope changed it). Neither exception flags (masked, so they change no result) nor the empty x87 stack (empty at
 // every call) are part of the mode.
 constexpr unsigned int kMxcsrExceptionFlags = 0x3F;
 // (x87 control word << 32) | MXCSR less its exception flags, with bit 63 set once learnt.
@@ -229,7 +227,8 @@ unsigned long long packFloatingPointMode(unsigned short controlWord, unsigned in
 // thread's own, never the process's global one: with the GIL released, another thread's setlocale() cannot change
 // the engine's number parsing in the middle of a step. A thread on the global locale (LC_GLOBAL_LOCALE, as
 // Python's are) keeps the snapshot of it taken at its first entry; one that uselocale()s another locale of its
-// own gets a new engine locale made from that one at its next outermost entry. `users` counts the Scopes on this
+// own gets a new engine locale made from that one at each outermost entry (`source` is only trusted while it is
+// LC_GLOBAL_LOCALE: the host may free its own locale and a new one may take its address). `users` counts the Scopes on this
 // thread that switched to it and have not yet left. Freed at thread exit (a pthread key's destructor; the main
 // thread's goes with the process).
 struct ThreadEngineLocale
@@ -257,7 +256,12 @@ const ThreadEngineLocaleKey& threadEngineLocaleKey() noexcept
 {
 	static const ThreadEngineLocaleKey key = []() noexcept {
 		ThreadEngineLocaleKey k{};
-		k.made = pthread_key_create(&k.key, freeThreadEngineLocale) == 0;
+		// The destructor is code in this library, so the library is pinned (never unloaded) before the key exists:
+		// a thread that exits after a dlclose would otherwise call unmapped code.
+		Dl_info info{};
+		if (dladdr(reinterpret_cast<const void*>(&freeThreadEngineLocale), &info) != 0 && info.dli_fname != nullptr
+			&& dlopen(info.dli_fname, RTLD_LAZY | RTLD_NOLOAD | RTLD_NODELETE) != nullptr)
+			k.made = pthread_key_create(&k.key, freeThreadEngineLocale) == 0;
 		return k;
 	}();
 	return key;
@@ -324,7 +328,7 @@ void enterEngineThreadInvariants(ThreadInvariants& saved) noexcept
 	// Already the engine's (a Scope for another engine inside one): nothing to switch.
 	if (cache.locale != (locale_t)0 && current == cache.locale)
 		return;
-	if (cache.locale == (locale_t)0 || current != cache.source)
+	if (cache.locale == (locale_t)0 || current != cache.source || current != LC_GLOBAL_LOCALE)
 	{
 		const locale_t engine = makeEngineLocale(current);
 		if (engine == (locale_t)0)
@@ -363,9 +367,17 @@ void leaveEngineThreadInvariants(const ThreadInvariants& saved) noexcept
 			--t_engineLocale.users;
 	}
 #endif
-	if (!saved.floatingPointSaved)
-		return;
 #if RTS_SCOPE_CONTROL_WORDS
+	if (!saved.floatingPointSaved)
+	{
+		// The thread entered in the engine's mode: reload it only if something inside the Scope changed it.
+		unsigned short controlWord = 0;
+		unsigned int mxcsr = 0;
+		__asm__ __volatile__("fnstcw %0" : "=m" (controlWord));
+		__asm__ __volatile__("stmxcsr %0" : "=m" (mxcsr));
+		if (controlWord == saved.x87ControlWord && mxcsr == saved.mxcsr)
+			return;
+	}
 	__asm__ __volatile__("fldcw %0" : : "m" (saved.x87ControlWord));
 	__asm__ __volatile__("ldmxcsr %0" : : "m" (saved.mxcsr));
 #else
@@ -378,8 +390,20 @@ void leaveEngineThreadInvariants(const ThreadInvariants& saved) noexcept
 
 bool noEngineIsPristine()
 {
-	return g_noEngine.countLiveSingletons() == 0 && !g_noEngine.engineTearingDown && !g_noEngine.nameKeysFrozen
-		&& g_noEngine.originalGlobalData == nullptr && !g_noEngine.wwMathInitialized && !g_noEngine.hasSlotObjects();
+	if (g_noEngine.countLiveSingletons() != 0 || g_noEngine.originalGlobalData != nullptr || g_noEngine.hasSlotObjects())
+		return false;
+	// Every value field still has its initial value, the seeds included: a write outside every Scope (a
+	// host callback, a parked engine's leftover call) is engine state leaking into the no-engine context.
+#define RTS_ENGINE_CONTEXT_POINTER(T, n)
+#define RTS_ENGINE_CONTEXT_VALUE(T, n, init) if (!(g_noEngine.n == (init))) return false;
+#include "Common/EngineContextFields.inl"
+#undef RTS_ENGINE_CONTEXT_POINTER
+#undef RTS_ENGINE_CONTEXT_VALUE
+	static const std::uint32_t initialSeed[6] = RTS_RANDOM_SEED_INITIAL_VALUES;
+	return std::memcmp(g_noEngine.gameAudioSeed, initialSeed, sizeof(initialSeed)) == 0
+		&& std::memcmp(g_noEngine.gameClientSeed, initialSeed, sizeof(initialSeed)) == 0
+		&& std::memcmp(g_noEngine.gameLogicSeed, initialSeed, sizeof(initialSeed)) == 0
+		&& g_noEngine.gameLogicBaseSeed == 0;
 }
 
 } // namespace rts
