@@ -61,9 +61,13 @@
 #include "Common/CommandLine.h"
 #include "Common/Debug.h"
 #include "Common/FatalEngineError.h"
+// GeneralsX @bugfix cemlyn007 02/10/2026 Guard <atomic> the same way WWLib/mutex.h does, so the
+// vc6/vc6-debug/vc6-profile presets (which still build this shared Core file) keep working.
+#if !(defined(_MSC_VER) && _MSC_VER < 1300)
 #include <atomic>
 #include <cstdlib>
 #include <exception>
+#endif
 #include "Common/CRCDebug.h"
 #include "Common/UnicodeString.h"
 #include "GameClient/ClientInstance.h"
@@ -767,18 +771,69 @@ static void TriggerMiniDump()
 
 
 // GeneralsX @feature cemlyn007 28/09/2026 Embedded mode (see FatalEngineError.h)
+// GeneralsX @bugfix cemlyn007 03/10/2026 Pre-C++11/VC6 builds have no std::atomic<bool> (see the
+// <atomic> guard above); a plain volatile Bool is the same fallback WWLib/mutex.h uses for its
+// FastCriticalSectionClass flag on those presets. The only host that ever stores true,
+// rlgenerals' launcher, does so from its own single boot/engine thread: once before init() and
+// again, storing false, before a normal teardown (ReleaseCrash reads the flag up to twice per
+// crash and ReleaseCrashLocalized up to three times, and the host's own test hooks read it on
+// every init()/loadGame(), but always from that same thread). A VC6/retail build links no
+// embedded host at all, so this flag there is read-only in practice (always false); the
+// volatile bool fallback exists so such presets still link, not because they observe the flag
+// from a second thread.
+#if !(defined(_MSC_VER) && _MSC_VER < 1300)
 static std::atomic<bool> theEngineEmbeddedMode(false);
+#else
+static volatile bool theEngineEmbeddedMode = false;
+#endif
 
-FatalEngineError::~FatalEngineError() = default;
+// GeneralsX @bugfix cemlyn007 02/10/2026 `= default` is C++11; VC6 cannot parse it, so give the
+// destructor an explicit empty body instead (see the <atomic> guard above for the same reasoning).
+FatalEngineError::~FatalEngineError() {}
 
 void SetEngineEmbeddedMode(bool embedded)
 {
+#if !(defined(_MSC_VER) && _MSC_VER < 1300)
 	theEngineEmbeddedMode.store(embedded);
+#else
+	theEngineEmbeddedMode = embedded;
+#endif
 }
 
 bool IsEngineEmbeddedMode()
 {
+#if !(defined(_MSC_VER) && _MSC_VER < 1300)
 	return theEngineEmbeddedMode.load();
+#else
+	return theEngineEmbeddedMode;
+#endif
+}
+
+// GeneralsX @feature cemlyn007 02/10/2026 Sticky fault latch (see FatalEngineError.h): set before
+// the throw below, so a catch (...) that swallows the exception anyway still leaves a trace a
+// polling host can find. Same VC6/pre-C++11 fallback as theEngineEmbeddedMode above.
+#if !(defined(_MSC_VER) && _MSC_VER < 1300)
+static std::atomic<bool> theEngineHasFaulted(false);
+#else
+static volatile bool theEngineHasFaulted = false;
+#endif
+
+bool HasEngineFaulted()
+{
+#if !(defined(_MSC_VER) && _MSC_VER < 1300)
+	return theEngineHasFaulted.load();
+#else
+	return theEngineHasFaulted;
+#endif
+}
+
+void ClearEngineFault()
+{
+#if !(defined(_MSC_VER) && _MSC_VER < 1300)
+	theEngineHasFaulted.store(false);
+#else
+	theEngineHasFaulted = false;
+#endif
 }
 
 // GeneralsX @bugfix cemlyn007 28/09/2026 The teardown window (see FatalEngineError.h)
@@ -810,15 +865,28 @@ bool IsEngineTearingDown()
 }
 #endif
 
+// GeneralsX @feature cemlyn007 02/10/2026 Sets the fault latch (see FatalEngineError.h).
+static void latchEngineFault()
+{
+#if !(defined(_MSC_VER) && _MSC_VER < 1300)
+	theEngineHasFaulted.store(true);
+#else
+	theEngineHasFaulted = true;
+#endif
+}
+
 // GeneralsX @bugfix cemlyn007 28/09/2026 Whether this thread is inside ReleaseCrashNoReturn, which
 // reports a ReleaseCrash that returned itself (see throwWithoutGlobalData).
 static THREAD_LOCAL bool theInReleaseCrashNoReturn = false;
 
-// Embedded mode with no TheGlobalData: throw, unless that would end the process through std::terminate
-// (the engine is being torn down, or another exception is already propagating).
+// Embedded mode with no TheGlobalData: latch the fault, then throw, unless that would end the process
+// through std::terminate (the engine is being torn down, or another exception is already propagating).
 static bool throwWithoutGlobalData(const char *reason)
 {
-	if (!IsEngineEmbeddedMode() || IsEngineTearingDown() || std::uncaught_exceptions() != 0)
+	if (!IsEngineEmbeddedMode())
+		return false;
+	latchEngineFault();
+	if (IsEngineTearingDown() || std::uncaught_exceptions() != 0)
 		return false;
 #if RTS_ENGINE_CONTEXT
 	// GeneralsX @bugfix cemlyn007 28/09/2026 Outside every engine context (rts::g_noEngine, where
@@ -839,17 +907,40 @@ static bool throwWithoutGlobalData(const char *reason)
 	return true;
 }
 
+// GeneralsX @bugfix cemlyn007 02/10/2026 Single place for the embedded-mode fatal error where
+// TheGlobalData exists, used by ReleaseCrash and ReleaseCrashLocalized's sites alike. Returns false
+// outside embedded mode (the caller carries on with the normal crash path). Otherwise it latches the
+// fault and then throws, unless that would end the process through std::terminate (the engine is being
+// torn down, or another exception is already propagating): then it returns true without throwing and
+// the caller returns. The embedded-mode flag is read once, so the latch and the decision cannot disagree.
+static bool HandleEmbeddedFatalError(const char *reason)
+{
+	if (!IsEngineEmbeddedMode())
+		return false;
+	latchEngineFault();
+	if (IsEngineTearingDown() || std::uncaught_exceptions() != 0)
+		return true;
+	throw FatalEngineError(reason ? reason : "");
+}
+
 void ReleaseCrash(const char *reason)
 {
 	/// do additional reporting on the crash, if possible
 
-	if (!DX8Wrapper_IsWindowed) {
-		if (ApplicationHWnd) {
-			ShowWindow(ApplicationHWnd, SW_HIDE);
+	// GeneralsX @bugfix cemlyn007 02/10/2026 Embedded mode: skip the process-wide UI and minidump
+	// side effects (ShowWindow, TriggerMiniDump -> MiniDumper::shutdownMiniDumper for the whole
+	// process) entirely. A host embedding this engine keeps other engines and the process running
+	// after the throw below, so hiding the app window or tearing down the process-wide minidumper
+	// here would affect them too.
+	if (!IsEngineEmbeddedMode()) {
+		if (!DX8Wrapper_IsWindowed) {
+			if (ApplicationHWnd) {
+				ShowWindow(ApplicationHWnd, SW_HIDE);
+			}
 		}
-	}
 
-	TriggerMiniDump();
+		TriggerMiniDump();
+	}
 
 	char prevbuf[ _MAX_PATH ];
 	char curbuf[ _MAX_PATH ];
@@ -901,9 +992,10 @@ void ReleaseCrash(const char *reason)
 
 	// GeneralsX @feature cemlyn007 28/09/2026 Embedded mode: hand the error to the host instead of
 	// showing a message box and exiting the process.
-	if (IsEngineEmbeddedMode()) {
-		throw FatalEngineError(reason ? reason : "");
-	}
+	// GeneralsX @bugfix cemlyn007 03/10/2026 Not in the teardown window or while another exception is
+	// propagating, though: return there, as with no TheGlobalData above.
+	if (HandleEmbeddedFatalError(reason))
+		return;
 
 	if (!DX8Wrapper_IsWindowed) {
 		if (ApplicationHWnd) {
@@ -967,48 +1059,64 @@ void ReleaseCrashLocalized(const AsciiString& p, const AsciiString& m)
 		return;
 	}
 
-	TriggerMiniDump();
+	// GeneralsX @bugfix cemlyn007 03/10/2026 Take the minidump here, before the two
+	// TheGameText->fetch() calls and the translate() below, not after: those can themselves fault
+	// on corrupt state (a damaged string table, heap corruption), and the dump exists to capture
+	// state at the point of the original fatal error, not whatever is left once two more lookups
+	// and a string translation have run on top of it. This restores ReleaseCrash's own ordering
+	// and main's; only the MessageBox/ShowWindow/stderr block below needs the fetched text, so that
+	// part alone stays after the fetches, inside its own embedded-mode check.
+	if (!IsEngineEmbeddedMode()) {
+		TriggerMiniDump();
+	}
 
 	UnicodeString prompt = TheGameText->fetch(p);
 	UnicodeString mesg = TheGameText->fetch(m);
 
+	AsciiString reason;
+	reason.translate(mesg);
 
 	/// do additional reporting on the crash, if possible
 
-	// GeneralsX @build BenderAI 12/02/2026 Platform-specific crash reporting
-	// Windows: Native MessageBox dialogs
-	// Linux: Console output (crash dialogs would need SDL_ShowSimpleMessageBox)
-	#ifdef _WIN32
-	extern const Bool TheSystemIsUnicode;
+	// GeneralsX @bugfix cemlyn007 02/10/2026 Embedded mode: skip the process-wide UI side effects
+	// entirely, same reasoning as ReleaseCrash above (the minidump itself is taken above, before
+	// the fetches, which embedded mode also skips).
+	if (!IsEngineEmbeddedMode()) {
+		// GeneralsX @build BenderAI 12/02/2026 Platform-specific crash reporting
+		// Windows: Native MessageBox dialogs
+		// Linux: Console output (crash dialogs would need SDL_ShowSimpleMessageBox)
+		#ifdef _WIN32
+		extern const Bool TheSystemIsUnicode;
 
-		if (!DX8Wrapper_IsWindowed) {
-		if (ApplicationHWnd) {
-			ShowWindow(ApplicationHWnd, SW_HIDE);
+			if (!DX8Wrapper_IsWindowed) {
+			if (ApplicationHWnd) {
+				ShowWindow(ApplicationHWnd, SW_HIDE);
+			}
 		}
-	}
 
-	if (!(TheGlobalData && TheGlobalData->m_headless))
-	{
-		if (TheSystemIsUnicode)
+		if (!(TheGlobalData && TheGlobalData->m_headless))
 		{
-			::MessageBoxW(nullptr, mesg.str(), prompt.str(), MB_OK|MB_SYSTEMMODAL|MB_ICONERROR);
+			if (TheSystemIsUnicode)
+			{
+				::MessageBoxW(nullptr, mesg.str(), prompt.str(), MB_OK|MB_SYSTEMMODAL|MB_ICONERROR);
+			}
+			else
+			{
+				// However, if we're using the default version of the message box, we need to
+				// translate the string into an AsciiString
+				AsciiString promptA, mesgA;
+				promptA.translate(prompt);
+				mesgA.translate(mesg);
+				//Make sure main window is not TOP_MOST
+				::SetWindowPos(ApplicationHWnd, HWND_NOTOPMOST, 0, 0, 0, 0,SWP_NOSIZE |SWP_NOMOVE);
+				::MessageBoxA(nullptr, mesgA.str(), promptA.str(), MB_OK|MB_TASKMODAL|MB_ICONERROR);
+			}
 		}
-		else
-		{
-			// However, if we're using the default version of the message box, we need to
-			// translate the string into an AsciiString
-			AsciiString promptA, mesgA;
-			promptA.translate(prompt);
-			mesgA.translate(mesg);
-			//Make sure main window is not TOP_MOST
-			::SetWindowPos(ApplicationHWnd, HWND_NOTOPMOST, 0, 0, 0, 0,SWP_NOSIZE |SWP_NOMOVE);
-			::MessageBoxA(nullptr, mesgA.str(), promptA.str(), MB_OK|MB_TASKMODAL|MB_ICONERROR);
-		}
+		#else
+		// Linux: Output to stderr (game will crash anyway after this)
+		fprintf(stderr, "FATAL ERROR: %s\n%s\n", prompt.str(), mesg.str());
+		#endif
 	}
-	#else
-	// Linux: Output to stderr (game will crash anyway after this)
-	fprintf(stderr, "FATAL ERROR: %s\n%s\n", prompt.str(), mesg.str());
-	#endif
 
 	// GeneralsX @bugfix cemlyn007 28/09/2026 Embedded mode: with no TheGlobalData there is no crash
 	// file path, so hand the error straight to the host (see FatalEngineError.h).
@@ -1064,11 +1172,10 @@ void ReleaseCrashLocalized(const AsciiString& p, const AsciiString& m)
 
 	// GeneralsX @feature cemlyn007 28/09/2026 Embedded mode: hand the error to the host instead of
 	// exiting the process (see FatalEngineError.h).
-	if (IsEngineEmbeddedMode()) {
-		AsciiString reason;
-		reason.translate(mesg);
-		throw FatalEngineError(reason.str());
-	}
+	// GeneralsX @bugfix cemlyn007 03/10/2026 Not in the teardown window or while another exception is
+	// propagating: return, as ReleaseCrash does.
+	if (HandleEmbeddedFatalError(reason.str()))
+		return;
 
 	_exit(1);
 }

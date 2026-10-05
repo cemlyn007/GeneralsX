@@ -28,6 +28,7 @@
 #include <atomic>
 #include <cfenv>
 #include <cstdio>
+#include <cstring>
 #include <mutex>
 #include <vector>
 
@@ -120,15 +121,16 @@ void EngineContext::destroySlots()
 	// A slot object's destructor may read engine state, which must be this engine's.
 	Scope scope(this);
 
-	// A slot object's destructor may read another slot (or create one), so destroy them newest first and
-	// clear each before its destructor runs.
+	// A slot object's destructor may read another slot (or create one), so destroy them newest first. A
+	// slot stays set while its own destructor runs, so a destructor that reaches its own static finds the
+	// object being destroyed, not a fresh one; it is cleared once the destructor returns.
 	while (!m_slots->inCreationOrder.empty())
 	{
 		EngineSlotTable::Owned owned = m_slots->inCreationOrder.back();
 		m_slots->inCreationOrder.pop_back();
-		m_slots->byIndex[owned.index] = nullptr;
 		if (owned.destroy != nullptr)
 			owned.destroy(owned.object);
+		m_slots->byIndex[owned.index] = nullptr;
 	}
 	delete m_slots;
 	m_slots = nullptr;
@@ -175,18 +177,11 @@ std::size_t EngineContext::forEachLiveSingleton(void (*visit)(const char* name, 
 #undef RTS_ENGINE_SINGLETON_STRUCT
 #undef RTS_ENGINE_SINGLETON_ZH
 	// The direct pointer fields, which the engine's teardown frees and nulls just as it does the singletons.
-#define RTS_ENGINE_CONTEXT_POINTER(n) if (n != nullptr) { ++live; visit(#n, user); }
-	RTS_ENGINE_CONTEXT_POINTER(pathfindCellInfoArray)
-	RTS_ENGINE_CONTEXT_POINTER(pathfindCellInfoFirstFree)
-	RTS_ENGINE_CONTEXT_POINTER(polygonTriggerList)
-	RTS_ENGINE_CONTEXT_POINTER(mapObjectList)
-	RTS_ENGINE_CONTEXT_POINTER(partitionContactList)
-	RTS_ENGINE_CONTEXT_POINTER(w3dDisplay3DScene)
-	RTS_ENGINE_CONTEXT_POINTER(w3dDisplay2DScene)
-	RTS_ENGINE_CONTEXT_POINTER(w3dDisplay3DInterfaceScene)
-	RTS_ENGINE_CONTEXT_POINTER(w3dDisplayAssetManager)
-	RTS_ENGINE_CONTEXT_POINTER(ww3dAssetManager)
+#define RTS_ENGINE_CONTEXT_POINTER(T, n) if (n != nullptr) { ++live; visit(#n, user); }
+#define RTS_ENGINE_CONTEXT_VALUE(T, n, init)
+#include "Common/EngineContextFields.inl"
 #undef RTS_ENGINE_CONTEXT_POINTER
+#undef RTS_ENGINE_CONTEXT_VALUE
 	return live;
 }
 
@@ -254,8 +249,20 @@ void leaveEngineThreadInvariants(const ThreadInvariants& saved) noexcept
 
 bool noEngineIsPristine()
 {
-	return g_noEngine.countLiveSingletons() == 0 && !g_noEngine.engineTearingDown && !g_noEngine.nameKeysFrozen
-		&& g_noEngine.originalGlobalData == nullptr && !g_noEngine.wwMathInitialized && !g_noEngine.hasSlotObjects();
+	if (g_noEngine.countLiveSingletons() != 0 || g_noEngine.originalGlobalData != nullptr || g_noEngine.hasSlotObjects())
+		return false;
+	// Every value field still has its initial value, the seeds included: a write outside every Scope (a
+	// host callback, a parked engine's leftover call) is engine state leaking into the no-engine context.
+#define RTS_ENGINE_CONTEXT_POINTER(T, n)
+#define RTS_ENGINE_CONTEXT_VALUE(T, n, init) if (!(g_noEngine.n == (init))) return false;
+#include "Common/EngineContextFields.inl"
+#undef RTS_ENGINE_CONTEXT_POINTER
+#undef RTS_ENGINE_CONTEXT_VALUE
+	static const std::uint32_t initialSeed[6] = RTS_RANDOM_SEED_INITIAL_VALUES;
+	return std::memcmp(g_noEngine.gameAudioSeed, initialSeed, sizeof(initialSeed)) == 0
+		&& std::memcmp(g_noEngine.gameClientSeed, initialSeed, sizeof(initialSeed)) == 0
+		&& std::memcmp(g_noEngine.gameLogicSeed, initialSeed, sizeof(initialSeed)) == 0
+		&& g_noEngine.gameLogicBaseSeed == 0;
 }
 
 } // namespace rts
