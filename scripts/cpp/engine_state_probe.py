@@ -84,6 +84,7 @@ ALLOWLIST = {
     "StringClass::m_TempStrings": "WWLib string temp-buffer pool, under its own mutex",
     "AssetStatusClass::Instance": "the process's missing-asset report, under its lock",
     "AutoPoolClass<PolyRenderTaskClass, 256>::Allocator()::allocator": "WWLib's object pool for the mesh renderer's tasks, process-wide like malloc (made at its first use)",
+    "theEngineEmbeddedMode": "the host's fatal-error mode, a std::atomic every boot sets and the shutdown of the last live engine clears (so the priming engine's closing turned it off)",
     "DX8Wrapper_IsWindowed": "the process's assert switch, a std::atomic every boot's command line writes",
     "LookupTableMgrClass::Tables": "WWMath's lookup tables, made by the first counted WWMath::Init and freed by the last Shutdown",
     "WWMathInitCount": "the process-wide WWMath::Init/Shutdown count, under its mutex",
