@@ -1931,14 +1931,10 @@ TSV_HEADER = (
     "# variable); binding (local, global, unique = STB_GNU_UNIQUE); section; count (instances: TUs can each\n"
     "# have one); bytes; source (path:line of the definition, found by searching the sources, every TU's site\n"
     "# joined by `;` when several TUs define the name, `third-party:<lib>` for a vcpkg library, `?` if not\n"
-    "# found; a count-1 name can still list several `;`-joined candidate sites when the search cannot tell
-"
-    "# which one build configuration actually links, for example two platform files that are never both
-"
-    "# built); class; phase (the stage that moves it: per-engine and render classes); note; by (hand, file = a
-"
-    "# hand `file:` pattern, rule:<name>, guard, none).
-"
+    "# found; a count-1 name can still list several `;`-joined candidate sites when the search cannot tell\n"
+    "# which one build configuration actually links, for example two platform files that are never both\n"
+    "# built); class; phase (the stage that moves it: per-engine and render classes); note; by (hand, file = a\n"
+    "# hand `file:` pattern, rule:<name>, guard, none).\n"
 )
 
 
