@@ -29,11 +29,16 @@
 // it either (its destructors may run on inconsistent state). A fatal error raised while a
 // destructor is running still ends the process, through std::terminate.
 //
-// GeneralsX @bugfix cemlyn007 28/09/2026 The teardown window (PLAN-023 Phase 1). With no TheGlobalData
-// a fatal error has no crash file to write. Before the engine has made TheGlobalData (early boot) it
-// still throws, but once the engine is being torn down (TheGlobalData is freed by then) it returns, as
-// it did before embedded mode: a throw there would almost always escape a destructor and end the
-// process through std::terminate. It also returns while another exception is already propagating.
+// GeneralsX @bugfix cemlyn007 03/10/2026 The teardown window (PLAN-023 Phase 1). Once the engine is
+// being torn down, or while another exception is already propagating, a fatal error writes the crash
+// file (if TheGlobalData exists) and then returns to its caller instead of throwing: a throw there
+// would almost always escape a destructor and end the process through std::terminate. Upstream
+// returns only once TheGlobalData is gone and otherwise exits the process, so with TheGlobalData
+// alive this is new behaviour: the caller carries on past the fatal error. The sticky fault latch
+// below is still set. Outside that window, with no TheGlobalData it throws without a crash file.
+// The teardown flag is cleared only by the next GameEngine(): a host that boots again in the same
+// process (or context) must call SetEngineTearingDown(false) before its startup parse, or fatal
+// errors in that parse return as well.
 
 #pragma once
 
@@ -92,3 +97,29 @@ FATAL_ENGINE_ERROR_API bool IsEngineTearingDown();
 // embedded mode it throws even where ReleaseCrash would not, and a throw out of a destructor ends the
 // process through std::terminate. Such callers keep ReleaseCrash, which returns there.
 [[noreturn]] FATAL_ENGINE_ERROR_API void ReleaseCrashNoReturn(const char *reason);
+
+// GeneralsX @feature cemlyn007 02/10/2026 Sticky fault latch: fault delivery to the host otherwise
+// depends on every catch (...) between RELEASE_CRASH and the host having a
+// catch (const FatalEngineError&) { throw; } in front of it. The engine sets this latch before it
+// throws, so something that swallows the exception anyway (a catch (...) added later, upstream or
+// in a merge) still leaves it set. Host-usage refusals and the repeat of a poisoned process (NameKeyGenerator's refuseInit) deliberately
+// do not set it: no engine faulted. It is also set when the teardown window above makes the error
+// return instead of throw. A host that polls HasEngineFaulted() after each call into the engine can
+// therefore detect the fault even when no exception reaches it.
+//
+// The flag is process-wide, like IsEngineEmbeddedMode() above, and nothing in this engine ever
+// clears it: the engine that set it is corrupt and the host must not call back into it to ask.
+// Clearing it is therefore entirely the host's job, and the host must do it as soon as it has
+// recorded a fault, not only when it found one by polling. A host that catches FatalEngineError
+// directly (for example at a boot-time try/catch) and does not also call ClearEngineFault() there
+// leaves the latch set, so the very next poll -- after an unrelated, successful call, to this
+// engine or, worse, to a different one -- misreports a fault that was already handled. A host
+// with more than one EngineContext alive must poll this latch after every entry into every
+// engine (it cannot yet tell which engine set it) and must clear it at every point it handles a
+// FatalEngineError, caught or polled, for the same reason: this one flag cannot distinguish "no
+// engine has faulted since the last clear" from "an engine faulted and the host already dealt
+// with it". A host that truly needs to tell those two apart per engine, or that cannot guarantee
+// it clears the latch at every catch site, needs a per-EngineContext latch instead of this
+// process-wide one.
+FATAL_ENGINE_ERROR_API bool HasEngineFaulted();
+FATAL_ENGINE_ERROR_API void ClearEngineFault();

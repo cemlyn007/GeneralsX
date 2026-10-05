@@ -230,11 +230,14 @@ NameKeyType NameKeyGenerator::createNameKey(UnsignedInt hash, const AsciiString&
 {
 	// GeneralsX @feature cemlyn007 28/09/2026 Downwards once perturbForTesting asked for it. The keys
 	// handed out downwards would meet those handed out upwards (a duplicate key) or, reaching 0, turn
-	// back into upwards ones: a hard failure in every build. (perturbForTesting keeps
+	// back into upwards ones: a hard failure in every build, like running out of keys upwards. (perturbForTesting keeps
 	// NAMEKEY_PERTURB_RESERVE keys between the two, so only a test hook's misuse gets here.)
 	if (m_descendingID != 0 && m_descendingID <= m_nextID)
 		ReleaseCrashNoReturn("NameKey space exhausted: the keys handed out downwards (perturbForTesting) met "
 			"those handed out upwards");
+	// Upwards, the keys must keep fitting into the bits the code that stores them relies on.
+	if (m_descendingID == 0 && m_nextID >= (UnsignedInt)NAMEKEY_MAX)
+		ReleaseCrashNoReturn("NameKey space exhausted: the keys handed out upwards reached NAMEKEY_MAX");
 	Bucket *b = newInstance(Bucket);
 	b->m_key = (NameKeyType)(m_descendingID != 0 ? m_descendingID-- : m_nextID++);
 	b->m_nameString = name;
