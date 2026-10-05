@@ -30,6 +30,8 @@
 
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
+#include <cstdio>
+
 #include "Common/FunctionLexicon.h"
 #include "GameClient/GameWindow.h"
 #include "GameClient/GameWindowManager.h"
@@ -410,6 +412,11 @@ void FunctionLexicon::loadTable( TableEntry *table,
 		// already looking functions up (PLAN-023 Phase 5b).
 		const NameKeyType key = TheNameKeyGenerator->nameToKey( entry->name );
 #if RTS_ENGINE_CONTEXT
+		if( entry->key != NAMEKEY_INVALID && entry->key != key )
+		{
+			fprintf( stderr, "FunctionLexicon::loadTable - '%s' already has key %d, not %d\n", entry->name, (int)entry->key, (int)key );
+			fflush( stderr );
+		}
 		DEBUG_ASSERTCRASH( entry->key == NAMEKEY_INVALID || entry->key == key,
 			( "FunctionLexicon::loadTable - '%s' already has key %d, not %d", entry->name, entry->key, key ) );
 		if( entry->key == NAMEKEY_INVALID )

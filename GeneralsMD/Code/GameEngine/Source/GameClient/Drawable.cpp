@@ -274,7 +274,7 @@ const Int MAX_ENABLED_MODULES								= 16;
 #if RTS_ENGINE_CONTEXT
 // GeneralsX @feature cemlyn007 28/09/2026 Per engine: every Drawable constructor (headless too) caches this
 // engine's images and 2D animation templates here, so another engine's would dangle once that engine is
-// gone (PLAN-023 Phase 4). The class statics stay declared; these macros stand in for them in this file.
+// gone (PLAN-023 Phase 4). The class statics are not declared in this build; these macros stand in for them in this file.
 struct DrawableStaticImages
 {
 	Bool inited;

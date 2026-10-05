@@ -25,6 +25,7 @@ jobs:
     outputs:
       zh-should-build: ${{ steps.filter.outputs.zh-should-build }}
       base-should-build: ${{ steps.filter.outputs.base-should-build }}
+      guards-should-run: ${{ steps.filter.outputs.guards-should-run }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v6
@@ -44,6 +45,11 @@ jobs:
               - 'CMakePresets.json'
               - '.github/workflows/build-*.yml'
               - '.github/workflows/replay-tests*.yml'
+              - '.github/workflows/ci.yml'
+            guards-should-run:
+              - 'scripts/cpp/engine_context_guards.py'
+              - 'GeneralsMD/**'
+              - 'Core/**'
               - '.github/workflows/ci.yml'
             base-should-build:
               - 'Generals/**'
@@ -72,6 +78,20 @@ jobs:
           else
             echo "| GeneralsX Base (Generals) | ⏭️ No changes |" >> $GITHUB_STEP_SUMMARY
           fi
+
+  engine-context-guards:
+    name: Engine Context Guards
+    needs: detect-changes
+    if: needs.detect-changes.outputs.guards-should-run == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v6
+
+      # Fails when a singleton declaration is unguarded or unclassified for RTS_ENGINE_CONTEXT.
+      - name: Check Singleton Guards
+        run: python3 scripts/cpp/engine_context_guards.py check
 
   build-linux-flatpak:
     name: Build Linux Flatpak
