@@ -2197,10 +2197,6 @@ void PartitionData::invalidateShroudedStatusForAllPlayers()
 	}
 }
 
-#if defined(RTS_DEBUG)
-static AsciiString theObjName;
-#endif
-
 //-----------------------------------------------------------------------------
 Int PartitionData::calcMaxCoiForShape(GeometryType geom, Real majorRadius, Real minorRadius, Bool isSmall)
 {
@@ -2259,9 +2255,6 @@ Int PartitionData::calcMaxCoiForObject()
 	Real majorRadius = obj->getGeometryInfo().getMajorRadius();
 	Real minorRadius = obj->getGeometryInfo().getMinorRadius();
 	Bool isSmall = obj->getGeometryInfo().getIsSmall();
-#if defined(RTS_DEBUG)
-theObjName = obj->getTemplate()->getName();
-#endif
 	return calcMaxCoiForShape(geom, majorRadius, minorRadius, isSmall);
 }
 

@@ -698,12 +698,16 @@ bool DX8Wrapper::Init(void * hwnd, bool lite)
 	Invalidate_Cached_Render_States();
 
 	if (!lite) {
-		// GeneralsX @bugfix cemlyn007 30/09/2026 The D3D8 library is loaded once for the process and never freed
+		// GeneralsX @bugfix cemlyn007 30/09/2026 The D3D8 library is loaded for the process and never freed
 		// (PLAN-023 Phase 8, stage RR1). A process may bring a render device up, shut it down and bring another
 		// up, and render engines may come and go while others run: unloading DXVK in one engine's Shutdown would
 		// pull its code from under the next device (and from the host's own IDirect3D8), so no FreeLibrary.
-		static std::once_flag s_d3d8LibOnce;
-		std::call_once(s_d3d8LibOnce, [] {
+		// A failed load is retried by the next Init, so a transient failure does not stick for the process.
+		static std::mutex s_d3d8LibMutex;
+		bool d3d8Loaded;
+		{
+		std::lock_guard<std::mutex> d3d8LibLock(s_d3d8LibMutex);
+		if (D3D8Lib == nullptr || Direct3DCreate8Ptr == nullptr) [] {
 			// GeneralsX @build BenderAI 10/02/2026 - Platform-specific DLL/SO/DYLIB loading (Phase 5: macOS)
 #ifdef _WIN32
 			D3D8Lib = LoadLibrary("D3D8.DLL");
@@ -736,8 +740,10 @@ bool DX8Wrapper::Init(void * hwnd, bool lite)
 				fprintf(stderr, "ERROR: DX8Wrapper::Init() - Failed to get Direct3DCreate8 function\n");
 			}
 
-		});
-		if (D3D8Lib == nullptr || Direct3DCreate8Ptr == nullptr) {
+		}();
+		d3d8Loaded = D3D8Lib != nullptr && Direct3DCreate8Ptr != nullptr;
+		}
+		if (!d3d8Loaded) {
 #if RTS_ENGINE_CONTEXT
 			// GeneralsX @bugfix cemlyn007 02/10/2026 Create_Render_State() above already allocated this
 			// engine's state; nothing else frees it on this failure return.
@@ -1532,7 +1538,8 @@ bool DX8Wrapper::Set_Render_Device(int dev, int width, int height, int bits, int
 
 		// GeneralsX @feature cemlyn007 30/09/2026 A windowless device has no desktop to match: if the
 		// adapter reports no display mode, take the 32-bit format the promotion below expects from a
-		// desktop, so it keeps the same back buffer as a windowed one (PLAN-023 Phase 8, stage RR0c).
+		// desktop, so it keeps the same back buffer as a windowed one. No driver tested (NVIDIA, lavapipe)
+		// reports no mode, so this fallback has not been run (PLAN-023 Phase 8, stage RR0c).
 		if (_Hwnd == nullptr && (FAILED(display_mode_result) || desktop_mode.Format == D3DFMT_UNKNOWN))
 			desktop_mode.Format = D3DFMT_X8R8G8B8;
 

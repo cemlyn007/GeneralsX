@@ -1,8 +1,12 @@
 # Game Memory features
 option(RTS_GAMEMEMORY_ENABLE "Enables the memory pool and dynamic memory allocator." ON)
 
-# Disable Game Memory if ASAN is enabled - Game Memory overrides new/delete and interferes with ASAN
-if(RTS_BUILD_OPTION_ASAN)
+# Disable Game Memory if ASAN is enabled - Game Memory overrides new/delete and interferes with ASAN.
+# RTS_SANITIZE=address (cmake/compilers.cmake) is included here too: it is the other way to turn
+# AddressSanitizer on, and without this, GameMemory's own operator new/delete and its MemoryPoolObject
+# pools (every Object, Drawable and module) still route allocation around ASan, so a cross-engine
+# use-after-free through a recycled pool block would go unreported instead of being caught.
+if(RTS_BUILD_OPTION_ASAN OR RTS_SANITIZE STREQUAL "address")
     set(RTS_GAMEMEMORY_ENABLE OFF)
 endif()
 

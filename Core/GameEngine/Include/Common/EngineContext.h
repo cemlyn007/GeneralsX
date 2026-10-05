@@ -131,14 +131,13 @@ struct RTS_ENGINE_CONTEXT_API EngineContext
 #undef RTS_ENGINE_SINGLETON_STRUCT
 #undef RTS_ENGINE_SINGLETON_ZH
 
-	// Set while this engine is being torn down (GameEngine's destructor onwards), cleared when a
-	// GameEngine is constructed in it. Fatal errors raised in that window do not throw (see
-	// FatalEngineError.h).
-	bool engineTearingDown = false;
-
-	// Set while this engine boots from names another engine primed, until its upgrades are loaded: it
-	// must intern no new NameKey then (NameKeyGenerator::PrimingLatch, PLAN-023 Decision 2).
-	bool nameKeysFrozen = false;
+	// The direct fields that are not seeds (the engine's teardown flags, the pathfinder pool, the map and
+	// partition lists, W3D's scenes, asset managers and clocks, ...), from EngineContextFields.inl.
+#define RTS_ENGINE_CONTEXT_POINTER(T, n) ::T* n = nullptr;
+#define RTS_ENGINE_CONTEXT_VALUE(T, n, init) T n = init;
+#include "EngineContextFields.inl"
+#undef RTS_ENGINE_CONTEXT_POINTER
+#undef RTS_ENGINE_CONTEXT_VALUE
 
 	// GlobalData::m_theOriginal, this engine's GlobalData with no overrides (Zero Hour; see GlobalData.h).
 	// GlobalData nulls it when that instance is deleted.
@@ -152,76 +151,6 @@ struct RTS_ENGINE_CONTEXT_API EngineContext
 	std::uint32_t gameClientSeed[6] = RTS_RANDOM_SEED_INITIAL_VALUES;
 	std::uint32_t gameLogicSeed[6] = RTS_RANDOM_SEED_INITIAL_VALUES;
 	std::uint32_t gameLogicBaseSeed = 0;
-
-	// PathfindCellInfo::s_infoArray/s_firstFree: the pathfinder's cell-info pool and its free list
-	// (AIPathfind.cpp), made and freed by this engine's Pathfinder.
-	::PathfindCellInfo* pathfindCellInfoArray = nullptr;
-	::PathfindCellInfo* pathfindCellInfoFirstFree = nullptr;
-
-	// PolygonTrigger::ThePolygonTriggerListPtr/s_currentID: the map's trigger areas, walked on every
-	// object's cell change, and the next trigger ID.
-	::PolygonTrigger* polygonTriggerList = nullptr;
-	std::int32_t polygonTriggerCurrentID = 1;
-
-	// MapObject::TheMapObjectListPtr: the map objects of the last map this engine read.
-	::MapObject* mapObjectList = nullptr;
-
-	// PartitionManager.cpp's TheContactList (the contact list of the partition update in progress) and
-	// getClosestObjects()'s iteration stamp (nonzero).
-	::PartitionContactList* partitionContactList = nullptr;
-	std::int32_t partitionIterFlag = 1;
-
-	// ScriptList::m_curId: the last script ID handed out.
-	std::int32_t scriptListCurId = 0;
-
-	// REPLAY_CRC_INTERVAL (Recorder.cpp): the logic CRC interval of a solo game or replay.
-	std::int32_t replayCrcInterval = 100;
-
-	// W3DDisplay's scenes and asset manager (W3DDisplay::m_3DScene, ...; PLAN-023 Phase 3). Headless
-	// builds them too, and each engine's GameClient::reset resets its own.
-	::RTS3DScene* w3dDisplay3DScene = nullptr;
-	::RTS2DScene* w3dDisplay2DScene = nullptr;
-	::RTS3DInterfaceScene* w3dDisplay3DInterfaceScene = nullptr;
-	::W3DAssetManager* w3dDisplayAssetManager = nullptr;
-
-	// WW3DAssetManager::TheInstance: the asset manager the W3D loaders use (bones and meshes, headless
-	// too); the same object as w3dDisplayAssetManager once W3DDisplay has made it.
-	::WW3DAssetManager* ww3dAssetManager = nullptr;
-
-	// WW3D's timing statics (WW3D::SyncTime, ...), with their upstream initial values: the animation clock
-	// (bones are posed headless too), advanced by this engine's frames only. 1000.0f / WWSyncPerSecond.
-	float ww3dLogicFrameTimeMs = 1000.0f / 30;
-	float ww3dFractionalSyncMs = 0.0f;
-	unsigned int ww3dSyncTime = 0;
-	unsigned int ww3dPreviousSyncTime = 0;
-	int ww3dFrameCount = 0;
-
-	// Whether this engine holds one of WWMath's Init counts (wwmath.cpp): set by its first WWMath::Init and
-	// cleared by its first WWMath::Shutdown after that, so an engine that calls Shutdown twice (W3DDisplay's
-	// failed init, then its destructor) releases only its own count, never another live engine's.
-	bool wwMathInitialized = false;
-
-	// GeneralsX @bugfix cemlyn007 30/09/2026 Drawable::s_modelLockCount (Drawable.cpp, under
-	// DIRTY_CONDITION_FLAGS): the depth of this engine's scene iterations that lock its drawables' dirty
-	// model state (StDrawableDirtyStuffLocker in W3DScene.cpp). Only a rendering engine locks, but every
-	// engine's Drawable::getDrawModules reads it, so one process-wide count let a headless engine's reads
-	// race the renderer's scene (PLAN-023 Phase 8, stage RR0a).
-	int drawableModelLockCount = 0;
-
-	// GeneralsX @feature cemlyn007 30/09/2026 This engine's DX8Wrapper state (WW3D2/w3drenderstate.h): its Direct3D
-	// interface and device, caps, render targets, cached states and statistics. DX8Wrapper::Init allocates it
-	// (Set_Display_Size_Provider, just before, too), DX8Wrapper::Shutdown frees it, and it is null for an engine
-	// that does not render. DX8Wrapper reads W3DRenderState::Defaults (no device, IsInitted false) while it is
-	// null, so a headless engine beside a renderer never reaches the renderer's device or caps and answers as in
-	// a headless solo run (this replaces RR0a's ownsRenderDevice flag). A direct field, not a slot: DX8Wrapper's
-	// inline state-cache setters are on the draw's hot path (PLAN-023 Phase 8, stage RR2a-1).
-	::W3DRenderState* w3dRender = nullptr;
-
-	// GeneralsX @feature cemlyn007 30/09/2026 DX8Wrapper_HeadlessRender and DX8Wrapper_PreserveFPU (dx8wrapper.h):
-	// the host's (and -preserveFPU's) switches for this engine's render device, set before its boot creates the
-	// device, so before w3dRender exists (PLAN-023 Phase 8, stage RR2a-1).
-	bool dx8HeadlessRender = false;
-	int dx8PreserveFPU = 0;
 
 	// Per-engine slot objects, by allocateEngineSlotIndex() index; null until set.
 	void* getSlot(std::size_t index) const;
@@ -256,8 +185,8 @@ inline EngineContext* ctx() noexcept
 	return t_engine;
 }
 
-// True when g_noEngine still has every singleton null and no slot object (nothing assigned one, or used a
-// PerEngineStatic, outside a Scope).
+// True when g_noEngine still has every singleton and direct field at its initial value and no slot object
+// (nothing assigned one, or used a PerEngineStatic, outside a Scope).
 RTS_ENGINE_CONTEXT_API bool noEngineIsPristine();
 
 // GeneralsX @feature cemlyn007 28/09/2026 The per-thread state an engine relies on (PLAN-023 Phase 5b): the calling
@@ -265,13 +194,16 @@ RTS_ENGINE_CONTEXT_API bool noEngineIsPristine();
 // an engine. Opaque here, so that this force-included header pulls in neither <cfenv> nor <locale.h>;
 // EngineContext.cpp checks that fenv_t and locale_t fit.
 // GeneralsX @bugfix cemlyn007 28/09/2026 Only what the Scope changes is saved and restored. On x86-64 (not Windows) that
-// is the x87 control word and MXCSR, and nothing at all for a thread already in the engine's mode; elsewhere the
-// whole fenv_t (with the x87 control word on i386). Only LC_NUMERIC is switched (to "C"), so that the engine sees
+// is the x87 control word and MXCSR, reloaded on exit for a thread already in the engine's mode only if the Scope
+// changed them; elsewhere the whole fenv_t (with the x87 control word on i386). Only LC_NUMERIC is switched (to "C"), so that the engine sees
 // the thread's other categories (LC_CTYPE for towlower, iswspace, mbstowcs) as it does without the engine context.
 // GeneralsX @bugfix cemlyn007 29/09/2026 The locale is switched on every entry, to one cached per thread (the
-// thread's own locale, as at its first entry, with LC_NUMERIC "C"), never left as the process's global locale:
+// thread's own locale with LC_NUMERIC "C": made at the first entry for a thread on the global locale, at every
+// outermost entry for one on a locale of its own), never left as the process's global locale:
 // see enterEngineThreadInvariants. The host must still not call setlocale() while any engine steps (glibc's
-// locale functions are not safe against it).
+// locale functions are not safe against it), and must set the process locale before the first entry: a thread on
+// the global locale keeps the LC_CTYPE it had at its first entry, so every thread that steps engines needs the
+// same LC_CTYPE.
 struct ThreadInvariants
 {
 	alignas(8) unsigned char floatingPointEnvironment[32];
@@ -281,7 +213,9 @@ struct ThreadInvariants
 	void* engineLocale;
 	unsigned int mxcsr;
 	unsigned short x87ControlWord;
-	// Whether the fields above hold the thread's floating-point state to restore.
+	// Whether the thread entered outside the engine's mode, so the fields above hold its own state to reload on
+	// exit. When false they hold the engine's mode as at entry, reloaded on exit only if something inside the
+	// Scope changed it.
 	bool floatingPointSaved;
 };
 
@@ -297,11 +231,10 @@ RTS_ENGINE_CONTEXT_API void leaveEngineThreadInvariants(const ThreadInvariants& 
 // GeneralsX @feature cemlyn007 28/09/2026 A Scope that switches the thread to a different engine also sets the
 // engine's per-thread invariants (PLAN-023 Phase 5b): the floating-point mode setFPMode() sets, which the engine's
 // boot, INI and load-screen paths set only on the thread that ran them, and a "C" LC_NUMERIC for its number
-// parsing and formatting. An engine
-// may be stepped on another thread than it booted on, or on one whose mode the host changed, and must still
-// run as it would alone. The thread's own mode and locale come back when the Scope ends. A nested Scope on
-// the engine already current, and a Scope for g_noEngine, do nothing more than before, so the cost is paid
-// once per outermost call into an engine.
+// parsing and formatting. An engine may be stepped on another thread than it booted on, or on one whose mode
+// the host changed, and must still run as it would alone, given the host's locale contract above. The thread's
+// own mode and locale come back when the Scope ends. A nested Scope on the engine already current, and a Scope
+// for g_noEngine, do nothing more than before, so the cost is paid once per outermost call into an engine.
 class [[nodiscard]] Scope
 {
 public:
@@ -349,17 +282,10 @@ public:
 
 	T& get() const
 	{
-		EngineContext* context = ctx();
-		void* object = context->getSlot(m_index);
-		if (object == nullptr)
-		{
-			Holder* holder = new Holder();
+		return get([this](T& value) {
 			if (m_initialize != nullptr)
-				m_initialize(holder->value);
-			context->setSlot(m_index, holder, &destroy);
-			object = holder;
-		}
-		return static_cast<Holder*>(object)->value;
+				m_initialize(value);
+		});
 	}
 
 	// GeneralsX @feature cemlyn007 28/09/2026 As get(), but the object is made with `initialize(object)`, which

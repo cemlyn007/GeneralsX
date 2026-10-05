@@ -301,7 +301,7 @@ GameMessageDisposition PlaceEventTranslator::translateGameMessage(const GameMess
 					// play a can't do that sound (UI beep type sound)
 #if RTS_ENGINE_CONTEXT
 					// GeneralsX @feature cemlyn007 28/09/2026 Per engine: the event keeps this engine's event info and sound rotation (PLAN-023 Phase 4).
-					static rts::PerEngineStatic<AudioEventRTS> noCanDoSound_perEngine([](AudioEventRTS& event) { event = AudioEventRTS("NoCanDoSound"); });
+					static rts::PerEngineStatic<AudioEventRTS> noCanDoSound_perEngine([](AudioEventRTS& event) { event.setEventName("NoCanDoSound"); });
 					AudioEventRTS& noCanDoSound = noCanDoSound_perEngine.get();
 #else
 					static AudioEventRTS noCanDoSound( "NoCanDoSound" );

@@ -432,21 +432,27 @@ W3DDisplay::~W3DDisplay()
 	for (Int j=0; j<LightEnvironmentClass::MAX_LIGHTS; j++)
 		REF_PTR_RELEASE( m_myLight[j] );
 
-	PredictiveLODOptimizerClass::Free();
+	// GeneralsX @bugfix cemlyn007 03/10/2026 Only a rendering engine tears down the process-wide render state
+	// (the render statistics' string, the predictive LOD arrays that WW3D::Shutdown frees, the shader manager);
+	// a headless engine's teardown used to free the statistics string and the LOD arrays under the rendering
+	// engine beside it (PLAN-023 Phase 8, stage RR0a).
+	const Bool renders = !TheGlobalData->m_headless;
 
 	// shutdown
-	Debug_Statistics::Shutdown_Statistics();
-	if (!TheGlobalData->m_headless)
+	if (renders)
+	{
+		Debug_Statistics::Shutdown_Statistics();
 		W3DShaderManager::shutdown();
+	}
 	m_assetManager->Free_Assets();
 	delete m_assetManager;
 	// GeneralsX @bugfix cemlyn007 28/09/2026 Null it: with RTS_ENGINE_CONTEXT it is this engine's context
 	// field, which the context's lifecycle checks expect null after the teardown (PLAN-023 Phase 3).
 	m_assetManager = nullptr;
-	if (!TheGlobalData->m_headless)
+	if (renders)
 		WW3D::Shutdown();
 	WWMath::Shutdown();
-	if (!TheGlobalData->m_headless)
+	if (renders)
 		DX8WebBrowser::Shutdown();
 	delete TheW3DFileSystem;
 	TheW3DFileSystem = nullptr;
@@ -2036,14 +2042,7 @@ AGAIN:
 		}
 	}
 
-	// GeneralsX @bugfix cemlyn007 30/09/2026 Render-headless (an embed host's image observations) advances
-	// WW3D's clock only by the logic frames it draws. Every draw adds a frame's time to the clock's pending
-	// time, which the next Sync with a logic update takes in whole, so the draws the load screen and the
-	// start-of-game fade make while the map loads (paced by the wall clock: about 180,000-310,000 of them,
-	// fewer on a busy machine) set every animation's phase for the rest of the game, and the images of two
-	// runs of one game differed (PLAN-023 Phase 8, stage RR0c).
-	if (!(TheGlobalData->m_headless && TheGlobalData->m_headlessRender) || TheGameLogic->hasUpdated())
-		WW3D::Update_Logic_Frame_Time(TheFramePacer->getLogicTimeStepMilliseconds());
+	WW3D::Update_Logic_Frame_Time(TheFramePacer->getLogicTimeStepMilliseconds());
 
 	// TheSuperHackers @info This binds the WW3D update to the logic update.
 	WW3D::Sync(TheGameLogic->hasUpdated());

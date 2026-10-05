@@ -171,7 +171,9 @@ public:
     void loginWithRefreshToken(const std::string& refreshToken);
 
     // GeneralsX @feature fbraz3 19/09/2026 Silent synchronous token refresh using saved refresh token
-    bool refreshSessionTokenSync(uint32_t knownVersion = 0);
+    // GeneralsX @bugfix cemlyn007 03/10/2026 The CRCs are parameters so that a detached thread can pass
+    // values it copied before it started, instead of reading TheGlobalData after its engine may be gone.
+    bool refreshSessionTokenSync(uint32_t exeCRC, uint32_t iniCRC, uint32_t knownVersion = 0);
     uint32_t getAuthTokenVersion() const { return m_authTokenVersion.load(); }
     int getOnlinePlayersCount() const { return m_onlinePlayersCount.load(); }
 

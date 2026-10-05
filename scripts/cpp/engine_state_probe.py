@@ -9,11 +9,13 @@
 #
 # A written symbol is judged by name, never by its class alone:
 #
-#   worklist     classified render-per-engine or render-scratch (or per-engine): state known to change as an
-#                engine draws, which PLAN-023 Phase 8 moves into the engine (the row's phase says when);
+#   worklist     classified render-per-engine or render-scratch (state known to change as an engine draws,
+#                which PLAN-023 Phase 8 moves into the engine), or one of the phased render-const rows
+#                REWRITTEN names (constants a render boot rewrites with the same value until the named
+#                stage builds them once). A write to any other phased render-const row is unexpected;
 #   allowed      named in the explicit allowlist (ALLOWLIST below, or the caller's), each with its reason: a
 #                process-wide counter, pool or cache that is written on purpose and safe to share;
-#   unexpected   anything else: a symbol the list calls constant, render-const, render-process, debug-only,
+#   unexpected   anything else: a symbol the list calls constant, render-const without a phase or not in REWRITTEN, render-process, debug-only,
 #                process-global or render-only (UI) that the engine wrote all the same. Either the list is
 #                wrong (classify it again) or the write is a bug.
 #
@@ -47,8 +49,20 @@ import engine_state_symbols as ess  # noqa: E402
 
 LIBRARY = "libgeneralsx.so"
 PROBED_SECTIONS = {".data", ".bss"}
-WORKLIST_CLASSES = {"per-engine", "render-per-engine", "render-scratch"}
+WORKLIST_CLASSES = {"render-per-engine", "render-scratch"}
 GUARD = "guard variable for "
+# The phased render-const rows that a render boot rewrites with the same value, until RR2b builds them once for
+# the process. Every other phased render-const row is never written, so a write to it is a bug.
+REWRITTEN = {
+    "D3DFormatToWW3DFormatConversionArray",
+    "D3DFormatToWW3DZFormatConversionArray",
+    "BoxRenderObjClass::DisplayMask",
+    "_BoxShader",
+    "default_dazzle_shader",
+    "default_halo_shader",
+    "vis_shader",
+    "debug_shader",
+}
 
 # Written on purpose, and safe to share between engines: each by exact key (the TSV's symbol column), with its
 # reason. A class is never enough: a process-global symbol that a render step writes is listed here once
@@ -56,9 +70,8 @@ GUARD = "guard variable for "
 ALLOWLIST = {
     # Written once per process, by the first render boot (the probe's first snapshot follows a headless
     # priming boot, so the render engine's is the process's first device).
-    "D3D8Lib": "the D3D8 library, loaded once per process (std::call_once) and never freed",
+    "D3D8Lib": "the D3D8 library, loaded per process under a mutex and never freed",
     "Direct3DCreate8Ptr": "the D3D8 library's Direct3DCreate8, looked up once per process with it",
-    "DX8Wrapper::Init(void*, bool)::s_d3d8LibOnce": "the std::once_flag that loads the D3D8 library",
     "DX8Wrapper_FinalReleaseHook": "the host's final-release check, set by its first render boot",
     "RTS3DScene::updateFixedLightEnvironments(RenderInfoClass&)::id": "a constant vector, built at first use under the static-init guard",
     "W3DVolumetricShadow::Update()::originCompareVector": "a constant vector, built at first use under the static-init guard",
@@ -71,6 +84,7 @@ ALLOWLIST = {
     "StringClass::m_TempStrings": "WWLib string temp-buffer pool, under its own mutex",
     "AssetStatusClass::Instance": "the process's missing-asset report, under its lock",
     "AutoPoolClass<PolyRenderTaskClass, 256>::Allocator()::allocator": "WWLib's object pool for the mesh renderer's tasks, process-wide like malloc (made at its first use)",
+    "theEngineEmbeddedMode": "the host's fatal-error mode, a std::atomic every boot sets and the shutdown of the last live engine clears (so the priming engine's closing turned it off)",
     "DX8Wrapper_IsWindowed": "the process's assert switch, a std::atomic every boot's command line writes",
     "LookupTableMgrClass::Tables": "WWMath's lookup tables, made by the first counted WWMath::Init and freed by the last Shutdown",
     "WWMathInitCount": "the process-wide WWMath::Init/Shutdown count, under its mutex",
@@ -180,10 +194,9 @@ class Report:
     def _judge(probe, key, cls, phase=""):
         if cls in WORKLIST_CLASSES:
             return "worklist", ""
-        # A render-const row with a phase says so itself: every render boot still rewrites it (with the same
-        # value) until that stage builds it once.
-        if cls == "render-const" and phase:
-            return "worklist", f"rewritten at every render boot until {phase}"
+        # A render boot rewrites these constants with the same value until the named stage builds them once.
+        if cls == "render-const" and phase and key in REWRITTEN:
+            return "worklist", f"render-const until {phase}"
         if key in probe.allowlist:
             return "allowed", probe.allowlist[key]
         return "unexpected", ""

@@ -51,6 +51,7 @@
 
 #include "Common/ActionManager.h"
 #include "Common/DiscreteCircle.h"
+#include "Common/EngineContext.h"
 #include "Common/GameEngine.h"
 #include "Common/GameState.h"
 #include "Common/GameUtility.h"
@@ -2186,7 +2187,14 @@ void PartitionData::invalidateShroudedStatusForAllPlayers()
 }
 
 #if defined(RTS_DEBUG)
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @fix cemlyn007 03/10/2026 Per engine: calcMaxCoiForObject() assigns this from every engine's thread, and
+// two threads must not write one AsciiString object (the atomic refcount only covers buffers shared between copies).
+static rts::PerEngineStatic<AsciiString> theObjName_perEngine;
+#define theObjName (theObjName_perEngine.get())
+#else
 static AsciiString theObjName;
+#endif
 #endif
 
 //-----------------------------------------------------------------------------
