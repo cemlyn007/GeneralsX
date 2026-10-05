@@ -485,27 +485,27 @@ W3DDisplay::~W3DDisplay()
 	for (Int j=0; j<LightEnvironmentClass::MAX_LIGHTS; j++)
 		REF_PTR_RELEASE( m_myLight[j] );
 
-	// GeneralsX @bugfix cemlyn007 30/09/2026 Only an engine that renders frees the predictive LOD arrays and
-	// the render statistics' string: both are process-wide, and only the render path (Prepare_LOD, End_Statistics)
-	// fills them, so a headless engine's teardown freed them under the rendering engine beside it (PLAN-023
-	// Phase 8, stage RR0a; found by ThreadSanitizer).
-	if (!TheGlobalData->m_headless || TheGlobalData->m_headlessRender)
-		PredictiveLODOptimizerClass::Free();
+	// GeneralsX @bugfix cemlyn007 30/09/2026 Only an engine that renders tears down the process-wide render
+	// state (the render statistics' string, the predictive LOD arrays that WW3D::Shutdown frees, the shader
+	// manager). A headless engine's teardown used to free the statistics string and the LOD arrays under the
+	// rendering engine beside it (PLAN-023 Phase 8, stage RR0a; found by ThreadSanitizer).
+	const Bool renders = !TheGlobalData->m_headless || TheGlobalData->m_headlessRender;
 
 	// shutdown
-	if (!TheGlobalData->m_headless || TheGlobalData->m_headlessRender)
+	if (renders)
+	{
 		Debug_Statistics::Shutdown_Statistics();
-	if (!TheGlobalData->m_headless || TheGlobalData->m_headlessRender)
 		W3DShaderManager::shutdown();
+	}
 	m_assetManager->Free_Assets();
 	delete m_assetManager;
 	// GeneralsX @bugfix cemlyn007 28/09/2026 Null it: with RTS_ENGINE_CONTEXT it is this engine's context
 	// field, which the context's lifecycle checks expect null after the teardown (PLAN-023 Phase 3).
 	m_assetManager = nullptr;
-	if (!TheGlobalData->m_headless || TheGlobalData->m_headlessRender)
+	if (renders)
 		WW3D::Shutdown();
 	WWMath::Shutdown();
-	if (!TheGlobalData->m_headless || TheGlobalData->m_headlessRender)
+	if (renders)
 		DX8WebBrowser::Shutdown();
 	delete TheW3DFileSystem;
 	TheW3DFileSystem = nullptr;
@@ -2150,8 +2150,10 @@ AGAIN:
 	// start-of-game fade make while the map loads (paced by the wall clock: about 180,000-310,000 of them,
 	// fewer on a busy machine) set every animation's phase for the rest of the game, and the images of two
 	// runs of one game differed (PLAN-023 Phase 8, stage RR0c).
-	if (!(TheGlobalData->m_headless && TheGlobalData->m_headlessRender) || TheGameLogic->hasUpdated())
-		WW3D::Update_Logic_Frame_Time(TheFramePacer->getLogicTimeStepMilliseconds());
+	// A draw with no logic update passes zero, so LogicFrameTimeMs, which the draw path's own animations
+	// (cloud scroll, rings, spheres) multiply once per draw, holds them still too.
+	const Bool renderHeadless = TheGlobalData->m_headless && TheGlobalData->m_headlessRender;
+	WW3D::Update_Logic_Frame_Time(!renderHeadless || TheGameLogic->hasUpdated() ? TheFramePacer->getLogicTimeStepMilliseconds() : 0.0f);
 
 	// TheSuperHackers @info This binds the WW3D update to the logic update.
 	WW3D::Sync(TheGameLogic->hasUpdated());

@@ -25,16 +25,16 @@
 # replay's playback, a game ended by script victory, and an Env game to the local player's defeat): no
 # symbol classified render-only, constant or debug-only changed but the const objects built on first use.
 #
-# There are no per-engine entries left: PLAN-023 Phases 2-4 moved every one into the engine, and Phase 5b
-# (engines on separate threads) the last 18, the "threads only" scratch that was correct for several engines
-# stepped on ONE thread, into thread_locals, PER_ENGINE_STATICs or locals. A symbol classified per-engine is
-# therefore a regression, and `check` fails on it in every mode. A thread_local is process-global here (per
-# thread by design), and must stay small: the library's TLS is initial-exec, so it comes out of glibc's
-# static TLS surplus for a dlopened library (a few KB at most; Phase 2's 5 KB XferLoad buffers failed to load).
+# There are no per-engine entries left: PLAN-023 Phases 2-4 moved every one into the engine, and Phase 5b (engines on
+# separate threads) the last 18, the "threads only" scratch that was correct for several engines stepped on ONE
+# thread, into thread_locals, PER_ENGINE_STATICs, locals or (AssetStatusClass::Instance) a lock. A symbol classified
+# per-engine is therefore a regression, and `check` fails on it in every mode. A thread_local is process-global here
+# (per thread by design), and must stay small: the library's TLS is initial-exec, so it comes out of glibc's static
+# TLS surplus for a dlopened library (a few KB at most; Phase 2's 5 KB XferLoad buffers failed to load).
 #
 # Process-wide state must be written once (at static initialisation or the first boot) and only read after
 # that, or be atomic or locked: engines boot while others step on their threads (PLAN-023 Phase 5b). A note
-# that says "boot/shutdown only, serialised by the host" names state that only boots and teardowns touch,
+# that says "boot/shutdown only, serialized by the host" names state that only boots and teardowns touch,
 # which the host serialises (one process mutex), and that no engine reads while it steps.
 
 PER = "per-engine"
@@ -67,13 +67,13 @@ NET = (
 # fixes): Show/HideControlBar (ControlBarCallback.cpp; no static of its own), HideQuitMenu (QuitMenu.cpp, from
 # clearGameData: the state it touches is a PER_ENGINE_STATIC; the rest only the menu writes), Shell::update
 # (Shell.cpp, from GameClient::update: its throttle is a PER_ENGINE_STATIC) and ~GameWindowManager's
-# freeStaticStrings (GameWindowManagerScript.cpp: the .wnd parse scratch, entry below).
+# freeStaticStrings (GameWindowManagerScript.cpp: the .wnd parse's callback strings, a PER_ENGINE_STATIC).
 HEADLESS_GUI = (
-    "ControlBar/|LoadScreen\\.cpp|GameWindowManager\\.cpp|"
+    "ControlBar/|LoadScreen\\.cpp|GameWindowManager\\.cpp|Shell/(Shell|ShellMenuScheme)\\.cpp|"
     "GUICallbacks/(Diplomacy|InGameChat|InGamePopupMessage|ControlBarPopupDescription)\\.cpp"
 )
 W3D_RENDER = "W3D render path (device, shaders, draw lists): only the one rendering engine per process reaches it (PLAN-023 Phase 8)"
-LOADER = "stateless W3D prototype loader/persist factory, registered once at static initialisation"
+LOADER = "stateless W3D prototype loader/persist factory, registered once at static initialization"
 
 HAND = [
     # ---------------------------------------------------------------------------------------------------
@@ -85,12 +85,10 @@ HAND = [
     # are EngineContext fields or PER_ENGINE_STATICs now (so gone from the library; their slot indexes are
     # rule:per-engine-static), as are Phase 3's TheWaterTransparency, TheWeatherSetting, WaterSettings[], rand4
     # and CameraShakerSystem.
-    # thread_local (per thread by design, so process-global here): both checkfortransitionsnum, inCRCGen,
-    # dx8renderer.cpp's DX8MeshRendererState_destroying and
+    # thread_local (per thread by design, so process-global here): both checkfortransitionsnum, inCRCGen and
     # PathNode::computeDirectionVector()'s dir. The two XferLoad buffers are locals now (so gone).
     (GLOBAL, "", "re:State::friend_check(For|ForSleep)Transitions\\(StateReturnType\\)::checkfortransitionsnum", "thread_local call-depth counter (PLAN-023 Phase 2): per thread by design"),
     (GLOBAL, "", "TerrainLogic::m_gridWaterHandle", "an address-only sentinel (the grid water's WaterHandle is compared by address and never written), the same for every engine"),
-    (GLOBAL, "", "re:\\(anonymous namespace\\)::DX8MeshRendererState_destroying", "thread_local, set only while this thread runs an engine's DX8MeshRendererState destructor (PLAN-023 Phase 3): per thread by design"),
     (GLOBAL, "", "inCRCGen", "thread_local, set only while this thread runs GameLogic::getCRC (PLAN-023 Phase 2): per thread by design"),
     (GLOBAL, "", "re:PathNode::computeDirectionVector\\(\\)::dir", "thread_local returned-by-pointer scratch, consumed at once (PLAN-023 Phase 2): per thread by design"),
     (GLOBAL, "", "re:BuildAssistant::buildTiledLocations\\(.*\\)::tileInfo", "thread_local returned-by-pointer scratch, consumed at once (PLAN-023 Phase 5b): per thread by design"),
@@ -101,22 +99,23 @@ HAND = [
     # and its three lists, the particle buffers' rand_gen and the mesh/material/texture/decal ID counters are
     # PER_ENGINE_STATICs; WorldHeightMap::m_alphaTiles is a member (so gone from the library, the slot
     # indexes rule:per-engine-static). What is left here is process-wide by design.
-    (GLOBAL, "", "_TheFileFactory", "with RTS_ENGINE_CONTEXT, always the one permanent W3D file factory (W3DFileSystem.cpp, immortal) that forwards to the current engine's W3DFileSystem (PLAN-023 Phase 3): written once, by the first W3DFileSystem (a later one finds it set and does not write it, PLAN-023 Phase 5b; it replaces only the library's default, and refuses any other factory with a DEBUG_CRASH), and never nulled"),
+    (GLOBAL, "", "_TheFileFactory", "with RTS_ENGINE_CONTEXT, always the one permanent W3D file factory (W3DFileSystem.cpp, immortal) that forwards to the current engine's W3DFileSystem (PLAN-023 Phase 3): written once, by the factory's first use (PLAN-023 Phase 5b; it replaces only the library's default, and refuses any other factory with a stderr message and a DEBUG_CRASH), and never nulled"),
     (GLOBAL, "", "re:(guard variable for )?\\(anonymous namespace\\)::engineW3DFileFactory\\(\\)::factory", "the one permanent W3D file factory _TheFileFactory points at (PLAN-023 Phase 3): made on first use under the static-init guard and never destroyed, the same object for every engine"),
     (GLOBAL, "", "_TheSimpleFileFactory", "never reassigned by the engine (only the tools do): always the process-global default factory"),
-    (GLOBAL, "", "re:table_once|Ring_Array_Once|Sphere_Array_Once", "std::once_flag of a table built once per process from constants (motchan's filter table, the ring/sphere LOD meshes; PLAN-023 Phase 3)"),
-    (GLOBAL, "", "re:WWMathInitMutex|WWMathInitCount", "the process-wide WWMath::Init/Shutdown count and its mutex (PLAN-023 Phase 3): the tables are built by the first Init and freed by the last Shutdown of any engine; each engine holds at most one count (EngineContext::wwMathInitialized)"),
     (GLOBAL, "", "filtertable", "motchan's filter table: built once per process under std::call_once from constants (PLAN-023 Phase 3)"),
     (GLOBAL, "", "re:(Sphere|Ring)MeshArray|(Sphere|Ring)LODCosts", "sphere/ring LOD meshes: built once per process under std::call_once from constants (PLAN-023 Phase 3); only the one rendering engine's draw re-sets their alpha/scale, right before it draws them"),
     (GLOBAL, "", "re:_Fast(Acos|Asin|Sin|InvSin)Table", "WWMath::Init tables: built by the first of the counted WWMath::Init calls (PLAN-023 Phase 3), the same values every time"),
-    (GLOBAL, "", "TheW3DFrameLengthInMsec", "the W3D frame length: every engine's GameClient::init sets it to MSEC_PER_LOGICFRAME_REAL, its initial value, and with RTS_ENGINE_CONTEXT W3DGameClient::setFrameRate refuses a different value (DEBUG_CRASH) rather than write it (PLAN-023 Phase 5b), so no engine writes it after static initialisation"),
+    (GLOBAL, "", "TheW3DFrameLengthInMsec", "the W3D frame length: every engine's GameClient::init sets it to MSEC_PER_LOGICFRAME_REAL, its initial value, and with RTS_ENGINE_CONTEXT W3DGameClient::setFrameRate refuses a different value (a stderr message and a DEBUG_CRASH) rather than write it (PLAN-023 Phase 5b), so no engine writes it after static initialization"),
     (GLOBAL, "", "re:W3DAssetManager::Create_Render_Obj\\(.*\\)::warning_count|WW3DAssetManager::Create_Render_Obj\\(.*\\)::warning_count", "missing-asset log limiter: bounds a log message count, and no engine state depends on it; a std::atomic, since any engine's thread may count (PLAN-023 Phase 5b)"),
     (GLOBAL, "", "re:AssetStatusClass::Instance|AssetStatusReportMutex", "the one missing-asset report (the WWDEBUG destructor writes it out at exit) and its lock: every engine adds to it, under the lock (PLAN-023 Phase 5b), and none reads it"),
+    (GLOBAL, "", "re:Ring_Array_Once|Sphere_Array_Once|table_once", "the std::call_once flag of a table built once per process from constants (the ring and sphere LOD meshes, motchan's filter table; PLAN-023 Phase 3)"),
+    (GLOBAL, "", "WWMathInitCount", "WWMath::Init's count of the engines that hold an Init, written under WWMathInitMutex (PLAN-023 Phase 3): shared by every engine on purpose: the first Init builds the _Fast* tables and the default lookup table, and the last Shutdown frees only the lookup-table manager's tables (the _Fast* tables are static and never freed)"),
+    (GLOBAL, "", "WWMathInitMutex", "guards WWMathInitCount (PLAN-023 Phase 3)"),
     # ---------------------------------------------------------------------------------------------------
     # PLAN-023 Phase 4: caches and remaining statics.
     # Done (PLAN-023 Phase 4 PR): every function-local cache of a per-engine pointer (the seven ActiveBody
     # particle templates, the upgrade/thing template caches, muzzle, debrisTemplate, genericBridgeTemplate,
-    # the seven WaveGuideUpdate particle templates), the thirteen static AudioEventRTS (PER_ENGINE_STATICs,
+    # the seven WaveGuideUpdate particle templates), the fifteen static AudioEventRTS (PER_ENGINE_STATICs,
     # not locals: each keeps its event's sound rotation index, which a local would reset), Drawable's static
     # images, ControlBar's rank icons, the observer, diplomacy, briefing, chat and build-tooltip GUI state a
     # headless engine writes, debrisModelNamesGlobalHack, TerrainRoadCollection::m_idCounter, View::m_idNext,
@@ -129,37 +128,48 @@ HAND = [
     # constructor clears it), the quit-menu state HideQuitMenu touches (clearGameData), Shell::update's
     # throttle (GameClient::update) and W3DStatusCircle's colour (every engine's setTeamColor). The
     # other TUs' statics of the same names (the WOL and download menus' staticTextPlayer/staticTextStatus)
-    # fall to the GUI blanket below. What follows is the one rule for Phase 5b's thread_local scratch.
+    # fall to the GUI blanket below.
     (RENDER, "", "re:staticTextPlayer|staticTextStatus", "with RTS_ENGINE_CONTEXT only the online menus' statics of these names are left (WOLGameSetupMenu.cpp's staticTextPlayer, DownloadMenu.cpp's staticTextStatus); the source column shows the first definition the search finds, the OFF-build one in ControlBarObserver.cpp or Diplomacy.cpp (those are PER_ENGINE_STATIC fields with the context on): " + UI),
     (GLOBAL, "", "re:ParticleSystem::(computePointOnUnitSphere|computeParticleVelocity|computeParticlePosition)\\(.*\\)::\\w+", "thread_local returned-by-pointer scratch, consumed at once (PLAN-023 Phase 5b): per thread by design"),
     # ---------------------------------------------------------------------------------------------------
     # Process-global on purpose.
-    (GLOBAL, "", "re:rts::t_engine|rts::g_noEngine|rts::\\(anonymous namespace\\)::(theNextSlotIndex|theEngineFloatingPointMode)", "the EngineContext mechanism itself (PLAN-023 Decision 1; the engines' floating-point mode, learnt from setFPMode() and atomic, Phase 5b)"),
+    (GLOBAL, "", "re:rts::t_engine|rts::g_noEngine|rts::\\(anonymous namespace\\)::theNextSlotIndex", "the EngineContext mechanism itself (PLAN-023 Decision 1)"),
+    (GLOBAL, "", "rts::(anonymous namespace)::theEngineFloatingPointMode", "the engines' floating-point mode (x87 control word and MXCSR) learnt from setFPMode() by the first Scope, and atomic (PLAN-023 Phase 5b)"),
     (GLOBAL, "", "re:rts::\\(anonymous namespace\\)::(t_engineLocale|threadEngineLocaleKey\\(\\)::key)", "the Scope's per-thread engine locale (thread_local, per thread by design) and the pthread key that frees it at thread exit, made once (PLAN-023 Phase 5b)"),
     (GLOBAL, "", "re:TheNameKeyGenerator|\\(anonymous namespace\\)::thePriming(Mutex|State|Failure)|NameKeyGenerator::perturbForTesting\\(.*\\)::calls", "shared immortal NameKey generator and its priming latch (PLAN-023 Decision 2)"),
     (GLOBAL, "", "re:.*::(key_\\w+|jetKey)", "cached NameKeyType (a NAMEKEY(...) in an inline function): process-wide by PLAN-023 Decision 2"),
     (GLOBAL, "", "re:ControlBar::update(OCLTimer|Construction)TextDisplay\\(.*\\)::(descID|barID)", "cached window NameKey held as UnsignedInt: process-wide by PLAN-023 Decision 2"),
     (GLOBAL, "", "re:Object::Object\\(.*\\)::\\w+ModuleData|.*taggedHelperModuleData<\\w+>\\(.*\\)::data", "shared helper ModuleData and Object::Object's references to it: made and tagged with its (Decision 2) NameKey once, under the static-init guard, and only read afterwards (PLAN-023 Phase 5b; every Object used to write the tag again)"),
-    (GLOBAL, "", "re:gameWin(System|Input|Tooltip)Table|winLayout(Init|Update|Shutdown)Table|gameWinDrawTable|layoutInitTable", "FunctionLexicon table: names and function pointers; every engine's init interns the same names (Decision 2), and with RTS_ENGINE_CONTEXT FunctionLexicon::loadTable writes a key only while it is unset (a different one from a later boot is refused with a DEBUG_CRASH), so only the first boot writes (PLAN-023 Phase 5b)"),
+    (GLOBAL, "", "re:gameWin(System|Input|Tooltip)Table|winLayout(Init|Update|Shutdown)Table|gameWinDrawTable|layoutInitTable", "FunctionLexicon table: names and function pointers; every engine's init interns the same names (Decision 2), and with RTS_ENGINE_CONTEXT FunctionLexicon::loadTable writes a key only while it is unset (a different one from a later boot is refused with a stderr message and a DEBUG_CRASH), so only the first boot writes (PLAN-023 Phase 5b)"),
+    # rule:namekey requires the declaration itself to initialise from NAMEKEY(...) or
+    # TheNameKeyGenerator->nameToKey(...): sound for most caches, but these are declared `= NAMEKEY_INVALID`
+    # (or with no initialiser, for an array) and filled from the generator later, in a separate init function,
+    # so the rule does not see them. Still process-wide NameKey caches by PLAN-023 Decision 2.
+    (GLOBAL, "", "re:buttonOkID|buttonCancelID|buttonMuteID|buttonUnMuteID|buttonPlayerID|parentID|staticTextPlayerID|staticTextSideID|staticTextTeamID|staticTextStatusID|radioButtonInGameID|radioButtonBuddiesID|winInGameID|winBuddiesID|winSoloID|s_replayObserverNameKey", "cached NameKeyType (a window/button ID key), declared `= NAMEKEY_INVALID` and filled from TheNameKeyGenerator by a later init call that every engine running that window runs, with the same value (Decision 2)"),
+    (GLOBAL, "", "re:ControlBar::(updateBuildQueueDisabledImages|populateBuildQueue)\\(.*\\)::buildQueueIDs", "cached NameKeyType array, declared empty and filled from TheNameKeyGenerator in the same function under an idsInitialized latch: process-wide by Decision 2, with the ID statics above"),
     (GLOBAL, "", "re:The(AsciiString|UnicodeString|Dma|MemoryPool|DebugLog)CriticalSection", "critical section, process-wide lock (PLAN-023 Phase 1)"),
     (GLOBAL, "", "re:TheMemoryPoolFactory|TheDynamicMemoryAllocator|theMainInitFlag|theMemoryManagerUsers(Mutex)?|\\(anonymous namespace\\)::TheProcessOperators(State)?", "refcounted process-wide memory manager (PLAN-023 Phase 1b, Decision 3)"),
     (GLOBAL, "", "TheVersion", "build version, identical for every engine"),
     (GLOBAL, "", "GlobalData::m_theOriginal", "empty stand-in: the value lives in EngineContext::originalGlobalData (Phase 1b)"),
-    (GLOBAL, "", "re:theEngineEmbeddedMode|theReleaseCrashLogFile", "embedding host's fatal-error mode / release-crash log (PLAN-023 Phase 5 moves the log to per-engine output paths)"),
+    (GLOBAL, "", "theEngineEmbeddedMode", "embedding host's fatal-error mode: atomic (PLAN-023 Phase 5 moves the release-crash log to per-engine output paths)"),
+    (GLOBAL, "", "theReleaseCrashLogFile", "thread_local handle of the release-crash log being written: per thread by design (PLAN-023 Phase 5 moves the log to per-engine output paths)"),
+    (GLOBAL, "", "theEngineHasFaulted", "embedding host's sticky fault latch: atomic (PLAN-023 Phase 5 moves the release-crash log to per-engine output paths)"),
     (GLOBAL, "", "theInReleaseCrashNoReturn", "thread_local re-entry guard of ReleaseCrashNoReturn: per thread by design"),
-    (GLOBAL, "", "re:__argc|__argv", "the process's argv (the executable's, set by rlgenerals' launcher; PLAN-023 Phase 5 BootConfig replaces it): boot/shutdown only, serialised by the host (only CommandLine's boot-time parse reads it)"),
+    (GLOBAL, "", "re:__argc|__argv", "the process's argv (the executable's, set by rlgenerals' launcher; PLAN-023 Phase 5 BootConfig replaces it): boot/shutdown only, serialized by the host (only CommandLine's boot-time parse reads it)"),
     (GLOBAL, "", "re:critSec[1-5]|FilterSoftwareVulkanICDs\\(\\)::hw_icds", "the game executable's own (SDL3Main), unused by an embedding host"),
-    (GLOBAL, "", "re:rts::WorkingDirectory::\\w+", "the startup working directory (one per process): boot/shutdown only, serialised by the host (CommandLine's boot-time parse writes and reads it)"),
+    (GLOBAL, "", "re:rts::WorkingDirectory::\\w+", "the startup working directory (one per process): boot/shutdown only, serialized by the host (CommandLine's boot-time parse writes and reads it)"),
     (GLOBAL, "", "re:rts::ClientInstance::\\w+", "the process's single-instance mutex"),
     (GLOBAL, "", "re:ReplaySimulation::s_\\w+", "the game executable's multi-replay simulation driver (-simReplay); an embedded engine never runs it"),
     (GLOBAL, "", "OurLanguage", "the installation's language, the same for every engine"),
     (GLOBAL, "", "re:GetRegistryLanguage\\(\\)::(once|val)", "the installation's language string: with RTS_ENGINE_CONTEXT written exactly once, under std::call_once, and never mutated afterwards (PLAN-023 Phase 4's process-global string rule); every engine reads the same install"),
     (GLOBAL, "", "UnicodeString::format_va(wchar_t const*, __va_list_tag*)::s_utf8_locale", "a UTF-8 locale handle, created once"),
-    (GLOBAL, "", "s_assetFallbackPath", "the install's asset fallback root: every engine's boot (StdBIGFileSystem::init) sets it, but setAssetRootPath writes only a change, and with RTS_ENGINE_CONTEXT only while it is unset (another root from a later boot is refused with a DEBUG_CRASH): the engines of a process share one install, so only the first boot writes while later engines' file lookups read it (PLAN-023 Phase 5b)"),
+    (GLOBAL, "", "s_assetFallbackPath", "the install's asset fallback root: every engine's boot (StdBIGFileSystem::init) sets it, but setAssetRootPath writes only a change, and with RTS_ENGINE_CONTEXT only by the first boot, which settles it even when it resolves no root (another root from a later boot is refused with a stderr message and a DEBUG_CRASH): the engines of a process share one install, so only the first boot writes while later engines' file lookups read it (PLAN-023 Phase 5b)"),
+    (GLOBAL, "", "StdLocalFileSystem::setAssetRootPath(AsciiString const&)::s_assetRootSettled", "std::atomic flag: set by the first boot's setAssetRootPath (even with no root), after which a different root is refused (PLAN-023 Phase 5b)"),
     (GLOBAL, "", "re:s_thread|s_done|s_hasUpdate|s_latestTag", "update checker (menus), one per process"),
     (GLOBAL, "", "re:thread_id_map(_mutex)?|next_thread_id", "pthread-to-Win32 thread id map (CompatLib), process-wide by nature"),
-    (CONST, "", "GameSpyColorDefaults", "the online chat colours' defaults (Chat.cpp), which each engine's GameSpyColor (a PER_ENGINE_STATIC, PLAN-023 Phase 5b) starts from; never written"),
-    (GLOBAL, "", "NGMP_OnlineServicesManager::getInstance()::instance", "the process's GeneralsOnline session, logged into from the online menus of the one UI engine: every engine's teardown makes the (idle) instance, but with RTS_ENGINE_CONTEXT only a non-headless engine initialises it (GameEngine::init) or shuts it down (~GameEngine), so a headless engine never touches the session; the instance is made under the static-init guard, at teardown only, which the host serialises (PLAN-023 Phase 5b)"),
+    (CONST, "", "re:scoringBuilding(Create|Destroy)?Mask", "KindOf masks built once at static initialization by ScoreKeeper.cpp's makeScoringMask from constants; never written (PLAN-023 Phase 5b)"),
+    (CONST, "", "GameSpyColorDefaults", "the online chat colors' defaults (Chat.cpp), which each engine's GameSpyColor (a PER_ENGINE_STATIC, PLAN-023 Phase 5b) starts from; never written"),
+    (GLOBAL, "", "NGMP_OnlineServicesManager::getInstance()::instance", "the process's GeneralsOnline session, logged into from the online menus of the one UI engine: with RTS_ENGINE_CONTEXT only a non-headless engine calls getInstance() (GameEngine::init, every update, its menus and ~GameEngine; headless engines skip it), and there is at most one such engine per process, so no other engine touches the instance (PLAN-023 Phase 5b)"),
     (GLOBAL, "", "re:theLobbyFilter|isThreadHosting|NET_CRC_INTERVAL|MIN_LOGIC_FRAMES|MAX_FRAMES_AHEAD|MIN_RUNAHEAD|FRAME_DATA_LENGTH|FRAMES_TO_KEEP|commandsReadyDebugSpewage", NET),
     # Not the whole of GameNetwork/: GameInfo.cpp (skirmish setup), LANGameInfo.cpp, GameMessageParser.cpp and
     # NetworkUtil.cpp are reached without a network, so their statics are classified by name.
@@ -168,13 +178,20 @@ HAND = [
     (GLOBAL, "", "file:/WWDownload/", "patch/map downloader (menus only), one per process"),
     (GLOBAL, "", "re:Return_Buffer|Temp_Buffer", "password encryption for the online login menu: " + NET),
     (GLOBAL, "", "re:TheLobbyQueuedUTMs.*", "GameSpy lobby menu queue (menu state; one UI engine per process)"),
-    (GLOBAL, "", "re:CPUDetectClass::\\w+|Windows9xVersionTable", "CPU/OS detection, done once per process at static initialisation"),
-    (GLOBAL, "", "re:WideStringClass::m_\\w+|StringClass::(m_Mutex|m_NullChar|m_EmptyString|m_TempStrings|ReservedMask)", "WWLib string temp-buffer pool, guarded by its own mutex: process-wide by design"),
-    (GLOBAL, "", "re:generalAllocator|FastAllocatorGeneral::Alloc\\(unsigned int\\)::re_entrancy", "WWLib fast allocator, process-wide like malloc"),
+    (GLOBAL, "", "re:CPUDetectClass::\\w+|Windows9xVersionTable", "CPU/OS detection, done once per process at static initialization"),
+    (GLOBAL, "", "re:WideStringClass::(m_NullChar|m_UsedTempStringCount|m_ResTempPtr)", "known unsynchronised race, not fixed here: the constructor writes the shared m_NullChar with no lock (widestring.h), Get_String reads m_UsedTempStringCount outside m_TempMutex (widestring.cpp), and Free_String scans every m_ResTempPtr[index] against m_Buffer before taking m_TempMutex, racing Get_String's and Free_String's own locked writes to the same slots (widestring.cpp); the threaded driver never calls Get_Wide_String or renders text on more than one thread, so TSan does not catch any of them, and the fix is deferred to the string-lock work (PLAN-023 Phase 5b, \"Known, not fixed here\")"),
+    (GLOBAL, "", "WideStringClass::m_EmptyString", "never written after static initialization: every constructor and Get_String/Free_String path only reads it to recognise or restore the shared empty buffer (widestring.cpp)"),
+    (GLOBAL, "", "re:WideStringClass::(m_TempMutex|m_TempString[1-4]|m_FreeTempPtr)", "WWLib string temp-buffer pool, guarded by its own mutex: process-wide by design"),
+    (GLOBAL, "", "StringClass::m_NullChar", "never written at runtime: a zero-length, non-temporary StringClass is m_EmptyString, and every write path skips m_Buffer[0] when m_Buffer equals m_EmptyString"),
+    (GLOBAL, "", "StringClass::m_EmptyString", "never written after static initialization: every constructor and write path only reads it to recognise or restore the shared empty buffer (wwstring.cpp)"),
+    (GLOBAL, "", "StringClass::ReservedMask", "std::atomic<unsigned>: the pre-lock check is a relaxed, lock-free early-out hint only, and the authoritative test-and-set still runs under m_Mutex"),
+    (GLOBAL, "", "re:StringClass::(m_Mutex|m_TempStrings)", "WWLib string temp-buffer pool, guarded by its own mutex: process-wide by design"),
+    (GLOBAL, "", "re:generalAllocator|FastAllocatorGeneral::Alloc\\(unsigned int\\)::re_entrancy", "threads only: WWLib fast allocator, process-wide like malloc, but generalAllocator's lazy creation and re_entrancy's increment/decrement are both unsynchronized, lock-free reads/writes"),
     (GLOBAL, "", "re:AutoPoolClass<.*>::Allocator\\(\\)::allocator", "WWLib object pool per type, process-wide like malloc"),
     (GLOBAL, "", "re:RegistryClass::IsLocked|\\(anonymous namespace\\)::GetRegistryPaths\\(\\)::paths", "registry emulation (the process's settings files)"),
     (GLOBAL, "", "re:IndexClass<int, INI(Entry|Section)\\*>::operator\\[\\]\\(int const&\\) const::x", "default value returned for a missing index, never written"),
     (CONST, "", "BufferedFileClass::_DesiredBufferSize", "buffer-size setting, never changed"),
+    (CONST, "", "re:rts::WorkingDirectory::saveStartupWorkingDirectory\\(\\)::len", "captures the process's own startup cwd (::GetCurrentDirectory): the same OS-level value for every engine in the process, written once"),
     (GLOBAL, "", "INIClass::KeepBlankEntries", "WWLib INI parser option, never changed"),
     (GLOBAL, "", "re:_DefaultFileFactory|_DefaultWritingFileFactory|_TheWritingFileFactory", "WWLib default (raw) file factories"),
     (GLOBAL, "", "re:SaveLoadSystemClass::\\w+|DefinitionFactoryMgrClass::_FactoryListHead|_TheDefinitionMgr|DefinitionMgrClass::\\w+|text_mutex|status_text|status_count|_(alloc|load|reg)_time", "WWSaveLoad registries (persist factories registered at static init; the definition manager is used only by W3DView/tools)"),
@@ -190,7 +207,7 @@ HAND = [
     (CONST, "", "re:LZHL(De|En)coderStat::\\w+Table0", "LZHL static coding tables"),
     (CONST, "", "re:gli::.*::Table|stbiw__encode_png_line\\(.*\\)::(firstmap|mapping)|pi_lo|tiny", "table/constant in header-only third-party code"),
     (CONST, "", "re:paramsFor(Startup|EngineInit)", "command-line parameter table (names and handlers)"),
-    (CONST, "", "re:OBJECT_STATUS_MASK_NONE|DAMAGE_TYPE_FLAGS_(NONE|ALL)|DISABLEDMASK_(NONE|ALL)|KINDOFMASK_(NONE|FS)", "constant bit mask, set at static initialisation"),
+    (CONST, "", "re:OBJECT_STATUS_MASK_NONE|DAMAGE_TYPE_FLAGS_(NONE|ALL)|DISABLEDMASK_(NONE|ALL)|KINDOFMASK_(NONE|FS)", "constant bit mask, set at static initialization"),
     (CONST, "", "re:replayExtention|lastReplayFileName|PORTABLE_(SAVE|MAPS|USER_MAPS)|g_csfFile|g_strFile|statsDir|ignoredChars", "constant string, never reassigned"),
     (CONST, "", "re:Surfaces|ShakeIntensities|EMITTER_TYPE_NAMES|ReportCategoryNames", "name table, never written"),
     (CONST, "", "re:s_noSoundMarker|ThingTemplate::s_audioEventNoSound", "default-constructed 'no sound' marker, returned by const pointer"),
@@ -199,6 +216,21 @@ HAND = [
     (CONST, "", "re:CRC::_Table|CRC32_Table|Random3Class::Mix[12]|_box_normal|TwiddlerClassName", "constant table"),
     (CONST, "", "re:gameWindowFieldList|layoutScriptTable", ".wnd parse table (names and parsers)"),
     (CONST, "", "re:_\\w+(Loader|Factory)|_NullPrototype|_TwiddlerPersistFactory", LOADER),
+    (
+        CONST,
+        "",
+        "SpecialPowerTemplate::m_specialPowerFieldParse",
+        "INI FieldParse table, built once, never written; rule:fieldparse's declared-type check expects an "
+        "unqualified array name and this is an out-of-line, class-qualified definition",
+    ),
+    (
+        CONST,
+        "",
+        "s_allWeaponFireFlags",
+        "built once from MAKE_MODELCONDITION_MASK5 (Common/ModelState.h), which macro-expands to "
+        "ModelConditionFlags's own constructor applied to literal flags only; a textual rule cannot see "
+        "through the macro to confirm that",
+    ),
     # ---------------------------------------------------------------------------------------------------
     # Debug only.
     (DEBUG, "", "re:TheDebugIgnoreSyncErrors|TheCurrentIgnoreCrashPtr|g_LastErrorDump", "debug"),
@@ -207,9 +239,15 @@ HAND = [
     # them: they are a PER_ENGINE_STATIC now (PLAN-023 Phase 5b, found by the TSan build), so gone from the
     # library; the slot index is rule:per-engine-static.
     (DEBUG, "", "re:_writeSingleParticleSystem\\(.*\\)::buff[1-4]|_reloadParticleSystemFromINI\\(.*\\)::linebuff|_getParticleSystemName\\(\\)::buff", "particle-editor writer/reader buffers (debug DLL)"),
-    (DEBUG, "", "ScriptEngine::getTeamNamed(AsciiString const&)::warnCount", "debug-message limiter"),
-    (DEBUG, "", "re:Object::setTriggerAreaFlagsForChangeInPosition\\(\\)::didWarn|PathfindCell::~PathfindCell\\(\\)::warn", "warn-once flag"),
-    (DEBUG, "", "re:s_totalOpen", "open-file counter for a debug assert"),
+    # ScriptEngine::getTeamNamed(AsciiString const&)::warnCount, Object::setTriggerAreaFlagsForChangeInPosition()::
+    # didWarn and PathfindCell::~PathfindCell()::warn were listed here as debug-only "warn-once" flags, but each
+    # is written on a release sim path by every engine's own thread (getTeamNamed's own script-evaluation thread,
+    # the object update that changes trigger-area membership, or the pathfinder freeing its cells): they are
+    # PER_ENGINE_STATICs now (02/10/2026), so gone from the library as function-local
+    # statics; the slot index is rule:per-engine-static (same treatment as the st_* hooks above). The same
+    # audit found LocalFile.cpp's s_totalOpen and ParticleBufferClass::TotalActiveCount had no reader (the
+    # former a commented-out DEBUG_LOG, the latter a getter with no caller) and no debug assert either, so
+    # both were deleted rather than reclassified; they are gone from the library too.
     (DEBUG, "", "re:DebugDisplay::printf\\(.*\\)::text", "debug display text buffer"),
     (DEBUG, "", "re:CommandTranslator::translateGameMessage\\(.*\\)::old\\w+", "debug-command toggles (MSG_META_DEMO_*)"),
     (DEBUG, "", "file:/WWDebug/", "WW memory log"),
@@ -225,45 +263,44 @@ HAND = [
     #   render-scratch     filled and consumed within one call (a draw, a load): safe for one renderer at a time,
     #                      not for renderers drawing at once; per engine, per thread or a local by its phase;
     #   render-const       the same for every engine and device: built at static initialisation or from
-    #                      constants (a phase: still rewritten at every render boot, with the same value, until
-    #                      that stage builds it once);
+    #                      constants (a phase: constant today, but that stage still changes it: its note says how);
     #   render-process     one per process by design: the D3D8 library, the host's hooks, and what only a user
     #                      interface reaches (every rlgenerals engine keeps GlobalData::m_headless TRUE, the
     #                      viewer's included, so no menu, mouse cursor, control bar or radar is drawn).
     # `engine_state_symbols.py check --render` prints the render-per-engine and render-scratch rows by phase.
     # The runtime probe (engine_state_probe.py) checks this list against the writes a render engine makes.
-    (RPROC, "", "re:D3D8Lib|Direct3DCreate8Ptr|DX8Wrapper::Init\\(void\\*, bool\\)::s_d3d8LibOnce", "the D3D8 library and its Direct3DCreate8, loaded once per process under std::call_once and never freed (RR1): a render engine's Shutdown no longer unloads it from under the next device"),
+    (RPROC, "", "re:D3D8Lib|Direct3DCreate8Ptr|DX8Wrapper::Init\\(void\\*, bool\\)::s_d3d8LibMutex", "the D3D8 library and its Direct3DCreate8, loaded per process under a mutex (a failed load is retried) and never freed (RR1): a render engine's Shutdown no longer unloads it from under the next device"),
     (RPROC, "", "DX8Wrapper_FinalReleaseHook", "the embedding host's check before a render device's or Direct3D interface's last release (RR1): set once, before any render device"),
     # RR2a-1 moved DX8Wrapper's device state (its class statics, dx8wrapper.cpp's file statics and globals) and
     # Debug_Statistics' counters (statistics.cpp) into W3DRenderState, one per render engine (EngineContext::w3dRender,
     # heap-allocated by DX8Wrapper::Init, freed by Destroy_Render_State at the end of WW3D::Shutdown from RR2a-2); the host's two render switches are EngineContext fields.
-    (RCONST, "", "W3DRenderState::Defaults", "the render state an engine without one reads (RR2a-1): every field at its upstream initial value, built at static initialisation and never written (an engine that renders reads and writes its own W3DRenderState; a host makes its pages read-only, W3D_Protect_Render_Defaults, RR2a-2)"),
+    (RCONST, "", "W3DRenderState::Defaults", "the render state an engine without one reads (RR2a-1): every field at its upstream initial value, built at static initialization and never written (an engine that renders reads and writes its own W3DRenderState; a host makes its pages read-only, W3D_Protect_Render_Defaults, RR2a-2)"),
     # RR2a-2 moved WW3D's statics (its render settings and render-loop state, ww3d.cpp's file statics) into WW3DState,
     # one per render engine (EngineContext::ww3dState, allocated and freed with w3dRender), and ShaderClass's device
     # state (CurrentShader, ShaderDirty, _PolygonCullMode) into W3DRenderState; the 22 preset shaders are const
     # (constant-initialised, so read-only data); TheSDL3Window and ApplicationHWnd are EngineContext fields; and
     # W3DDisplay's FPS history and debug statistics are its members.
-    (RCONST, "", "WW3DState::Defaults", "the WW3D state an engine without one reads (RR2a-2): every field at its upstream initial value, constant-initialised and never written (a host makes its pages read-only, W3D_Protect_Render_Defaults)"),
+    (RCONST, "", "WW3DState::Defaults", "the WW3D state an engine without one reads (RR2a-2): every field at its upstream initial value, constant-initialized and never written (a host makes its pages read-only, W3D_Protect_Render_Defaults)"),
     (RPROC, "", "W3D_Protect_Render_Defaults(bool)::s_exitHandlerOnce", "registers, once per process, the exit handler that makes the render defaults writable again for their static destructors (RR2a-2)"),
     (DEBUG, "", "file:WW3D2/dx8rendererdebugger\\.cpp", "WW3D renderer debugger (DX8RendererDebugger::Enabled is never set)"),
     (RCONST, "", "VertexMaterialClass::Apply_Null()::default_settings", "the null material's settings, constant data"),
     (RCONST, "", "DAZZLE_INI_FILENAME", "the dazzle INI's name, never reassigned"),
-    (RCONST, "", "re:(src|dst)BlendLUT", "blend-mode lookup tables, built at static initialisation from constants and only read"),
+    (RCONST, "", "re:(src|dst)BlendLUT", "blend-mode lookup tables, built at static initialization from constants and only read"),
     (RPER, "RR2b", "re:VertexMaterialClass::Presets|BoxRenderObjClass::IsInitted|_BoxMaterial|PointGroupClass::PointMaterial|_MissingTexture|DX8TextureManagerClass::Managed_Textures|Render2DClass::ScreenResolution|_surface|CapsWorkString", "a device-dependent object Do_Onetime_Device_Dependent_Inits (or WW3D::Init) makes and its Shutdowns free, or state they set from the device: per render engine"),
     (RPER, "RR2b", "re:_Dynamic(DX8|Sorting)(Vertex|Index)(Buffer|Array)(Size|Offset)?|_(Vertex|Index)BufferTotal(Vertices|Indices|Size)|_(Vertex|Index)BufferCount", "the dynamic vertex/index buffers, their cursors, and the buffer statistics every buffer's creation and release counts: per render engine"),
-    (RCONST, "", "_DynamicFVFInfo", "the dynamic vertex buffers' vertex format, built at static initialisation"),
+    (RCONST, "", "_DynamicFVFInfo", "the dynamic vertex buffers' vertex format, built at static initialization"),
     (RPER, "RR2b", "re:PointGroupClass::(_TriVertexLocationOrientationTable|_QuadVertexLocationOrientationTable|_TriVertexUVFrameTable|_QuadVertexUVFrameTable)", "rebuilt from constants by every render engine's PointGroupClass::_Init (the same values): built once for the process (std::call_once), then only read"),
     (RPER, "RR2b", "re:Tris|SortingTris|Quads|SortingQuads", "PointGroupClass's shared index buffers, made by _Init and freed by _Shutdown: per render engine"),
     (RSCR, "RR2b", "re:PointGroupClass::(compressed_(loc|diffuse|size|orient|frame)|transformed_loc)|VertexLoc|VertexDiffuse|VertexUV|remap", "PointGroupClass's render scratch, filled and consumed within one draw"),
-    (RCONST, "", "re:PointGroupClass::_ScreenspaceVertexLocationSizeTable|GroundMultiplier[XY]", "constant vectors, initialised statically and only read"),
+    (RCONST, "", "re:PointGroupClass::_ScreenspaceVertexLocationSizeTable|GroundMultiplier[XY]", "constant vectors, initialized statically and only read"),
     (RCONST, "", "re:missing_image_(palette|pixels)", "the missing texture's image, constant data"),
     (RCONST, "", "re:MetalMapManagerClass::(_NormalTable|initialize_normal_table\\(\\)::_normal_table)", "the metal map normal table, built from constants on first use"),
     (RCONST, "", "MaterialPassClass::EnablePerPolygonCulling", "never written: Enable_Per_Polygon_Culling has no caller"),
     (RCONST, "", "re:WW3D(Z)?FormatToD3DFormatConversionArray", "format conversion table, constant data"),
     (RCONST, "RR2b", "re:D3DFormatToWW3D(Z)?FormatConversionArray", "the reverse format tables, rebuilt from the constant ones at every render boot (Init_D3D_To_WW3_Conversion, the same values): built once for the process"),
     (RCONST, "", "DynamicMeshModel::Render(RenderInfoClass&)::default_uv", "a const local static, (0, 0)"),
-    (RPROC, "", "DX8WebBrowser::hWnd", "the embedded web browser's window, a Linux stub never initialised"),
-    (RCONST, "", "re:_BoxVerts|_BoxFaces|_BoxVertexNormals|W3DVolumetricShadow::RenderMeshVolumeBounds\\(.*\\)::_Box(Verts|Faces)", "unit-box geometry (boxrobj.cpp's, and W3DVolumetricShadow::RenderMeshVolumeBounds'), initialised statically from constants and only read"),
+    (RPROC, "", "DX8WebBrowser::hWnd", "the embedded web browser's window, a Linux stub never initialized"),
+    (RCONST, "", "re:_BoxVerts|_BoxFaces|_BoxVertexNormals|W3DVolumetricShadow::RenderMeshVolumeBounds\\(.*\\)::_Box(Verts|Faces)", "unit-box geometry (boxrobj.cpp's, and W3DVolumetricShadow::RenderMeshVolumeBounds'), initialized statically from constants and only read"),
     (RCONST, "RR2b", "_BoxShader", "the box shader, set to the same preset by every BoxRenderObjClass::Init: set once"),
     (RCONST, "RR2b", "BoxRenderObjClass::DisplayMask", "the collision boxes' display mask, rewritten with the same value (0) by every render boot (W3DDisplay::init's WW3D::Set_Collision_Box_Display_Mask): set once"),
     (RSCR, "RR2b", "re:BoxRenderObjClass::(render_box|vis_render_box)\\(.*\\)::verts", "the box's vertices, filled and consumed within one draw"),
@@ -274,7 +311,7 @@ HAND = [
     (RSCR, "RR2b", "re:_DecalPoly[01]|_VisPoly[01]|temp_apt|_TempTransformedVertexBuffer|_TempClipFlagBuffer|LocationHash|DuplicateLocationHash|SideHash", "clipping, decal and mesh-model scratch (decalmsh, visrasterizer, mesh, meshmdl): filled and consumed within one call"),
     (RCONST, "", "re:_LightingLODCutoff2?", "written only by LightEnvironmentClass::Set_Lighting_LOD_Cutoff, which Zero Hour never calls: the initial values for every engine"),
     (RSCR, "RR2b", "re:LineGroupClass::Render\\(.*\\)::offset(_[abc])?", "LineGroupClass::Render's corner offsets, recomputed within each draw"),
-    (RCONST, "", "MeshMatDescClass::NullShader", "the 'no shader' marker, built at static initialisation and only compared against"),
+    (RCONST, "", "MeshMatDescClass::NullShader", "the 'no shader' marker, built at static initialization and only compared against"),
     (RSCR, "RR2b", "re:ParticleBufferClass::Render_Line\\(RenderInfoClass&\\)::tmp_(points|diffuse|id)", "ParticleBufferClass::Render_Line scratch: filled and consumed within one draw"),
     (RSCR, "RR2b", "SimpleSceneClass::Customized_Render(RenderInfoClass&)::lenv", "the light environment each draw rebuilds before it uses it"),
     (RCONST, "", "re:TexProjectClass::Init_(Multiplicative|Additive)\\(\\)::(mult|add)_shader", "shaders built once, under the static-init guard, from constants"),
@@ -291,8 +328,8 @@ HAND = [
     (RPER, "RR2b", "ShatterPatterns", "the shatter patterns ShatterSystem::Init loads and Shutdown frees: per render engine"),
     (RSCR, "RR2b", "re:ClipPools|MeshFragments|TmpVertPositions|TmpVertNormals", "the shatter system's clipping scratch, filled and consumed within one shatter"),
     (RSCR, "RR2b", "_LineRenderer", "segline.cpp's and streak.cpp's line renderers: set up and used within one draw"),
-    (RSCR, "RR2b", "re:PredictiveLODOptimizerClass::\\w+", "the predictive LOD optimiser's object arrays and cost, filled and consumed within one frame's optimisation"),
-    (RPROC, "", "re:AnimatedSoundMgrClass::\\w+", "W3D animated sounds (WWAudio), never initialised by the game (not used by its audio)"),
+    (RSCR, "RR2b", "re:PredictiveLODOptimizerClass::\\w+", "the predictive LOD optimizer's object arrays and cost, filled and consumed within one frame's optimization"),
+    (RPROC, "", "re:AnimatedSoundMgrClass::\\w+", "W3D animated sounds (WWAudio), never initialized by the game (not used by its audio)"),
     (RPER, "RR2b", "Vector3Randomizer::Randomizer", "the RNG of the W3D particle emitters' randomizers: per engine with an identical seed (the render engines have no particles today: ParticleSystemManagerDummy while m_headless)"),
     # The terrain, tree, bib, bridge, road, status-circle, water and player-colour shaders (detailOpaqueShader,
     # detailAlphaShader, zFillAlphaShader, PlayerColorShader; one per TU) left the writable data at RR2a-2: they
@@ -308,7 +345,7 @@ HAND = [
     (RCONST, "", "re:SHADOW_(DECAL_)?(VERTEX|INDEX)_SIZE", "shadow buffer sizes, never changed"),
     (RSCR, "RR3", "re:b[ce][XYZ]|W3DVolumetricShadow::RenderMeshVolumeBounds\\(.*\\)::verts|W3DVolumetricShadow::updateVolumes\\(float\\)::(aaBox|sphere)|W3DProjectedShadowManager::(renderProjectedTerrainShadow|flushDecals)\\(.*\\)::mWorld|W3DProjectedShadowManager::renderShadows\\(RenderInfoClass&\\)::(aaBox|sphere)", "shadow scratch (bounds, boxes, matrices), filled and consumed within one call"),
     (RCONST, "", "guard variable for W3DProjectedShadow::updateTexture(Vector3&)::uvData", "the guard of a constant uv table (the table itself is not in the library's symbols)"),
-    (RSCR, "RR3", "guard variable for W3DProjectedShadowManager::queueDecal(W3DProjectedShadow*)::objCenter", "the guard of queueDecal's centre scratch (the static itself is not in the library's symbols), set within each call"),
+    (RSCR, "RR3", "guard variable for W3DProjectedShadowManager::queueDecal(W3DProjectedShadow*)::objCenter", "the guard of queueDecal's center scratch (the static itself is not in the library's symbols), set within each call"),
     (RCONST, "", "re:W3DVolumetricShadow::Update\\(\\)::originCompareVector|W3DProjectedShadowManager::(addShadow|createDecalShadow)\\(.*\\)::defaultDecalName", "constants built once under the static-init guard"),
     (RPER, "RR3", "re:W3DDisplay::draw\\(\\)::(now|timeMultiplierCounter|couldRender)", "W3DDisplay::draw's frame timing and device-lost state, kept between frames: W3DDisplay members (now is the wall clock: logic-frame time)"),
     (RPROC, "", "re:s_filtered(Resolutions|Dirty)", "the options menu's resolution list: " + UI),
@@ -318,6 +355,7 @@ HAND = [
     (RCONST, "", "(anonymous namespace)::LoadUnicodeFallbackFont(int, bool, char const*)::kFallbackUnicodeFonts", "font name list, constant data"),
     (RPROC, "", "re:W3DRadar::(drawHeroIcon|drawEvents)\\(.*\\)::\\w+", "W3DRadar's draw (the radar window): " + UI),
     (RPROC, "", "file:/W3DDevice/GameClient/GUI/", "W3D menus, control bar, gadgets and window borders: " + UI),
+    (RPROC, "", "mutex", "the W3D mouse cursor's critical section (W3DMouse.cpp; the name's other candidate site, WWLib's lzo.cpp, is not built): only an engine with a real mouse, " + UI),
     (RPROC, "", "file:W3DMouse\\.cpp", "the W3D mouse cursor (its textures, models, images and animation thread): only an engine with a real mouse, " + UI),
     # ---------------------------------------------------------------------------------------------------
     # Render only (and UI only).
@@ -325,29 +363,27 @@ HAND = [
     # locks it every headless engine's getDrawModules reads it on its own thread: it is an EngineContext
     # field now (drawableModelLockCount; PLAN-023 Phase 8, stage RR0a), so gone from the library.
     (RENDER, "", "re:TheSupplyAndTechImageLocations", "skirmish menu map-preview markers (T3 listed it for Phase 4; only the menu reads it): " + UI),
-    (GLOBAL, "", "re:ControlBar::(updateBuildQueueDisabledImages|populateBuildQueue)\\(.*\\)::idsInitialized", "guards the fill of that function's cached NameKey array (process-wide by PLAN-023 Decision 2)"),
+    (GLOBAL, "", "re:ControlBar::(updateBuildQueueDisabledImages|populateBuildQueue)\\(.*\\)::idsInitialized", "threads only: unsynchronized check-then-set latch guarding the fill of that function's cached NameKey array (process-wide by PLAN-023 Decision 2); std::call_once replaces it"),
     (CONST, "", "commandWindowsInitialized", "never written (nothing but its definition names it)"),
     (CONST, "", "WindowLayoutCurrentVersion", "never written"),
-    (CONST, "", "re:(guard variable for )?GameWindowManager::assignDefaultGadgetLook\\(.*\\)::\\w+", "set on the first call to a fixed colour (winMakeColor of constants), the same in every engine"),
+    (CONST, "", "re:(guard variable for )?GameWindowManager::assignDefaultGadgetLook\\(.*\\)::\\w+", "set on the first call to a fixed color (winMakeColor of constants), the same in every engine"),
     (RENDER, "", "re:ControlBar::populateBuildQueue\\(.*\\)::cancel(Unit|Upgrade)Command", "cached CommandButton*, but populateBuildQueue runs only from evaluateContextUI (ControlBar::update returns at once headless): " + UI),
     (RENDER, "", "re:ControlBar::(showBuildTooltipLayout|populateBuildTooltipLayout)\\(.*\\)::\\w+", "tooltip on mouse hover over a command button (commandButtonTooltip): " + UI),
     (RENDER, "", "re:radioButton(InGame|Buddies)|win(InGame|Buddies|Solo)", "written only by ShowDiplomacy (player input) and the online buddy overlay: " + UI),
     (RENDER, "", "ToggleInGameChat(bool)::justHid", "chat toggle, set only on player input (ToggleInGameChat, from CommandXlat's chat keys): " + UI),
     (RENDER, "", "re:staticTextMessage|buttonOk|shouldPause", "InGamePopupMessageInit only: headless, InGameUI::popupMessage's layout has no init (GameWindowManagerDummy's winCreateFromScript returns no init name): " + UI),
     (RENDER, "", "re:ChallengeLoadScreen::activatePieces\\(.*\\)::textPos\\w+", "Generals' Challenge load screen teletype positions: GameLogic::getLoadScreen makes a ChallengeLoadScreen only for a challenge campaign, which only the shell's Generals' Challenge menu starts (" + UI + "); they are also reset (FRAME_TELETYPE_START) and consumed within one ChallengeLoadScreen::init call"),
-    (RENDER, "", "re:the(System|Input|Tooltip|Draw)String", "the .wnd parser's scratch names, filled and consumed within one parse (only a real GameWindowManager parses); only the ~GameWindowManager of a manager that parsed a .wnd file clears them (freeStaticStrings, PLAN-023 Phase 5b), which only drops a finished parse's leftovers, so a headless engine never writes them: " + UI),
     (RENDER, "", "file:/GUI/(?!" + HEADLESS_GUI + ")", UI),
     (RENDER, "", "re:scrollDir|prevCursor|Mouse::updateMouseData\\(\\)::busy", "mouse/scroll input: headless has MouseDummy and no input"),
-    (RENDER, "", "file:Win32Mouse\\.cpp", "the Win32 mouse cursor: headless has MouseDummy and no input"),
+    (RENDER, "", "file:Win32Mouse\\.cpp|SDL3Mouse\\.cpp", "the Win32 and SDL3 mouse cursors (cursorResources): headless has MouseDummy and no input"),
     (RENDER, "", "re:SmudgeSet::m_freeSmudgeList", "heat-haze smudges, drawn only"),
-    (GLOBAL, "", "DX8Wrapper_IsWindowed", "the process's assert switch (Debug.cpp's ignoringAsserts): every headless engine's command line (parseHeadless) sets it false so asserts stay off for the rest of the process, after TheGlobalData is gone too; a std::atomic, since boots write it while other engines' assert paths read it (PLAN-023 Phase 5b)"),
+    (GLOBAL, "", "DX8Wrapper_IsWindowed", "the process's assert switch (Debug.cpp's ignoringAsserts): every headless engine's command line (parseHeadless) sets it false, and a rendering engine's DX8Wrapper::Init (false) and Set_Render_Device (the device's windowed flag) write it too, so it holds the last writer's value, not a fixed one; a std::atomic, since boots write it while other engines' assert paths read it (PLAN-023 Phase 5b)"),
     # Only device-only WW3D2 files: mesh, meshmdl, meshgeometry, rendobj, texture, ww3d, dx8renderer,
     # part_emt and part_buf are reached by a headless engine too (models, bones, emitters, asset loading),
     # so their statics are classified by name below or above.
     (RENDER, "", "parent", "a menu's parent window, one per menu TU (in-game popup, lobby, score screen, map select, ...): " + UI),
     (GLOBAL, "", "pingImages", "the online lobby's and WOL game setup's ping images: " + NET),
     (DEBUG, "", "statistics_requested", "DX8 mesh-renderer statistics request (debug display)"),
-    (DEBUG, "", "ParticleBufferClass::TotalActiveCount", "particle-buffer statistics counter; its getter Get_Total_Active_Count has no caller"),
     (DEBUG, "", "RenderObjPersistFactoryClass::Load(ChunkLoadClass&) const::count", "warning limiters (two in the function)"),
     (CONST, "", "DX8TextureCategoryClass::m_gForceMultiply", "never written: SetForceMultiply has no caller"),
     (CONST, "", "MeshClass::Legacy_Meshes_Fogged", "never written"),
