@@ -142,8 +142,9 @@ InGameUI *TheInGameUI = nullptr;
 #if RTS_ENGINE_CONTEXT
 // GeneralsX @feature cemlyn007 28/09/2026 Per engine: InGameUI::init (headless too) stores this engine's replay
 // control here, a real window with GameWindowManagerDummy, and Show/HideControlBar (GameLogic::startNewGame,
-// clearGameData, ScriptActions, ~GameEngine) hide it; shared, one engine would hide another's window, or one
-// its own window manager has freed (PLAN-023 Phase 4). The macro keeps the uses unchanged.
+// clearGameData, ScriptActions, GameEngine::init, InGameUI::init's createControlBar) hide it; shared, one engine
+// would hide another's window, or one its own window manager has freed (PLAN-023 Phase 4). The macro keeps the
+// uses unchanged.
 static rts::PerEngineStatic<GameWindow *> s_replayWindow_perEngine;
 #define m_replayWindow (s_replayWindow_perEngine.get())
 #else
