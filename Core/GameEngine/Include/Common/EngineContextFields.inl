@@ -16,6 +16,12 @@
 // constructed in it. Fatal errors raised in that window do not throw (see FatalEngineError.h).
 RTS_ENGINE_CONTEXT_VALUE(bool, engineTearingDown, false)
 
+// Set when a FatalEngineError is constructed in this engine (cleared by TakeEngineFatalErrorThrown or
+// TakeEngineFatalErrorRaised), and when a fatal error returns instead of throwing (the teardown window, or
+// another exception propagating; cleared by TakeEngineFatalErrorRaised only). See FatalEngineError.h.
+RTS_ENGINE_CONTEXT_VALUE(bool, fatalErrorThrown, false)
+RTS_ENGINE_CONTEXT_VALUE(bool, fatalErrorReturned, false)
+
 // Set while this engine boots from names another engine primed, until its upgrades are loaded: it must
 // intern no new NameKey then (NameKeyGenerator::PrimingLatch, PLAN-023 Decision 2).
 RTS_ENGINE_CONTEXT_VALUE(bool, nameKeysFrozen, false)

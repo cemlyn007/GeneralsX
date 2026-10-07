@@ -33,6 +33,7 @@
 #include "StdDevice/Common/StdLocalFile.h"
 
 #include <algorithm>
+#include <atomic>
 #include <cstdio>
 #include <filesystem>
 
@@ -485,6 +486,24 @@ void StdLocalFileSystem::setAssetRootPath(const AsciiString& path)
 	// a process share one install, so only the first boot writes the process-wide path while later engines' file
 	// lookups on other threads read it (PLAN-023 Phase 5b).
 	std::filesystem::path assetRootPath(std::move(p));
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @bugfix cemlyn007 28/09/2026 Settled by the first boot, whether it names a root or none (an empty one
+	// is passed too): a later boot naming another root is refused rather than changing the path under the engines
+	// already reading it (the host boots every engine on one install).
+	static std::atomic<bool> s_assetRootSettled{false};
+	if (s_assetRootSettled.exchange(true))
+	{
+		if (s_assetFallbackPath != assetRootPath)
+		{
+			std::fprintf(stderr, "StdLocalFileSystem::setAssetRootPath - the asset fallback path is process-wide ('%s'): '%s' refused\n",
+				s_assetFallbackPath.string().c_str(), assetRootPath.string().c_str());
+			std::fflush(stderr);
+			DEBUG_CRASH(("StdLocalFileSystem::setAssetRootPath - the asset fallback path is process-wide ('%s'): '%s' refused",
+				s_assetFallbackPath.string().c_str(), assetRootPath.string().c_str()));
+		}
+		return;
+	}
+#endif
 	if (s_assetFallbackPath == assetRootPath)
 		return;
 	s_assetFallbackPath = std::move(assetRootPath);

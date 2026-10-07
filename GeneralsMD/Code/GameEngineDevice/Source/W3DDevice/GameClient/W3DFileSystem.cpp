@@ -40,6 +40,8 @@
 // for now we maintain old legacy files
 // #define MAINTAIN_LEGACY_FILES
 
+#include <cstdio>
+
 #include "Common/ArchiveFile.h"
 #include "Common/Debug.h"
 #include "Common/file.h"
@@ -503,7 +505,19 @@ namespace
 class EngineW3DFileFactoryClass : public FileFactoryClass
 {
 public:
-	EngineW3DFileFactoryClass() { _TheFileFactory = this; }
+	EngineW3DFileFactoryClass()
+	{
+		// Only over the library's default: a factory something else installed is refused rather than replaced
+		// under the engines already reading it (PLAN-023 Phase 5b).
+		if (_TheFileFactory == static_cast<FileFactoryClass *>(_TheSimpleFileFactory))
+			_TheFileFactory = this;
+		else
+		{
+			fprintf(stderr, "W3DFileSystem - another file factory is installed process-wide; the engine's is refused\n");
+			fflush(stderr);
+			DEBUG_CRASH(("W3DFileSystem - another file factory is installed process-wide; the engine's is refused"));
+		}
+	}
 	virtual FileClass * Get_File( char const *filename ) override
 	{
 		if (TheW3DFileSystem != nullptr)

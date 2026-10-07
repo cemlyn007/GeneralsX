@@ -56,13 +56,25 @@
 class FATAL_ENGINE_ERROR_API FatalEngineError : public std::runtime_error
 {
 public:
-	explicit FatalEngineError(const std::string& reason) : std::runtime_error(reason) {}
+	explicit FatalEngineError(const std::string& reason);
 	virtual ~FatalEngineError() override;
 };
 
 // Process-wide. Set it before the first engine is initialised; off by default.
 FATAL_ENGINE_ERROR_API void SetEngineEmbeddedMode(bool embedded);
 FATAL_ENGINE_ERROR_API bool IsEngineEmbeddedMode();
+
+// GeneralsX @bugfix cemlyn007 03/10/2026 The engine's own record of a fatal error (with RTS_ENGINE_CONTEXT, in
+// the current engine context, never outside every one; without it, in the process). Two kinds, each cleared
+// by its read:
+// - TakeEngineFatalErrorThrown: a FatalEngineError was constructed since the last call. It says nothing
+//   about which exception is leaving the engine: this one may have been swallowed earlier. A host that
+//   enters an engine around its calls reads it as the call ends, before it can have caught that exception.
+// - TakeEngineFatalErrorRaised: either kind, that or a fatal error that returned instead of throwing (see the
+//   teardown window above), which is no FatalEngineError and so says nothing about the exception leaving the
+//   engine, if there is one. It clears both.
+FATAL_ENGINE_ERROR_API bool TakeEngineFatalErrorThrown();
+FATAL_ENGINE_ERROR_API bool TakeEngineFatalErrorRaised();
 
 // Per engine (per engine context with RTS_ENGINE_CONTEXT): GameEngine's destructor sets it and its
 // constructor clears it.

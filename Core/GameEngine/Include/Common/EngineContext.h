@@ -192,16 +192,34 @@ RTS_ENGINE_CONTEXT_API bool noEngineIsPristine();
 // thread's floating-point environment (with the x87 control word) and its locale, saved by a Scope that enters
 // an engine. Opaque here, so that this force-included header pulls in neither <cfenv> nor <locale.h>;
 // EngineContext.cpp checks that fenv_t and locale_t fit.
+// GeneralsX @bugfix cemlyn007 28/09/2026 Only what the Scope changes is saved and restored. On x86-64 (not Windows) that
+// is the x87 control word and MXCSR, reloaded on exit for a thread already in the engine's mode only if the Scope
+// changed them; elsewhere the whole fenv_t (with the x87 control word on i386). Only LC_NUMERIC is switched (to "C"), so that the engine sees
+// the thread's other categories (LC_CTYPE for towlower, iswspace, mbstowcs) as it does without the engine context.
+// GeneralsX @bugfix cemlyn007 29/09/2026 The locale is switched on every entry, to one cached per thread (the
+// thread's own locale with LC_NUMERIC "C": made at the first entry for a thread on the global locale, at every
+// outermost entry for one on a locale of its own), never left as the process's global locale:
+// see enterEngineThreadInvariants. The host must still not call setlocale() while any engine steps (glibc's
+// locale functions are not safe against it), and must set the process locale before the first entry: a thread on
+// the global locale keeps the LC_CTYPE it had at its first entry, so every thread that steps engines needs the
+// same LC_CTYPE.
 struct ThreadInvariants
 {
 	alignas(8) unsigned char floatingPointEnvironment[32];
+	// The thread's locale to restore (null when the Scope left the thread's locale alone), and the one made for
+	// this Scope only (freed on exit; null when it used the thread's cached one).
 	void* locale;
+	void* engineLocale;
+	unsigned int mxcsr;
 	unsigned short x87ControlWord;
+	// Whether the thread entered outside the engine's mode, so the fields above hold its own state to reload on
+	// exit. When false they hold the engine's mode as at entry, reloaded on exit only if something inside the
+	// Scope changed it.
+	bool floatingPointSaved;
 };
 
-// Saves the calling thread's invariants into `saved`, then sets the engine's: setFPMode()'s rounding and
-// precision, and the engine's locale (made once per process from the global locale: LC_NUMERIC "C", the rest as
-// it was then) for this thread.
+// Saves the calling thread's invariants into `saved` where they differ from the engine's, then sets the engine's:
+// setFPMode()'s rounding and precision, and LC_NUMERIC "C" over the thread's own locale.
 RTS_ENGINE_CONTEXT_API void enterEngineThreadInvariants(ThreadInvariants& saved) noexcept;
 // Restores what enterEngineThreadInvariants saved.
 RTS_ENGINE_CONTEXT_API void leaveEngineThreadInvariants(const ThreadInvariants& saved) noexcept;
@@ -210,14 +228,12 @@ RTS_ENGINE_CONTEXT_API void leaveEngineThreadInvariants(const ThreadInvariants& 
 // A null context means g_noEngine.
 //
 // GeneralsX @feature cemlyn007 28/09/2026 A Scope that switches the thread to a different engine also sets the
-// engine's per-thread invariants (PLAN-023 Phase 5b): the floating-point mode setFPMode() sets, which applies
-// to the calling thread only, and LC_NUMERIC "C" (the other locale categories are the global locale's, as at
-// the first entry). The engine calls setFPMode() at boot, at INI and map loads and around every
-// GameLogic::update, so the Scope sets it at entry for the rest of a call (client update, host reads). An
-// engine may be stepped on another thread than it booted on, or on one whose mode or number format the host
-// changed, and must still run as it would alone. The thread's own mode and locale come back when the Scope
-// ends. A nested Scope on the engine already current, and a Scope for g_noEngine, do nothing more than
-// before, so the cost is paid once per outermost call into an engine.
+// engine's per-thread invariants (PLAN-023 Phase 5b): the floating-point mode setFPMode() sets, which the engine's
+// boot, INI and load-screen paths set only on the thread that ran them, and a "C" LC_NUMERIC for its number
+// parsing and formatting. An engine may be stepped on another thread than it booted on, or on one whose mode
+// the host changed, and must still run as it would alone, given the host's locale contract above. The thread's
+// own mode and locale come back when the Scope ends. A nested Scope on the engine already current, and a Scope
+// for g_noEngine, do nothing more than before, so the cost is paid once per outermost call into an engine.
 class [[nodiscard]] Scope
 {
 public:

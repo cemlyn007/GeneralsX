@@ -787,9 +787,75 @@ static std::atomic<bool> theEngineEmbeddedMode(false);
 static volatile bool theEngineEmbeddedMode = false;
 #endif
 
+#if !RTS_ENGINE_CONTEXT
+#if !(defined(_MSC_VER) && _MSC_VER < 1300)
+static std::atomic<bool> theFatalErrorThrown(false);
+static std::atomic<bool> theFatalErrorReturned(false);
+#else
+static volatile bool theFatalErrorThrown = false;
+static volatile bool theFatalErrorReturned = false;
+#endif
+#endif
+
+// GeneralsX @bugfix cemlyn007 03/10/2026 See TakeEngineFatalErrorThrown (FatalEngineError.h)
+FatalEngineError::FatalEngineError(const std::string& reason)
+	: std::runtime_error(reason)
+{
+#if RTS_ENGINE_CONTEXT
+	// g_noEngine stays pristine.
+	rts::EngineContext* context = rts::ctx();
+	if (context != &rts::g_noEngine)
+		context->fatalErrorThrown = true;
+#elif !(defined(_MSC_VER) && _MSC_VER < 1300)
+	theFatalErrorThrown.store(true);
+#else
+	theFatalErrorThrown = true;
+#endif
+}
+
 // GeneralsX @bugfix cemlyn007 02/10/2026 `= default` is C++11; VC6 cannot parse it, so give the
 // destructor an explicit empty body instead (see the <atomic> guard above for the same reasoning).
 FatalEngineError::~FatalEngineError() {}
+
+bool TakeEngineFatalErrorThrown()
+{
+#if RTS_ENGINE_CONTEXT
+	rts::EngineContext* context = rts::ctx();
+	if (context == &rts::g_noEngine)
+		return false;
+	const bool thrown = context->fatalErrorThrown;
+	context->fatalErrorThrown = false;
+	return thrown;
+#elif !(defined(_MSC_VER) && _MSC_VER < 1300)
+	return theFatalErrorThrown.exchange(false);
+#else
+	const bool thrown = theFatalErrorThrown;
+	theFatalErrorThrown = false;
+	return thrown;
+#endif
+}
+
+bool TakeEngineFatalErrorRaised()
+{
+#if RTS_ENGINE_CONTEXT
+	rts::EngineContext* context = rts::ctx();
+	if (context == &rts::g_noEngine)
+		return false;
+	const bool raised = context->fatalErrorThrown || context->fatalErrorReturned;
+	context->fatalErrorThrown = false;
+	context->fatalErrorReturned = false;
+	return raised;
+#elif !(defined(_MSC_VER) && _MSC_VER < 1300)
+	const bool thrown = theFatalErrorThrown.exchange(false);
+	const bool returned = theFatalErrorReturned.exchange(false);
+	return thrown || returned;
+#else
+	const bool raised = theFatalErrorThrown || theFatalErrorReturned;
+	theFatalErrorThrown = false;
+	theFatalErrorReturned = false;
+	return raised;
+#endif
+}
 
 void SetEngineEmbeddedMode(bool embedded)
 {
@@ -865,13 +931,28 @@ bool IsEngineTearingDown()
 }
 #endif
 
-// GeneralsX @feature cemlyn007 02/10/2026 Sets the fault latch (see FatalEngineError.h).
-static void latchEngineFault()
+// GeneralsX @feature cemlyn007 02/10/2026 Sets the fault latch (see FatalEngineError.h). A fatal error that
+// returns instead of throwing (the teardown window, another exception propagating) constructs no
+// FatalEngineError, so `returns` also records it on the current engine, apart from the thrown kind: the
+// exception leaving the engine is not that fatal error.
+static void latchEngineFault(bool returns)
 {
 #if !(defined(_MSC_VER) && _MSC_VER < 1300)
 	theEngineHasFaulted.store(true);
 #else
 	theEngineHasFaulted = true;
+#endif
+	if (!returns)
+		return;
+#if RTS_ENGINE_CONTEXT
+	// g_noEngine stays pristine.
+	rts::EngineContext* context = rts::ctx();
+	if (context != &rts::g_noEngine)
+		context->fatalErrorReturned = true;
+#elif !(defined(_MSC_VER) && _MSC_VER < 1300)
+	theFatalErrorReturned.store(true);
+#else
+	theFatalErrorReturned = true;
 #endif
 }
 
@@ -885,8 +966,9 @@ static bool throwWithoutGlobalData(const char *reason)
 {
 	if (!IsEngineEmbeddedMode())
 		return false;
-	latchEngineFault();
-	if (IsEngineTearingDown() || std::uncaught_exceptions() != 0)
+	const bool returns = IsEngineTearingDown() || std::uncaught_exceptions() != 0;
+	latchEngineFault(returns);
+	if (returns)
 		return false;
 #if RTS_ENGINE_CONTEXT
 	// GeneralsX @bugfix cemlyn007 28/09/2026 Outside every engine context (rts::g_noEngine, where
@@ -917,8 +999,9 @@ static bool HandleEmbeddedFatalError(const char *reason)
 {
 	if (!IsEngineEmbeddedMode())
 		return false;
-	latchEngineFault();
-	if (IsEngineTearingDown() || std::uncaught_exceptions() != 0)
+	const bool returns = IsEngineTearingDown() || std::uncaught_exceptions() != 0;
+	latchEngineFault(returns);
+	if (returns)
 		return true;
 	throw FatalEngineError(reason ? reason : "");
 }

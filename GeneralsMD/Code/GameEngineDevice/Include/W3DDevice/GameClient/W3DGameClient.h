@@ -37,6 +37,8 @@
 // SYSTEM INCLUDES ////////////////////////////////////////////////////////////
 
 // USER INCLUDES //////////////////////////////////////////////////////////////
+#include <cstdio>
+
 #include "GameClient/GameClient.h"
 #include "W3DDevice/GameClient/W3DParticleSys.h"
 #include "W3DDevice/GameClient/W3DDisplay.h"
@@ -133,7 +135,23 @@ protected:
 	// GeneralsX @feature cemlyn007 28/09/2026 Written only when it changes: every engine's GameClient::init sets the
 	// initial value, so once static initialisation is done no engine writes the process-wide value while another
 	// reads it (PLAN-023 Phase 5b).
-	virtual void setFrameRate(Real msecsPerFrame) override { if (TheW3DFrameLengthInMsec != msecsPerFrame) TheW3DFrameLengthInMsec = msecsPerFrame; }
+	// GeneralsX @bugfix cemlyn007 28/09/2026 With the engine context, a different value is refused rather than
+	// written under the engines already stepping on other threads: the length is process-wide, so every engine of a
+	// process plays at the static default (PLAN-023 Phase 5b).
+	virtual void setFrameRate(Real msecsPerFrame) override
+	{
+		if (TheW3DFrameLengthInMsec == msecsPerFrame)
+			return;
+#if RTS_ENGINE_CONTEXT
+		fprintf(stderr, "W3DGameClient::setFrameRate - the frame length is process-wide (%g ms): %g ms refused\n",
+			(double)TheW3DFrameLengthInMsec, (double)msecsPerFrame);
+		fflush(stderr);
+		DEBUG_CRASH(("W3DGameClient::setFrameRate - the frame length is process-wide (%g ms): %g ms refused",
+			TheW3DFrameLengthInMsec, msecsPerFrame));
+#else
+		TheW3DFrameLengthInMsec = msecsPerFrame;
+#endif
+	}
 
 };
 
