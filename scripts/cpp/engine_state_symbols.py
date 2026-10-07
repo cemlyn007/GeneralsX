@@ -9,8 +9,16 @@
 #   process-global  one per process on purpose (the note says why)
 #   constant        a table or value that never changes after static initialisation / first use
 #   debug-only      only written by debug, logging or profiling code
-#   render-only     only reached with a render device or a user interface (menus, the shell, the W3D
-#                   renderer); fine while only the first engine in a process renders
+#   render-only     only reached with a user interface (menus, the shell, the control bar); fine while no
+#                   engine but one per process has a user interface
+#   render-per-engine  (PLAN-023 Phase 8) a render engine's device, scene or draw state, kept from one call
+#                   to the next: moves into the engine in the stage its phase names (RR2a-1 ... RR3)
+#   render-scratch  (Phase 8) filled and consumed within one render call: safe for one renderer at a time,
+#                   not for renderers drawing at once (per engine, per thread or a local by its phase)
+#   render-const    (Phase 8) the same for every engine and device (a phase: constant today, but that stage still
+#                   changes it: the row's note says how)
+#   render-process  (Phase 8) one per process by design: the D3D8 library, the host's hooks, and what only a
+#                   user interface reaches in the W3D device layer
 #   unreviewed      not classified yet: nobody has looked, so nothing is claimed
 #
 # The per-engine entries are the work list for Phases 2-4, and Phase 7 turns the same list into the CI gate.
@@ -39,6 +47,10 @@
 #                                             Phase 5b emptied the per-engine list, so one is a regression,
 #                                             and on a hand entry whose note says thread_local but whose
 #                                             symbol is not in .tbss/.tdata
+#   engine_state_symbols.py check --render LIB.so
+#                                             also print the render work list (warnings only): the
+#                                             render-per-engine and render-scratch symbols by phase, and the
+#                                             render-const ones a stage still changes, with counts
 #   engine_state_symbols.py report [LIB.so]   print the per-engine work list grouped by phase, the counts
 #                                             per class and the unreviewed symbols (from the TSV, or from
 #                                             the library when given)
@@ -77,7 +89,18 @@ SOURCE_EXTENSIONS = (".cpp", ".c", ".cc", ".h", ".hpp", ".inl")
 
 TLS_SECTIONS = {".tbss", ".tdata"}
 
-CLASSES = ("per-engine", "process-global", "constant", "debug-only", "render-only", "unreviewed")
+CLASSES = (
+    "per-engine",
+    "process-global",
+    "constant",
+    "debug-only",
+    "render-only",
+    "render-per-engine",
+    "render-scratch",
+    "render-const",
+    "render-process",
+    "unreviewed",
+)
 COLUMNS = ("symbol", "scope", "binding", "section", "count", "bytes", "source", "class", "phase", "note", "by")
 
 WRITABLE_SECTIONS = {".bss", ".data", ".tbss", ".tdata"}
@@ -843,10 +866,11 @@ DEF_PREFIX_RE = re.compile(
     r"(?!\s*(?:return|extern|delete|if|else|case|goto|throw|using|typedef|friend|#|//|/\*|\*)\b)"
     r"(?:\s*(?:[A-Za-z_][\w:]*(?:\s*<[^;()]*>)?[\s*&]+)+"  # a type
     r"(?:[*&]*\s*\w+\s*(?:\[[^\]]*\]\s*)*(?:=[^,;]*)?,\s*)*"  # earlier declarators on the same line
+    r"|\s*(?:[A-Za-z_][\w:]*[\s*&]+)+\(\s*\*+\s*"  # a function pointer: `void (*name)(...)`
     r"|\s*\}\s*"  # the instance after a struct body
     r"|[A-Z_][A-Z_0-9]*\(.*\)\s*)"  # a declaring macro (DECLARE_DEFINITION_FACTORY(...) name;)
 )
-DEF_SUFFIX_RE = re.compile(r"\s*(?:\[[^\]]*\]\s*)*(?:=|;|\{|\(|,|$)")
+DEF_SUFFIX_RE = re.compile(r"\s*(?:\[[^\]]*\]\s*)*(?:=|;|\{|\(|,|$|\)\s*\()")
 # What follows a class-body static's name when the line itself initialises it (`= 5`, `{5}`): a bare
 # `;` or `,` is only a declaration.
 IN_CLASS_INIT_RE = re.compile(r"\s*(?:\[[^\]]*\]\s*)*(?:=|\{)")
@@ -904,7 +928,13 @@ def resolve_sources(root, symbols, third_party):
 # --------------------------------------------------------------------------------------------------------
 # Classification
 
-PER, GLOBAL, CONST, DEBUG, RENDER, UNREVIEWED = CLASSES
+PER, GLOBAL, CONST, DEBUG, RENDER, RPER, RSCR, RCONST, RPROC, UNREVIEWED = CLASSES
+# GeneralsX @feature cemlyn007 30/09/2026 The render classes (PLAN-023 Phase 8, stage RR1): a phase is the stage
+# that moves the symbol, required for the two classes of state that must move, optional for render-const and
+# render-process (the stage that still changes it, or how it is shared: the row's note says how).
+PHASE_REQUIRED = {PER, RPER, RSCR}
+PHASE_ALLOWED = PHASE_REQUIRED | {RCONST, RPROC}
+RENDER_CLASSES = (RPER, RSCR, RCONST, RPROC)
 
 
 class Hand:
@@ -917,7 +947,12 @@ class Hand:
     def __init__(self, entry):
         self.cls, phase, matcher, self.note = entry
         self.phase = str(phase) if phase else ""
-        if self.cls not in CLASSES or (self.cls == PER) != bool(self.phase) or not self.note:
+        if (
+            self.cls not in CLASSES
+            or (self.cls in PHASE_REQUIRED and not self.phase)
+            or (self.phase and self.cls not in PHASE_ALLOWED)
+            or not self.note
+        ):
             sys.exit(f"engine_state_hand.py: bad entry {entry!r}")
         self.name = self.regex = self.file = None
         if matcher.startswith("re:"):
@@ -1898,8 +1933,8 @@ TSV_HEADER = (
     "# joined by `;` when several TUs define the name, `third-party:<lib>` for a vcpkg library, `?` if not\n"
     "# found; a count-1 name can still list several `;`-joined candidate sites when the search cannot tell\n"
     "# which one build configuration actually links, for example two platform files that are never both\n"
-    "# built); class; phase (per-engine only); note; by (hand, file = a hand `file:` pattern, rule:<name>,\n"
-    "# guard, none).\n"
+    "# built); class; phase (the stage that moves it: per-engine and render classes); note; by (hand, file = a\n"
+    "# hand `file:` pattern, rule:<name>, guard, none).\n"
 )
 
 
@@ -2117,9 +2152,28 @@ def cmd_check(args):
             "then run `engine_state_symbols.py snapshot <lib>` and review the diff"
         )
         return 1
+    if args.render:
+        render_worklist(symbols)
     unreviewed = sum(1 for s in symbols.values() if s.cls == UNREVIEWED)
     print(f"ok: {len(symbols)} symbols, none new but what a safe rule classifies ({unreviewed} still unreviewed in the list)")
     return 0
+
+
+def render_worklist(symbols):
+    """The render work list (PLAN-023 Phase 8), as warnings: every render-per-engine and render-scratch symbol
+    and every render-const one a stage still changes, grouped by phase, with counts per class. Guard
+    variables follow their statics and are left out."""
+    syms = [s for s in symbols.values() if s.by != "guard"]
+    counts = collections.Counter(s.cls for s in syms if s.cls in RENDER_CLASSES)
+    print("render classes: " + ", ".join(f"{c} {counts.get(c, 0)}" for c in RENDER_CLASSES))
+    for cls in (RPER, RSCR, RCONST):
+        group = [s for s in syms if s.cls == cls and s.phase]
+        for phase in sorted({s.phase for s in group}):
+            rows = sorted((s for s in group if s.phase == phase), key=lambda s: (s.source, s.key))
+            print(f"\nwarning: {cls} {phase}: {len(rows)}")
+            for s in rows:
+                print(f"  {s.key}  [{s.source}]")
+    print()
 
 
 def cmd_report(args):
@@ -2141,7 +2195,7 @@ def cmd_report(args):
     for r in rest:
         print(f"  {r['symbol']}  [{r['source']}]")
     if args.by_class:
-        for cls in (GLOBAL, CONST, DEBUG, RENDER):
+        for cls in (GLOBAL, CONST, DEBUG, RENDER) + RENDER_CLASSES:
             group = sorted((r for r in rows if r["class"] == cls), key=lambda r: (r["source"], r["symbol"]))
             print(f"\n== {cls}: {len(group)}")
             for r in group:
@@ -2159,6 +2213,7 @@ def main():
     p = sub.add_parser("check", help="fail on a new symbol no safe rule classifies, a changed class or a new instance")
     p.add_argument("lib")
     p.add_argument("--strict", action="store_true", help="also fail if the TSV is stale in any way")
+    p.add_argument("--render", action="store_true", help="also print the render work list (warnings only)")
     p = sub.add_parser("report", help="print the per-engine work list by phase and the unreviewed symbols")
     p.add_argument("lib", nargs="?")
     p.add_argument("--guards", action="store_true", help="include guard variables")

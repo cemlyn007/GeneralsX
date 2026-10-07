@@ -99,6 +99,7 @@
 #include "shdlib.h"
 
 #include <atomic>
+#include <mutex>
 
 const int DEFAULT_RESOLUTION_WIDTH = 640;
 const int DEFAULT_RESOLUTION_HEIGHT = 480;
@@ -408,6 +409,10 @@ bool DX8Wrapper_HeadlessRender = false;  // rlgenerals: see dx8wrapper.h
 // FPU_PRESERVE
 int DX8Wrapper_PreserveFPU = 0;
 
+// GeneralsX @feature cemlyn007 30/09/2026 The host's check before a render device's or Direct3D interface's last
+// release (PLAN-023 Phase 8, stage RR1): see dx8wrapper.h.
+void (*DX8Wrapper_FinalReleaseHook)(const char* what) = nullptr;
+
 /***********************************************************************************
 **
 ** DX8Wrapper Static Variables
@@ -642,37 +647,53 @@ bool DX8Wrapper::Init(void * hwnd, bool lite)
 	Invalidate_Cached_Render_States();
 
 	if (!lite) {
-		// GeneralsX @build BenderAI 10/02/2026 - Platform-specific DLL/SO/DYLIB loading (Phase 5: macOS)
+		// GeneralsX @bugfix cemlyn007 30/09/2026 The D3D8 library is loaded for the process and never freed
+		// (PLAN-023 Phase 8, stage RR1). A process may bring a render device up, shut it down and bring another
+		// up, and render engines may come and go while others run: unloading DXVK in one engine's Shutdown would
+		// pull its code from under the next device (and from the host's own IDirect3D8), so no FreeLibrary.
+		// A failed load is retried by the next Init, so a transient failure does not stick for the process.
+		static std::mutex s_d3d8LibMutex;
+		bool d3d8Loaded;
+		{
+		std::lock_guard<std::mutex> d3d8LibLock(s_d3d8LibMutex);
+		if (D3D8Lib == nullptr || Direct3DCreate8Ptr == nullptr) [] {
+			// GeneralsX @build BenderAI 10/02/2026 - Platform-specific DLL/SO/DYLIB loading (Phase 5: macOS)
 #ifdef _WIN32
-		D3D8Lib = LoadLibrary("D3D8.DLL");
+			D3D8Lib = LoadLibrary("D3D8.DLL");
 #elif defined(__APPLE__)
-		fprintf(stderr, "DEBUG: DX8Wrapper::Init() - Loading libdxvk_d3d8.dylib (macOS)...\n");
-		D3D8Lib = LoadLibrary("libdxvk_d3d8.dylib");
-		fprintf(stderr, "DEBUG: DX8Wrapper::Init() - LoadLibrary result: %p\n", (void*)D3D8Lib);
-		if (D3D8Lib == nullptr) {
-			const char* error = dlerror();
-			fprintf(stderr, "ERROR: DX8Wrapper::Init() - dlerror(): %s\n", error ? error : "unknown");
-		}
+			fprintf(stderr, "DEBUG: DX8Wrapper::Init() - Loading libdxvk_d3d8.dylib (macOS)...\n");
+			D3D8Lib = LoadLibrary("libdxvk_d3d8.dylib");
+			fprintf(stderr, "DEBUG: DX8Wrapper::Init() - LoadLibrary result: %p\n", (void*)D3D8Lib);
+			if (D3D8Lib == nullptr) {
+				const char* error = dlerror();
+				fprintf(stderr, "ERROR: DX8Wrapper::Init() - dlerror(): %s\n", error ? error : "unknown");
+			}
 #else
-		fprintf(stderr, "DEBUG: DX8Wrapper::Init() - Loading libdxvk_d3d8.so (Linux)...\n");
-		D3D8Lib = LoadLibrary("libdxvk_d3d8.so");
-		fprintf(stderr, "DEBUG: DX8Wrapper::Init() - LoadLibrary result: %p\n", (void*)D3D8Lib);
-		if (D3D8Lib == nullptr) {
-			const char* error = dlerror();
-			fprintf(stderr, "ERROR: DX8Wrapper::Init() - dlerror(): %s\n", error ? error : "unknown");
-		}
+			fprintf(stderr, "DEBUG: DX8Wrapper::Init() - Loading libdxvk_d3d8.so (Linux)...\n");
+			D3D8Lib = LoadLibrary("libdxvk_d3d8.so");
+			fprintf(stderr, "DEBUG: DX8Wrapper::Init() - LoadLibrary result: %p\n", (void*)D3D8Lib);
+			if (D3D8Lib == nullptr) {
+				const char* error = dlerror();
+				fprintf(stderr, "ERROR: DX8Wrapper::Init() - dlerror(): %s\n", error ? error : "unknown");
+			}
 #endif
 
-		if (D3D8Lib == nullptr) {
-			fprintf(stderr, "ERROR: DX8Wrapper::Init() - Failed to load D3D8 library\n");
-			return false;	// Return false at this point if init failed
-		}
+			if (D3D8Lib == nullptr) {
+				fprintf(stderr, "ERROR: DX8Wrapper::Init() - Failed to load D3D8 library\n");
+				return;
+			}
 
-		fprintf(stderr, "DEBUG: DX8Wrapper::Init() - Getting Direct3DCreate8 function pointer...\n");
-		Direct3DCreate8Ptr = (Direct3DCreate8Type) GetProcAddress(D3D8Lib, "Direct3DCreate8");
-		if (Direct3DCreate8Ptr == nullptr) {
-			fprintf(stderr, "ERROR: DX8Wrapper::Init() - Failed to get Direct3DCreate8 function\n");
-			return false;
+			fprintf(stderr, "DEBUG: DX8Wrapper::Init() - Getting Direct3DCreate8 function pointer...\n");
+			Direct3DCreate8Ptr = (Direct3DCreate8Type) GetProcAddress(D3D8Lib, "Direct3DCreate8");
+			if (Direct3DCreate8Ptr == nullptr) {
+				fprintf(stderr, "ERROR: DX8Wrapper::Init() - Failed to get Direct3DCreate8 function\n");
+			}
+
+		}();
+		d3d8Loaded = D3D8Lib != nullptr && Direct3DCreate8Ptr != nullptr;
+		}
+		if (!d3d8Loaded) {
+			return false;	// Return false at this point if init failed
 		}
 
 		/*
@@ -719,6 +740,7 @@ void DX8Wrapper::Shutdown()
 	}
 
 	if (D3DInterface) {
+		if (DX8Wrapper_FinalReleaseHook) DX8Wrapper_FinalReleaseHook("a Direct3D interface");
 		D3DInterface->Release();
 		D3DInterface=nullptr;
 
@@ -737,10 +759,7 @@ void DX8Wrapper::Shutdown()
 		}
 	}
 
-	if (D3D8Lib) {
-		FreeLibrary(D3D8Lib);
-		D3D8Lib = nullptr;
-	}
+	// GeneralsX @bugfix cemlyn007 30/09/2026 D3D8Lib stays loaded for the process (see Init).
 
 	_RenderDeviceNameTable.Clear();		 // note - Delete_All() resizes the vector, causing a reallocation.  Clear is better. jba.
 	_RenderDeviceShortNameTable.Clear();
@@ -1108,6 +1127,7 @@ void DX8Wrapper::Release_Device()
 		// the GPU driver. A process that exits next unloads the driver under them and dies with
 		// SIGSEGV, most often when a cold shader cache and a loaded machine leave more compiles
 		// in flight. Only destroying the device joins those threads, so any leak is a bug.
+		if (DX8Wrapper_FinalReleaseHook) DX8Wrapper_FinalReleaseHook("a render device");
 		const ULONG refs = D3DDevice->Release();
 		if (refs != 0) {
 			fprintf(stderr, "ERROR: DX8Wrapper::Release_Device() - %lu leaked reference(s) keep the device alive\n", (unsigned long)refs);
@@ -1430,9 +1450,9 @@ bool DX8Wrapper::Set_Render_Device(int dev, int width, int height, int bits, int
 	// DXVK's SDL3 WSI calls SDL_SetWindowPosition during fullscreen entry which Wayland rejects.
 	// SDL3 native fullscreen is applied separately after device creation (see W3DDisplay::init).
 	_PresentParameters.Windowed = TRUE;
-	#else
+#else
 	_PresentParameters.Windowed = IsWindowed;
-	#endif
+#endif
 
 	_PresentParameters.EnableAutoDepthStencil = TRUE;				// Driver will attempt to match Z-buffer depth
 	_PresentParameters.Flags=0;											// We're not going to lock the backbuffer
