@@ -68,7 +68,8 @@
 #if !RTS_ENGINE_CONTEXT
 W3DVolumetricShadowManager	*TheW3DVolumetricShadowManager=nullptr;
 #endif
-extern const FrustumClass *shadowCameraFrustum;	//defined in W3DShadow.
+// GeneralsX @refactor cemlyn007 01/10/2026 W3DShadowManager's (PLAN-023 Phase 8, stage RR3).
+#define shadowCameraFrustum (TheW3DShadowManager->getShadowCameraFrustum())
 
 ///////////////////////////////////////////////////////////////////////////////
 // DEFINITIONS ////////////////////////////////////////////////////////////////
@@ -109,25 +110,27 @@ struct SHADOW_STATIC_VOLUME_VERTEX	//vertex structure passed to D3D
 	#define SHADOW_DYNAMIC_VOLUME_FVF	D3DFVF_XYZ
 #endif
 
-LPDIRECT3DVERTEXBUFFER8 shadowVertexBufferD3D=nullptr;		///<D3D vertex buffer
-LPDIRECT3DINDEXBUFFER8	shadowIndexBufferD3D=nullptr;	///<D3D index buffer
-int nShadowVertsInBuf=0;	//model vetices in vertex buffer
-int nShadowStartBatchVertex=0;
-int nShadowIndicesInBuf=0;	//model vetices in vertex buffer
-int nShadowStartBatchIndex=0;
+// GeneralsX @refactor cemlyn007 01/10/2026 The draw state is the volumetric shadow manager's, so each render engine's
+// (W3DVolumetricShadowManager::m_shadowVertexBufferD3D, ...; PLAN-023 Phase 8, stage RR3).
+#define shadowVertexBufferD3D (TheW3DVolumetricShadowManager->m_shadowVertexBufferD3D)
+#define shadowIndexBufferD3D (TheW3DVolumetricShadowManager->m_shadowIndexBufferD3D)
+#define nShadowVertsInBuf (TheW3DVolumetricShadowManager->m_nShadowVertsInBuf)
+#define nShadowStartBatchVertex (TheW3DVolumetricShadowManager->m_nShadowStartBatchVertex)
+#define nShadowIndicesInBuf (TheW3DVolumetricShadowManager->m_nShadowIndicesInBuf)
+#define nShadowStartBatchIndex (TheW3DVolumetricShadowManager->m_nShadowStartBatchIndex)
 int SHADOW_VERTEX_SIZE=4096;
 int SHADOW_INDEX_SIZE=8192;
 
 //Rough bounding box around visible portion of the terrain
 //useful for quick culling
-static Real bcX;
-static Real bcY;
-static Real bcZ;
-static Real beX;
-static Real beY;
-static Real beZ;
+#define bcX (TheW3DVolumetricShadowManager->m_bcX)
+#define bcY (TheW3DVolumetricShadowManager->m_bcY)
+#define bcZ (TheW3DVolumetricShadowManager->m_bcZ)
+#define beX (TheW3DVolumetricShadowManager->m_beX)
+#define beY (TheW3DVolumetricShadowManager->m_beY)
+#define beZ (TheW3DVolumetricShadowManager->m_beZ)
 
-static LPDIRECT3DVERTEXBUFFER8 lastActiveVertexBuffer=nullptr;
+#define lastActiveVertexBuffer (TheW3DVolumetricShadowManager->m_lastActiveVertexBuffer)
 
 /** A simple structure to hold random geometry (vertices, polygons, etc.).  We'll use this
 * to store shadow volumes. */
@@ -475,6 +478,12 @@ Bool isPatchShadowed(W3DShadowGeometryHeightmapMesh	*hm_mesh)
 	if (!map)
 		return FALSE;
 
+	// GeneralsX @bugfix cemlyn007 01/10/2026 The light position is the shadow manager's (per engine since PLAN-023
+	// Phase 8, stage RR3), not the removed global LightPosWorld. This block (DO_TERRAIN_SHADOW_VOLUMES, never
+	// defined) still does not compile, as upstream's did not: W3DShadowGeometryHeightmapMesh's GetPolygonIndex
+	// and buildPolygonNormal no longer match W3DShadowGeometryMesh's.
+	const Vector3 lightPosWorld = TheW3DShadowManager->getLightPosWorld(0);
+
 	hm_mesh->buildPolygonNormal( 0, &normal );
 
 	// get the vertex indices at this polygon
@@ -491,7 +500,7 @@ Bool isPatchShadowed(W3DShadowGeometryHeightmapMesh	*hm_mesh)
 	// we could use would be the object center
 	//
 	hm_mesh->GetVertex( poly[ 0 ], &vertex );
-	lightVector= vertex - LightPosWorld[0];
+	lightVector= vertex - lightPosWorld;
 
 	//
 	// dot the light vector with the normal of the polygon to see if the
@@ -518,7 +527,7 @@ Bool isPatchShadowed(W3DShadowGeometryHeightmapMesh	*hm_mesh)
 		// we could use would be the object center
 		//
 		hm_mesh->GetVertex( poly[ 0 ], &vertex );
-		lightVector= vertex - LightPosWorld[0];
+		lightVector= vertex - lightPosWorld;
 
 		//
 		// dot the light vector with the normal of the polygon to see if the
@@ -1533,7 +1542,7 @@ void W3DVolumetricShadow::RenderMeshVolumeBounds(Int meshIndex, Int lightIndex, 
 		Vector3i( 3,6,7 )
 	};
 
-	static Vector3 verts[8];
+	Vector3 verts[8];	// GeneralsX @refactor cemlyn007 01/10/2026 scratch: a local (RR3)
 
 	//Get D3D Device used by W3D for quicker access.
 	LPDIRECT3DDEVICE8 m_pDev=DX8Wrapper::_Get_D3D_Device8();
@@ -1848,8 +1857,9 @@ void W3DVolumetricShadow::updateVolumes(Real zoffset)
 
 	HLodClass *hlod=(HLodClass *)m_robj;
 	MeshClass *mesh;
-	static AABoxClass aaBox;
-	static SphereClass sphere;
+	// GeneralsX @refactor cemlyn007 01/10/2026 Scratch, set before each use: locals (PLAN-023 Phase 8, stage RR3).
+	AABoxClass aaBox;
+	SphereClass sphere;
 	Int meshIndex;
 
 	DEBUG_ASSERTCRASH(hlod != nullptr,("updateVolumes : hlod is null!"));

@@ -283,7 +283,8 @@ private:
 // One object per engine in place of a file, class or function-local static: the object lives in a slot of
 // the current EngineContext, made on first use in that context (value-initialised, then passed to
 // `initialize` if one is given) and destroyed with it, newest first. The static itself only holds the slot
-// index, so it is process-wide and written once, at static initialisation. A TU-local (or header) `#define`
+// index, process-wide: taken at static initialisation for a file or class static, or at the first call (under
+// the static-init guard) for a function-local one. A TU-local (or header) `#define`
 // of the old name to `(name_perEngine.get())` keeps the uses unchanged. An access costs a slot lookup (a
 // call), so hot state belongs in direct EngineContext fields instead. It must not be used outside every
 // Scope (g_noEngine owns no slots).

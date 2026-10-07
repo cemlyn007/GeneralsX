@@ -136,5 +136,9 @@ protected:
 	Int		m_stripSizeY;			///< resolution (vertex count) of wave strip
 	Int		m_batchStart;			///< start of unused vertices in vertex buffer
 	Real	m_level;				///< water level
+	// GeneralsX @refactor cemlyn007 01/10/2026 update()'s last update time, set at its first call: was a function-local
+	// static, so one render engine's draw moved another's clock (PLAN-023 Phase 8, stage RR3).
+	Int		m_lastUpdateTime = 0;
+	Bool	m_lastUpdateTimeSet = false;
 	void releaseTrack( WaterTracksObj *mod );	///<returns track object to free store.
 };

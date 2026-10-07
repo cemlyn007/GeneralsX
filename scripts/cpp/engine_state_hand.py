@@ -281,7 +281,7 @@ HAND = [
     # W3DDisplay's FPS history and debug statistics are its members.
     (RCONST, "", "WW3DState::Defaults", "the WW3D state an engine without one reads (RR2a-2): every field at its upstream initial value, constant-initialized and never written (a host makes its pages read-only, W3D_Protect_Render_Defaults)"),
     (RPROC, "", "W3D_Protect_Render_Defaults(bool)::s_exitHandlerOnce", "registers, once per process, the exit handler that makes the render defaults writable again for their static destructors (RR2a-2)"),
-    (RPROC, "", "W3D_Protect_Render_Defaults(bool)::s_readOnly", "which of the two render defaults' pages are read-only, written only by the host's W3D_Protect_Render_Defaults calls (RR2a-2)"),
+    (RPROC, "", "W3D_Protect_Render_Defaults(bool)::s_readOnly", "which of the two render defaults' pages are read-only now, so that a failed call puts back only the pages it changed (RR2b): the host's switch, set before any engine boots"),
     (DEBUG, "", "file:WW3D2/dx8rendererdebugger\\.cpp", "WW3D renderer debugger (DX8RendererDebugger::Enabled is never set)"),
     (RCONST, "", "VertexMaterialClass::Apply_Null()::default_settings", "the null material's settings, constant data"),
     (RCONST, "", "DAZZLE_INI_FILENAME", "the dazzle INI's name, never reassigned"),
@@ -303,8 +303,6 @@ HAND = [
     (RCONST, "", "re:MetalMapManagerClass::(_NormalTable|initialize_normal_table\\(\\)::_normal_table)", "the metal map normal table, built from constants on first use"),
     (RCONST, "", "MaterialPassClass::EnablePerPolygonCulling", "never written: Enable_Per_Polygon_Culling has no caller"),
     (RCONST, "", "re:WW3D(Z)?FormatToD3DFormatConversionArray", "format conversion table, constant data"),
-    (RCONST, "", "re:D3DFormatToWW3D(Z)?FormatConversionArray", "the reverse format tables, built from the constant ones by the first render boot, once per process (Init_D3D_To_WW3_Conversion under std::call_once, RR2b), then only read"),
-    (RPROC, "", "Init_D3D_To_WW3_Conversion()::once", "the std::once_flag of the reverse format tables (RR2b)"),
     (RCONST, "", "DynamicMeshModel::Render(RenderInfoClass&)::default_uv", "a const local static, (0, 0)"),
     (RPROC, "", "DX8WebBrowser::hWnd", "the embedded web browser's window, a Linux stub never initialized"),
     (RCONST, "", "re:_BoxVerts|_BoxFaces|_BoxVertexNormals|W3DVolumetricShadow::RenderMeshVolumeBounds\\(.*\\)::_Box(Verts|Faces)", "unit-box geometry (boxrobj.cpp's, and W3DVolumetricShadow::RenderMeshVolumeBounds'), initialized statically from constants and only read"),
@@ -323,22 +321,18 @@ HAND = [
     # detailAlphaShader, zFillAlphaShader, PlayerColorShader; one per TU) left the writable data at RR2a-2: they
     # are `static const`, and ShaderClass's constructor from bits is constexpr, so they are constant-initialised
     # read-only data.
-    (RPER, "RR3", "re:FlatHeightMapRenderObjClass::updateCenter\\(.*\\)::prev\\w+|visM(in|ax)[XY]|HeightMapRenderObjClass::renderExtraBlendTiles\\(\\)::maxBlendTiles", "terrain draw state kept between frames: members of the height map"),
-    (RPER, "RR3", "re:W3DFilters|W3DShaders|W3DShadersPassCount|W3DShaderManager::\\w+|screen(Default|BW|BWFilterDOT3|CrossFade|MotionBlur)Filter\\w*|Screen(BW|CrossFade|MotionBlur)Filter::\\w+|(shroud|flatShroud|mask|cloud)TextureShader|(terrain|flatTerrain|road)Shader(2Stage|8Stage|PixelShader)", "W3DShaderManager: its shader and filter tables, the chosen chipset, the render-to-texture surfaces, and the shader and filter objects (some holding D3D pixel shaders and textures; the screen filters' fade and motion-blur state is script-driven): one per-engine struct made by init and freed by shutdown"),
-    (RCONST, "RR3", "re:\\w+(Shader|Filter)List", "tables of pointers to the shader and filter objects above, never written: they move with them"),
-    (RPER, "RR3", "W3DView::update()::followFactor", "the camera's follow smoothing, kept between frames: a W3DView member"),
+    # RR3 made W3DDevice's draw state per engine. W3DShaderManager's statics, its shader and filter objects and their
+    # lists, and the screen filters' statics are one PER_ENGINE_STATIC (W3DShaderManagerState_perEngine, so gone from
+    # the library). The shadows' buffers, cursors, culling box, camera frustum and light position are members of the
+    # per-engine shadow managers; the height map's, flat height map's, view's, display's, water tracks', shroud's and
+    # smudge manager's statics are members of their owners; the shadow and height-map scratch, draw's letterbox time,
+    # the infantry light cap and the shroud's debug texture are locals. The reverse format tables are constexpr. The
+    # snow table, WWMath::Random_Float and the shatter pattern draw from per-engine generators (PER_ENGINE_STATICs).
     (RCONST, "", "waveTypeInfo", "the water wave types' parameters, constant data"),
-    (RPER, "RR3", "WaterTracksRenderSystem::update()::iLastTime", "the water tracks' last update, by the wall clock, which only a render engine's draw writes (WaterTracksRenderSystem::flush calls update). It never reaches an image: the difference it yields goes to WaterTracksObj::update, which ignores it and returns TRUE, and the waves advance by the logic time step in WaterTracksObj::render once per draw, 33 ms under the launcher (checked in RR1: Tournament Desert draws two water-track modules every frame, and their clocks and the render digest match between render-solo runs, one of them with every core busy). A write-only value, per engine so that one engine's draw does not write it for another"),
-    (RPER, "RR3", "re:shadowCameraFrustum|LightPosWorld|shadow(Decal)?(Vertex|Index)BufferD3D|nShadow(Decal)?(VertsInBuf|StartBatchVertex|IndicesInBuf|StartBatchIndex|PolysInBatch|VertsInBatch)|lastActiveVertexBuffer", "the shadow managers' shared vertex/index buffers, their cursors and the light and frustum they draw with: members of the per-engine shadow managers"),
     (RCONST, "", "re:SHADOW_(DECAL_)?(VERTEX|INDEX)_SIZE", "shadow buffer sizes, never changed"),
-    (RSCR, "RR3", "re:b[ce][XYZ]|W3DVolumetricShadow::RenderMeshVolumeBounds\\(.*\\)::verts|W3DVolumetricShadow::updateVolumes\\(float\\)::(aaBox|sphere)|W3DProjectedShadowManager::(renderProjectedTerrainShadow|flushDecals)\\(.*\\)::mWorld|W3DProjectedShadowManager::renderShadows\\(RenderInfoClass&\\)::(aaBox|sphere)", "shadow scratch (bounds, boxes, matrices), filled and consumed within one call"),
     (RCONST, "", "guard variable for W3DProjectedShadow::updateTexture(Vector3&)::uvData", "the guard of a constant uv table (the table itself is not in the library's symbols)"),
-    (RSCR, "RR3", "guard variable for W3DProjectedShadowManager::queueDecal(W3DProjectedShadow*)::objCenter", "the guard of queueDecal's center scratch (the static itself is not in the library's symbols), set within each call"),
     (RCONST, "", "re:W3DVolumetricShadow::Update\\(\\)::originCompareVector|W3DProjectedShadowManager::(addShadow|createDecalShadow)\\(.*\\)::defaultDecalName", "constants built once under the static-init guard"),
-    (RPER, "RR3", "re:W3DDisplay::draw\\(\\)::(now|timeMultiplierCounter|couldRender)", "W3DDisplay::draw's frame timing and device-lost state, kept between frames: W3DDisplay members (now is the wall clock: logic-frame time)"),
     (RPROC, "", "re:s_filtered(Resolutions|Dirty)", "the options menu's resolution list: " + UI),
-    (RCONST, "", "RTS3DScene::updateFixedLightEnvironments(RenderInfoClass&)::id", "a constant (1, 1, 1) vector the infantry light is capped to, built once under the static-init guard"),
-    (RPER, "RR3", "re:DummyTexture|W3DShroud::interpolateFogLevels\\(.*\\)::prevTime", "the shroud's dummy texture (made at init, released at shutdown) and its fog interpolation clock: members of the per-engine W3DShroud"),
     (RCONST, "", "animationDisableOverride", "the ghost objects' material override, default-constructed and only pointed at"),
     (RCONST, "", "(anonymous namespace)::LoadUnicodeFallbackFont(int, bool, char const*)::kFallbackUnicodeFonts", "font name list, constant data"),
     (RPROC, "", "re:W3DRadar::(drawHeroIcon|drawEvents)\\(.*\\)::\\w+", "W3DRadar's draw (the radar window): " + UI),
@@ -364,7 +358,6 @@ HAND = [
     (RENDER, "", "file:/GUI/(?!" + HEADLESS_GUI + ")", UI),
     (RENDER, "", "re:scrollDir|prevCursor|Mouse::updateMouseData\\(\\)::busy", "mouse/scroll input: headless has MouseDummy and no input"),
     (RENDER, "", "file:Win32Mouse\\.cpp|SDL3Mouse\\.cpp", "the Win32 and SDL3 mouse cursors (cursorResources): headless has MouseDummy and no input"),
-    (RENDER, "", "re:SmudgeSet::m_freeSmudgeList", "heat-haze smudges, drawn only"),
     (GLOBAL, "", "DX8Wrapper_IsWindowed", "the process's assert switch (Debug.cpp's ignoringAsserts): every headless engine's command line (parseHeadless) sets it false, and a rendering engine's DX8Wrapper::Init (false) and Set_Render_Device (the device's windowed flag) write it too, so it holds the last writer's value, not a fixed one; a std::atomic, since boots write it while other engines' assert paths read it (PLAN-023 Phase 5b)"),
     # Only device-only WW3D2 files: mesh, meshmdl, meshgeometry, rendobj, texture, ww3d, dx8renderer,
     # part_emt and part_buf are reached by a headless engine too (models, bones, emitters, asset loading),

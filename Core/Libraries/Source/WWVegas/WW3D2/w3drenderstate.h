@@ -222,7 +222,8 @@ struct RTS_ENGINE_CONTEXT_API alignas(::rts::renderStateAlignment) W3DRenderStat
 
 	// GeneralsX @bugfix cemlyn007 30/09/2026 Whether WW3D::Init took this state (and WW3D's), so that WW3D::Shutdown
 	// frees both; otherwise DX8Wrapper::Shutdown does (PLAN-023 Phase 8, stage RR2b).
-	bool OwnedByWW3D;
+	// GeneralsX @bugfix cemlyn007 01/10/2026 False until WW3D::Init takes it, also in the Defaults (RR3).
+	bool OwnedByWW3D = false;
 };
 
 // GeneralsX @feature cemlyn007 30/09/2026 Makes the pages of W3DRenderState::Defaults and WW3DState::Defaults

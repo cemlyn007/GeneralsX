@@ -37,9 +37,6 @@
  * Functions:                                                                                  *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 #include "formconv.h"
-#if RTS_ENGINE_CONTEXT
-#include <mutex>
-#endif
 
 D3DFORMAT WW3DFormatToD3DFormatConversionArray[WW3D_FORMAT_COUNT] = {
 	D3DFMT_UNKNOWN,
@@ -118,8 +115,65 @@ WW3DFormat D3DFormatToWW3DFormatConversionArray[HIGHEST_SUPPORTED_D3DFORMAT + 1]
 
 #define HIGHEST_SUPPORTED_D3DFORMAT D3DFMT_X8L8V8U8
 #define HIGHEST_SUPPORTED_D3DZFORMAT D3DFMT_D16
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @bugfix cemlyn007 01/10/2026 The reverse tables are constants, built at compile time from the same
+// assignments Init_D3D_To_WW3_Conversion made at every render boot (PLAN-023 Phase 8, stage RR3). RR2b built them once
+// per process under std::call_once, but readers on other engines' threads did not synchronise with that call, and a
+// headless engine beside a renderer saw filled tables where its solo run saw zeros; now every engine sees the same.
+namespace
+{
+struct ReverseFormatTables
+{
+	WW3DFormat Color[HIGHEST_SUPPORTED_D3DFORMAT + 1];
+	WW3DZFormat Depth[HIGHEST_SUPPORTED_D3DZFORMAT + 1];
+};
+
+constexpr ReverseFormatTables Build_Reverse_Format_Tables()
+{
+	ReverseFormatTables tables{};
+	for (int i = 0; i <= HIGHEST_SUPPORTED_D3DFORMAT; ++i)
+		tables.Color[i] = WW3D_FORMAT_UNKNOWN;
+	tables.Color[D3DFMT_R8G8B8] = WW3D_FORMAT_R8G8B8;
+	tables.Color[D3DFMT_A8R8G8B8] = WW3D_FORMAT_A8R8G8B8;
+	tables.Color[D3DFMT_X8R8G8B8] = WW3D_FORMAT_X8R8G8B8;
+	tables.Color[D3DFMT_R5G6B5] = WW3D_FORMAT_R5G6B5;
+	tables.Color[D3DFMT_X1R5G5B5] = WW3D_FORMAT_X1R5G5B5;
+	tables.Color[D3DFMT_A1R5G5B5] = WW3D_FORMAT_A1R5G5B5;
+	tables.Color[D3DFMT_A4R4G4B4] = WW3D_FORMAT_A4R4G4B4;
+	tables.Color[D3DFMT_R3G3B2] = WW3D_FORMAT_R3G3B2;
+	tables.Color[D3DFMT_A8] = WW3D_FORMAT_A8;
+	tables.Color[D3DFMT_A8R3G3B2] = WW3D_FORMAT_A8R3G3B2;
+	tables.Color[D3DFMT_X4R4G4B4] = WW3D_FORMAT_X4R4G4B4;
+	tables.Color[D3DFMT_A8P8] = WW3D_FORMAT_A8P8;
+	tables.Color[D3DFMT_P8] = WW3D_FORMAT_P8;
+	tables.Color[D3DFMT_L8] = WW3D_FORMAT_L8;
+	tables.Color[D3DFMT_A8L8] = WW3D_FORMAT_A8L8;
+	tables.Color[D3DFMT_A4L4] = WW3D_FORMAT_A4L4;
+	tables.Color[D3DFMT_V8U8] = WW3D_FORMAT_U8V8;
+	tables.Color[D3DFMT_L6V5U5] = WW3D_FORMAT_L6V5U5;
+	tables.Color[D3DFMT_X8L8V8U8] = WW3D_FORMAT_X8L8V8U8;
+
+	for (int i = 0; i <= HIGHEST_SUPPORTED_D3DZFORMAT; ++i)
+		tables.Depth[i] = WW3D_ZFORMAT_UNKNOWN;
+	tables.Depth[D3DFMT_D16_LOCKABLE] = WW3D_ZFORMAT_D16_LOCKABLE;
+	tables.Depth[D3DFMT_D32] = WW3D_ZFORMAT_D32;
+	tables.Depth[D3DFMT_D15S1] = WW3D_ZFORMAT_D15S1;
+	tables.Depth[D3DFMT_D24S8] = WW3D_ZFORMAT_D24S8;
+	tables.Depth[D3DFMT_D16] = WW3D_ZFORMAT_D16;
+	tables.Depth[D3DFMT_D24X8] = WW3D_ZFORMAT_D24X8;
+	tables.Depth[D3DFMT_D24X4S4] = WW3D_ZFORMAT_D24X4S4;
+	return tables;
+}
+
+constexpr ReverseFormatTables ReverseFormats = Build_Reverse_Format_Tables();
+} // namespace
+
+#define D3DFormatToWW3DFormatConversionArray (ReverseFormats.Color)
+#define D3DFormatToWW3DZFormatConversionArray (ReverseFormats.Depth)
+#else
 WW3DFormat D3DFormatToWW3DFormatConversionArray[HIGHEST_SUPPORTED_D3DFORMAT + 1];
 WW3DZFormat D3DFormatToWW3DZFormatConversionArray[HIGHEST_SUPPORTED_D3DZFORMAT + 1];
+#endif
 
 D3DFORMAT WW3DFormat_To_D3DFormat(WW3DFormat ww3d_format) {
 	if (ww3d_format >= WW3D_FORMAT_COUNT) {
@@ -186,20 +240,13 @@ WW3DZFormat D3DFormat_To_WW3DZFormat(D3DFORMAT d3d_format)
  * 06/27/02 KM Z Format support																						*
 */
 #if RTS_ENGINE_CONTEXT
-// GeneralsX @feature cemlyn007 30/09/2026 The reverse tables are the same for every engine: built by the first render
-// boot, once per process, instead of rewritten under the readers at every one (PLAN-023 Phase 8, stage RR2b).
-static void Build_D3D_To_WW3_Conversion();
-
+// GeneralsX @bugfix cemlyn007 01/10/2026 Nothing to build: the reverse tables are constants (above; PLAN-023 Phase 8,
+// stage RR3).
 void Init_D3D_To_WW3_Conversion()
 {
-	static std::once_flag once;
-	std::call_once(once, Build_D3D_To_WW3_Conversion);
 }
-
-static void Build_D3D_To_WW3_Conversion()
 #else
 void Init_D3D_To_WW3_Conversion()
-#endif
 {
 	int i=0;
 	for (;i<HIGHEST_SUPPORTED_D3DFORMAT;++i) {
@@ -240,3 +287,4 @@ void Init_D3D_To_WW3_Conversion()
 	D3DFormatToWW3DZFormatConversionArray[D3DFMT_D24X8]=WW3D_ZFORMAT_D24X8;
 	D3DFormatToWW3DZFormatConversionArray[D3DFMT_D24X4S4]=WW3D_ZFORMAT_D24X4S4;
 };
+#endif

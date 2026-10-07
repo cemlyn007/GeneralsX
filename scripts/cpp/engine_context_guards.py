@@ -92,7 +92,7 @@ CONSTANT_TABLE_RE = re.compile(r"(Names|FieldParse|FieldParseTable|LookupList)$"
 
 
 # A PER_ENGINE_STATIC's static (`TheXxx_perEngine`, rts::PerEngineStatic<T>): it holds only the slot index,
-# written once at static initialisation; the object lives in each engine's EngineContext.
+# allocated at static initialisation (file or class scope) or at the first call (function-local); the object lives in each engine's EngineContext.
 PER_ENGINE_STATIC_RE = re.compile(r"_perEngine$")
 
 

@@ -188,6 +188,11 @@ protected:
 	// GeneralsX @feature cemlyn007 30/09/2026 Whether draw() has logged the device's first TestCooperativeLevel
 	// result: once per engine (PLAN-023 Phase 8, stage RR0c).
 	Bool m_loggedCooperativeLevel;
+	// GeneralsX @refactor cemlyn007 01/10/2026 draw()'s fast-time frame skip counter and whether its last frame
+	// rendered: were function-local statics, so one render engine's draw skipped or flagged another's (PLAN-023
+	// Phase 8, stage RR3).
+	Int m_timeMultiplierCounter = 1;
+	Bool m_couldRender = true;
 	Real m_currentFPS;		///<current fps value.
 
 	// GeneralsX @refactor cemlyn007 30/09/2026 updateAverageFPS's and gatherDebugStats' state, which were

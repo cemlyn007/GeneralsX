@@ -119,6 +119,8 @@ static void drawFramerateBar();
 #include "WinMain.h"
 // GeneralsX @refactor cemlyn007 30/09/2026 The window handles (PLAN-023 Phase 8, stage RR2a-2).
 #include "Common/ApplicationWindow.h"
+// GeneralsX @bugfix cemlyn007 01/10/2026 The draw clock (PLAN-023 Phase 8, stage RR3).
+#include "W3DDevice/GameClient/W3DDrawClock.h"
 
 
 // DEFINE AND ENUMS ///////////////////////////////////////////////////////////
@@ -2159,12 +2161,14 @@ AGAIN:
 	// TheSuperHackers @info This binds the WW3D update to the logic update.
 	WW3D::Sync(TheGameLogic->hasUpdated());
 
-	static Int now;
-	now=timeGetTime();
+	// GeneralsX @bugfix cemlyn007 01/10/2026 The letterbox fade's clock: the draw clock (logic-frame time for an
+	// embedding host's image observations, W3DDrawClock.h), set at every draw, so a local (PLAN-023 Phase 8, stage
+	// RR3).
+	const Int now = W3D_DRAW_CLOCK_MS();
 
 	if (TheTacticalView->getTimeMultiplier()>1)
 	{
-		static Int timeMultiplierCounter = 1;
+		Int& timeMultiplierCounter = m_timeMultiplierCounter;	// GeneralsX @refactor cemlyn007 01/10/2026 (RR3)
 		timeMultiplierCounter--;
 		if (timeMultiplierCounter>1)
 			return;
@@ -2226,7 +2230,7 @@ AGAIN:
     #endif
 		{
 			//USE_PERF_TIMER(BigAssRenderLoop)
-			static Bool couldRender = true;
+			Bool& couldRender = m_couldRender;	// GeneralsX @refactor cemlyn007 01/10/2026 the display's own (RR3)
 			if ((TheGlobalData->m_breakTheMovie == FALSE) && (TheGlobalData->m_disableRender == false) && WW3D::Begin_Render( true, true, Vector3( 0.0f, 0.0f, 0.0f ), TheWaterTransparency->m_minWaterOpacity ) == WW3D_ERROR_OK)
 			{
 
@@ -2468,7 +2472,7 @@ void W3DDisplay::createLightPulse( const Coord3D *pos, const RGBColor *color,
 void W3DDisplay::toggleLetterBox()
 {
 	m_letterBoxEnabled = !m_letterBoxEnabled;
-	m_letterBoxFadeStartTime = timeGetTime();
+	m_letterBoxFadeStartTime = W3D_DRAW_CLOCK_MS();	// GeneralsX @bugfix cemlyn007 01/10/2026 the draw clock (RR3)
 
 	//WST  9/18/2002 This is not a script api to prevent cheat. JSC Integrated 5/20/03
 	if( TheTacticalView )
@@ -2484,7 +2488,7 @@ void W3DDisplay::enableLetterBox(Bool enable)
 		if (!m_letterBoxEnabled)
 		{	//letterbox mode not previously enabled
 			m_letterBoxEnabled = TRUE;
-			m_letterBoxFadeStartTime = timeGetTime();
+			m_letterBoxFadeStartTime = W3D_DRAW_CLOCK_MS();	// GeneralsX @bugfix cemlyn007 01/10/2026 the draw clock (RR3)
 
 			//WST  9/18/2002 - This is not a script api to prevent cheat.  JSC Integrated 5/20/03
 			if( TheTacticalView )
@@ -2498,7 +2502,7 @@ void W3DDisplay::enableLetterBox(Bool enable)
 		if (m_letterBoxEnabled)
 		{	//letterbox mode no previously disabled
 			m_letterBoxEnabled = FALSE;
-			m_letterBoxFadeStartTime = timeGetTime();
+			m_letterBoxFadeStartTime = W3D_DRAW_CLOCK_MS();	// GeneralsX @bugfix cemlyn007 01/10/2026 the draw clock (RR3)
 
 			//WST  9/18/2002. JSC Integrated 5/20/03
 			if( TheTacticalView )

@@ -73,10 +73,6 @@ ALLOWLIST = {
     "D3D8Lib": "the D3D8 library, loaded per process under a mutex and never freed",
     "Direct3DCreate8Ptr": "the D3D8 library's Direct3DCreate8, looked up once per process with it",
     "DX8Wrapper_FinalReleaseHook": "the host's final-release check, set by its first render boot",
-    "D3DFormatToWW3DFormatConversionArray": "the reverse format table, built from constants by the first render boot (std::call_once, RR2b)",
-    "D3DFormatToWW3DZFormatConversionArray": "the reverse depth format table, built from constants by the first render boot (std::call_once, RR2b)",
-    "Init_D3D_To_WW3_Conversion()::once": "the std::once_flag that builds the reverse format tables (RR2b)",
-    "RTS3DScene::updateFixedLightEnvironments(RenderInfoClass&)::id": "a constant vector, built at first use under the static-init guard",
     "W3DVolumetricShadow::Update()::originCompareVector": "a constant vector, built at first use under the static-init guard",
     "Drawable::drawBombed(IRegion2D const*)::key_StickyBombUpdate": "a NameKey cache (PLAN-023 Decision 2), set at first use (a draw path) under the static-init guard",
     "FiringTracker::getModuleNameKey() const::nk": "a NameKey cache (PLAN-023 Decision 2), set at first use under the static-init guard",
@@ -94,6 +90,8 @@ ALLOWLIST = {
     "theMemoryManagerUsers": "the refcounted memory manager's user count, under its mutex",
     "s_totalOpen": "a std::atomic open-file counter for a debug assert",
     "std::__detail::__waiter_pool_base::_S_for(void const*)::__w": "libstdc++'s wait pool for std::atomic::wait, process-wide by design",
+    # GeneralsX @feature cemlyn007 01/10/2026 (PLAN-023 Phase 8, stage RR3)
+    "rts::(anonymous namespace)::theNextSlotIndex": "the PER_ENGINE_STATIC slot index counter (atomic): a function-local PER_ENGINE_STATIC takes its index at its first use",
     "fcrandbuf": "fontconfig's random state (third-party; its cache file names): whether it is safe with renderers on several threads is ThreadSanitizer's to find (RR4)",
     "statebuf": "fontconfig's random state (third-party; its cache file names): whether it is safe with renderers on several threads is ThreadSanitizer's to find (RR4)",
 }
@@ -202,6 +200,13 @@ class Report:
             return "worklist", f"render-const until {phase}"
         if key in probe.allowlist:
             return "allowed", probe.allowlist[key]
+        # GeneralsX @feature cemlyn007 01/10/2026 A PER_ENGINE_STATIC's slot index (the symbol is the index, the
+        # object is each engine's own): written once, by its first use under the static-init guard when it is a
+        # function-local one, the same for every engine by design (PLAN-023 Phase 8, stage RR3). Judged by what
+        # the symbol is (the classifier's structural rule), not by its class.
+        row = probe.rows.get(key)
+        if row is not None and row.get("by") == "rule:per-engine-static":
+            return "allowed", "a PER_ENGINE_STATIC's slot index, taken at its first use"
         return "unexpected", ""
 
     def written(self, key):

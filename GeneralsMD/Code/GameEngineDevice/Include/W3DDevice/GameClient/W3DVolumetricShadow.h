@@ -37,6 +37,8 @@ struct Geometry;	//forward reference
 struct PolyNeighbor;	//forward reference
 class W3DVolumetricShadow;	//forward reference
 class Drawable;	//forward reference
+struct IDirect3DVertexBuffer8;	//forward reference
+struct IDirect3DIndexBuffer8;	//forward reference
 
 struct W3DVolumetricShadowRenderTask : public W3DBufferManager::W3DRenderTask
 {
@@ -72,6 +74,27 @@ public:
 	void renderShadows( Bool forceStencilFill );
 	void ReleaseResources();
 	Bool ReAcquireResources();
+
+	// GeneralsX @refactor cemlyn007 01/10/2026 The shadow volumes' draw state, file statics of W3DVolumetricShadow.cpp
+	// before (PLAN-023 Phase 8, stage RR3): the dynamic vertex and index buffers this manager makes on its device
+	// (W3DProjectedShadowManager's terrain shadows draw through them too), their cursors, the vertex buffer last set
+	// on the device, and the box around the visible terrain renderShadows culls against. Members, so that each render
+	// engine's shadows draw with their own; W3DVolumetricShadow.cpp reaches them by their old names.
+	IDirect3DVertexBuffer8 *m_shadowVertexBufferD3D = nullptr;	///<D3D vertex buffer
+	IDirect3DIndexBuffer8 *m_shadowIndexBufferD3D = nullptr;	///<D3D index buffer
+	int m_nShadowVertsInBuf = 0;	//model vetices in vertex buffer
+	int m_nShadowStartBatchVertex = 0;
+	int m_nShadowIndicesInBuf = 0;	//model vetices in vertex buffer
+	int m_nShadowStartBatchIndex = 0;
+	IDirect3DVertexBuffer8 *m_lastActiveVertexBuffer = nullptr;
+	//Rough bounding box around visible portion of the terrain
+	//useful for quick culling
+	Real m_bcX = 0.0f;
+	Real m_bcY = 0.0f;
+	Real m_bcZ = 0.0f;
+	Real m_beX = 0.0f;
+	Real m_beY = 0.0f;
+	Real m_beZ = 0.0f;
 
 protected:
 
