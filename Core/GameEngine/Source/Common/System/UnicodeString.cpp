@@ -44,7 +44,6 @@
 ///////////////////////////////////////////////////////////////////////////////
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
-#include "Common/CriticalSection.h"
 #include "WWLib/utf8.h"
 
 
@@ -205,7 +204,7 @@ static Bool normalizeWidePrintfFormatForPosix(const WideChar *src, WideChar *dst
 void UnicodeString::validate() const
 {
 	if (!m_data) return;
-	DEBUG_ASSERTCRASH(m_data->m_refCount > 0, ("m_refCount is zero"));
+	DEBUG_ASSERTCRASH(m_data->m_refCount.load(std::memory_order_relaxed) > 0, ("m_refCount is zero"));
 	DEBUG_ASSERTCRASH(m_data->m_numCharsAllocated > 0, ("m_numCharsAllocated is zero"));
 	DEBUG_ASSERTCRASH(wcslen(m_data->peek())+1 <= m_data->m_numCharsAllocated,("str is too long for storage"));
 }
@@ -214,9 +213,10 @@ void UnicodeString::validate() const
 // -----------------------------------------------------
 UnicodeString::UnicodeString(const UnicodeString& stringSrc) : m_data(stringSrc.m_data)
 {
-	ScopedCriticalSection scopedCriticalSection(TheUnicodeStringCriticalSection);
+	// GeneralsX @performance cemlyn007 29/09/2026 No global lock: stringSrc keeps its reference while we take
+	// ours, so the count cannot reach zero underneath us and a relaxed increment is enough.
 	if (m_data)
-		++m_data->m_refCount;
+		m_data->m_refCount.fetch_add(1, std::memory_order_relaxed);
 	validate();
 }
 
@@ -227,8 +227,15 @@ void UnicodeString::ensureUniqueBufferOfSize(int numCharsNeeded, Bool preserveDa
 
 	const int usableNumChars = numCharsNeeded - 1;
 
+	// GeneralsX @performance cemlyn007 29/09/2026 Copy-on-write safety without the global lock: a buffer is
+	// written in place only when this string holds the sole reference. That count protects a buffer shared
+	// between distinct UnicodeString copies only. The old global lock also made concurrent assignment to one
+	// UnicodeString object refcount-safe, which is gone: any write to an object another thread reads or writes is
+	// unsafe, so a process-global string is never written after priming (PLAN-023 Phase 5b item 2). The acquire
+	// load pairs with the acq_rel decrement in releaseBuffer(), so every read the last other holder made of
+	// this buffer happens before our in-place write.
 	if (m_data &&
-			m_data->m_refCount == 1 &&
+			m_data->m_refCount.load(std::memory_order_acquire) == 1 &&
 			m_data->m_numCharsAllocated >= numCharsNeeded)
 	{
 		// no buffer manhandling is needed (it's already large enough, and unique to us)
@@ -249,7 +256,7 @@ void UnicodeString::ensureUniqueBufferOfSize(int numCharsNeeded, Bool preserveDa
 	int minBytes = sizeof(UnicodeStringData) + numCharsNeeded*sizeof(WideChar);
 	int actualBytes = TheDynamicMemoryAllocator->getActualAllocationSize(minBytes);
 	UnicodeStringData* newData = (UnicodeStringData*)TheDynamicMemoryAllocator->allocateBytesDoNotZero(actualBytes, "STR_UnicodeString::ensureUniqueBufferOfSize");
-	newData->m_refCount = 1;
+	newData->m_refCount.store(1, std::memory_order_relaxed);
 	newData->m_numCharsAllocated = (actualBytes - sizeof(UnicodeStringData))/sizeof(WideChar);
 #if defined(RTS_DEBUG)
 	newData->m_debugptr = newData->peek();	// just makes it easier to read in the debugger
@@ -281,12 +288,13 @@ void UnicodeString::ensureUniqueBufferOfSize(int numCharsNeeded, Bool preserveDa
 // -----------------------------------------------------
 void UnicodeString::releaseBuffer()
 {
-	ScopedCriticalSection scopedCriticalSection(TheUnicodeStringCriticalSection);
-
 	validate();
 	if (m_data)
 	{
-		if (--m_data->m_refCount == 0)
+		// GeneralsX @performance cemlyn007 29/09/2026 acq_rel decrement, freeing only on the 1 -> 0 transition:
+		// the release half publishes our reads of the buffer to whoever frees or reuses it, and the acquire
+		// half orders the free after every other holder's release.
+		if (m_data->m_refCount.fetch_sub(1, std::memory_order_acq_rel) == 1)
 		{
 			TheDynamicMemoryAllocator->freeBytes(m_data);
 		}
@@ -318,15 +326,17 @@ UnicodeString::UnicodeString(const WideChar* s, int len) : m_data(nullptr)
 // -----------------------------------------------------
 void UnicodeString::set(const UnicodeString& stringSrc)
 {
-	ScopedCriticalSection scopedCriticalSection(TheUnicodeStringCriticalSection);
-
 	validate();
 	if (&stringSrc != this)
 	{
+		// GeneralsX @performance cemlyn007 29/09/2026 No global lock: take the new reference (relaxed, as in the
+		// copy constructor) before dropping the old one, so a shared buffer's count never passes through a
+		// false 1 on the way.
+		UnicodeStringData* newData = stringSrc.m_data;
+		if (newData)
+			newData->m_refCount.fetch_add(1, std::memory_order_relaxed);
 		releaseBuffer();
-		m_data = stringSrc.m_data;
-		if (m_data)
-			++m_data->m_refCount;
+		m_data = newData;
 	}
 	validate();
 }
