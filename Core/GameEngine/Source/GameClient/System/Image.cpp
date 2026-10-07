@@ -134,7 +134,9 @@ void Image::parseImageStatus( INI* ini, void *instance, void *store, const void*
 }
 
 // PUBLIC DATA ////////////////////////////////////////////////////////////////////////////////////
+#if !RTS_ENGINE_CONTEXT
 ImageCollection *TheMappedImageCollection = nullptr;  ///< mapped images
+#endif
 
 // PUBLIC FUNCTIONS////////////////////////////////////////////////////////////////////////////////
 //-------------------------------------------------------------------------------------------------

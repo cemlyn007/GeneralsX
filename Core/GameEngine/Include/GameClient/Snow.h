@@ -112,4 +112,6 @@ class SnowManager : public SubsystemInterface
 	Bool				m_isVisible;		///<used to prevent map weather (if defined) from rendering.
 };
 
+#if !RTS_ENGINE_CONTEXT
 extern SnowManager *TheSnowManager;  ///< the ray effects singleton external
+#endif

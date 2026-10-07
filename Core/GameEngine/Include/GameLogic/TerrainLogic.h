@@ -373,7 +373,9 @@ protected:
 };
 
 // EXTERNALS //////////////////////////////////////////////////////////////////////////////////////
+#if !RTS_ENGINE_CONTEXT
 extern TerrainLogic *TheTerrainLogic;   ///< singleton definition
+#endif
 
 extern void makeAlignToNormalMatrix( Real angle, const Coord3D& pos, const Coord3D& normal, Matrix3D& mtx);
 extern Bool LineInRegion( const Coord2D *p1, const Coord2D *p2, const Region2D *clipRegion );

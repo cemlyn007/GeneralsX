@@ -72,4 +72,6 @@ public:
 	virtual Bool areGameResultsBeingSent() = 0;
 };
 
+#if !RTS_ENGINE_CONTEXT
 extern GameResultsInterface *TheGameResultsQueue;
+#endif

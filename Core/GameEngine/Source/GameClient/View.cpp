@@ -37,7 +37,9 @@
 UnsignedInt View::m_idNext = 1;
 
 // the tactical view singleton
+#if !RTS_ENGINE_CONTEXT
 View *TheTacticalView = nullptr;
+#endif
 
 
 View::View()

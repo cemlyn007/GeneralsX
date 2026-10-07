@@ -94,7 +94,9 @@ GameResultsInterface* GameResultsInterface::createNewGameResultsInterface()
 	return NEW GameResultsQueue;
 }
 
+#if !RTS_ENGINE_CONTEXT
 GameResultsInterface *TheGameResultsQueue;
+#endif
 
 //-------------------------------------------------------------------------
 

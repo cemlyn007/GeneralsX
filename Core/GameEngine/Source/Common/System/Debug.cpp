@@ -65,6 +65,7 @@
 // vc6/vc6-debug/vc6-profile presets (which still build this shared Core file) keep working.
 #if !(defined(_MSC_VER) && _MSC_VER < 1300)
 #include <atomic>
+#include <exception>
 #endif
 #include "Common/CRCDebug.h"
 #include "Common/UnicodeString.h"
@@ -829,20 +830,52 @@ void ClearEngineFault()
 #endif
 }
 
-// GeneralsX @bugfix cemlyn007 02/10/2026 Single place for the embedded-mode throw, used by both
-// ReleaseCrash and ReleaseCrashLocalized's two throw sites each, so a future change (for example
-// the sticky fault latch above) only needs to touch one function instead of drifting across four
-// copies.
-static void ThrowIfEmbedded(const char *reason)
+// GeneralsX @bugfix cemlyn007 28/09/2026 The teardown window (see FatalEngineError.h)
+#if RTS_ENGINE_CONTEXT
+void SetEngineTearingDown(bool tearingDown)
 {
-	if (IsEngineEmbeddedMode()) {
-#if !(defined(_MSC_VER) && _MSC_VER < 1300)
-		theEngineHasFaulted.store(true);
+	rts::EngineContext* context = rts::ctx();
+	if (context != &rts::g_noEngine)
+		context->engineTearingDown = tearingDown;
+}
+
+bool IsEngineTearingDown()
+{
+	const rts::EngineContext* context = rts::ctx();
+	return context == &rts::g_noEngine || context->engineTearingDown;
+}
 #else
-		theEngineHasFaulted = true;
+static bool theEngineTearingDown = false;
+
+void SetEngineTearingDown(bool tearingDown)
+{
+	theEngineTearingDown = tearingDown;
+}
+
+bool IsEngineTearingDown()
+{
+	return theEngineTearingDown;
+}
 #endif
-		throw FatalEngineError(reason ? reason : "");
-	}
+
+// GeneralsX @bugfix cemlyn007 02/10/2026 Single place for the embedded-mode fatal error, used by
+// ReleaseCrash and ReleaseCrashLocalized's sites alike. Returns false outside embedded mode (the
+// caller carries on with the normal crash path). Otherwise it latches the fault and then throws,
+// unless that would end the process through std::terminate (the engine is being torn down, or
+// another exception is already propagating): then it returns true without throwing and the caller
+// returns. The embedded-mode flag is read once, so the latch and the decision cannot disagree.
+static bool HandleEmbeddedFatalError(const char *reason)
+{
+	if (!IsEngineEmbeddedMode())
+		return false;
+#if !(defined(_MSC_VER) && _MSC_VER < 1300)
+	theEngineHasFaulted.store(true);
+#else
+	theEngineHasFaulted = true;
+#endif
+	if (IsEngineTearingDown() || std::uncaught_exceptions() != 0)
+		return true;
+	throw FatalEngineError(reason ? reason : "");
 }
 
 void ReleaseCrash(const char *reason)
@@ -870,7 +903,8 @@ void ReleaseCrash(const char *reason)
 	if (TheGlobalData==nullptr) {
 		// GeneralsX @bugfix cemlyn007 28/09/2026 Embedded mode: there is no crash file to write, but
 		// the caller still must not carry on, so hand the error to the host (see FatalEngineError.h).
-		ThrowIfEmbedded(reason);
+		// GeneralsX @bugfix cemlyn007 28/09/2026 Not in the teardown window, though.
+		HandleEmbeddedFatalError(reason);
 		return; // We are shutting down, and TheGlobalData has been freed.  jba. [4/15/2003]
 	}
 
@@ -911,7 +945,10 @@ void ReleaseCrash(const char *reason)
 
 	// GeneralsX @feature cemlyn007 28/09/2026 Embedded mode: hand the error to the host instead of
 	// showing a message box and exiting the process.
-	ThrowIfEmbedded(reason);
+	// GeneralsX @bugfix cemlyn007 03/10/2026 Not in the teardown window or while another exception is
+	// propagating, though: return there, as with no TheGlobalData above.
+	if (HandleEmbeddedFatalError(reason))
+		return;
 
 	if (!DX8Wrapper_IsWindowed) {
 		if (ApplicationHWnd) {
@@ -1014,8 +1051,11 @@ void ReleaseCrashLocalized(const AsciiString& p, const AsciiString& m)
 
 	// GeneralsX @bugfix cemlyn007 28/09/2026 Embedded mode: with no TheGlobalData there is no crash
 	// file path, so hand the error straight to the host (see FatalEngineError.h).
+	// GeneralsX @bugfix cemlyn007 28/09/2026 In the teardown window return instead, as ReleaseCrash does
+	// (the code below needs TheGlobalData).
 	if (TheGlobalData == nullptr) {
-		ThrowIfEmbedded(reason.str());
+		HandleEmbeddedFatalError(reason.str());
+		return;
 	}
 
 	char prevbuf[ _MAX_PATH ];
@@ -1058,7 +1098,10 @@ void ReleaseCrashLocalized(const AsciiString& p, const AsciiString& m)
 
 	// GeneralsX @feature cemlyn007 28/09/2026 Embedded mode: hand the error to the host instead of
 	// exiting the process (see FatalEngineError.h).
-	ThrowIfEmbedded(reason.str());
+	// GeneralsX @bugfix cemlyn007 03/10/2026 Not in the teardown window or while another exception is
+	// propagating: return, as ReleaseCrash does.
+	if (HandleEmbeddedFatalError(reason.str()))
+		return;
 
 	_exit(1);
 }

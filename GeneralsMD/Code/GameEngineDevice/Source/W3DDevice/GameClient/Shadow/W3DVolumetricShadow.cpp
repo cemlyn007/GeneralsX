@@ -65,7 +65,9 @@
 
 // Global Variables and Functions /////////////////////////////////////////////
 
+#if !RTS_ENGINE_CONTEXT
 W3DVolumetricShadowManager	*TheW3DVolumetricShadowManager=nullptr;
+#endif
 extern const FrustumClass *shadowCameraFrustum;	//defined in W3DShadow.
 
 ///////////////////////////////////////////////////////////////////////////////

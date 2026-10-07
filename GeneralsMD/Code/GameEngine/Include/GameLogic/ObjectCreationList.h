@@ -215,4 +215,6 @@ private:
 };
 
 // EXTERNALS //////////////////////////////////////////////////////////////////////////////////////
+#if !RTS_ENGINE_CONTEXT
 extern ObjectCreationListStore *TheObjectCreationListStore;
+#endif

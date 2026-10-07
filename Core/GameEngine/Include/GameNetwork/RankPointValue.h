@@ -97,4 +97,6 @@ RankPoints();
 Int CalculateRank( const PSPlayerStats& stats );
 Int GetFavoriteSide( const PSPlayerStats& stats );
 const Image* LookupSmallRankImage(Int side, Int rankPoints);
+#if !RTS_ENGINE_CONTEXT
 extern RankPoints *TheRankPointValues;
+#endif

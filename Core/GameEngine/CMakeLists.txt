@@ -34,6 +34,9 @@ set(GAMEENGINE_SRC
     Include/Common/DiscreteCircle.h
 #    Include/Common/DrawModule.h
     Include/Common/DynamicAudioEventInfo.h
+    Include/Common/EngineContext.h
+    Include/Common/EngineSingletonMacros.h
+    Include/Common/EngineSingletons.inl
 #    Include/Common/encrypt.h
 #    Include/Common/Energy.h
     Include/Common/Errors.h
@@ -579,6 +582,7 @@ set(GAMEENGINE_SRC
     Source/Common/Diagnostic/SimulationMathCrc.cpp
     Source/Common/Dict.cpp
     Source/Common/DiscreteCircle.cpp
+    Source/Common/EngineContext.cpp
     Source/Common/FramePacer.cpp
     Source/Common/FrameRateLimit.cpp
 #    Source/Common/GameEngine.cpp

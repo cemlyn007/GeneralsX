@@ -253,7 +253,9 @@ const Image *PlayerTemplate::getEnabledImage() const
 //-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
 
+#if !RTS_ENGINE_CONTEXT
 /*extern*/ PlayerTemplateStore *ThePlayerTemplateStore = nullptr;
+#endif
 
 //-----------------------------------------------------------------------------
 PlayerTemplateStore::PlayerTemplateStore()

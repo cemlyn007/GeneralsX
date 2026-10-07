@@ -235,7 +235,9 @@ static Bool selectSingleDrawableWithoutSound( Drawable *draw )
 
 }
 
+#if !RTS_ENGINE_CONTEXT
 SelectionTranslator *TheSelectionTranslator = nullptr;
+#endif
 //-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------

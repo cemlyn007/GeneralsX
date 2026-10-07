@@ -221,4 +221,6 @@ public:
 	virtual Shadow	*addDecal(Shadow::ShadowTypeInfo *shadowInfo)=0;	///<add a non-shadow decal which does not follow an object.
 };
 
+#if !RTS_ENGINE_CONTEXT
 extern ProjectedShadowManager *TheProjectedShadowManager;
+#endif

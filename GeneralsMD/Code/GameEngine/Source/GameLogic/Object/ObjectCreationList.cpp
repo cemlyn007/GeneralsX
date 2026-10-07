@@ -78,7 +78,9 @@
 // PUBLIC DATA ////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
+#if !RTS_ENGINE_CONTEXT
 ObjectCreationListStore *TheObjectCreationListStore = nullptr;					///< the ObjectCreationList store definition
+#endif
 
 //-------------------------------------------------------------------------------------------------
 static void adjustVector(Coord3D *vec, const Matrix3D* mtx)

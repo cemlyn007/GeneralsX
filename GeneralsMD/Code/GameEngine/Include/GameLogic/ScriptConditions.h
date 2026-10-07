@@ -51,7 +51,9 @@ public:
 	virtual Bool evaluateTeamIsContained(Parameter *pTeamParm, Bool allContained) = 0;
 
 };
+#if !RTS_ENGINE_CONTEXT
 extern ScriptConditionsInterface *TheScriptConditions;   ///< singleton definition
+#endif
 
 
 //-----------------------------------------------------------------------------

@@ -130,4 +130,6 @@ private:
 };
 
 // EXTERN /////////////////////////////////////////////////////////////////////////////////////////
+#if !RTS_ENGINE_CONTEXT
 extern ThingFactory *TheThingFactory;  ///< the template singleton
+#endif

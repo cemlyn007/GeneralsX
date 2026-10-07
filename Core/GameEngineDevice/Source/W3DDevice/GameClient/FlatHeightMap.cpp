@@ -90,7 +90,9 @@
 #include "Common/UnitTimings.h" //Contains the DO_UNIT_TIMINGS define jba.
 
 
+#if !RTS_ENGINE_CONTEXT
 FlatHeightMapRenderObjClass *TheFlatHeightMap = nullptr;
+#endif
 
 //-----------------------------------------------------------------------------
 //         Private Data

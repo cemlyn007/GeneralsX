@@ -34,7 +34,9 @@
 #include "Common/Xfer.h"
 #include "GameLogic/CaveSystem.h"
 
+#if !RTS_ENGINE_CONTEXT
 CaveSystem *TheCaveSystem = nullptr;
+#endif
 
 CaveSystem::CaveSystem()
 {

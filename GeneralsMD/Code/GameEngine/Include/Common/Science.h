@@ -130,4 +130,6 @@ private:
 	ScienceInfoVec m_sciences;
 };
 
+#if !RTS_ENGINE_CONTEXT
 extern ScienceStore* TheScienceStore;
+#endif

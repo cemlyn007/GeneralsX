@@ -72,4 +72,6 @@ private:
 	RankInfoVec m_rankInfos;
 };
 
+#if !RTS_ENGINE_CONTEXT
 extern RankInfoStore* TheRankInfoStore;
+#endif

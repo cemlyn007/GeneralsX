@@ -229,4 +229,6 @@ private:
 };
 
 // ----------------------------------------------------------------------------------------------
+#if !RTS_ENGINE_CONTEXT
 extern PlayerTemplateStore *ThePlayerTemplateStore;	///< singleton instance of PlayerTemplateStore
+#endif

@@ -66,7 +66,9 @@
 //-----------------------------------------------------------------------------
 // DEFINES ////////////////////////////////////////////////////////////////////
 //-----------------------------------------------------------------------------
+#if !RTS_ENGINE_CONTEXT
 GlobalLanguage *TheGlobalLanguageData = nullptr;
+#endif
 
 static const LookupListRec ResolutionFontSizeMethodNames[] =
 {

@@ -184,4 +184,6 @@ private:
 
 
 // ----------------------------------------------------------------------------------------------
+#if !RTS_ENGINE_CONTEXT
 extern PlayerList *ThePlayerList;	///< singleton instance of PlayerList
+#endif

@@ -12,6 +12,7 @@
 #include <thread>
 #include <chrono>
 #include "GameNetwork/GeneralsOnline/NGMP_json.h"
+#include "Common/EngineContext.h" // GeneralsX @feature cemlyn007 28/09/2026 rts::withCurrentEngine
 
 using json = nlohmann::json;
 
@@ -121,7 +122,7 @@ void NGMP_OnlineServicesManager::beginBrowserLogin() {
         m_pollThread.join();
     }
 
-    m_pollThread = std::thread([this]() {
+    m_pollThread = std::thread(::rts::withCurrentEngine([this]() {
         const int64_t pollIntervalMs = 1000;
 
         fprintf(stderr, "[NGMP] Poll thread started for gamecode=%s\n", m_gamecode.c_str());
@@ -257,7 +258,7 @@ void NGMP_OnlineServicesManager::beginBrowserLogin() {
 
         fprintf(stderr, "[NGMP] Poll thread exiting\n");
         fflush(stderr);
-    });
+    }));
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -321,7 +322,7 @@ void NGMP_OnlineServicesManager::loginWithRefreshToken(const std::string& refres
         m_pollThread.join();
     }
 
-    m_pollThread = std::thread([this, refreshToken]() {
+    m_pollThread = std::thread(::rts::withCurrentEngine([this, refreshToken]() {
         std::string url = NGMP::GetAPIEndpoint("LoginWithToken");
 
         // GeneralsX @bugfix fbraz3 14/09/2026 Guard against cleartext token transmission over unencrypted remote HTTP (CWE-319)
@@ -463,7 +464,7 @@ void NGMP_OnlineServicesManager::loginWithRefreshToken(const std::string& refres
         NGMPEvent ev;
         ev.type = NGMPEvent::EVENT_AUTH_FALLBACK_BROWSER;
         postEvent(ev);
-    });
+    }));
 }
 
 void NGMP_OnlineServicesManager::logout() {
@@ -479,7 +480,7 @@ void NGMP_OnlineServicesManager::logout() {
 }
 
 // GeneralsX @feature fbraz3 19/09/2026 Silent synchronous token refresh using saved refresh token
-bool NGMP_OnlineServicesManager::refreshSessionTokenSync(uint32_t knownVersion) {
+bool NGMP_OnlineServicesManager::refreshSessionTokenSync(uint32_t exeCRC, uint32_t iniCRC, uint32_t knownVersion) {
     std::lock_guard<std::mutex> refreshLock(m_refreshMutex);
     if (knownVersion != 0 && m_authTokenVersion.load() > knownVersion) {
         // Another thread already refreshed the session token
@@ -527,8 +528,8 @@ bool NGMP_OnlineServicesManager::refreshSessionTokenSync(uint32_t knownVersion) 
         { "reserved_0", "" },
         { "reserved_1", "" },
         { "reserved_2", "" },
-        { "exe_crc", TheGlobalData ? TheGlobalData->m_exeCRC : 0 },
-        { "ini_crc", TheGlobalData ? TheGlobalData->m_iniCRC : 0 }
+        { "exe_crc", exeCRC },
+        { "ini_crc", iniCRC }
     };
     std::string requestBody = requestJson.dump(-1, ' ', false, json::error_handler_t::replace);
 
@@ -597,7 +598,7 @@ void NGMP_OnlineServicesManager::requestGlobalStatsAsync() {
         m_statsThread.join();
     }
 
-    m_statsThread = std::thread([this]() {
+    m_statsThread = std::thread(::rts::withCurrentEngine([this]() {
         std::string url = NGMP::GetAPIEndpoint("GlobalStats");
 
         auto fetchStats = [this, &url](std::string& responseText, long& httpCode) -> CURLcode {
@@ -640,7 +641,7 @@ void NGMP_OnlineServicesManager::requestGlobalStatsAsync() {
         if (httpCode == 401) {
             fprintf(stderr, "[NGMP] GlobalStats returned 401 Unauthorized, attempting silent session refresh...\n");
             fflush(stderr);
-            if (refreshSessionTokenSync(tokenVersion)) {
+            if (refreshSessionTokenSync(TheGlobalData ? TheGlobalData->m_exeCRC : 0, TheGlobalData ? TheGlobalData->m_iniCRC : 0, tokenVersion)) {
                 res = fetchStats(responseText, httpCode);
             }
         }
@@ -696,7 +697,7 @@ void NGMP_OnlineServicesManager::requestGlobalStatsAsync() {
         }
 
         m_statsRequestInFlight = false;
-    });
+    }));
 }
 
 bool NGMP_OnlineServicesManager::getCachedPlayerStats(int64_t userID, PSPlayerStats& outStats) const {
@@ -710,7 +711,11 @@ bool NGMP_OnlineServicesManager::getCachedPlayerStats(int64_t userID, PSPlayerSt
 }
 
 void NGMP_OnlineServicesManager::requestPlayerStatsAsync(int64_t userID) {
-    std::thread([this, userID]() {
+    // GeneralsX @bugfix cemlyn007 03/10/2026 Read the engine values here: this thread is detached, so it
+    // may outlive the engine's context and must not reach engine state itself.
+    const uint32_t exeCRC = TheGlobalData ? TheGlobalData->m_exeCRC : 0;
+    const uint32_t iniCRC = TheGlobalData ? TheGlobalData->m_iniCRC : 0;
+    std::thread([this, userID, exeCRC, iniCRC]() {
         std::string url = NGMP::GetAPIEndpoint("PlayerStats") + "/" + std::to_string(userID);
 
         auto fetchPlayerStats = [this, &url](std::string& responseText, long& httpCode) -> CURLcode {
@@ -753,7 +758,7 @@ void NGMP_OnlineServicesManager::requestPlayerStatsAsync(int64_t userID) {
         if (httpCode == 401) {
             fprintf(stderr, "[NGMP] PlayerStats returned 401 Unauthorized, attempting silent session refresh...\n");
             fflush(stderr);
-            if (refreshSessionTokenSync(tokenVersion)) {
+            if (refreshSessionTokenSync(exeCRC, iniCRC, tokenVersion)) {
                 res = fetchPlayerStats(responseText, httpCode);
             }
         }

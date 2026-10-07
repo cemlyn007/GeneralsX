@@ -32,7 +32,9 @@
 #include "GameClient/View.h"
 
 
+#if !RTS_ENGINE_CONTEXT
 SnowManager *TheSnowManager=nullptr;
+#endif
 
 SnowManager::SnowManager()
 {

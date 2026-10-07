@@ -79,5 +79,7 @@ protected:
 	LangMap m_subWordList;
 };
 
+#if !RTS_ENGINE_CONTEXT
 extern LanguageFilter *TheLanguageFilter;
+#endif
 LanguageFilter * createLanguageFilter();

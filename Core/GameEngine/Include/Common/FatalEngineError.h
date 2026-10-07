@@ -28,6 +28,17 @@
 // The engine that threw is corrupt: the host must not call into it again, and should not destroy
 // it either (its destructors may run on inconsistent state). A fatal error raised while a
 // destructor is running still ends the process, through std::terminate.
+//
+// GeneralsX @bugfix cemlyn007 03/10/2026 The teardown window (PLAN-023 Phase 1). Once the engine is
+// being torn down, or while another exception is already propagating, a fatal error writes the crash
+// file (if TheGlobalData exists) and then returns to its caller instead of throwing: a throw there
+// would almost always escape a destructor and end the process through std::terminate. Upstream
+// returns only once TheGlobalData is gone and otherwise exits the process, so with TheGlobalData
+// alive this is new behaviour: the caller carries on past the fatal error. The sticky fault latch
+// below is still set. Outside that window, with no TheGlobalData it throws without a crash file.
+// The teardown flag is cleared only by the next GameEngine(): a host that boots again in the same
+// process (or context) must call SetEngineTearingDown(false) before its startup parse, or fatal
+// errors in that parse return as well.
 
 #pragma once
 
@@ -53,12 +64,18 @@ public:
 FATAL_ENGINE_ERROR_API void SetEngineEmbeddedMode(bool embedded);
 FATAL_ENGINE_ERROR_API bool IsEngineEmbeddedMode();
 
+// Per engine (per engine context with RTS_ENGINE_CONTEXT): GameEngine's destructor sets it and its
+// constructor clears it. Outside every engine context it reads as set (nothing to hand an error to).
+FATAL_ENGINE_ERROR_API void SetEngineTearingDown(bool tearingDown);
+FATAL_ENGINE_ERROR_API bool IsEngineTearingDown();
+
 // GeneralsX @feature cemlyn007 02/10/2026 Sticky fault latch: fault delivery to the host otherwise
 // depends on every catch (...) between RELEASE_CRASH and the host having a
-// catch (const FatalEngineError&) { throw; } in front of it. Something that swallows the
-// exception anyway (a catch (...) added later, upstream or in a merge) still sets this latch
-// first, so a host that polls HasEngineFaulted() after each call into the engine can detect the
-// fault even when the exception itself never reaches it.
+// catch (const FatalEngineError&) { throw; } in front of it. The engine sets this latch before it
+// throws, so something that swallows the exception anyway (a catch (...) added later, upstream or
+// in a merge) still leaves it set. It is also set when the teardown window above makes the error
+// return instead of throw. A host that polls HasEngineFaulted() after each call into the engine can
+// therefore detect the fault even when no exception reaches it.
 //
 // The flag is process-wide, like IsEngineEmbeddedMode() above, and nothing in this engine ever
 // clears it: the engine that set it is corrupt and the host must not call back into it to ask.

@@ -94,7 +94,9 @@
 #define no_OPTIMIZED_HEIGHTMAP_LIGHTING	01
 // Doesn't work well.  jba.
 
+#if !RTS_ENGINE_CONTEXT
 HeightMapRenderObjClass *TheHeightMap = nullptr;
+#endif
 //-----------------------------------------------------------------------------
 //         Private Data
 //-----------------------------------------------------------------------------

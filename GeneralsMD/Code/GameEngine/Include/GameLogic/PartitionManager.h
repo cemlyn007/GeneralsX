@@ -1596,4 +1596,6 @@ public:
 //-----------------------------------------------------------------------------
 //           Externals
 //-----------------------------------------------------------------------------
+#if !RTS_ENGINE_CONTEXT
 extern PartitionManager *ThePartitionManager;  ///< object manager singleton
+#endif

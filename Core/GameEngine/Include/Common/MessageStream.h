@@ -825,12 +825,16 @@ protected:
 //
 // The message stream that filters client input into game commands
 //
+#if !RTS_ENGINE_CONTEXT
 extern MessageStream *TheMessageStream;
+#endif
 
 //
 // The list of commands awaiting execution by the GameLogic
 //
+#if !RTS_ENGINE_CONTEXT
 extern CommandList *TheCommandList;
+#endif
 
 
 //-----------------------------------------------------------------------------

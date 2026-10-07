@@ -307,7 +307,9 @@ protected:
 };
 
 // EXTERNALS //////////////////////////////////////////////////////////////////////////////////////
+#if !RTS_ENGINE_CONTEXT
 extern Radar *TheRadar;  ///< the radar singleton extern
+#endif
 
 // TheSuperHackers @feature helmutbuhler 10/04/2025
 // Radar that does nothing. Used for Headless Mode.

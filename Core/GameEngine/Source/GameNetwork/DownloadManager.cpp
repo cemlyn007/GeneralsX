@@ -31,7 +31,9 @@
 #include "GameClient/GameText.h"
 #include "GameNetwork/DownloadManager.h"
 
+#if !RTS_ENGINE_CONTEXT
 DownloadManager *TheDownloadManager;
+#endif
 
 DownloadManager::DownloadManager()
 {

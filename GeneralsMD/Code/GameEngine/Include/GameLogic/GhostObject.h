@@ -123,4 +123,6 @@ public:
 };
 
 // the singleton
+#if !RTS_ENGINE_CONTEXT
 extern GhostObjectManager *TheGhostObjectManager;
+#endif

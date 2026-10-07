@@ -88,7 +88,9 @@
 
 
 // PUBLIC /////////////////////////////////////////////////////////////////////////////////////////
+#if !RTS_ENGINE_CONTEXT
 ControlBar *TheControlBar = nullptr;
+#endif
 
 const Image* ControlBar::m_rankVeteranIcon	= nullptr;
 const Image* ControlBar::m_rankEliteIcon		= nullptr;

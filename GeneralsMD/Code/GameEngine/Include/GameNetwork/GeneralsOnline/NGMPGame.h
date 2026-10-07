@@ -157,4 +157,6 @@ public:
 	inline UnicodeString getGameName(void) const { return m_gameName; }
 };
 
+#if !RTS_ENGINE_CONTEXT
 extern NGMPGame* TheNGMPGame;
+#endif

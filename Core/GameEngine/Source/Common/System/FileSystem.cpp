@@ -102,7 +102,9 @@ DECLARE_PERF_TIMER(FileSystem)
 	*/
 //===============================
 
+#if !RTS_ENGINE_CONTEXT
 FileSystem	*TheFileSystem = nullptr;
+#endif
 
 //----------------------------------------------------------------------------
 //         Private Prototypes

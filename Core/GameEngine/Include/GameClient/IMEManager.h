@@ -104,7 +104,9 @@ class IMEManagerInterface : public SubsystemInterface
 };
 
 
+#if !RTS_ENGINE_CONTEXT
 extern IMEManagerInterface *TheIMEManager;
+#endif
 extern IMEManagerInterface *CreateIMEManagerInterface();
 
 

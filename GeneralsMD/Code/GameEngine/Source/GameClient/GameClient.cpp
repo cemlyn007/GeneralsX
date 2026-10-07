@@ -90,7 +90,9 @@
 #define DRAWABLE_HASH_SIZE	8192
 
 /// The GameClient singleton instance
+#if !RTS_ENGINE_CONTEXT
 GameClient *TheGameClient = nullptr;
+#endif
 
 //-------------------------------------------------------------------------------------------------
 GameClient::GameClient()

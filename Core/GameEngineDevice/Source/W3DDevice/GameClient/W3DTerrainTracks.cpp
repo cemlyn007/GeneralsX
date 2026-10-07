@@ -970,4 +970,6 @@ void TerrainTracksRenderObjClassSystem::setDetail()
 	ReAcquireResources();
 };
 
+#if !RTS_ENGINE_CONTEXT
 TerrainTracksRenderObjClassSystem *TheTerrainTracksRenderObjClassSystem=nullptr;	///< singleton for track drawing system.
+#endif

@@ -264,7 +264,9 @@ inline Drawable* GameClient::findDrawableByID( const DrawableID id )
 
 
 // the singleton
+#if !RTS_ENGINE_CONTEXT
 extern GameClient *TheGameClient;
+#endif
 
 
 // TheSuperHackers @logic-client-separation helmutbuhler 11/04/2025
