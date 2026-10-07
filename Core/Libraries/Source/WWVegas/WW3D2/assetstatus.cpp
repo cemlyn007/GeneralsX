@@ -21,6 +21,13 @@
 #include "WWLib/wwstring.h"
 #include "WWLib/RAWFILE.h"
 
+#include <mutex>
+
+// GeneralsX @feature cemlyn007 28/09/2026 The one missing-asset report is process-wide (its WWDEBUG destructor writes
+// it out at exit), and every engine adds to it: engines on separate threads add under this lock (PLAN-023
+// Phase 5b).
+static std::mutex AssetStatusReportMutex;
+
 AssetStatusClass AssetStatusClass::Instance;
 
 const char* ReportCategoryNames[AssetStatusClass::REPORT_COUNT]={
@@ -75,6 +82,7 @@ AssetStatusClass::~AssetStatusClass()
 
 void AssetStatusClass::Add_To_Report(int index, const char* name)
 {
+	std::lock_guard<std::mutex> lock(AssetStatusReportMutex);
 	StringClass lower_case_name(name,true);
 	_strlwr(lower_case_name.Peek_Buffer());
 	// This is a bit slow - two accesses to the same member, but currently there's no better way to do it.

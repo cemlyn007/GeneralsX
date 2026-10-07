@@ -98,6 +98,8 @@
 
 #include "shdlib.h"
 
+#include <atomic>
+
 const int DEFAULT_RESOLUTION_WIDTH = 640;
 const int DEFAULT_RESOLUTION_HEIGHT = 480;
 const int DEFAULT_BIT_DEPTH = 32;
@@ -398,7 +400,9 @@ static void Resolve_Present_BackBuffer_Size(int gameW, int gameH, bool isWindowe
 DX8FrameStatistics DX8Wrapper::FrameStatistics;
 static DX8FrameStatistics LastFrameStatistics;
 
-bool DX8Wrapper_IsWindowed = true;
+// GeneralsX @feature cemlyn007 28/09/2026 Atomic (the process's assert switch): every headless engine's command line writes it and any engine's
+// assert path reads it, so engines on separate threads would race on a plain bool (PLAN-023 Phase 5b).
+std::atomic<bool> DX8Wrapper_IsWindowed(true);
 bool DX8Wrapper_HeadlessRender = false;  // rlgenerals: see dx8wrapper.h
 
 // FPU_PRESERVE

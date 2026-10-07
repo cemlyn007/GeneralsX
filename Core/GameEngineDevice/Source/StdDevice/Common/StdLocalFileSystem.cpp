@@ -481,7 +481,13 @@ void StdLocalFileSystem::setAssetRootPath(const AsciiString& path)
 {
 	std::string p(path.str());
 	std::replace(p.begin(), p.end(), '\\', '/');
-	s_assetFallbackPath = std::filesystem::path(std::move(p));
+	// GeneralsX @feature cemlyn007 28/09/2026 Written only when it changes: every engine's boot sets it, and the engines of
+	// a process share one install, so only the first boot writes the process-wide path while later engines' file
+	// lookups on other threads read it (PLAN-023 Phase 5b).
+	std::filesystem::path assetRootPath(std::move(p));
+	if (s_assetFallbackPath == assetRootPath)
+		return;
+	s_assetFallbackPath = std::move(assetRootPath);
 	DEBUG_LOG(("StdLocalFileSystem::setAssetRootPath - asset fallback path set to '%s'", s_assetFallbackPath.string().c_str()));
 }
 #endif

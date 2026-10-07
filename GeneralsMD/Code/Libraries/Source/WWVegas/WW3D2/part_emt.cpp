@@ -50,10 +50,9 @@
 #include <WWLib/gcd_lcm.h>
 
 
-// Global variable which is only used to communicate the worldspace emitter
-// velocity from ParticleEmitterClass::Create_New_Particles() to
-// ParticleEmitterClass::Initialize_Particle(), for velocity inheritance.
-Vector3 InheritedWorldSpaceEmitterVel;
+// GeneralsX @feature cemlyn007 28/09/2026 The global InheritedWorldSpaceEmitterVel, which only carried the worldspace
+// emitter velocity from ParticleEmitterClass::Create_New_Particles() to Initialize_Particle(), is now a local
+// passed as an argument, so that engines on separate threads do not share it (PLAN-023 Phase 5b).
 
 // This debug setting disables particles from being generated
 bool ParticleEmitterClass::DebugDisable = false;
@@ -584,10 +583,9 @@ void ParticleEmitterClass::Create_New_Particles(const Quaternion & curr_quat, co
    SlerpInfoStruct slerp_info;
    Slerp_Setup(PrevQ, curr_quat, &slerp_info);
 
-	// Find the velocity of the emitter (for velocity inheritance).
-	// InheritedWorldSpaceEmitterVel is a global variable which is only used
-	// to pass this into the following Initialize_Particle() calls without
-	// having to set it as an argument for each call.
+	// Find the velocity of the emitter (for velocity inheritance), passed to
+	// the following Initialize_Particle() calls.
+	Vector3 InheritedWorldSpaceEmitterVel;
 	if (VelInheritFactor) {
 		InheritedWorldSpaceEmitterVel = (curr_orig - PrevOrig) * (VelInheritFactor / fl_frametime);
 	} else {
@@ -628,7 +626,7 @@ void ParticleEmitterClass::Create_New_Particles(const Quaternion & curr_quat, co
 		}
 
 		for (unsigned int i = 0; i < burst_size; i++) {
-			Initialize_Particle(Buffer->Add_Uninitialized_New_Particle(), age, quat, orig);
+			Initialize_Particle(Buffer->Add_Uninitialized_New_Particle(), age, quat, orig, InheritedWorldSpaceEmitterVel);
 		}
 
 		if (IsComplete) break;
@@ -640,7 +638,7 @@ void ParticleEmitterClass::Create_New_Particles(const Quaternion & curr_quat, co
 // the given age and emitter transform (expressed as a quaternion and origin
 // vector). (must check if address is nullptr).
 void ParticleEmitterClass::Initialize_Particle(NewParticleStruct * newpart,
-   unsigned int timestamp, const Quaternion & quat, const Vector3 & orig)
+   unsigned int timestamp, const Quaternion & quat, const Vector3 & orig, const Vector3 & InheritedWorldSpaceEmitterVel)
 {
    // Set time stamp.
 	newpart->TimeStamp = timestamp;

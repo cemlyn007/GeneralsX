@@ -64,9 +64,6 @@
 bool DX8TextureCategoryClass::m_gForceMultiply = false; // Forces opaque materials to use the multiply blend - pseudo transparent effect.  jba.
 // ----------------------------------------------------------------------------
 
-static DynamicVectorClass<Vector3>				_TempVertexBuffer;
-static DynamicVectorClass<Vector3>				_TempNormalBuffer;
-
 #if RTS_ENGINE_CONTEXT
 // GeneralsX @feature cemlyn007 28/09/2026 Per engine: the mesh renderer and the lists it tears down, one
 // object (PLAN-023 Phase 3). The renderer is the last member, so it is destroyed first and still finds the
@@ -77,6 +74,11 @@ struct DX8MeshRendererState
 {
 	~DX8MeshRendererState();
 
+	// GeneralsX @feature cemlyn007 28/09/2026 The skinned-mesh deform scratch (the file statics _TempVertexBuffer and
+	// _TempNormalBuffer OFF), per engine so that engines on separate threads do not share it (PLAN-023 Phase 5b).
+	// Before the renderer, whose Shutdown frees their memory.
+	DynamicVectorClass<Vector3>			tempVertexBuffer;
+	DynamicVectorClass<Vector3>			tempNormalBuffer;
 	MultiListClass<MeshModelClass>	registeredMeshList;
 	TextureCategoryList					textureCategoryDeleteList;
 	FVFCategoryList						fvfCategoryContainerDeleteList;
@@ -99,7 +101,11 @@ DX8MeshRendererClass & DX8_Current_Mesh_Renderer()
 #define _RegisteredMeshList (DX8_Current_Mesh_Renderer_State().registeredMeshList)
 #define texture_category_delete_list (DX8_Current_Mesh_Renderer_State().textureCategoryDeleteList)
 #define fvf_category_container_delete_list (DX8_Current_Mesh_Renderer_State().fvfCategoryContainerDeleteList)
+#define _TempVertexBuffer (DX8_Current_Mesh_Renderer_State().tempVertexBuffer)
+#define _TempNormalBuffer (DX8_Current_Mesh_Renderer_State().tempNormalBuffer)
 #else
+static DynamicVectorClass<Vector3>				_TempVertexBuffer;
+static DynamicVectorClass<Vector3>				_TempNormalBuffer;
 static MultiListClass<MeshModelClass>			_RegisteredMeshList;
 static TextureCategoryList							texture_category_delete_list;
 static FVFCategoryList								fvf_category_container_delete_list;

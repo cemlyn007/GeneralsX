@@ -12,6 +12,9 @@
 
 static int theFailures = 0;
 
+// EngineContext.cpp calls the engine's setFPMode, which lives in GameLogic.cpp and is not linked into this test.
+void setFPMode() {}
+
 #define CHECK(condition) \
 	do \
 	{ \

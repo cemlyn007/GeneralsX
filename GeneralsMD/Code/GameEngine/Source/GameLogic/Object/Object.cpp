@@ -174,6 +174,17 @@ AsciiString DebugDescribeObject(const Object *obj)
 	return ret;
 }
 
+// GeneralsX @feature cemlyn007 28/09/2026 The shared ModuleData of one kind of Object helper, tagged once, when it is made
+// under the static-initialisation guard: Object::Object used to set the same tag again for every Object, a
+// process-wide write that engines constructing Objects on separate threads would race on (PLAN-023 Phase 5b).
+template <typename T>
+static T& taggedHelperModuleData( NameKeyType tagNameKey )
+{
+	static T data;
+	data.setModuleTagNameKey( tagNameKey );
+	return data;
+}
+
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
 Object::Object( const ThingTemplate *tt, const ObjectStatusMaskType &objectStatusMask, Team *team ) :
@@ -315,8 +326,7 @@ Object::Object( const ThingTemplate *tt, const ObjectStatusMaskType &objectStatu
 	// the helpers are done first -- even before Behaviors! -- in case a module needs
 	// to call something that uses them.
 	static const NameKeyType smcHelperModuleDataTagNameKey = NAMEKEY( "ModuleTag_SMCHelper" );
-	static ObjectSMCHelperModuleData smcModuleData;
-	smcModuleData.setModuleTagNameKey( smcHelperModuleDataTagNameKey );
+	static ObjectSMCHelperModuleData& smcModuleData = taggedHelperModuleData<ObjectSMCHelperModuleData>( smcHelperModuleDataTagNameKey );
 	m_smcHelper = newInstance(ObjectSMCHelper)(this, &smcModuleData);
 	*curB++ = m_smcHelper;
 
@@ -338,14 +348,12 @@ Object::Object( const ThingTemplate *tt, const ObjectStatusMaskType &objectStatu
 	if( !isInactiveBody )
 	{
 		static const NameKeyType statusHelperModuleDataTagNameKey = NAMEKEY( "ModuleTag_StatusDamageHelper" );
-		static StatusDamageHelperModuleData statusModuleData;
-		statusModuleData.setModuleTagNameKey( statusHelperModuleDataTagNameKey );
+		static StatusDamageHelperModuleData& statusModuleData = taggedHelperModuleData<StatusDamageHelperModuleData>( statusHelperModuleDataTagNameKey );
 		m_statusDamageHelper = newInstance(StatusDamageHelper)(this, &statusModuleData);
 		*curB++ = m_statusDamageHelper;
 
 		static const NameKeyType subdualHelperModuleDataTagNameKey = NAMEKEY( "ModuleTag_SubdualDamageHelper" );
-		static SubdualDamageHelperModuleData subdualModuleData;
-		subdualModuleData.setModuleTagNameKey( subdualHelperModuleDataTagNameKey );
+		static SubdualDamageHelperModuleData& subdualModuleData = taggedHelperModuleData<SubdualDamageHelperModuleData>( subdualHelperModuleDataTagNameKey );
 		m_subdualDamageHelper = newInstance(SubdualDamageHelper)(this, &subdualModuleData);
 		*curB++ = m_subdualDamageHelper;
 	}
@@ -356,8 +364,7 @@ Object::Object( const ThingTemplate *tt, const ObjectStatusMaskType &objectStatu
 	{
 		// if we can ever be a temporary-repulsor, make a repulsor helper. (srj)
 		static const NameKeyType repulsorHelperModuleDataTagNameKey = NAMEKEY( "ModuleTag_RepulsorHelper" );
-		static ObjectRepulsorHelperModuleData repulsorModuleData;
-		repulsorModuleData.setModuleTagNameKey( repulsorHelperModuleDataTagNameKey );
+		static ObjectRepulsorHelperModuleData& repulsorModuleData = taggedHelperModuleData<ObjectRepulsorHelperModuleData>( repulsorHelperModuleDataTagNameKey );
 		m_repulsorHelper = newInstance(ObjectRepulsorHelper)(this, &repulsorModuleData);
 		*curB++ = m_repulsorHelper;
 	}
@@ -371,8 +378,7 @@ Object::Object( const ThingTemplate *tt, const ObjectStatusMaskType &objectStatu
 	if (!tt->isKindOf(KINDOF_SHRUBBERY))
 	{
 		static const NameKeyType defectionModuleDataTagNameKey = NAMEKEY( "ModuleTag_DefectionHelper" );
-		static ObjectDefectionHelperModuleData defectionModuleData;
-		defectionModuleData.setModuleTagNameKey( defectionModuleDataTagNameKey );
+		static ObjectDefectionHelperModuleData& defectionModuleData = taggedHelperModuleData<ObjectDefectionHelperModuleData>( defectionModuleDataTagNameKey );
 		m_defectionHelper = newInstance(ObjectDefectionHelper)(this, &defectionModuleData);
 		*curB++ = m_defectionHelper;
 	}
@@ -381,20 +387,17 @@ Object::Object( const ThingTemplate *tt, const ObjectStatusMaskType &objectStatu
 	{
 		// we only need a firingtracker and wshelper if we can possibly have a weapon.
 		static const NameKeyType weaponStatusModuleDataTagNameKey = NAMEKEY( "ModuleTag_WeaponStatusHelper" );
-		static ObjectWeaponStatusHelperModuleData weaponStatusModuleData;
-		weaponStatusModuleData.setModuleTagNameKey( weaponStatusModuleDataTagNameKey );
+		static ObjectWeaponStatusHelperModuleData& weaponStatusModuleData = taggedHelperModuleData<ObjectWeaponStatusHelperModuleData>( weaponStatusModuleDataTagNameKey );
 		m_wsHelper = newInstance(ObjectWeaponStatusHelper)(this, &weaponStatusModuleData);
 		*curB++ = m_wsHelper;
 
 		static const NameKeyType firingTrackerModuleDataTagNameKey = NAMEKEY( "ModuleTag_FiringTrackerHelper" );
-		static FiringTrackerModuleData firingTrackerModuleData;
-		firingTrackerModuleData.setModuleTagNameKey( firingTrackerModuleDataTagNameKey );
+		static FiringTrackerModuleData& firingTrackerModuleData = taggedHelperModuleData<FiringTrackerModuleData>( firingTrackerModuleDataTagNameKey );
 		m_firingTracker = newInstance(FiringTracker)(this, &firingTrackerModuleData);
 		*curB++ = m_firingTracker;
 
 		static const NameKeyType tempWeaponBonusHelperModuleDataTagNameKey = NAMEKEY( "ModuleTag_TempWeaponBonusHelper" );
-		static TempWeaponBonusHelperModuleData tempWeaponBonusModuleData;
-		tempWeaponBonusModuleData.setModuleTagNameKey( tempWeaponBonusHelperModuleDataTagNameKey );
+		static TempWeaponBonusHelperModuleData& tempWeaponBonusModuleData = taggedHelperModuleData<TempWeaponBonusHelperModuleData>( tempWeaponBonusHelperModuleDataTagNameKey );
 		m_tempWeaponBonusHelper = newInstance(TempWeaponBonusHelper)(this, &tempWeaponBonusModuleData);
 		*curB++ = m_tempWeaponBonusHelper;
 	}

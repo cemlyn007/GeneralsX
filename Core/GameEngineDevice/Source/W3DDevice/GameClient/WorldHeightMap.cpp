@@ -2461,8 +2461,18 @@ AsciiString WorldHeightMap::getTerrainNameAt(Real x, Real y)
 }
 
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 28/09/2026 Per engine (PLAN-023 Phase 5b): getPointerToTileData returns s_buffer, so
+// engines on separate threads must not share it. A slot, not thread_local: 256 KiB each is far too big for
+// the library's static TLS.
+static rts::PerEngineStatic<UnsignedByte[DATA_LEN_BYTES]> s_buffer_perEngine;
+static rts::PerEngineStatic<UnsignedByte[DATA_LEN_BYTES]> s_blendBuffer_perEngine;
+#define s_buffer (s_buffer_perEngine.get())
+#define s_blendBuffer (s_blendBuffer_perEngine.get())
+#else
 static UnsignedByte s_buffer[DATA_LEN_BYTES];
 static UnsignedByte s_blendBuffer[DATA_LEN_BYTES];
+#endif
 
 UnsignedByte * WorldHeightMap::getPointerToTileData(Int xIndex, Int yIndex, Int width)
 {

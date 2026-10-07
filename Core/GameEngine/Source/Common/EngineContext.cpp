@@ -26,9 +26,21 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cfenv>
 #include <cstdio>
 #include <cstring>
+#include <mutex>
 #include <vector>
+
+#ifndef _WIN32
+#include <locale.h>
+#if defined(__APPLE__)
+#include <xlocale.h>
+#endif
+#endif
+
+// GameLogic.cpp (GameLogic/FPUControl.h): the engine's floating-point mode.
+void setFPMode();
 
 namespace rts
 {
@@ -171,6 +183,68 @@ std::size_t EngineContext::forEachLiveSingleton(void (*visit)(const char* name, 
 #undef RTS_ENGINE_CONTEXT_POINTER
 #undef RTS_ENGINE_CONTEXT_VALUE
 	return live;
+}
+
+// GeneralsX @feature cemlyn007 28/09/2026 The per-thread invariants a Scope sets when it enters an engine (PLAN-023
+// Phase 5b; see Scope).
+static_assert(sizeof(std::fenv_t) <= sizeof(ThreadInvariants::floatingPointEnvironment), "fenv_t does not fit ThreadInvariants");
+static_assert(alignof(std::fenv_t) <= 8, "fenv_t is over-aligned for ThreadInvariants");
+#ifndef _WIN32
+static_assert(sizeof(locale_t) <= sizeof(void*), "locale_t does not fit ThreadInvariants");
+
+namespace
+{
+std::once_flag theEngineLocaleOnce;
+locale_t theEngineLocale = (locale_t)0;
+
+// The locale every engine runs in: the global locale as at the first entry, with LC_NUMERIC "C" (INI parsing uses
+// strtod and atof). A thread's own uselocale() locale and later setlocale() calls are not followed. Made once per
+// process and never freed (a thread may still use it at exit).
+locale_t engineLocale() noexcept
+{
+	std::call_once(theEngineLocaleOnce, []() {
+		const locale_t base = duplocale(LC_GLOBAL_LOCALE);
+		if (base != (locale_t)0)
+		{
+			theEngineLocale = newlocale(LC_NUMERIC_MASK, "C", base);
+			if (theEngineLocale == (locale_t)0)
+				freelocale(base);
+		}
+	});
+	return theEngineLocale;
+}
+}
+#endif
+
+void enterEngineThreadInvariants(ThreadInvariants& saved) noexcept
+{
+	std::fegetenv(reinterpret_cast<std::fenv_t*>(saved.floatingPointEnvironment));
+#if (defined(__i386__) || defined(__x86_64__)) && !defined(_WIN32)
+	// fesetenv need not restore the x87 precision bits that setFPMode clears, so the control word is saved too.
+	__asm__ __volatile__("fnstcw %0" : "=m" (saved.x87ControlWord));
+#else
+	saved.x87ControlWord = 0;
+#endif
+	setFPMode();
+#ifndef _WIN32
+	const locale_t locale = engineLocale();
+	saved.locale = locale != (locale_t)0 ? static_cast<void*>(uselocale(locale)) : nullptr;
+#else
+	// Windows has no per-thread uselocale; the engine keeps the thread's locale there.
+	saved.locale = nullptr;
+#endif
+}
+
+void leaveEngineThreadInvariants(const ThreadInvariants& saved) noexcept
+{
+#ifndef _WIN32
+	if (saved.locale != nullptr)
+		uselocale(static_cast<locale_t>(saved.locale));
+#endif
+	std::fesetenv(reinterpret_cast<const std::fenv_t*>(saved.floatingPointEnvironment));
+#if (defined(__i386__) || defined(__x86_64__)) && !defined(_WIN32)
+	__asm__ __volatile__("fldcw %0" : : "m" (saved.x87ControlWord));
+#endif
 }
 
 bool noEngineIsPristine()

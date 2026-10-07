@@ -88,7 +88,10 @@
 #endif
 
 // Horrible reference, but we really, really need to know if we are windowed.
-extern bool DX8Wrapper_IsWindowed;
+// GeneralsX @feature cemlyn007 28/09/2026 Atomic: every headless engine's command line writes it and any engine's
+// assert path reads it, so engines on separate threads would race on a plain bool (PLAN-023 Phase 5b).
+#include <atomic>
+extern std::atomic<bool> DX8Wrapper_IsWindowed;
 extern HWND ApplicationHWnd;
 
 extern const char *gAppPrefix; /// So WB can have a different log file name.
@@ -738,7 +741,9 @@ double SimpleProfiler::getAverageTime()
 	#define RELEASECRASH_FILE_NAME				"ReleaseCrashInfo.txt"
 	#define RELEASECRASH_FILE_NAME_PREV		"ReleaseCrashInfoPrev.txt"
 
-	static FILE *theReleaseCrashLogFile = nullptr;
+	// GeneralsX @bugfix cemlyn007 03/10/2026 Per thread: engines fault on their own threads, and a shared handle
+	// would be opened, written and closed by two faulting engines at once.
+	static THREAD_LOCAL FILE *theReleaseCrashLogFile = nullptr;
 
 	static void releaseCrashLogOutput(const char *buffer)
 	{

@@ -25,15 +25,17 @@
 # replay's playback, a game ended by script victory, and an Env game to the local player's defeat): no
 # symbol classified render-only, constant or debug-only changed but the const objects built on first use.
 #
-# A per-engine note that starts "threads only" names state that is correct for several engines stepped on
-# ONE thread (a scratch buffer filled and consumed inside one call, a call-depth counter) and only breaks
-# once engines step concurrently: PLAN-023's delivery scope defers those, so they are listed for the
-# threaded follow-up rather than for Phases 2-4 of this delivery. A process-global note can start "threads
-# only" too: every engine writes the SAME value into a shared process-global (so it is correct, and stays
-# process-global, on one thread), but the write itself is unsynchronised, so it is a data race once engines
-# run on separate threads (Object's helper ModuleData, the ScoreKeeper/ModuleInfo KindOf masks, the
-# FunctionLexicon tables, generalAllocator's lazy, lock-free creation); the threaded follow-up gives each of
-# these a `std::call_once` or an equivalent one-time/locked write.
+# There are no per-engine entries left: PLAN-023 Phases 2-4 moved every one into the engine, and Phase 5b (engines on
+# separate threads) the last 18, the "threads only" scratch that was correct for several engines stepped on ONE
+# thread, into thread_locals, PER_ENGINE_STATICs, locals or (AssetStatusClass::Instance) a lock. A symbol classified
+# per-engine is therefore a regression, and `check` fails on it in every mode. A thread_local is process-global here
+# (per thread by design), and must stay small: the library's TLS is initial-exec, so it comes out of glibc's static
+# TLS surplus for a dlopened library (a few KB at most; Phase 2's 5 KB XferLoad buffers failed to load).
+#
+# Process-wide state must be written once (at static initialisation or the first boot) and only read after
+# that, or be atomic or locked: engines boot while others step on their threads (PLAN-023 Phase 5b). A note
+# that says "boot/shutdown only, serialized by the host" names state that only boots and teardowns touch,
+# which the host serialises (one process mutex), and that no engine reads while it steps.
 
 PER = "per-engine"
 GLOBAL = "process-global"
@@ -85,7 +87,7 @@ HAND = [
     (GLOBAL, "", "TerrainLogic::m_gridWaterHandle", "an address-only sentinel (the grid water's WaterHandle is compared by address and never written), the same for every engine"),
     (GLOBAL, "", "inCRCGen", "thread_local, set only while this thread runs GameLogic::getCRC (PLAN-023 Phase 2): per thread by design"),
     (GLOBAL, "", "re:PathNode::computeDirectionVector\\(\\)::dir", "thread_local returned-by-pointer scratch, consumed at once (PLAN-023 Phase 2): per thread by design"),
-    (PER, 4, "re:BuildAssistant::buildTiledLocations\\(.*\\)::tileInfo", "threads only: returned-by-pointer scratch, consumed at once"),
+    (GLOBAL, "", "re:BuildAssistant::buildTiledLocations\\(.*\\)::tileInfo", "thread_local returned-by-pointer scratch, consumed at once (PLAN-023 Phase 5b): per thread by design"),
     # ---------------------------------------------------------------------------------------------------
     # PLAN-023 Phase 3: device-layer state a headless engine uses.
     # Done (PLAN-023 Phase 3 PR): W3DDisplay's scenes and asset manager, WW3DAssetManager::TheInstance and
@@ -99,17 +101,12 @@ HAND = [
     (GLOBAL, "", "filtertable", "motchan's filter table: built once per process under std::call_once from constants (PLAN-023 Phase 3)"),
     (GLOBAL, "", "re:(Sphere|Ring)MeshArray|(Sphere|Ring)LODCosts", "sphere/ring LOD meshes: built once per process under std::call_once from constants (PLAN-023 Phase 3); only the one rendering engine's draw re-sets their alpha/scale, right before it draws them"),
     (GLOBAL, "", "re:_Fast(Acos|Asin|Sin|InvSin)Table", "WWMath::Init tables: built by the first of the counted WWMath::Init calls (PLAN-023 Phase 3), the same values every time"),
+    (GLOBAL, "", "TheW3DFrameLengthInMsec", "the W3D frame length: every engine's GameClient::init sets it to MSEC_PER_LOGICFRAME_REAL, its initial value, and W3DGameClient::setFrameRate writes only a change (PLAN-023 Phase 5b), so no engine writes it after static initialization"),
+    (GLOBAL, "", "re:W3DAssetManager::Create_Render_Obj\\(.*\\)::warning_count|WW3DAssetManager::Create_Render_Obj\\(.*\\)::warning_count", "missing-asset log limiter: bounds a log message count, and no engine state depends on it; a std::atomic, since any engine's thread may count (PLAN-023 Phase 5b)"),
+    (GLOBAL, "", "re:AssetStatusClass::Instance|AssetStatusReportMutex", "the one missing-asset report (the WWDEBUG destructor writes it out at exit) and its lock: every engine adds to it, under the lock (PLAN-023 Phase 5b), and none reads it"),
     (GLOBAL, "", "re:Ring_Array_Once|Sphere_Array_Once|table_once", "the std::call_once flag of a table built once per process from constants (the ring and sphere LOD meshes, motchan's filter table; PLAN-023 Phase 3)"),
     (GLOBAL, "", "WWMathInitCount", "WWMath::Init's count of the engines that hold an Init, written under WWMathInitMutex (PLAN-023 Phase 3): shared by every engine on purpose: the first Init builds the _Fast* tables and the default lookup table, and the last Shutdown frees only the lookup-table manager's tables (the _Fast* tables are static and never freed)"),
     (GLOBAL, "", "WWMathInitMutex", "guards WWMathInitCount (PLAN-023 Phase 3)"),
-    (GLOBAL, "", "TheW3DFrameLengthInMsec", "every engine writes the same constant: GameClient::init calls W3DGameClient::setFrameRate(MSEC_PER_LOGICFRAME_REAL), its initial value; the unsynchronized write matters only with threads"),
-    (GLOBAL, "", "re:W3DAssetManager::Create_Render_Obj\\(.*\\)::warning_count|WW3DAssetManager::Create_Render_Obj\\(.*\\)::warning_count", "missing-asset log limiter: bounds a log message count, and no engine state depends on it"),
-    (PER, 3, "AssetStatusClass::Instance", "threads only: the missing-asset report, written by every engine and read by none (the WWDEBUG destructor writes it out at exit); concurrent engines need a lock"),
-    (PER, 3, "re:_TempVertexBuffer|_TempNormalBuffer", "threads only: one pair per TU (dx8renderer.cpp's skinned-mesh deform scratch, cleared by TheDX8MeshRenderer's teardown; mesh.cpp's ray-cast/decal skin scratch; decalmsh.cpp's decal scratch; meshmdl.cpp's unused pair), each resized, filled and consumed within one call"),
-    (PER, 3, "re:s_buffer|s_blendBuffer", "threads only: WorldHeightMap tile scratch, filled and consumed in one call"),
-    (PER, 3, "_PlaneEQArray", "threads only: MeshGeometryClass plane-equation scratch (ray casts), filled and consumed in one call"),
-    (PER, 3, "re:CollisionContext|IntersectContext", "threads only: WWMath AAB-tree collision scratch, filled and consumed in one call"),
-    (PER, 3, "InheritedWorldSpaceEmitterVel", "threads only: set by ParticleEmitterClass::Emit and read by Initialize_Particle within the same call"),
     # ---------------------------------------------------------------------------------------------------
     # PLAN-023 Phase 4: caches and remaining statics.
     # Done (PLAN-023 Phase 4 PR): every function-local cache of a per-engine pointer (the seven ActiveBody
@@ -127,53 +124,52 @@ HAND = [
     # constructor clears it), the quit-menu state HideQuitMenu touches (clearGameData), Shell::update's
     # throttle (GameClient::update) and W3DStatusCircle's colour (every engine's setTeamColor). The
     # other TUs' statics of the same names (the WOL and download menus' staticTextPlayer/staticTextStatus)
-    # fall to the GUI blanket below. What is left here is threads only.
+    # fall to the GUI blanket below.
     (RENDER, "", "re:staticTextPlayer|staticTextStatus", "with RTS_ENGINE_CONTEXT only the online menus' statics of these names are left (WOLGameSetupMenu.cpp's staticTextPlayer, DownloadMenu.cpp's staticTextStatus); the source column shows the first definition the search finds, the OFF-build one in ControlBarObserver.cpp or Diplomacy.cpp (those are PER_ENGINE_STATIC fields with the context on): " + UI),
-    (PER, 4, "re:ParticleSystem::(computePointOnUnitSphere|computeParticleVelocity|computeParticlePosition|generateParticleInfo)\\(.*\\)::\\w+", "threads only: particle scratch returned by pointer, consumed at once"),
+    (GLOBAL, "", "re:ParticleSystem::(computePointOnUnitSphere|computeParticleVelocity|computeParticlePosition)\\(.*\\)::\\w+", "thread_local returned-by-pointer scratch, consumed at once (PLAN-023 Phase 5b): per thread by design"),
     # ---------------------------------------------------------------------------------------------------
     # Process-global on purpose.
-    (GLOBAL, "", "re:rts::t_engine|rts::g_noEngine|rts::\\(anonymous namespace\\)::theNextSlotIndex", "the EngineContext mechanism itself (PLAN-023 Decision 1)"),
+    (GLOBAL, "", "re:rts::t_engine|rts::g_noEngine|rts::\\(anonymous namespace\\)::(theNextSlotIndex|theEngineLocaleOnce|theEngineLocale)", "the EngineContext mechanism itself (PLAN-023 Decision 1; the engines' locale (LC_NUMERIC set to C), made once under std::call_once, Phase 5b)"),
     (GLOBAL, "", "re:TheNameKeyGenerator|\\(anonymous namespace\\)::thePriming(Mutex|State|Failure)|NameKeyGenerator::perturbForTesting\\(.*\\)::calls", "shared immortal NameKey generator and its priming latch (PLAN-023 Decision 2)"),
     (GLOBAL, "", "re:.*::(key_\\w+|jetKey)", "cached NameKeyType (a NAMEKEY(...) in an inline function): process-wide by PLAN-023 Decision 2"),
     (GLOBAL, "", "re:ControlBar::update(OCLTimer|Construction)TextDisplay\\(.*\\)::(descID|barID)", "cached window NameKey held as UnsignedInt: process-wide by PLAN-023 Decision 2"),
-    # rule:namekey now requires the declaration itself to initialise from NAMEKEY(...) or
+    (GLOBAL, "", "re:Object::Object\\(.*\\)::\\w+ModuleData|.*taggedHelperModuleData<\\w+>\\(.*\\)::data", "shared helper ModuleData and Object::Object's references to it: made and tagged with its (Decision 2) NameKey once, under the static-init guard, and only read afterwards (PLAN-023 Phase 5b; every Object used to write the tag again)"),
+    (GLOBAL, "", "re:gameWin(System|Input|Tooltip)Table|winLayout(Init|Update|Shutdown)Table|gameWinDrawTable|layoutInitTable", "FunctionLexicon table: names and function pointers; every engine's init interns the same names (Decision 2), and FunctionLexicon::loadTable writes a key only when it changes, so only the first boot writes (PLAN-023 Phase 5b)"),
+    # rule:namekey requires the declaration itself to initialise from NAMEKEY(...) or
     # TheNameKeyGenerator->nameToKey(...): sound for most caches, but these are declared `= NAMEKEY_INVALID`
-    # (or with no initialiser, for an array) and filled from the generator later, in a separate init function
-    # (ControlBar::initObserverControls, ShowDiplomacy, InGamePopupMessageInit, LobbyUtils, ...), so the rule
-    # no longer sees them. Still process-wide NameKey caches by PLAN-023 Decision 2.
-    (GLOBAL, "", "re:buttonOkID|buttonCancelID|buttonMuteID|buttonUnMuteID|buttonPlayerID|parentID|staticTextPlayerID|staticTextSideID|staticTextTeamID|staticTextStatusID|radioButtonInGameID|radioButtonBuddiesID|winInGameID|winBuddiesID|winSoloID|s_replayObserverNameKey", "threads only: cached NameKeyType (a window/button ID key), declared `= NAMEKEY_INVALID` and filled from TheNameKeyGenerator by a later init call (ControlBar::initObserverControls, ShowDiplomacy, ...) that every engine runs, unsynchronized: process-wide by PLAN-023 Decision 2; std::call_once or an engine-independent static initializer fixes it"),
-    (GLOBAL, "", "re:ControlBar::(updateBuildQueueDisabledImages|populateBuildQueue)\\(.*\\)::buildQueueIDs", "threads only: cached NameKeyType array, declared empty and filled from TheNameKeyGenerator in the same function under an unsynchronized check-then-set idsInitialized latch: process-wide by PLAN-023 Decision 2, with the ID statics above; std::call_once fixes it"),
-    (GLOBAL, "", "re:Object::Object\\(.*\\)::\\w+ModuleData", "threads only: shared helper ModuleData; every Object writes the same (Decision 2) NameKey tag into it, but the write is unsynchronized"),
-    (GLOBAL, "", "re:scoringBuilding(Create|Destroy)?Mask", "threads only: rewritten (a KindOfMaskType::set(), a non-atomic read-modify-write) with the same constant KindOf bits by every ScoreKeeper"),
-    (GLOBAL, "", "re:ModuleInfo::clearCopiedFromDefaultEntries\\(.*\\)::\\w+Mask", "threads only: rewritten with the same constant KindOf bits on every call, unsynchronized"),
-    (GLOBAL, "", "re:gameWin(System|Input|Tooltip)Table|winLayout(Init|Update|Shutdown)Table|gameWinDrawTable|layoutInitTable", "threads only: FunctionLexicon table (names and function pointers); every engine's init writes the same NameKeys into it (Decision 2), unsynchronized"),
+    # (or with no initialiser, for an array) and filled from the generator later, in a separate init function,
+    # so the rule does not see them. Still process-wide NameKey caches by PLAN-023 Decision 2.
+    (GLOBAL, "", "re:buttonOkID|buttonCancelID|buttonMuteID|buttonUnMuteID|buttonPlayerID|parentID|staticTextPlayerID|staticTextSideID|staticTextTeamID|staticTextStatusID|radioButtonInGameID|radioButtonBuddiesID|winInGameID|winBuddiesID|winSoloID|s_replayObserverNameKey", "cached NameKeyType (a window/button ID key), declared `= NAMEKEY_INVALID` and filled from TheNameKeyGenerator by a later init call that every engine running that window runs, with the same value (Decision 2)"),
+    (GLOBAL, "", "re:ControlBar::(updateBuildQueueDisabledImages|populateBuildQueue)\\(.*\\)::buildQueueIDs", "cached NameKeyType array, declared empty and filled from TheNameKeyGenerator in the same function under an idsInitialized latch: process-wide by Decision 2, with the ID statics above"),
     (GLOBAL, "", "re:The(AsciiString|UnicodeString|Dma|MemoryPool|DebugLog)CriticalSection", "critical section, process-wide lock (PLAN-023 Phase 1)"),
     (GLOBAL, "", "re:TheMemoryPoolFactory|TheDynamicMemoryAllocator|theMainInitFlag|theMemoryManagerUsers(Mutex)?|\\(anonymous namespace\\)::TheProcessOperators(State)?", "refcounted process-wide memory manager (PLAN-023 Phase 1b, Decision 3)"),
     (GLOBAL, "", "TheVersion", "build version, identical for every engine"),
     (GLOBAL, "", "GlobalData::m_theOriginal", "empty stand-in: the value lives in EngineContext::originalGlobalData (Phase 1b)"),
-    (GLOBAL, "", "re:theEngineEmbeddedMode|theEngineHasFaulted|theReleaseCrashLogFile", "embedding host's fatal-error mode / sticky fault latch / release-crash log (PLAN-023 Phase 5 moves the log to per-engine output paths)"),
+    (GLOBAL, "", "theEngineEmbeddedMode", "embedding host's fatal-error mode: atomic (PLAN-023 Phase 5 moves the release-crash log to per-engine output paths)"),
+    (GLOBAL, "", "theReleaseCrashLogFile", "thread_local handle of the release-crash log being written: per thread by design (PLAN-023 Phase 5 moves the log to per-engine output paths)"),
+    (GLOBAL, "", "theEngineHasFaulted", "embedding host's sticky fault latch: atomic (PLAN-023 Phase 5 moves the release-crash log to per-engine output paths)"),
     (GLOBAL, "", "theInReleaseCrashNoReturn", "thread_local re-entry guard of ReleaseCrashNoReturn: per thread by design"),
     (GLOBAL, "", "re:TheSDL3Window|ApplicationHWnd", "the process's window (at most one rendering engine per process)"),
-    (GLOBAL, "", "re:__argc|__argv", "the process's argv (the executable's, set by rlgenerals' launcher; PLAN-023 Phase 5 BootConfig replaces it)"),
+    (GLOBAL, "", "re:__argc|__argv", "the process's argv (the executable's, set by rlgenerals' launcher; PLAN-023 Phase 5 BootConfig replaces it): boot/shutdown only, serialized by the host (only CommandLine's boot-time parse reads it)"),
     (GLOBAL, "", "re:critSec[1-5]|FilterSoftwareVulkanICDs\\(\\)::hw_icds", "the game executable's own (SDL3Main), unused by an embedding host"),
-    (GLOBAL, "", "re:rts::WorkingDirectory::\\w+", "the startup working directory (one per process)"),
+    (GLOBAL, "", "re:rts::WorkingDirectory::\\w+", "the startup working directory (one per process): boot/shutdown only, serialized by the host (CommandLine's boot-time parse writes and reads it)"),
     (GLOBAL, "", "re:rts::ClientInstance::\\w+", "the process's single-instance mutex"),
     (GLOBAL, "", "re:ReplaySimulation::s_\\w+", "the game executable's multi-replay simulation driver (-simReplay); an embedded engine never runs it"),
     (GLOBAL, "", "OurLanguage", "the installation's language, the same for every engine"),
     (GLOBAL, "", "re:GetRegistryLanguage\\(\\)::(once|val)", "the installation's language string: with RTS_ENGINE_CONTEXT written exactly once, under std::call_once, and never mutated afterwards (PLAN-023 Phase 4's process-global string rule); every engine reads the same install"),
     (GLOBAL, "", "UnicodeString::format_va(wchar_t const*, __va_list_tag*)::s_utf8_locale", "a UTF-8 locale handle, created once"),
-    (GLOBAL, "", "s_assetFallbackPath", "the install's asset fallback root, set once from the environment (PLAN-023 Phase 5 BootConfig)"),
+    (GLOBAL, "", "s_assetFallbackPath", "the install's asset fallback root: every engine's boot (StdBIGFileSystem::init) sets it, but setAssetRootPath writes only a change and the engines of a process share one install, so only the first boot writes while later engines' file lookups read it (PLAN-023 Phase 5b)"),
     (GLOBAL, "", "re:s_thread|s_done|s_hasUpdate|s_latestTag", "update checker (menus), one per process"),
     (GLOBAL, "", "re:thread_id_map(_mutex)?|next_thread_id", "pthread-to-Win32 thread id map (CompatLib), process-wide by nature"),
-    (GLOBAL, "", "GameSpyColor", "the online chat colors: every engine's boot parses them (INI's OnlineChatColors block) with the install's values, the same for every engine; only the online menus read them"),
-    (GLOBAL, "", "NGMP_OnlineServicesManager::getInstance()::instance", "the process's GeneralsOnline session, logged into from the online menus of the one UI engine: with RTS_ENGINE_CONTEXT only a non-headless engine initializes it (GameEngine::init) or shuts it down (~GameEngine), so a headless engine never touches the session"),
+    (CONST, "", "re:scoringBuilding(Create|Destroy)?Mask", "KindOf masks built once at static initialization by ScoreKeeper.cpp's makeScoringMask from constants; never written (PLAN-023 Phase 5b)"),
+    (CONST, "", "GameSpyColorDefaults", "the online chat colors' defaults (Chat.cpp), which each engine's GameSpyColor (a PER_ENGINE_STATIC, PLAN-023 Phase 5b) starts from; never written"),
+    (GLOBAL, "", "NGMP_OnlineServicesManager::getInstance()::instance", "the process's GeneralsOnline session, logged into from the online menus of the one UI engine: with RTS_ENGINE_CONTEXT only a non-headless engine calls getInstance() (GameEngine::init, every update, its menus and ~GameEngine; headless engines skip it), and there is at most one such engine per process, so no other engine touches the instance (PLAN-023 Phase 5b)"),
     (GLOBAL, "", "re:theLobbyFilter|isThreadHosting|NET_CRC_INTERVAL|MIN_LOGIC_FRAMES|MAX_FRAMES_AHEAD|MIN_RUNAHEAD|FRAME_DATA_LENGTH|FRAMES_TO_KEEP|commandsReadyDebugSpewage", NET),
     # Not the whole of GameNetwork/: GameInfo.cpp (skirmish setup), LANGameInfo.cpp, GameMessageParser.cpp and
     # NetworkUtil.cpp are reached without a network, so their statics are classified by name.
     (GLOBAL, "", "file:/GameNetwork/(GameSpy/|GeneralsOnline/|WOLBrowser/|GameSpy\\w*\\.cpp|LANAPI\\w*\\.cpp|NAT\\.cpp|FirewallHelper\\.cpp|Connection(Manager)?\\.cpp|DisconnectManager\\.cpp|Network\\.cpp|GUIUtil\\.cpp|Transport\\.cpp|udp\\.cpp|FileTransfer\\.cpp|DownloadManager\\.cpp|IPEnumeration\\.cpp|NetPacket\\w*\\.cpp|NetCommand\\w*\\.cpp|NetMessageStream\\.cpp|FrameData\\w*\\.cpp|FrameMetrics\\.cpp|User\\.cpp)", NET),
     (GLOBAL, "", "s_commandID", "network command ID counter (NetworkUtil GenerateNextCommandID): only networked games' NetCommandMsgs take IDs; " + NET),
     (GLOBAL, "", "file:/WWDownload/", "patch/map downloader (menus only), one per process"),
-    (PER, 4, "re:(Unicode|Ascii)StringToQuotedPrintable\\(.*\\)::dest|QuotedPrintableTo(Unicode|Ascii)String\\(.*\\)::dest", "threads only: conversion scratch, copied into the returned string at once; every engine's map cache load and save (INIMapCache, MapCache) reach it, headless too"),
     (GLOBAL, "", "re:Return_Buffer|Temp_Buffer", "password encryption for the online login menu: " + NET),
     (GLOBAL, "", "re:TheLobbyQueuedUTMs.*", "GameSpy lobby menu queue (menu state; one UI engine per process)"),
     (GLOBAL, "", "re:CPUDetectClass::\\w+|Windows9xVersionTable", "CPU/OS detection, done once per process at static initialization"),
@@ -258,7 +254,7 @@ HAND = [
     (RENDER, "", "re:W3DDisplay::draw\\(\\)::\\w+|s_filtered(Resolutions|Dirty)", "W3DDisplay::draw returns at once headless; resolution list for the options menu"),
     (RENDER, "", "re:W3DView::update\\(\\)::followFactor", "W3DView: headless has ViewDummy"),
     (RENDER, "", "re:SmudgeSet::m_freeSmudgeList", "heat-haze smudges, drawn only"),
-    (GLOBAL, "", "DX8Wrapper_IsWindowed", "the process's assert switch (Debug.cpp's ignoringAsserts): every headless engine's command line (parseHeadless) sets it false, so asserts stay off after TheGlobalData is gone too, and a rendering engine's DX8Wrapper::Set_Render_Device sets its windowed flag; the last writer wins, and while embedded mode is on, only assert handling (debug builds) reads it"),
+    (GLOBAL, "", "DX8Wrapper_IsWindowed", "the process's assert switch (Debug.cpp's ignoringAsserts): every headless engine's command line (parseHeadless) sets it false, and a rendering engine's DX8Wrapper::Init (false) and Set_Render_Device (the device's windowed flag) write it too, so it holds the last writer's value, not a fixed one; a std::atomic, since boots write it while other engines' assert paths read it (PLAN-023 Phase 5b)"),
     (RENDER, "", "file:/W3DDevice/GameClient/(Shadow|Water)/", W3D_RENDER),
     (RENDER, "", "file:W3DShaderManager\\.cpp|W3DMouse\\.cpp|W3DScene\\.cpp|W3DShroud\\.cpp|W3DStatusCircle\\.cpp|W3DTreeBuffer\\.cpp|FlatHeightMap\\.cpp|HeightMap\\.cpp|BaseHeightMap\\.cpp|W3DGhostObject\\.cpp|Win32Mouse\\.cpp", W3D_RENDER),
     # Only device-only WW3D2 files: mesh, meshmdl, meshgeometry, rendobj, texture, ww3d, dx8renderer,

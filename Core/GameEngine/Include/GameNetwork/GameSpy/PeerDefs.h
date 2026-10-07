@@ -155,7 +155,15 @@ enum GameSpyColors CPP_11(: Int) {
 	GSCOLOR_MAX
 };
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 28/09/2026 Per engine (PLAN-023 Phase 5b): every engine's boot parses its INI's
+// OnlineChatColors block into these, which would race with the one online engine's menus reading them once
+// engines boot while others run. Each engine's starts from the defaults in Chat.cpp.
+extern rts::PerEngineStatic<Color[GSCOLOR_MAX]> GameSpyColor_perEngine;
+#define GameSpyColor (GameSpyColor_perEngine.get())
+#else
 extern Color GameSpyColor[GSCOLOR_MAX];
+#endif
 
 enum GameSpyBuddyStatus CPP_11(: Int) {
 	BUDDY_OFFLINE,
