@@ -370,7 +370,9 @@ const ThingTemplate *MapObject::getThingTemplate() const
 
 /* ********* WorldHeightMap class ****************************/
 
+#if !RTS_ENGINE_CONTEXT
 TileData *WorldHeightMap::m_alphaTiles[NUM_ALPHA_TILES]={0};
+#endif
 
 //
 // WorldHeightMap destructor .

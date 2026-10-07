@@ -420,7 +420,13 @@ protected:
 	** The 3d asset manager is a singleton, there should be only
 	** one and it is accessible through Get_Instance()
 	*/
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 28/09/2026 One asset manager per engine (an EngineContext field): the
+	// loaders read bones and meshes through it headless too (PLAN-023 Phase 3). The uses are unchanged.
+	static constexpr rts::ContextField<WW3DAssetManager*, &rts::EngineContext::ww3dAssetManager> TheInstance{};
+#else
 	static WW3DAssetManager *		TheInstance;
+#endif
 
 	/*
 	** the iterator classes are friends

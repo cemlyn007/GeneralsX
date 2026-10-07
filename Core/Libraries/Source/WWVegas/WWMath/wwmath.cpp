@@ -48,8 +48,28 @@ float _FastAsinTable[ARC_TABLE_SIZE];
 float _FastSinTable[SIN_TABLE_SIZE];
 float _FastInvSinTable[SIN_TABLE_SIZE];
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 28/09/2026 Init and Shutdown are counted: every engine calls them, and a
+// second Init would add a second default lookup table and rewrite the _Fast* tables other engines are
+// reading. The first Init builds the tables (the same values every time) and the last Shutdown frees the
+// lookup tables (PLAN-023 Phase 3). Each engine holds at most one count (EngineContext::wwMathInitialized),
+// so an unpaired Shutdown (W3DDisplay's failed init, then its destructor) cannot release another engine's.
+#include <mutex>
+static std::mutex WWMathInitMutex;
+static int WWMathInitCount = 0;
+#endif
+
 void		WWMath::Init()
 {
+#if RTS_ENGINE_CONTEXT
+	std::lock_guard<std::mutex> lock(WWMathInitMutex);
+	rts::EngineContext* context = rts::ctx();
+	if (context->wwMathInitialized)
+		return;
+	context->wwMathInitialized = true;
+	if (WWMathInitCount++ > 0)
+		return;
+#endif
 	LookupTableMgrClass::Init();
 
 	int a=0;
@@ -73,6 +93,15 @@ void		WWMath::Init()
 
 void		WWMath::Shutdown()
 {
+#if RTS_ENGINE_CONTEXT
+	std::lock_guard<std::mutex> lock(WWMathInitMutex);
+	rts::EngineContext* context = rts::ctx();
+	if (!context->wwMathInitialized)
+		return;
+	context->wwMathInitialized = false;
+	if (--WWMathInitCount > 0)
+		return;
+#endif
 	LookupTableMgrClass::Shutdown();
 }
 

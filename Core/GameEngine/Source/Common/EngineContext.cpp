@@ -24,7 +24,10 @@
 
 #include "Common/EngineContext.h"
 
+#include <algorithm>
 #include <atomic>
+#include <cstdio>
+#include <cstring>
 #include <vector>
 
 namespace rts
@@ -57,11 +60,42 @@ struct EngineSlotTable
 	std::vector<Owned> inCreationOrder;
 };
 
+#ifdef DEBUG_CRASHING
+namespace
+{
+// Appends each live field's name to a bounded, comma-separated list (for the ~EngineContext assert).
+struct LiveFieldNames
+{
+	char text[512] = "";
+	std::size_t length = 0;
+};
+
+void appendLiveFieldName(const char* name, void* user)
+{
+	LiveFieldNames& names = *static_cast<LiveFieldNames*>(user);
+	const std::size_t room = sizeof(names.text) - names.length;
+	if (room <= 1)
+		return;
+	const int written = std::snprintf(names.text + names.length, room, "%s%s", names.length == 0 ? "" : ", ", name);
+	if (written > 0)
+		names.length += std::min<std::size_t>((std::size_t)written, room - 1);
+}
+}
+#endif
+
 EngineContext::~EngineContext()
 {
-	DEBUG_ASSERTCRASH(this == &g_noEngine || (countLiveSingletons() == 0 && originalGlobalData == nullptr),
-		("EngineContext destroyed with %u live singletons: its engine was not shut down, or its shutdown left some",
-		(unsigned)countLiveSingletons()));
+#ifdef DEBUG_CRASHING
+	if (this != &g_noEngine && (countLiveSingletons() != 0 || originalGlobalData != nullptr || wwMathInitialized))
+	{
+		LiveFieldNames names;
+		const std::size_t live = forEachLiveSingleton(&appendLiveFieldName, &names);
+		DEBUG_CRASH(("EngineContext destroyed before its engine was shut down, or its shutdown left state: "
+			"%u live singleton/pointer fields (%s), originalGlobalData %s, wwMathInitialized %s",
+			(unsigned)live, live != 0 ? names.text : "none", originalGlobalData != nullptr ? "set" : "null",
+			wwMathInitialized ? "true" : "false"));
+	}
+#endif
 	DEBUG_ASSERTCRASH(this == &g_noEngine || noEngineIsPristine(), ("g_noEngine was written: engine state leaked outside every Scope"));
 
 	destroySlots();
@@ -75,15 +109,16 @@ void EngineContext::destroySlots()
 	// A slot object's destructor may read engine state, which must be this engine's.
 	Scope scope(this);
 
-	// A slot object's destructor may read another slot (or create one), so destroy them newest first and
-	// clear each before its destructor runs.
+	// A slot object's destructor may read another slot (or create one), so destroy them newest first. A
+	// slot stays set while its own destructor runs, so a destructor that reaches its own static finds the
+	// object being destroyed, not a fresh one; it is cleared once the destructor returns.
 	while (!m_slots->inCreationOrder.empty())
 	{
 		EngineSlotTable::Owned owned = m_slots->inCreationOrder.back();
 		m_slots->inCreationOrder.pop_back();
-		m_slots->byIndex[owned.index] = nullptr;
 		if (owned.destroy != nullptr)
 			owned.destroy(owned.object);
+		m_slots->byIndex[owned.index] = nullptr;
 	}
 	delete m_slots;
 	m_slots = nullptr;
@@ -129,13 +164,31 @@ std::size_t EngineContext::forEachLiveSingleton(void (*visit)(const char* name, 
 #undef RTS_ENGINE_SINGLETON
 #undef RTS_ENGINE_SINGLETON_STRUCT
 #undef RTS_ENGINE_SINGLETON_ZH
+	// The direct pointer fields, which the engine's teardown frees and nulls just as it does the singletons.
+#define RTS_ENGINE_CONTEXT_POINTER(T, n) if (n != nullptr) { ++live; visit(#n, user); }
+#define RTS_ENGINE_CONTEXT_VALUE(T, n, init)
+#include "Common/EngineContextFields.inl"
+#undef RTS_ENGINE_CONTEXT_POINTER
+#undef RTS_ENGINE_CONTEXT_VALUE
 	return live;
 }
 
 bool noEngineIsPristine()
 {
-	return g_noEngine.countLiveSingletons() == 0 && !g_noEngine.engineTearingDown && !g_noEngine.nameKeysFrozen
-		&& g_noEngine.originalGlobalData == nullptr && !g_noEngine.hasSlotObjects();
+	if (g_noEngine.countLiveSingletons() != 0 || g_noEngine.originalGlobalData != nullptr || g_noEngine.hasSlotObjects())
+		return false;
+	// Every value field still has its initial value, the seeds included: a write outside every Scope (a
+	// host callback, a parked engine's leftover call) is engine state leaking into the no-engine context.
+#define RTS_ENGINE_CONTEXT_POINTER(T, n)
+#define RTS_ENGINE_CONTEXT_VALUE(T, n, init) if (!(g_noEngine.n == (init))) return false;
+#include "Common/EngineContextFields.inl"
+#undef RTS_ENGINE_CONTEXT_POINTER
+#undef RTS_ENGINE_CONTEXT_VALUE
+	static const std::uint32_t initialSeed[6] = RTS_RANDOM_SEED_INITIAL_VALUES;
+	return std::memcmp(g_noEngine.gameAudioSeed, initialSeed, sizeof(initialSeed)) == 0
+		&& std::memcmp(g_noEngine.gameClientSeed, initialSeed, sizeof(initialSeed)) == 0
+		&& std::memcmp(g_noEngine.gameLogicSeed, initialSeed, sizeof(initialSeed)) == 0
+		&& g_noEngine.gameLogicBaseSeed == 0;
 }
 
 } // namespace rts

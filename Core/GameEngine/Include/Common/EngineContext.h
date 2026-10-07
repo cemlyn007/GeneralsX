@@ -59,6 +59,8 @@
 #include <type_traits>
 #include <utility>
 
+#include "RandomValueSeeds.h"
+
 // initial-exec TLS: one 8-byte pointer in the static TLS block, read with a single %fs-relative load and no
 // __tls_get_addr call. ELF only; Mach-O has only the TLV model, and Windows its own implicit TLS.
 #if defined(__ELF__)
@@ -88,6 +90,11 @@ class PathfindCellInfo;
 class PolygonTrigger;
 class MapObject;
 class PartitionContactList;
+class RTS3DScene;
+class RTS2DScene;
+class RTS3DInterfaceScene;
+class W3DAssetManager;
+class WW3DAssetManager;
 
 namespace rts
 {
@@ -123,14 +130,13 @@ struct RTS_ENGINE_CONTEXT_API EngineContext
 #undef RTS_ENGINE_SINGLETON_STRUCT
 #undef RTS_ENGINE_SINGLETON_ZH
 
-	// Set while this engine is being torn down (GameEngine's destructor onwards), cleared when a
-	// GameEngine is constructed in it. Fatal errors raised in that window do not throw (see
-	// FatalEngineError.h).
-	bool engineTearingDown = false;
-
-	// Set while this engine boots from names another engine primed, until its upgrades are loaded: it
-	// must intern no new NameKey then (NameKeyGenerator::PrimingLatch, PLAN-023 Decision 2).
-	bool nameKeysFrozen = false;
+	// The direct fields that are not seeds (the engine's teardown flags, the pathfinder pool, the map and
+	// partition lists, W3D's scenes, asset managers and clocks, ...), from EngineContextFields.inl.
+#define RTS_ENGINE_CONTEXT_POINTER(T, n) ::T* n = nullptr;
+#define RTS_ENGINE_CONTEXT_VALUE(T, n, init) T n = init;
+#include "EngineContextFields.inl"
+#undef RTS_ENGINE_CONTEXT_POINTER
+#undef RTS_ENGINE_CONTEXT_VALUE
 
 	// GlobalData::m_theOriginal, this engine's GlobalData with no overrides (Zero Hour; see GlobalData.h).
 	// GlobalData nulls it when that instance is deleted.
@@ -140,42 +146,10 @@ struct RTS_ENGINE_CONTEXT_API EngineContext
 	// lookup (PLAN-023 Phases 2-3).
 
 	// RandomValue.cpp's seeds (theGameAudioSeed, ...), with their upstream initial values.
-	std::uint32_t gameAudioSeed[6] = {0xf22d0e56U, 0x883126e9U, 0xc624dd2fU, 0x702c49cU, 0x9e353f7dU, 0x6fdf3b64U};
-	std::uint32_t gameClientSeed[6] = {0xf22d0e56U, 0x883126e9U, 0xc624dd2fU, 0x702c49cU, 0x9e353f7dU, 0x6fdf3b64U};
-	std::uint32_t gameLogicSeed[6] = {0xf22d0e56U, 0x883126e9U, 0xc624dd2fU, 0x702c49cU, 0x9e353f7dU, 0x6fdf3b64U};
+	std::uint32_t gameAudioSeed[6] = RTS_RANDOM_SEED_INITIAL_VALUES;
+	std::uint32_t gameClientSeed[6] = RTS_RANDOM_SEED_INITIAL_VALUES;
+	std::uint32_t gameLogicSeed[6] = RTS_RANDOM_SEED_INITIAL_VALUES;
 	std::uint32_t gameLogicBaseSeed = 0;
-
-	// PathfindCellInfo::s_infoArray/s_firstFree: the pathfinder's cell-info pool and its free list
-	// (AIPathfind.cpp), made and freed by this engine's Pathfinder.
-	::PathfindCellInfo* pathfindCellInfoArray = nullptr;
-	::PathfindCellInfo* pathfindCellInfoFirstFree = nullptr;
-
-	// AIPathfind.cpp's RETAIL_COMPATIBLE_PATHFINDING s_useFixedPathfinding/s_forceCleanCells: set when
-	// this engine's own cell-info pool (above) runs out, so a RETAIL_COMPATIBLE_PATHFINDING build's
-	// pool-exhaustion fallback stays this engine's own and never force-cleans another engine's healthy
-	// pool. Unused outside that build option, but kept unconditional (two bools) rather than guarded on
-	// it, since this header is not where RETAIL_COMPATIBLE_PATHFINDING is defined.
-	bool pathfindUseFixedPathfinding = false;
-	bool pathfindForceCleanCells = false;
-
-	// PolygonTrigger::ThePolygonTriggerListPtr/s_currentID: the map's trigger areas, walked on every
-	// object's cell change, and the next trigger ID.
-	::PolygonTrigger* polygonTriggerList = nullptr;
-	std::int32_t polygonTriggerCurrentID = 1;
-
-	// MapObject::TheMapObjectListPtr: the map objects of the last map this engine read.
-	::MapObject* mapObjectList = nullptr;
-
-	// PartitionManager.cpp's TheContactList (the contact list of the partition update in progress) and
-	// getClosestObjects()'s iteration stamp (nonzero).
-	::PartitionContactList* partitionContactList = nullptr;
-	std::int32_t partitionIterFlag = 1;
-
-	// ScriptList::m_curId: the last script ID handed out.
-	std::int32_t scriptListCurId = 0;
-
-	// REPLAY_CRC_INTERVAL (Recorder.cpp): the logic CRC interval of a solo game or replay.
-	std::int32_t replayCrcInterval = 100;
 
 	// Per-engine slot objects, by allocateEngineSlotIndex() index; null until set.
 	void* getSlot(std::size_t index) const;
@@ -187,10 +161,11 @@ struct RTS_ENGINE_CONTEXT_API EngineContext
 	// Whether this context holds any slot object (for the lifecycle checks: g_noEngine must hold none).
 	bool hasSlotObjects() const;
 
-	// The number of singleton fields that are not null (for the lifecycle checks).
+	// The number of singleton fields and direct pointer fields (pathfindCellInfoArray, ...) that are not
+	// null (for the lifecycle checks).
 	std::size_t countLiveSingletons() const;
-	// Calls `visit` with the name (`TheXxx`) of every singleton field that is not null, in list order,
-	// and returns how many there were.
+	// Calls `visit` with the name (`TheXxx`, or the field's name for a direct pointer field) of every such
+	// field that is not null, singletons first in list order, and returns how many there were.
 	std::size_t forEachLiveSingleton(void (*visit)(const char* name, void* user), void* user) const;
 
 private:
@@ -209,8 +184,8 @@ inline EngineContext* ctx() noexcept
 	return t_engine;
 }
 
-// True when g_noEngine still has every singleton null and no slot object (nothing assigned one, or used a
-// PerEngineStatic, outside a Scope).
+// True when g_noEngine still has every singleton and direct field at its initial value and no slot object
+// (nothing assigned one, or used a PerEngineStatic, outside a Scope).
 RTS_ENGINE_CONTEXT_API bool noEngineIsPristine();
 
 // Makes `context` the current context for its lifetime, then restores the previous one. Scopes nest.
@@ -312,6 +287,17 @@ struct ContextField
 	T operator++(int) const noexcept
 	{
 		return (ctx()->*Field)++;
+	}
+	// Compound assignment needs members: a built-in `+=` takes no user-defined conversion of its left operand.
+	template <typename U>
+	T& operator+=(const U& value) const noexcept
+	{
+		return ctx()->*Field += value;
+	}
+	template <typename U>
+	T& operator-=(const U& value) const noexcept
+	{
+		return ctx()->*Field -= value;
 	}
 };
 

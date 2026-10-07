@@ -872,7 +872,7 @@ static void latchEngineFault()
 
 // GeneralsX @bugfix cemlyn007 28/09/2026 Whether this thread is inside ReleaseCrashNoReturn, which
 // reports a ReleaseCrash that returned itself (see throwWithoutGlobalData).
-static thread_local bool theInReleaseCrashNoReturn = false;
+static THREAD_LOCAL bool theInReleaseCrashNoReturn = false;
 
 // Embedded mode with no TheGlobalData: latch the fault, then throw, unless that would end the process
 // through std::terminate (the engine is being torn down, or another exception is already propagating).

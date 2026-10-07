@@ -354,6 +354,15 @@ private:
 	static void					Allocate_Debug_Resources();
 	static void					Release_Debug_Resources();
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 28/09/2026 The timing statics are per engine (EngineContext fields, with
+	// the same initial values): each engine's animation clock advances with its own frames only (PLAN-023
+	// Phase 3). The uses are unchanged.
+	static constexpr rts::ContextField<float, &rts::EngineContext::ww3dLogicFrameTimeMs> LogicFrameTimeMs{};
+	static constexpr rts::ContextField<float, &rts::EngineContext::ww3dFractionalSyncMs> FractionalSyncMs{};
+	static constexpr rts::ContextField<unsigned int, &rts::EngineContext::ww3dSyncTime> SyncTime{};
+	static constexpr rts::ContextField<unsigned int, &rts::EngineContext::ww3dPreviousSyncTime> PreviousSyncTime{};
+#else
 	// Logic frame time, in milliseconds
 	static float LogicFrameTimeMs;
 
@@ -371,6 +380,7 @@ private:
 	// application sets sync time at the start of every frame, this represents
 	// the frame interval.
 	static unsigned int PreviousSyncTime;
+#endif
 
 	static float						PixelCenterX;
 	static float						PixelCenterY;
@@ -395,7 +405,11 @@ private:
 	static FrameGrabClass *			Movie;
 	static bool							PauseRecord;
 	static bool							RecordNextFrame;
+#if RTS_ENGINE_CONTEXT
+	static constexpr rts::ContextField<int, &rts::EngineContext::ww3dFrameCount> FrameCount{};
+#else
 	static int							FrameCount;
+#endif
 
 	static VertexMaterialClass *	DefaultDebugMaterial;
 	static VertexMaterialClass *	BackfaceDebugMaterial;
