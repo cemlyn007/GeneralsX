@@ -172,6 +172,41 @@ class LODHeap {
 		}
 };
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 30/09/2026 Per engine: the optimiser's objects (each holding a reference) and cost,
+// gathered and consumed within one frame of the engine's scene, and its heap arrays (PLAN-023 Phase 8, stage RR2b).
+namespace
+{
+struct PredictiveLODOptimizerState
+{
+	RenderObjClass** ObjectArray = nullptr;
+	int ArraySize = 0;
+	int NumObjects = 0;
+	float TotalCost = 0.0f;
+	LODHeapNode* VisibleObjArray1 = nullptr;
+	LODHeapNode* VisibleObjArray2 = nullptr;
+	int VisibleObjArraySize = 0;
+};
+rts::PerEngineStatic<PredictiveLODOptimizerState> PredictiveLODOptimizerState_perEngine;
+} // namespace
+#define ObjectArray (PredictiveLODOptimizerState_perEngine.get().ObjectArray)
+#define ArraySize (PredictiveLODOptimizerState_perEngine.get().ArraySize)
+#define NumObjects (PredictiveLODOptimizerState_perEngine.get().NumObjects)
+#define TotalCost (PredictiveLODOptimizerState_perEngine.get().TotalCost)
+#define VisibleObjArray1 (PredictiveLODOptimizerState_perEngine.get().VisibleObjArray1)
+#define VisibleObjArray2 (PredictiveLODOptimizerState_perEngine.get().VisibleObjArray2)
+#define VisibleObjArraySize (PredictiveLODOptimizerState_perEngine.get().VisibleObjArraySize)
+
+void PredictiveLODOptimizerClass::Add_Cost(float cost)
+{
+	TotalCost += cost;
+}
+
+float PredictiveLODOptimizerClass::Get_Total_Cost()
+{
+	return TotalCost;
+}
+#else
 // Static PredictiveLODOptimizerClass data members:
 RenderObjClass **	PredictiveLODOptimizerClass::ObjectArray = nullptr;
 int					PredictiveLODOptimizerClass::ArraySize = 0;
@@ -180,6 +215,7 @@ float					PredictiveLODOptimizerClass::TotalCost = 0.0f;
 LODHeapNode *		PredictiveLODOptimizerClass::VisibleObjArray1;
 LODHeapNode	*		PredictiveLODOptimizerClass::VisibleObjArray2;
 int					PredictiveLODOptimizerClass::VisibleObjArraySize;
+#endif
 
 
 /**************************************************************************

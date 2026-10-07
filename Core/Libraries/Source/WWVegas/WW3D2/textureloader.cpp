@@ -59,9 +59,14 @@
 #include "ddsfile.h"
 #include "bitmaphandler.h"
 #include "WWDebug/wwprofile.h"
+#if RTS_ENGINE_CONTEXT
+#include <optional>
+#endif
 
+#if !RTS_ENGINE_CONTEXT
 bool TextureLoader::TextureLoadSuspended;
 int TextureLoader::TextureInactiveOverrideTime = 0;
+#endif
 
 #define USE_MANAGED_TEXTURES
 
@@ -217,12 +222,77 @@ static FastCriticalSectionClass					_BackgroundCriticalSection;
 
 // Lists
 
+#if RTS_ENGINE_CONTEXT
+#if !defined(_UNIX)
+// The queues below are reached through the current engine's slot table, which the loader thread would read while
+// the owning engine's thread can grow it; and that thread serves only the engine that started it.
+#error "RTS_ENGINE_CONTEXT needs a platform where ThreadClass::Execute starts no loader thread (see TextureLoaderState)."
+#endif
+// GeneralsX @feature cemlyn007 30/09/2026 Per engine (PLAN-023 Phase 8, stage RR2b): the load queues, the free lists
+// of load tasks, and the suspend switch and inactive-texture time, so that each engine loads, recycles and retires
+// only its own textures and one engine's TextureLoader::Deinit (Delete_Free_Pool) cannot free another's tasks. The
+// locks above stay process-wide, but are no longer held across a synchronous load: on Unix no loader thread runs
+// (ThreadClass::Execute returns at once), so an engine's queues and tasks are only ever touched by the thread
+// stepping that engine, and a lock held across a load would only stall every other engine's loads.
+namespace
+{
+struct TextureLoaderState
+{
+	SynchronizedTextureLoadTaskListClass _ForegroundQueue;
+	SynchronizedTextureLoadTaskListClass _BackgroundQueue;
+
+	TextureLoadTaskListClass _TexLoadFreeList;
+	TextureLoadTaskListClass _CubeTexLoadFreeList;
+	TextureLoadTaskListClass _VolTexLoadFreeList;
+
+	bool TextureLoadSuspended = false;
+	int TextureInactiveOverrideTime = 0;
+
+	// A headless engine's texture constructors may make load tasks too, which only a render engine's
+	// TextureLoader::Deinit would otherwise retire: free what is left with the engine. A task that has begun
+	// loading holds a device texture and surfaces that need the device to release, so it is only unlinked.
+	~TextureLoaderState()
+	{
+		Delete_Load_Tasks(_TexLoadFreeList);
+		Delete_Load_Tasks(_CubeTexLoadFreeList);
+		Delete_Load_Tasks(_VolTexLoadFreeList);
+		Delete_Queued_Tasks(_ForegroundQueue);
+		Delete_Queued_Tasks(_BackgroundQueue);
+	}
+
+	static void Delete_Load_Tasks(TextureLoadTaskListClass& list)
+	{
+		while (TextureLoadTaskClass* task = list.Pop_Front()) {
+			delete task;
+		}
+	}
+
+	static void Delete_Queued_Tasks(TextureLoadTaskListClass& list)
+	{
+		while (TextureLoadTaskClass* task = list.Pop_Front()) {
+			if (task->Get_State() == TextureLoadTaskClass::STATE_NONE) {
+				delete task;
+			}
+		}
+	}
+};
+rts::PerEngineStatic<TextureLoaderState> TextureLoaderState_perEngine;
+} // namespace
+#define _ForegroundQueue (TextureLoaderState_perEngine.get()._ForegroundQueue)
+#define _BackgroundQueue (TextureLoaderState_perEngine.get()._BackgroundQueue)
+#define _TexLoadFreeList (TextureLoaderState_perEngine.get()._TexLoadFreeList)
+#define _CubeTexLoadFreeList (TextureLoaderState_perEngine.get()._CubeTexLoadFreeList)
+#define _VolTexLoadFreeList (TextureLoaderState_perEngine.get()._VolTexLoadFreeList)
+#define TextureLoadSuspended (TextureLoaderState_perEngine.get().TextureLoadSuspended)
+#define TextureInactiveOverrideTime (TextureLoaderState_perEngine.get().TextureInactiveOverrideTime)
+#else
 static SynchronizedTextureLoadTaskListClass	_ForegroundQueue;
 static SynchronizedTextureLoadTaskListClass	_BackgroundQueue;
 
 static TextureLoadTaskListClass					_TexLoadFreeList;
 static TextureLoadTaskListClass					_CubeTexLoadFreeList;
 static TextureLoadTaskListClass					_VolTexLoadFreeList;
+#endif
 
 
 // The background texture loading thread.
@@ -331,12 +401,28 @@ void TextureLoader::Init()
 
 void TextureLoader::Deinit()
 {
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 30/09/2026 The background lock only for stopping the loader thread: the
+	// thumbnail managers and the free lists are this engine's (PLAN-023 Phase 8, stage RR2b).
+	{
+		FastCriticalSectionClass::LockClass lock(_BackgroundCriticalSection);
+		_TextureLoadThread.Stop();
+	}
+#else
 	FastCriticalSectionClass::LockClass lock(_BackgroundCriticalSection);
 	_TextureLoadThread.Stop();
+#endif
 
 	ThumbnailManagerClass::Deinit();
 	TextureLoadTaskClass::Delete_Free_Pool();
 }
+
+#if RTS_ENGINE_CONTEXT
+void TextureLoader::Set_Texture_Inactive_Override_Time(int time_ms)
+{
+	TextureInactiveOverrideTime = time_ms;
+}
+#endif
 
 
 bool TextureLoader::Is_DX8_Thread()
@@ -659,7 +745,11 @@ void TextureLoader::Request_Thumbnail(TextureBaseClass *tc)
 	// Grab the foreground lock. This prevents the foreground thread
 	// from retiring any tasks related to this texture. It also
 	// serializes calls to Request_Thumbnail from multiple threads.
+#if RTS_ENGINE_CONTEXT
+	std::optional<FastCriticalSectionClass::LockClass> lock(std::in_place, _ForegroundCriticalSection);
+#else
 	FastCriticalSectionClass::LockClass lock(_ForegroundCriticalSection);
+#endif
 
 	// Has a Direct3D texture already been loaded?
 	if (tc->Peek_D3D_Base_Texture()) {
@@ -669,6 +759,16 @@ void TextureLoader::Request_Thumbnail(TextureBaseClass *tc)
 	TextureLoadTaskClass *task = tc->ThumbnailLoadTask;
 
 	if (Is_DX8_Thread()) {
+#if RTS_ENGINE_CONTEXT
+		// GeneralsX @feature cemlyn007 30/09/2026 Not under the process-wide foreground lock: clear any pending
+		// thumbnail load first, then load it (PLAN-023 Phase 8, stage RR2b; see TextureLoaderState).
+		if (task) {
+			_ForegroundQueue.Remove(task);
+			task->Destroy();
+		}
+		lock.reset();
+		TextureLoader::Load_Thumbnail(tc);
+#else
 		// load the thumbnail immediately
 		TextureLoader::Load_Thumbnail(tc);
 
@@ -677,6 +777,7 @@ void TextureLoader::Request_Thumbnail(TextureBaseClass *tc)
 			_ForegroundQueue.Remove(task);
 			task->Destroy();
 		}
+#endif
 
 	} else {
 		TextureLoadTaskClass *load_task = tc->TextureLoadTask;
@@ -702,7 +803,11 @@ void TextureLoader::Request_Background_Loading(TextureBaseClass *tc)
 	// from retiring any tasks related to this texture. It also
 	// serializes calls to Request_Background_Loading from other
 	// threads.
+#if RTS_ENGINE_CONTEXT
+	std::optional<FastCriticalSectionClass::LockClass> foreground_lock(std::in_place, _ForegroundCriticalSection);
+#else
 	FastCriticalSectionClass::LockClass foreground_lock(_ForegroundCriticalSection);
+#endif
 
 	// Has the texture already been loaded?
 	if (tc->Is_Initialized()) {
@@ -719,6 +824,9 @@ void TextureLoader::Request_Background_Loading(TextureBaseClass *tc)
 	task = TextureLoadTaskClass::Create(tc, TextureLoadTaskClass::TASK_LOAD, TextureLoadTaskClass::PRIORITY_LOW);
 
 	if (Is_DX8_Thread()) {
+#if RTS_ENGINE_CONTEXT
+		foreground_lock.reset(); // GeneralsX @feature cemlyn007 30/09/2026 not held across the load (RR2b)
+#endif
 		Begin_Load_And_Queue(task);
 	} else {
 		_ForegroundQueue.Push_Back(task);
@@ -733,7 +841,11 @@ void TextureLoader::Request_Foreground_Loading(TextureBaseClass *tc)
 	// from retiring the load tasks for this texture. It also
 	// serializes calls to Request_Foreground_Loading from other
 	// threads.
+#if RTS_ENGINE_CONTEXT
+	std::optional<FastCriticalSectionClass::LockClass> foreground_lock(std::in_place, _ForegroundCriticalSection);
+#else
 	FastCriticalSectionClass::LockClass foreground_lock(_ForegroundCriticalSection);
+#endif
 
 	// Has the texture already been loaded?
 	if (tc->Is_Initialized()) {
@@ -770,6 +882,9 @@ void TextureLoader::Request_Foreground_Loading(TextureBaseClass *tc)
 			task = TextureLoadTaskClass::Create(tc, TextureLoadTaskClass::TASK_LOAD, TextureLoadTaskClass::PRIORITY_HIGH);
 		}
 
+#if RTS_ENGINE_CONTEXT
+		foreground_lock.reset(); // GeneralsX @feature cemlyn007 30/09/2026 not held across the load (RR2b)
+#endif
 		// finish loading the task and destroy it.
 		task->Finish_Load();
 		task->Destroy();
@@ -878,14 +993,27 @@ void TextureLoader::Update(void (*network_callback)())
 		return;
 	}
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 30/09/2026 The foreground lock only while taking each task, not across its load:
+	// only this engine's thread touches its queue and tasks (PLAN-023 Phase 8, stage RR2b; see TextureLoaderState).
+	auto pop_foreground_task = []() {
+		FastCriticalSectionClass::LockClass lock(_ForegroundCriticalSection);
+		return _ForegroundQueue.Pop_Front();
+	};
+#else
 	// grab foreground lock to prevent any other thread from
 	// modifying texture tasks.
 	FastCriticalSectionClass::LockClass lock(_ForegroundCriticalSection);
+#endif
 
 	unsigned long time = timeGetTime();
 
 	// while we have tasks on the foreground queue
+#if RTS_ENGINE_CONTEXT
+	while (TextureLoadTaskClass *task = pop_foreground_task()) {
+#else
 	while (TextureLoadTaskClass *task = _ForegroundQueue.Pop_Front()) {
+#endif
 		UPDATE_NETWORK;
 		// dispatch to proper task handler
 		switch (task->Get_Type()) {

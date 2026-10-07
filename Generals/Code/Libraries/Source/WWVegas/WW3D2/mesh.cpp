@@ -769,6 +769,13 @@ void MeshClass::Render(RenderInfoClass & rinfo)
 }
 
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 30/09/2026 Per engine: Render_Material_Pass's polygon scratch, filled and consumed
+// within one pass. A file static, so that its slot is taken at static initialisation, not at the first draw (PLAN-023
+// Phase 8, stage RR2b).
+static rts::PerEngineStatic<SimpleDynVecClass<uint32> > Render_Material_Pass_temp_apt_perEngine;
+#endif
+
 /***********************************************************************************************
  * MeshClass::Render_Material_Pass -- Render a procedural material pass for this mesh          *
  *                                                                                             *
@@ -844,7 +851,11 @@ void MeshClass::Render_Material_Pass(MaterialPassClass * pass,IndexBufferClass *
 		/*
 		** Generate the APT
 		*/
+#if RTS_ENGINE_CONTEXT
+		SimpleDynVecClass<uint32>& temp_apt = Render_Material_Pass_temp_apt_perEngine.get();
+#else
 		static SimpleDynVecClass<uint32> temp_apt;
+#endif
 		temp_apt.Delete_All(false);
 
 		Matrix3D modeltminv;

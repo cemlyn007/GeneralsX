@@ -130,7 +130,14 @@ static unsigned MeshDebugIdCount;
 #endif
 
 bool MeshClass::Legacy_Meshes_Fogged = true;
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 30/09/2026 Per engine: the decal polygon scratch, filled and consumed
+// within one decal or projection (PLAN-023 Phase 8, stage RR2b).
+static rts::PerEngineStatic<SimpleDynVecClass<uint32>> temp_apt_perEngine;
+#define temp_apt (temp_apt_perEngine.get())
+#else
 static SimpleDynVecClass<uint32> temp_apt;
+#endif
 
 /*
 ** This #define causes the collision code to always recompute the triangle normals rather

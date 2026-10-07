@@ -706,8 +706,9 @@ protected:
 	static RenderInfoClass*				Render_Info;
 
 	// Allocates this engine's W3DRenderState and WW3DState if it has none (WW3D::Init, Init,
-	// Set_Display_Size_Provider); Destroy_Render_State frees both (the end of WW3D::Shutdown, RR2a-2).
-	static void Create_Render_State();
+	// Set_Display_Size_Provider); Destroy_Render_State frees both (the end of WW3D::Shutdown, RR2a-2, or of
+	// Shutdown when WW3D::Init never took them: RR2b). WW3D::Init passes ownedByWW3D.
+	static void Create_Render_State(bool ownedByWW3D = false);
 	static void Destroy_Render_State();
 	// GeneralsX @bugfix cemlyn007 02/10/2026 Frees this engine's W3DRenderState if it has one, without
 	// touching any device or interface: Init's failure returns, which never create a device.

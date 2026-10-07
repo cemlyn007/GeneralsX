@@ -59,14 +59,23 @@ class PredictiveLODOptimizerClass {
 
 		static void		Clear();
 		static void		Add_Object(RenderObjClass *robj);
+#if RTS_ENGINE_CONTEXT
+		// GeneralsX @feature cemlyn007 30/09/2026 Out of line: the optimiser's state is per engine (predlod.cpp;
+		// PLAN-023 Phase 8, stage RR2b).
+		static void		Add_Cost(float cost);
+		static void		Optimize_LODs(float max_cost);
+		static float	Get_Total_Cost();
+#else
 		static void		Add_Cost(float cost)								{ TotalCost += cost; }
 		static void		Optimize_LODs(float max_cost);
 		static float	Get_Total_Cost()								{ return TotalCost; }
+#endif
 		static void		Free();	// frees all memory
 
 	private:
 		static void		AllocVisibleObjArrays(int num_objects);
 
+#if !RTS_ENGINE_CONTEXT
 		static RenderObjClass **	ObjectArray;
 		static int						ArraySize;
 		static int						NumObjects;
@@ -75,5 +84,6 @@ class PredictiveLODOptimizerClass {
 		static LODHeapNode *VisibleObjArray1;
 		static LODHeapNode *VisibleObjArray2;
 		static int VisibleObjArraySize;
+#endif
 
 };

@@ -207,9 +207,12 @@ public:
 	static void				_Shutdown();
 
 private:
+	static Vector3 _ScreenspaceVertexLocationSizeTable[2][3];
+#if !RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 30/09/2026 With RTS_ENGINE_CONTEXT, per engine: pointgr.cpp (PLAN-023 Phase 8,
+	// stage RR2b).
 	static Vector3 _TriVertexLocationOrientationTable[256][3];
 	static Vector3 _QuadVertexLocationOrientationTable[256][4];
-	static Vector3 _ScreenspaceVertexLocationSizeTable[2][3];
 	static Vector2 *_TriVertexUVFrameTable[5];
 	static Vector2 *_QuadVertexUVFrameTable[5];
 	static VertexMaterialClass *PointMaterial;
@@ -221,6 +224,7 @@ private:
 	static VectorClass<unsigned char>	compressed_orient;	// point orientations 'compressed' by APT
 	static VectorClass<unsigned char>	compressed_frame;		// point frames 'compressed' by APT
 	static VectorClass<Vector3>		transformed_loc;		// transformed point locations
+#endif
 };
 
 

@@ -53,8 +53,24 @@
 
 
 bool SortingRendererClass::_EnableTriangleDraw=true;
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 30/09/2026 Per engine: the sorting buffer sizes, which a render boot with
+// -incrementalAGPBuf shrinks (SetMinVertexBufferSize; PLAN-023 Phase 8, stage RR2b).
+namespace
+{
+struct SortingRendererSizes
+{
+	unsigned DEFAULT_SORTING_POLY_COUNT = 16384; // (count * 3) must be less than 65536
+	unsigned DEFAULT_SORTING_VERTEX_COUNT = 32768; // count must be less than 65536
+};
+rts::PerEngineStatic<SortingRendererSizes> SortingRendererSizes_perEngine;
+} // namespace
+#define DEFAULT_SORTING_POLY_COUNT (SortingRendererSizes_perEngine.get().DEFAULT_SORTING_POLY_COUNT)
+#define DEFAULT_SORTING_VERTEX_COUNT (SortingRendererSizes_perEngine.get().DEFAULT_SORTING_VERTEX_COUNT)
+#else
 static unsigned DEFAULT_SORTING_POLY_COUNT = 16384;	// (count * 3) must be less than 65536
 static unsigned DEFAULT_SORTING_VERTEX_COUNT = 32768;	// count must be less than 65536
+#endif
 
 void SortingRendererClass::SetMinVertexBufferSize( unsigned val )
 {
@@ -166,10 +182,46 @@ public:
 };
 
 typedef std::list<SortingNodeStruct*> SortingNodeStructList;
+static const unsigned MAX_OVERLAPPING_NODES=4096;
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 30/09/2026 Per engine (PLAN-023 Phase 8, stage RR2b): the sorting renderer's node
+// lists (whose nodes hold references to the engine's own textures and buffers), its temporary index array (Deinit
+// frees both) and the overlap scratch of one flush, defined further down upstream.
+namespace
+{
+struct SortingRendererState
+{
+	SortingNodeStructList sorted_list;
+	SortingNodeStructList unsorted_list;
+	SortingNodeStructList clean_list;
+	unsigned total_sorting_vertices = 0;
+
+	TempIndexStruct* temp_index_array = nullptr;
+	unsigned temp_index_array_count = 0;
+
+	unsigned overlapping_node_count = 0;
+	unsigned overlapping_polygon_count = 0;
+	unsigned overlapping_vertex_count = 0;
+	SortingNodeStruct* overlapping_nodes[MAX_OVERLAPPING_NODES] = {};
+};
+rts::PerEngineStatic<SortingRendererState> SortingRendererState_perEngine;
+} // namespace
+#define sorted_list (SortingRendererState_perEngine.get().sorted_list)
+#define unsorted_list (SortingRendererState_perEngine.get().unsorted_list)
+#define clean_list (SortingRendererState_perEngine.get().clean_list)
+#define total_sorting_vertices (SortingRendererState_perEngine.get().total_sorting_vertices)
+#define temp_index_array (SortingRendererState_perEngine.get().temp_index_array)
+#define temp_index_array_count (SortingRendererState_perEngine.get().temp_index_array_count)
+#define overlapping_node_count (SortingRendererState_perEngine.get().overlapping_node_count)
+#define overlapping_polygon_count (SortingRendererState_perEngine.get().overlapping_polygon_count)
+#define overlapping_vertex_count (SortingRendererState_perEngine.get().overlapping_vertex_count)
+#define overlapping_nodes (SortingRendererState_perEngine.get().overlapping_nodes)
+#else
 static SortingNodeStructList sorted_list;
 static SortingNodeStructList unsorted_list;
 static SortingNodeStructList clean_list;
 static unsigned total_sorting_vertices;
+#endif
 
 static SortingNodeStruct* Get_Sorting_Struct()
 {
@@ -187,8 +239,10 @@ static SortingNodeStruct* Get_Sorting_Struct()
 //
 // ----------------------------------------------------------------------------
 
+#if !RTS_ENGINE_CONTEXT
 static TempIndexStruct* temp_index_array;
 static unsigned temp_index_array_count;
+#endif
 
 static TempIndexStruct* Get_Temp_Index_Array(unsigned count)
 {
@@ -319,11 +373,12 @@ void Release_Refs(SortingNodeStruct* state)
 	}
 }
 
+#if !RTS_ENGINE_CONTEXT
 static unsigned overlapping_node_count;
 static unsigned overlapping_polygon_count;
 static unsigned overlapping_vertex_count;
-static const unsigned MAX_OVERLAPPING_NODES=4096;
 static SortingNodeStruct* overlapping_nodes[MAX_OVERLAPPING_NODES];
+#endif
 
 // ----------------------------------------------------------------------------
 

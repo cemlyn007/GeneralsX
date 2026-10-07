@@ -37,6 +37,9 @@
  * Functions:                                                                                  *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 #include "formconv.h"
+#if RTS_ENGINE_CONTEXT
+#include <mutex>
+#endif
 
 D3DFORMAT WW3DFormatToD3DFormatConversionArray[WW3D_FORMAT_COUNT] = {
 	D3DFMT_UNKNOWN,
@@ -182,7 +185,21 @@ WW3DZFormat D3DFormat_To_WW3DZFormat(D3DFORMAT d3d_format)
 /*!
  * 06/27/02 KM Z Format support																						*
 */
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 30/09/2026 The reverse tables are the same for every engine: built by the first render
+// boot, once per process, instead of rewritten under the readers at every one (PLAN-023 Phase 8, stage RR2b).
+static void Build_D3D_To_WW3_Conversion();
+
 void Init_D3D_To_WW3_Conversion()
+{
+	static std::once_flag once;
+	std::call_once(once, Build_D3D_To_WW3_Conversion);
+}
+
+static void Build_D3D_To_WW3_Conversion()
+#else
+void Init_D3D_To_WW3_Conversion()
+#endif
 {
 	int i=0;
 	for (;i<HIGHEST_SUPPORTED_D3DFORMAT;++i) {

@@ -485,11 +485,12 @@ W3DDisplay::~W3DDisplay()
 	for (Int j=0; j<LightEnvironmentClass::MAX_LIGHTS; j++)
 		REF_PTR_RELEASE( m_myLight[j] );
 
-	// GeneralsX @bugfix cemlyn007 30/09/2026 Only an engine that renders tears down the process-wide render
-	// state (the render statistics' string, the predictive LOD arrays that WW3D::Shutdown frees, the shader
-	// manager). A headless engine's teardown used to free the statistics string and the LOD arrays under the
-	// rendering engine beside it (PLAN-023 Phase 8, stage RR0a; found by ThreadSanitizer).
+	// GeneralsX @bugfix cemlyn007 30/09/2026 Only an engine that renders has the predictive LOD arrays and
+	// the render statistics' string to free: only the render path (Prepare_LOD, End_Statistics) fills them, and
+	// both are per engine, so a headless engine's are empty (PLAN-023 Phase 8, stage RR2b).
 	const Bool renders = !TheGlobalData->m_headless || TheGlobalData->m_headlessRender;
+	if (renders)
+		PredictiveLODOptimizerClass::Free();
 
 	// shutdown
 	if (renders)

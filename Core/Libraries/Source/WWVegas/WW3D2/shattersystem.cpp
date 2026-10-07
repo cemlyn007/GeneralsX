@@ -213,11 +213,33 @@ protected:
 ***********************************************************************************************/
 
 enum { MAX_MESH_FRAGMENTS = 32 };
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 30/09/2026 Per engine: the shatter patterns Init loads and Shutdown frees, and
+// the clipping scratch (clip pools, fragments, vertex workspaces) of one shatter (PLAN-023 Phase 8, stage RR2b).
+namespace
+{
+struct ShatterState
+{
+	SimpleDynVecClass<BSPClass*> ShatterPatterns;
+	SimpleDynVecClass<PolygonClass> ClipPools[MAX_MESH_FRAGMENTS];
+	SimpleDynVecClass<DynamicMeshClass*> MeshFragments{MAX_MESH_FRAGMENTS};
+	SimpleVecClass<Vector3> TmpVertPositions{256};
+	SimpleVecClass<Vector3> TmpVertNormals{256};
+};
+rts::PerEngineStatic<ShatterState> ShatterState_perEngine;
+} // namespace
+#define ShatterPatterns (ShatterState_perEngine.get().ShatterPatterns)
+#define ClipPools (ShatterState_perEngine.get().ClipPools)
+#define MeshFragments (ShatterState_perEngine.get().MeshFragments)
+#define TmpVertPositions (ShatterState_perEngine.get().TmpVertPositions)
+#define TmpVertNormals (ShatterState_perEngine.get().TmpVertNormals)
+#else
 static SimpleDynVecClass<BSPClass *>				ShatterPatterns;
 static SimpleDynVecClass<PolygonClass>				ClipPools[MAX_MESH_FRAGMENTS];
 static SimpleDynVecClass<DynamicMeshClass	*>		MeshFragments(MAX_MESH_FRAGMENTS);
 static SimpleVecClass<Vector3>						TmpVertPositions(256);
 static SimpleVecClass<Vector3>						TmpVertNormals(256);
+#endif
 
 
 /***********************************************************************************************

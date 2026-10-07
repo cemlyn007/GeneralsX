@@ -87,7 +87,13 @@ public:
 	static void Suspend_Texture_Load();
 	static void Continue_Texture_Load();
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 30/09/2026 Out of line: the time is per engine (textureloader.cpp; PLAN-023
+	// Phase 8, stage RR2b).
+	static void Set_Texture_Inactive_Override_Time(int time_ms);
+#else
 	static void Set_Texture_Inactive_Override_Time(int time_ms) {TextureInactiveOverrideTime = time_ms;}
+#endif
 
 private:
 	static void Process_Foreground_Load			(TextureLoadTaskClass *task);
@@ -96,11 +102,15 @@ private:
 	static void Begin_Load_And_Queue				(TextureLoadTaskClass *task);
 	static void Load_Thumbnail						(TextureBaseClass *tc);
 
+#if !RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 30/09/2026 With RTS_ENGINE_CONTEXT, per engine: textureloader.cpp (PLAN-023
+	// Phase 8, stage RR2b).
 	static bool TextureLoadSuspended;
 
 	// The time in ms before a texture is thrown out.
 	// The default is zero.  The scripted movies set this to reduce texture stalls in movies.
 	static int	TextureInactiveOverrideTime;
+#endif
 };
 
 class TextureLoadTaskListNodeClass
@@ -202,7 +212,7 @@ class TextureLoadTaskClass : public TextureLoadTaskListNodeClass
 
 
 		TextureLoadTaskClass();
-		~TextureLoadTaskClass();
+		virtual ~TextureLoadTaskClass();
 
 		static TextureLoadTaskClass *	Create			(TextureBaseClass *tc, TaskType type, PriorityType priority);
 		static void				Delete_Free_Pool			();

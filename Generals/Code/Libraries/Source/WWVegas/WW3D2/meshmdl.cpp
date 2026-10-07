@@ -54,8 +54,22 @@
 */
 static DynamicVectorClass<Vector3>	_TempVertexBuffer;
 static DynamicVectorClass<Vector3>	_TempNormalBuffer;
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 30/09/2026 Per engine: the transformed-vertex scratch of one draw. The unused
+// _TempClipFlagBuffer is left out (PLAN-023 Phase 8, stage RR2b).
+namespace
+{
+struct MeshModelScratch
+{
+	DynamicVectorClass<Vector4> _TempTransformedVertexBuffer;
+};
+rts::PerEngineStatic<MeshModelScratch> MeshModelScratch_perEngine;
+} // namespace
+#define _TempTransformedVertexBuffer (MeshModelScratch_perEngine.get()._TempTransformedVertexBuffer)
+#else
 static DynamicVectorClass<Vector4>	_TempTransformedVertexBuffer;
 static DynamicVectorClass<unsigned long> _TempClipFlagBuffer;
+#endif
 
 
 /*
@@ -556,9 +570,27 @@ struct SideIndexInfo
 };
 
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 30/09/2026 Per engine: the location and side hashes, filled and emptied
+// within one call (PLAN-023 Phase 8, stage RR2b).
+namespace
+{
+struct MeshModelHashes
+{
+	HashTemplateClass<Vector3, unsigned> LocationHash;
+	HashTemplateClass<Vector3, unsigned> DuplicateLocationHash;
+	HashTemplateClass<TriangleSide, SideIndexInfo> SideHash;
+};
+rts::PerEngineStatic<MeshModelHashes> MeshModelHashes_perEngine;
+} // namespace
+#define LocationHash (MeshModelHashes_perEngine.get().LocationHash)
+#define DuplicateLocationHash (MeshModelHashes_perEngine.get().DuplicateLocationHash)
+#define SideHash (MeshModelHashes_perEngine.get().SideHash)
+#else
 HashTemplateClass<Vector3, unsigned> LocationHash;
 HashTemplateClass<Vector3, unsigned> DuplicateLocationHash;
 HashTemplateClass<TriangleSide,SideIndexInfo> SideHash;
+#endif
 
 // ----------------------------------------------------------------------------
 //

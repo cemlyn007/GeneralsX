@@ -984,6 +984,22 @@ void ParticleBufferClass::Render_Particles(RenderInfoClass & rinfo)
 }
 
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 30/09/2026 Per engine: Render_Line's scratch, filled and consumed within one draw. A
+// file static, so that its slot is taken at static initialisation, not at the first draw (PLAN-023 Phase 8, stage
+// RR2b).
+namespace
+{
+struct RenderLineScratch
+{
+	SimpleDynVecClass<Vector3> tmp_points;
+	SimpleDynVecClass<Vector4> tmp_diffuse;
+	SimpleDynVecClass<unsigned char> tmp_id;
+};
+rts::PerEngineStatic<RenderLineScratch> RenderLineScratch_perEngine;
+} // namespace
+#endif
+
 void ParticleBufferClass::Render_Line(RenderInfoClass & rinfo)
 {
 
@@ -996,9 +1012,16 @@ void ParticleBufferClass::Render_Line(RenderInfoClass & rinfo)
 	}
 
 	// Unroll the circular buffer while skipping LOD'd particles
+#if RTS_ENGINE_CONTEXT
+	RenderLineScratch& scratch = RenderLineScratch_perEngine.get();
+	SimpleDynVecClass<Vector3>& tmp_points = scratch.tmp_points;
+	SimpleDynVecClass<Vector4>& tmp_diffuse = scratch.tmp_diffuse;
+	SimpleDynVecClass<unsigned char>& tmp_id = scratch.tmp_id;
+#else
 	static SimpleDynVecClass<Vector3> tmp_points;
 	static SimpleDynVecClass<Vector4> tmp_diffuse;
 	static SimpleDynVecClass<unsigned char> tmp_id;
+#endif
 
 	Vector3 * positions = Position[pingpong]->Get_Array();
 	Vector4 * diffuse = nullptr;

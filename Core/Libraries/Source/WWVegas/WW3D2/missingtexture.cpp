@@ -29,7 +29,14 @@ static unsigned missing_image_depth=24;
 extern unsigned int missing_image_palette[];
 extern unsigned int missing_image_pixels[];
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 30/09/2026 Per engine: the fallback texture, made on the render engine's own
+// device by Do_Onetime_Device_Dependent_Inits (_Init) and released by its Shutdowns (PLAN-023 Phase 8, stage RR2b).
+static rts::PerEngineStatic<IDirect3DTexture8*> _MissingTexture_perEngine;
+#define _MissingTexture (_MissingTexture_perEngine.get())
+#else
 static IDirect3DTexture8 * _MissingTexture = nullptr;
+#endif
 
 IDirect3DTexture8* MissingTexture::_Get_Missing_Texture()
 {
