@@ -185,6 +185,9 @@ protected:
 	IRegion2D m_clipRegion;									///< the clipping region for images
 	Bool m_isClippedEnabled;	///<used by 2D drawing operations to define clip re
 	Real m_averageFPS;		///<average fps over the last 30 frames.
+	// GeneralsX @feature cemlyn007 30/09/2026 Whether draw() has logged the device's first TestCooperativeLevel
+	// result: once per engine (PLAN-023 Phase 8, stage RR0c).
+	Bool m_loggedCooperativeLevel;
 	Real m_currentFPS;		///<current fps value.
 
 	TextureClass *m_batchTexture;

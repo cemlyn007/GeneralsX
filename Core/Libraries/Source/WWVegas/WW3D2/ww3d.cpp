@@ -829,10 +829,11 @@ WW3DErrorType WW3D::Begin_Render(bool clear,bool clearz,const Vector3 & color, f
 	SNAPSHOT_SAY(("========== WW3D::Begin_Render ============"));
 	SNAPSHOT_SAY(("==========================================\n"));
 
-	// rlgenerals: off-screen render mode has a hidden window with no presentable
-	// surface, so TestCooperativeLevel reports LOST/NOTRESET forever. We never
-	// present (the embed reads the backbuffer back) and the device can still
-	// render into the backbuffer VkImage, so skip the device-lost handling.
+	// rlgenerals: off-screen render mode never presents (the embed reads the
+	// backbuffer back) and renders into the backbuffer VkImage, so it skips the
+	// device-lost handling. TestCooperativeLevel measures D3D_OK there, with a
+	// hidden window and with none; the skip is kept so that mode never takes the
+	// device-lost path.
 	if (!DX8Wrapper_HeadlessRender &&
 	    DX8Wrapper::_Get_D3D_Device8() && (hr=DX8Wrapper::_Get_D3D_Device8()->TestCooperativeLevel()) != D3D_OK)
 	{
