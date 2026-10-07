@@ -39,6 +39,7 @@
 #include "always.h"
 #include "mutex.h"
 #include "win.h"
+#include <atomic>
 #include <stdarg.h>
 #include "trim.h"
 #include "WWDebug/wwdebug.h"
@@ -178,7 +179,10 @@ private:
 	////////////////////////////////////////////////////////////
 	//	Static member data
 	////////////////////////////////////////////////////////////
-	static unsigned ReservedMask;
+	// GeneralsX @bugfix cemlyn007 02/10/2026 atomic<unsigned> (not just unsigned) so Get_String can take a
+	// lock-free relaxed-load early-out when every temp buffer is in use, instead of taking m_Mutex on that
+	// path too; the authoritative test-and-set under m_Mutex is unaffected.
+	static std::atomic<unsigned> ReservedMask;
 	static char m_TempStrings[];
 
 	static FastCriticalSectionClass m_Mutex;
@@ -258,7 +262,12 @@ StringClass::StringClass (bool hint_temporary)
 	:	m_Buffer (m_EmptyString)
 {
 	Get_String (MAX_TEMP_LEN, hint_temporary);
-	m_Buffer[0]	= m_NullChar;
+	// GeneralsX @bugfix cemlyn007 29/09/2026 Never write the shared empty string (PLAN-023 Phase 5b, TSan)
+	// A zero-length, non-temporary string is m_EmptyString, the process-wide m_NullChar: writing its
+	// terminator again from several engine threads at once is a data race, and it is already 0.
+	if (m_Buffer != m_EmptyString) {
+		m_Buffer[0]	= m_NullChar;
+	}
 }
 
 ///////////////////////////////////////////////////////////////////
@@ -269,7 +278,12 @@ StringClass::StringClass (int initial_len, bool hint_temporary)
 	:	m_Buffer (m_EmptyString)
 {
 	Get_String (initial_len, hint_temporary);
-	m_Buffer[0]	= m_NullChar;
+	// GeneralsX @bugfix cemlyn007 29/09/2026 Never write the shared empty string (PLAN-023 Phase 5b, TSan)
+	// A zero-length, non-temporary string is m_EmptyString, the process-wide m_NullChar: writing its
+	// terminator again from several engine threads at once is a data race, and it is already 0.
+	if (m_Buffer != m_EmptyString) {
+		m_Buffer[0]	= m_NullChar;
+	}
 }
 
 ///////////////////////////////////////////////////////////////////

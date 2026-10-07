@@ -218,9 +218,6 @@ class ParticleBufferClass : public RenderObjClass
 		void						Get_Blur_Time_Key_Frames (ParticlePropertyStruct<float> &blurtimes) const;
 		float						Get_Initial_Orientation_Random () const { return InitialOrientationRandom; }
 
-		// Total Active Particle Buffer Count
-		static unsigned int	Get_Total_Active_Count()	{ return TotalActiveCount; }
-
 		// Global control of particle LOD.
 		static void				Set_LOD_Max_Screen_Size(int lod_level,float max_screen_size);
 		static float			Get_LOD_Max_Screen_Size(int lod_level);
@@ -416,9 +413,6 @@ class ParticleBufferClass : public RenderObjClass
 
 		// Projected area, used for LOD purposes
 		float									ProjectedArea;
-
-		// Total Active Particle Buffer Count
-		static unsigned int				TotalActiveCount;
 
 		// Static array of screen-size clamps for the 17 possible LOD levels a
 		// particle buffer can have. We can change these from being global to
