@@ -842,9 +842,10 @@ DazzleRenderObjClass::DazzleRenderObjClass(unsigned t)
 	halo_color(1.0f,1.0f,1.0f),
 	lensflare_intensity(1.0f),
 	on_list(false),
-	visibility(0.0f),
-	radius(Engine_Types()[t]->radius)
+	visibility(0.0f)
 {
+	DazzleTypeClass** engine_types = Engine_Types();
+	radius = (engine_types && t < Engine_Type_Count() && engine_types[t]) ? engine_types[t]->radius : 0.0f;
 	creation_time = WW3D::Get_Sync_Time();
 }
 
@@ -865,9 +866,11 @@ DazzleRenderObjClass::DazzleRenderObjClass(const char * type_name)
 	halo_color(1.0f,1.0f,1.0f),
 	lensflare_intensity(1.0f),
 	on_list(false),
-	visibility(0.0f),
-	radius(Engine_Types()[Get_Type_ID(type_name)]->radius)
+	visibility(0.0f)
 {
+	unsigned id = Get_Type_ID(type_name);
+	DazzleTypeClass** engine_types = Engine_Types();
+	radius = (engine_types && id < Engine_Type_Count() && engine_types[id]) ? engine_types[id]->radius : 0.0f;
 	creation_time = WW3D::Get_Sync_Time();
 }
 

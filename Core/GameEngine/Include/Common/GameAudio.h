@@ -196,11 +196,16 @@ class AudioManager : public SubsystemInterface
 
 		// GeneralsX @performance cemlyn007 29/09/2026 Whether this manager can ever play a sound
 		// (PLAN-023 Phase 5b, perf2). The device-free managers (OpenALAudioManagerDummy,
-		// MiniAudioManagerDummy) answer FALSE: they drop every request, so nothing is ever playing.
+		// MiniAudioManagerDummy) answer FALSE: they drop every request at the next audio update, so no sound is ever audible
+		// (isCurrentlyPlaying still reports a pending request as playing until then).
 		// Client code may use it to skip work that only exists to (re)start sounds, such as
 		// Drawable::updateDrawable's per-frame restart of looping ambient sounds. Like
 		// isCurrentlyPlaying, DO NOT USE THIS FOR GAMELOGIC PURPOSES.
 		virtual Bool canPlaySounds() const { return TRUE; }
+
+		// GeneralsX @feature cemlyn007 03/10/2026 Test hook: the number of audio handles allocated, so rlgenerals' fault_test can pin Drawable::updateDrawable's headless ambient-restart skip (PLAN-023 Phase 5b, perf2).
+		// How many audio handles allocateNewHandle() has handed out since this manager was constructed (reset() does not reset the pool).
+		AudioHandle getHandlesAllocated() const;
 
 		// Device Dependent open and close functions
 		virtual void openDevice() = 0;
