@@ -13,8 +13,17 @@
 # "Headless" below means an rlgenerals engine: GlobalData::m_headless without m_headlessRender. Such an
 # engine still runs GameClient::update (so the message translators, InGameUI::update and the drawables),
 # but W3DDisplay::draw returns at once, the window manager is GameWindowManagerDummy (no .wnd parse, no
-# window callbacks), the radar is RadarDummy and the tactical view is ViewDummy. At most one engine per
-# process renders (PLAN-023 consumer answer 2), so what only that engine reaches is `render-only`.
+# window callbacks, no layout init), the radar is RadarDummy and the tactical view is ViewDummy. At most one
+# engine per process renders (PLAN-023 consumer answer 2), so what only that engine reaches is `render-only`.
+# GameWindowManagerDummy never hands out null: winCreateFromScript makes a real (blank) window per call and
+# winGetWindowFromId returns some real window, so a window pointer a headless engine stores is a real object
+# of that engine's window manager, and a static holding one is per-engine. `render-only` therefore means
+# code a headless engine never runs, not state that stays null there: every entry below was checked against
+# the functions a headless engine calls (from GameLogic, the script engine, GameClient/InGameUI updates and
+# every engine's boot and teardown) and against a runtime probe of a headless engine (every .data/.bss
+# symbol read after boot, Hard AI skirmishes on Tournament City and Winding River, a save and load, the
+# replay's playback, a game ended by script victory, and an Env game to the local player's defeat): no
+# symbol classified render-only, constant or debug-only changed but the const objects built on first use.
 #
 # A per-engine note that starts "threads only" names state that is correct for several engines stepped on
 # ONE thread (a scratch buffer filled and consumed inside one call, a call-depth counter) and only breaks
@@ -35,7 +44,8 @@ UNREVIEWED = "unreviewed"
 
 UI = (
     "UI only: menus, window callbacks and gadgets run only with a real window manager, and a headless "
-    "engine has GameWindowManagerDummy (no .wnd parse, no callbacks); one UI engine per process"
+    "engine has GameWindowManagerDummy (no .wnd parse, no callbacks, no layout init; its windows are real "
+    "but blank) and no player input; one UI engine per process"
 )
 NET = (
     "multiplayer network/online state: reached only from the LAN/online menus and networked games; a "
@@ -45,18 +55,19 @@ NET = (
 # InGameUI::init creates the ControlBar and runs ControlBar::init; GameLogic::startNewGame makes and inits a
 # load screen; GameLogic::clearGameData (GameLogicDispatch) calls HideDiplomacy, ResetDiplomacy and
 # ResetInGameChat; ScriptActions reach InGameUI::popupMessage; VictoryConditions calls
-# PopulateInGameDiplomacyPopup; GameClient::update calls TheShell->UPDATE() every frame (Shell::update, which
-# also runs the scheme manager's update), headless included; and GameWindowManagerDummy is a GameWindowManager
-# whose winGetWindowFromId hands out a dummy window rather than null, so window pointers are real (per-engine)
-# objects headless too.
+# PopulateInGameDiplomacyPopup; and GameWindowManagerDummy is a GameWindowManager whose winGetWindowFromId hands
+# out a dummy window rather than null, so window pointers are real (per-engine) objects headless too. The GUI
+# functions in other files that a headless engine calls directly touch per-engine state only (PLAN-023 Phase 4
+# fixes): Show/HideControlBar (ControlBarCallback.cpp; no static of its own), HideQuitMenu (QuitMenu.cpp, from
+# clearGameData: the state it touches is a PER_ENGINE_STATIC; the rest only the menu writes), Shell::update
+# (Shell.cpp, from GameClient::update: its throttle is a PER_ENGINE_STATIC) and ~GameWindowManager's
+# freeStaticStrings (GameWindowManagerScript.cpp: the .wnd parse's callback strings, a PER_ENGINE_STATIC).
 HEADLESS_GUI = (
     "ControlBar/|LoadScreen\\.cpp|GameWindowManager\\.cpp|Shell/(Shell|ShellMenuScheme)\\.cpp|"
     "GUICallbacks/(Diplomacy|InGameChat|InGamePopupMessage|ControlBarPopupDescription)\\.cpp"
 )
 W3D_RENDER = "W3D render path (device, shaders, draw lists): only the one rendering engine per process reaches it (PLAN-023 Phase 8)"
 LOADER = "stateless W3D prototype loader/persist factory, registered once at static initialization"
-PER_ENGINE_STATIC = "cached per-engine pointer (template/image/button looked up once): PER_ENGINE_STATIC slot"
-AUDIO_SCRATCH = "static AudioEventRTS: make it a local (PLAN-023 Phase 4; also removes a lock-taking exit destructor)"
 
 HAND = [
     # ---------------------------------------------------------------------------------------------------
@@ -101,27 +112,23 @@ HAND = [
     (PER, 3, "InheritedWorldSpaceEmitterVel", "threads only: set by ParticleEmitterClass::Emit and read by Initialize_Particle within the same call"),
     # ---------------------------------------------------------------------------------------------------
     # PLAN-023 Phase 4: caches and remaining statics.
-    (PER, 4, "re:ActiveBody::updateBodyParticleSystems\\(\\)::\\w+Template", PER_ENGINE_STATIC),
-    (PER, 4, "re:.*::(upgradeTemplate|supplyLinesTemplate|workerShoeTemplate|nationalismTemplate|fanaticismTemplate|muzzle|debrisTemplate|genericBridgeTemplate)", PER_ENGINE_STATIC),
-    (PER, 4, "re:WaveGuideUpdate::.*::(wave[123]|left|right|splash|waveSplash)", PER_ENGINE_STATIC),
-    (PER, 4, "re:.*::(structureAttackSound|underAttackSound|infiltrationWarningSound|rallyNotSet|rallyPointSet|placeBuilding|aSound|discoveredSound|neutralizedSound|leftGameSound|noCanDoSound|click)", AUDIO_SCRATCH),
-    (PER, 4, "re:Drawable::s_(staticImagesInited|veterancyImage|fullAmmo|emptyAmmo|fullContainer|emptyContainer|animationTemplates)", "written by every Drawable constructor (headless too), read only by drawIconUI: stale Image*/Anim2DTemplate* after the first engine dies; PER_ENGINE_STATIC"),
-    (PER, 4, "debrisModelNamesGlobalHack", "INI-parse output (ObjectCreationList) consumed by the client's preload: another engine's boot feeds this engine's preload; ObjectCreationListStore member"),
-    (PER, 4, "TerrainRoadCollection::m_idCounter", "road type ID counter continued by every engine's Roads.ini parse: TheTerrainRoads member"),
-    (PER, 4, "View::m_idNext", "view ID counter: per engine"),
-    (PER, 4, "re:InGameUI::update\\(\\)::(lastMoney|lastIncome)|InGameUI::updateFloatingText\\(\\)::lastLogicFrameUpdate", "InGameUI::update runs headless too (GameClient::update): UI state, no simulation effect; InGameUI members"),
-    (PER, 4, "Shell::update()::lastUpdate", "GameClient::update calls TheShell->UPDATE() headless too: a wall-clock throttle shared by every engine's shell screens, so concurrent engines skip each other's scheme-manager updates; Shell member"),
-    # GUI statics that a headless engine writes too (see HEADLESS_GUI): the control bar, diplomacy and chat
-    # code runs headless against GameWindowManagerDummy's dummy windows, so these point at one engine's
-    # objects or are cleared/deleted by another engine's teardown.
-    (PER, 4, "re:ControlBar::m_rank(Veteran|Elite|Heroic)Icon", "written by ControlBar::init (InGameUI::init, headless too) from this engine's TheMappedImageCollection: stale Image* after that engine dies; ControlBar members (" + PER_ENGINE_STATIC + ")"),
-    (PER, 4, "re:ObserverPlayer(Info|List)Window|buttonPlayer|winFlag|winGeneralPortrait|buttonIdleWorker|staticTextNumberOf(Units|Buildings|UnitsKilled|UnitsLost)|staticTextPlayerName", "ControlBar::initObserverControls (from ControlBar::init, headless too) stores this engine's (dummy) windows: ControlBar members"),
-    (PER, 4, "re:staticTextPlayer|staticTextSide|staticTextTeam|staticTextStatus|buttonMute|buttonUnMute|slotNumInRow", "Diplomacy/observer window pointers: HideDiplomacy (GameLogic::clearGameData, headless too) clears them and PopulateInGameDiplomacyPopup (VictoryConditions) writes through them, so one engine touches another's windows; a per-engine Diplomacy state (the ControlBarObserver/menu TUs of the same name follow)"),
-    (PER, 4, "re:theWindow|theLayout", "Diplomacy's layout and window (the only instance linked in; ControlBarPopupDescription's are unused): ResetDiplomacy (clearGameData, headless too) destroys the layout and clears the window, another engine's included; per-engine Diplomacy state"),
-    (PER, 4, "theAnimateWindowManager", "ResetDiplomacy (clearGameData) and ControlBar::deleteBuildTooltipLayout (ScriptActions' disable-input, headless too) delete it: one engine deletes another's; per-engine Diplomacy state / ControlBar member"),
-    (PER, 4, "prevWindow", "tooltip button pointer, cleared by ControlBar::deleteBuildTooltipLayout (ScriptActions, headless too): ControlBar member"),
-    (PER, 4, "theBriefingList", "script briefing texts (UpdateDiplomacyBriefingText from InGameUI's popup/military captions, headless too; saved with the GameClient): InGameUI member"),
-    (PER, 4, "re:chatWindow|chatTextEntry|chatTypeStaticText|s_savedChat", "ResetInGameChat (GameLogic::clearGameData, headless too) destroys the chat window and clears these, another engine's included: per-engine chat state"),
+    # Done (PLAN-023 Phase 4 PR): every function-local cache of a per-engine pointer (the seven ActiveBody
+    # particle templates, the upgrade/thing template caches, muzzle, debrisTemplate, genericBridgeTemplate,
+    # the seven WaveGuideUpdate particle templates), the fifteen static AudioEventRTS (PER_ENGINE_STATICs,
+    # not locals: each keeps its event's sound rotation index, which a local would reset), Drawable's static
+    # images, ControlBar's rank icons, the observer, diplomacy, briefing, chat and build-tooltip GUI state a
+    # headless engine writes, debrisModelNamesGlobalHack, TerrainRoadCollection::m_idCounter, View::m_idNext,
+    # InGameUI's lastMoney/lastIncome/lastLogicFrameUpdate and ShellGameLoadScreen's firstLoad are
+    # PER_ENGINE_STATICs (so gone from the library; their slot indexes are rule:per-engine-static). So are,
+    # since the headless-GUI audit (they were render-only on the false premise that GameWindowManagerDummy's
+    # windows are null): InGameUI's m_replayWindow and ScriptActions::m_messageWindow (real windows headless:
+    # the replay control InGameUI::init makes, the victory/defeat window the map scripts open), the chat type
+    # (VictoryConditions sets it on the local player's defeat), ControlBar::m_containData (every ControlBar
+    # constructor clears it), the quit-menu state HideQuitMenu touches (clearGameData), Shell::update's
+    # throttle (GameClient::update) and W3DStatusCircle's colour (every engine's setTeamColor). The
+    # other TUs' statics of the same names (the WOL and download menus' staticTextPlayer/staticTextStatus)
+    # fall to the GUI blanket below. What is left here is threads only.
+    (RENDER, "", "re:staticTextPlayer|staticTextStatus", "with RTS_ENGINE_CONTEXT only the online menus' statics of these names are left (WOLGameSetupMenu.cpp's staticTextPlayer, DownloadMenu.cpp's staticTextStatus); the source column shows the first definition the search finds, the OFF-build one in ControlBarObserver.cpp or Diplomacy.cpp (those are PER_ENGINE_STATIC fields with the context on): " + UI),
     (PER, 4, "re:ParticleSystem::(computePointOnUnitSphere|computeParticleVelocity|computeParticlePosition|generateParticleInfo)\\(.*\\)::\\w+", "threads only: particle scratch returned by pointer, consumed at once"),
     # ---------------------------------------------------------------------------------------------------
     # Process-global on purpose.
@@ -153,18 +160,20 @@ HAND = [
     (GLOBAL, "", "re:rts::ClientInstance::\\w+", "the process's single-instance mutex"),
     (GLOBAL, "", "re:ReplaySimulation::s_\\w+", "the game executable's multi-replay simulation driver (-simReplay); an embedded engine never runs it"),
     (GLOBAL, "", "OurLanguage", "the installation's language, the same for every engine"),
-    (GLOBAL, "", "re:GetRegistryLanguage\\(\\)::(cached|val)", "the installation's language string, written once (Phase 4 string rule: call_once before threads)"),
+    (GLOBAL, "", "re:GetRegistryLanguage\\(\\)::(once|val)", "the installation's language string: with RTS_ENGINE_CONTEXT written exactly once, under std::call_once, and never mutated afterwards (PLAN-023 Phase 4's process-global string rule); every engine reads the same install"),
     (GLOBAL, "", "UnicodeString::format_va(wchar_t const*, __va_list_tag*)::s_utf8_locale", "a UTF-8 locale handle, created once"),
     (GLOBAL, "", "s_assetFallbackPath", "the install's asset fallback root, set once from the environment (PLAN-023 Phase 5 BootConfig)"),
     (GLOBAL, "", "re:s_thread|s_done|s_hasUpdate|s_latestTag", "update checker (menus), one per process"),
     (GLOBAL, "", "re:thread_id_map(_mutex)?|next_thread_id", "pthread-to-Win32 thread id map (CompatLib), process-wide by nature"),
-    (GLOBAL, "", "re:GameSpyColor|theLobbyFilter|isThreadHosting|NET_CRC_INTERVAL|MIN_LOGIC_FRAMES|MAX_FRAMES_AHEAD|MIN_RUNAHEAD|FRAME_DATA_LENGTH|FRAMES_TO_KEEP|commandsReadyDebugSpewage", NET),
+    (GLOBAL, "", "GameSpyColor", "the online chat colors: every engine's boot parses them (INI's OnlineChatColors block) with the install's values, the same for every engine; only the online menus read them"),
+    (GLOBAL, "", "NGMP_OnlineServicesManager::getInstance()::instance", "the process's GeneralsOnline session, logged into from the online menus of the one UI engine: with RTS_ENGINE_CONTEXT only a non-headless engine initializes it (GameEngine::init) or shuts it down (~GameEngine), so a headless engine never touches the session"),
+    (GLOBAL, "", "re:theLobbyFilter|isThreadHosting|NET_CRC_INTERVAL|MIN_LOGIC_FRAMES|MAX_FRAMES_AHEAD|MIN_RUNAHEAD|FRAME_DATA_LENGTH|FRAMES_TO_KEEP|commandsReadyDebugSpewage", NET),
     # Not the whole of GameNetwork/: GameInfo.cpp (skirmish setup), LANGameInfo.cpp, GameMessageParser.cpp and
     # NetworkUtil.cpp are reached without a network, so their statics are classified by name.
     (GLOBAL, "", "file:/GameNetwork/(GameSpy/|GeneralsOnline/|WOLBrowser/|GameSpy\\w*\\.cpp|LANAPI\\w*\\.cpp|NAT\\.cpp|FirewallHelper\\.cpp|Connection(Manager)?\\.cpp|DisconnectManager\\.cpp|Network\\.cpp|GUIUtil\\.cpp|Transport\\.cpp|udp\\.cpp|FileTransfer\\.cpp|DownloadManager\\.cpp|IPEnumeration\\.cpp|NetPacket\\w*\\.cpp|NetCommand\\w*\\.cpp|NetMessageStream\\.cpp|FrameData\\w*\\.cpp|FrameMetrics\\.cpp|User\\.cpp)", NET),
     (GLOBAL, "", "s_commandID", "network command ID counter (NetworkUtil GenerateNextCommandID): only networked games' NetCommandMsgs take IDs; " + NET),
     (GLOBAL, "", "file:/WWDownload/", "patch/map downloader (menus only), one per process"),
-    (GLOBAL, "", "re:(Unicode|Ascii)StringToQuotedPrintable\\(.*\\)::dest|QuotedPrintableTo(Unicode|Ascii)String\\(.*\\)::dest", "only the LAN/online lobby code calls these: " + NET),
+    (PER, 4, "re:(Unicode|Ascii)StringToQuotedPrintable\\(.*\\)::dest|QuotedPrintableTo(Unicode|Ascii)String\\(.*\\)::dest", "threads only: conversion scratch, copied into the returned string at once; every engine's map cache load and save (INIMapCache, MapCache) reach it, headless too"),
     (GLOBAL, "", "re:Return_Buffer|Temp_Buffer", "password encryption for the online login menu: " + NET),
     (GLOBAL, "", "re:TheLobbyQueuedUTMs.*", "GameSpy lobby menu queue (menu state; one UI engine per process)"),
     (GLOBAL, "", "re:CPUDetectClass::\\w+|Windows9xVersionTable", "CPU/OS detection, done once per process at static initialization"),
@@ -178,7 +187,7 @@ HAND = [
     (GLOBAL, "", "INIClass::KeepBlankEntries", "WWLib INI parser option, never changed"),
     (GLOBAL, "", "re:_DefaultFileFactory|_DefaultWritingFileFactory|_TheWritingFileFactory", "WWLib default (raw) file factories"),
     (GLOBAL, "", "re:SaveLoadSystemClass::\\w+|DefinitionFactoryMgrClass::_FactoryListHead|_TheDefinitionMgr|DefinitionMgrClass::\\w+|text_mutex|status_text|status_count|_(alloc|load|reg)_time", "WWSaveLoad registries (persist factories registered at static init; the definition manager is used only by W3DView/tools)"),
-    (GLOBAL, "", "LookupTableMgrClass::Tables", "WWMath lookup-table manager (tools/W3DView); not used by the game"),
+    (GLOBAL, "", "LookupTableMgrClass::Tables", "WWMath's lookup-table list: the first of the counted WWMath::Init calls (PLAN-023 Phase 3) adds its default table and the last Shutdown frees it; no game code adds or reads a table (only W3DView does)"),
     (GLOBAL, "", "re:CollisionMath::Stats", "collision-math statistics counters (debug display)"),
     (GLOBAL, "", "OpenALAudioManager::isOnScreen(Coord3D const*) const::dummy", "write-only out-parameter, never read"),
     (GLOBAL, "", "s_screenshotWrittenQueue", "screenshot writer queue (render mode; its thread reads no engine state)"),
@@ -237,20 +246,19 @@ HAND = [
     (CONST, "", "commandWindowsInitialized", "never written (nothing but its definition names it)"),
     (CONST, "", "WindowLayoutCurrentVersion", "never written"),
     (CONST, "", "re:(guard variable for )?GameWindowManager::assignDefaultGadgetLook\\(.*\\)::\\w+", "set on the first call to a fixed color (winMakeColor of constants), the same in every engine"),
-    (RENDER, "", "ControlBar::m_containData", "written only by the context UI (evaluateContextUI, from ControlBar::update, which returns at once headless) and button clicks: " + UI),
     (RENDER, "", "re:ControlBar::populateBuildQueue\\(.*\\)::cancel(Unit|Upgrade)Command", "cached CommandButton*, but populateBuildQueue runs only from evaluateContextUI (ControlBar::update returns at once headless): " + UI),
     (RENDER, "", "re:ControlBar::(showBuildTooltipLayout|populateBuildTooltipLayout)\\(.*\\)::\\w+", "tooltip on mouse hover over a command button (commandButtonTooltip): " + UI),
     (RENDER, "", "re:radioButton(InGame|Buddies)|win(InGame|Buddies|Solo)", "written only by ShowDiplomacy (player input) and the online buddy overlay: " + UI),
-    (RENDER, "", "re:inGameChatType|ToggleInGameChat\\(bool\\)::justHid", "chat type and toggle, set only on player input (Show/ToggleInGameChat): " + UI),
+    (RENDER, "", "ToggleInGameChat(bool)::justHid", "chat toggle, set only on player input (ToggleInGameChat, from CommandXlat's chat keys): " + UI),
     (RENDER, "", "re:staticTextMessage|buttonOk|shouldPause", "InGamePopupMessageInit only: headless, InGameUI::popupMessage's layout has no init (GameWindowManagerDummy's winCreateFromScript returns no init name): " + UI),
-    (UNREVIEWED, "", "re:ShellGameLoadScreen::init\\(.*\\)::firstLoad|ChallengeLoadScreen::activatePieces\\(.*\\)::textPos\\w+", "load-screen state: GameLogic::startNewGame makes and inits a load screen headless too (a shell game's or a challenge campaign's); not yet reviewed whether a headless engine's use of these can change the rendering engine's"),
+    (RENDER, "", "re:ChallengeLoadScreen::activatePieces\\(.*\\)::textPos\\w+", "Generals' Challenge load screen teletype positions: GameLogic::getLoadScreen makes a ChallengeLoadScreen only for a challenge campaign, which only the shell's Generals' Challenge menu starts (" + UI + "); they are also reset (FRAME_TELETYPE_START) and consumed within one ChallengeLoadScreen::init call"),
     (RENDER, "", "file:/GUI/(?!" + HEADLESS_GUI + ")", UI),
-    (RENDER, "", "re:m_replayWindow|ScriptActions::m_messageWindow", "GameWindow pointer, null with GameWindowManagerDummy: " + UI),
     (RENDER, "", "re:scrollDir|prevCursor|Mouse::updateMouseData\\(\\)::busy", "mouse/scroll input: headless has MouseDummy and no input"),
     (RENDER, "", "re:W3DRadar::.*", "W3DRadar: headless has RadarDummy"),
     (RENDER, "", "re:W3DDisplay::draw\\(\\)::\\w+|s_filtered(Resolutions|Dirty)", "W3DDisplay::draw returns at once headless; resolution list for the options menu"),
     (RENDER, "", "re:W3DView::update\\(\\)::followFactor", "W3DView: headless has ViewDummy"),
     (RENDER, "", "re:SmudgeSet::m_freeSmudgeList", "heat-haze smudges, drawn only"),
+    (GLOBAL, "", "DX8Wrapper_IsWindowed", "the process's assert switch (Debug.cpp's ignoringAsserts): every headless engine's command line (parseHeadless) sets it false, so asserts stay off after TheGlobalData is gone too, and a rendering engine's DX8Wrapper::Set_Render_Device sets its windowed flag; the last writer wins, and while embedded mode is on, only assert handling (debug builds) reads it"),
     (RENDER, "", "file:/W3DDevice/GameClient/(Shadow|Water)/", W3D_RENDER),
     (RENDER, "", "file:W3DShaderManager\\.cpp|W3DMouse\\.cpp|W3DScene\\.cpp|W3DShroud\\.cpp|W3DStatusCircle\\.cpp|W3DTreeBuffer\\.cpp|FlatHeightMap\\.cpp|HeightMap\\.cpp|BaseHeightMap\\.cpp|W3DGhostObject\\.cpp|Win32Mouse\\.cpp", W3D_RENDER),
     # Only device-only WW3D2 files: mesh, meshmdl, meshgeometry, rendobj, texture, ww3d, dx8renderer,

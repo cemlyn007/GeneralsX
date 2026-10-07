@@ -310,6 +310,13 @@ GameEngine::~GameEngine()
 	TheGameResultsQueue->endThreads();
 
 #ifdef SAGE_USE_NGMP
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 28/09/2026 The online services session is the process's, and only a
+	// non-headless engine initialises it (GameEngine::init, which has made TheGlobalData by then), so only such an
+	// engine shuts it down: a headless engine's teardown must not end the rendering engine's session (PLAN-023
+	// Phase 4).
+	if (TheGlobalData != nullptr && !TheGlobalData->m_headless)
+#endif
 	NGMP_OnlineServicesManager::getInstance().shutdown();
 #endif
 

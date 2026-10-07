@@ -244,7 +244,13 @@ UpdateSleepTime StealthDetectorUpdate::update()
 					if( doFeedback )
 					{
  						// audio msg
+#if RTS_ENGINE_CONTEXT
+ 						// GeneralsX @feature cemlyn007 28/09/2026 Per engine: the event keeps this engine's event info and sound rotation (PLAN-023 Phase 4).
+ 						static rts::PerEngineStatic<AudioEventRTS> discoveredSound_perEngine([](AudioEventRTS& event) { event = TheAudio->getMiscAudio()->m_stealthDiscoveredSound; });
+ 						AudioEventRTS& discoveredSound = discoveredSound_perEngine.get();
+#else
  						static AudioEventRTS discoveredSound = TheAudio->getMiscAudio()->m_stealthDiscoveredSound;
+#endif
  						discoveredSound.setPlayerIndex( self->getControllingPlayer()->getPlayerIndex() );
  						TheAudio->addAudioEvent( &discoveredSound );
  						// ui msg
@@ -280,7 +286,13 @@ UpdateSleepTime StealthDetectorUpdate::update()
 					{
 
  						// audio msg
+#if RTS_ENGINE_CONTEXT
+ 						// GeneralsX @feature cemlyn007 28/09/2026 Per engine: the event keeps this engine's event info and sound rotation (PLAN-023 Phase 4).
+ 						static rts::PerEngineStatic<AudioEventRTS> neutralizedSound_perEngine([](AudioEventRTS& event) { event = TheAudio->getMiscAudio()->m_stealthNeutralizedSound; });
+ 						AudioEventRTS& neutralizedSound = neutralizedSound_perEngine.get();
+#else
  						static AudioEventRTS neutralizedSound = TheAudio->getMiscAudio()->m_stealthNeutralizedSound;
+#endif
  						neutralizedSound.setPlayerIndex( them->getControllingPlayer()->getPlayerIndex() );
  						TheAudio->addAudioEvent( &neutralizedSound );
  						// ui msg

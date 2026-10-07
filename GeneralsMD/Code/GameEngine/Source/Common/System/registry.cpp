@@ -32,6 +32,9 @@
 #include "WWLib/registryini.h"
 
 #include <ctype.h>
+#if RTS_ENGINE_CONTEXT
+#include <mutex>
+#endif
 #include <stdlib.h>
 #include <sys/stat.h>
 
@@ -491,6 +494,18 @@ Bool GetUnsignedIntFromRegistry(AsciiString path, AsciiString key, UnsignedInt& 
 // GeneralsX @feature felipebraz 20/08/2026 Cross-platform language retrieval with BIG autodetect fallback
 AsciiString GetRegistryLanguage()
 {
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 28/09/2026 A process-global string, so it is written exactly once, under
+	// std::call_once, and never mutated afterwards (PLAN-023 Phase 4): every engine reads the same install,
+	// so the first caller's answer is every engine's.
+	static std::once_flag once;
+	static AsciiString val = "english";
+	std::call_once(once, []() {
+		if (!GetStringFromRegistry("", "Language", val))
+			tryAutoDetectLanguage(val);
+	});
+	return val;
+#else
 	static Bool cached = FALSE;
 	// NOTE: static causes a memory leak, but we have to keep it because the value is cached.
 	static AsciiString val = "english";
@@ -511,6 +526,7 @@ AsciiString GetRegistryLanguage()
 	}
 
 	return val;
+#endif
 }
 
 AsciiString GetRegistryGameName()

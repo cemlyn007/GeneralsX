@@ -57,6 +57,26 @@
 
 
 // PRIVATE DATA ///////////////////////////////////////////////////////////////////////////////////
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 28/09/2026 Per engine: HideQuitMenu runs in every engine's
+// GameLogic::clearGameData (headless too) and, when the menu is visible, clears these and destroys the
+// confirmation window through the current engine's window manager, so shared, a headless engine's game end
+// would close the rendering engine's quit menu (PLAN-023 Phase 4). The macros keep the uses unchanged.
+struct QuitMenuState
+{
+	WindowLayout *quitMenuLayout;
+	WindowLayout *fullQuitMenuLayout;
+	WindowLayout *noSaveLoadQuitMenuLayout;
+	Bool isVisible;
+	GameWindow *quitConfirmationWindow;
+};
+static rts::PerEngineStatic<QuitMenuState> s_quitMenuState_perEngine;
+#define quitMenuLayout (s_quitMenuState_perEngine.get().quitMenuLayout)
+#define fullQuitMenuLayout (s_quitMenuState_perEngine.get().fullQuitMenuLayout)
+#define noSaveLoadQuitMenuLayout (s_quitMenuState_perEngine.get().noSaveLoadQuitMenuLayout)
+#define isVisible (s_quitMenuState_perEngine.get().isVisible)
+#define quitConfirmationWindow (s_quitMenuState_perEngine.get().quitConfirmationWindow)
+#else
 static WindowLayout *quitMenuLayout = nullptr;
 static WindowLayout *fullQuitMenuLayout = nullptr;
 static WindowLayout *noSaveLoadQuitMenuLayout = nullptr;
@@ -64,6 +84,7 @@ static WindowLayout *noSaveLoadQuitMenuLayout = nullptr;
 static Bool isVisible = FALSE;
 
 static GameWindow *quitConfirmationWindow = nullptr;
+#endif
 
 //external declarations of the Gadgets the callbacks can use
 static WindowLayout *saveLoadMenuLayout = nullptr;

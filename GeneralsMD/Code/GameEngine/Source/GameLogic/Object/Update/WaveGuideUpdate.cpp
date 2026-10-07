@@ -252,9 +252,19 @@ Bool WaveGuideUpdate::initWaveGuide()
 	// compute the wave shape points
 	computeWaveShapePoints();
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 28/09/2026 Per engine: the cached template is this engine's (PLAN-023 Phase 4).
+	static rts::PerEngineStatic<const ParticleSystemTemplate *> wave1_perEngine;
+	const ParticleSystemTemplate *wave1 = wave1_perEngine.get([&](const ParticleSystemTemplate *&value) { value = TheParticleSystemManager->findTemplate( "WaveSpray01" ); });
+	static rts::PerEngineStatic<const ParticleSystemTemplate *> wave2_perEngine;
+	const ParticleSystemTemplate *wave2 = wave2_perEngine.get([&](const ParticleSystemTemplate *&value) { value = TheParticleSystemManager->findTemplate( "WaveSpray02" ); });
+	static rts::PerEngineStatic<const ParticleSystemTemplate *> wave3_perEngine;
+	const ParticleSystemTemplate *wave3 = wave3_perEngine.get([&](const ParticleSystemTemplate *&value) { value = TheParticleSystemManager->findTemplate( "WaveSpray03" ); });
+#else
 	static const ParticleSystemTemplate *wave1 = TheParticleSystemManager->findTemplate( "WaveSpray01" );
 	static const ParticleSystemTemplate *wave2 = TheParticleSystemManager->findTemplate( "WaveSpray02" );
 	static const ParticleSystemTemplate *wave3 = TheParticleSystemManager->findTemplate( "WaveSpray03" );
+#endif
 	ParticleSystem *particleSys;
 
 	// create wavespray particle system and attach to object
@@ -479,8 +489,16 @@ void WaveGuideUpdate::doShoreEffects()
 	// go across the shape of our wave ... when we detect a transition from underground to
 	// above ground or vice verse, that is a shoreline ... play an effect between those points
 	//
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 28/09/2026 Per engine: the cached template is this engine's (PLAN-023 Phase 4).
+	static rts::PerEngineStatic<const ParticleSystemTemplate *> left_perEngine;
+	const ParticleSystemTemplate *left = left_perEngine.get([&](const ParticleSystemTemplate *&value) { value = TheParticleSystemManager->findTemplate( "WaveSplashLeft01" ); });
+	static rts::PerEngineStatic<const ParticleSystemTemplate *> right_perEngine;
+	const ParticleSystemTemplate *right = right_perEngine.get([&](const ParticleSystemTemplate *&value) { value = TheParticleSystemManager->findTemplate( "WaveSplashRight01" ); });
+#else
 	static const ParticleSystemTemplate *left = TheParticleSystemManager->findTemplate( "WaveSplashLeft01" );
 	static const ParticleSystemTemplate *right = TheParticleSystemManager->findTemplate( "WaveSplashRight01" );
+#endif
 	ParticleSystem *particleSystem;
 	Real terrainZ;
 	Bool underWater = TRUE;
@@ -616,7 +634,13 @@ void WaveGuideUpdate::doDamage()
 				// if object was not wet before we kill it and play effects
 				if( !obj->getStatusBits().test( OBJECT_STATUS_WET ) )
 				{
+#if RTS_ENGINE_CONTEXT
+					// GeneralsX @feature cemlyn007 28/09/2026 Per engine: the cached template is this engine's (PLAN-023 Phase 4).
+					static rts::PerEngineStatic<const ParticleSystemTemplate *> splash_perEngine;
+					const ParticleSystemTemplate *splash = splash_perEngine.get([&](const ParticleSystemTemplate *&value) { value = TheParticleSystemManager->findTemplate( "WaveHit01" ); });
+#else
 					static const ParticleSystemTemplate *splash = TheParticleSystemManager->findTemplate( "WaveHit01" );
+#endif
 					ParticleSystem *particleSystem;
 
 					// create particle system at position
@@ -831,7 +855,13 @@ UpdateSleepTime WaveGuideUpdate::update()
 	v.y = m_finalDestination.y - currentPos->y;
 	if( v.x * v.x + v.y * v.y <= distSquared )
 	{
+#if RTS_ENGINE_CONTEXT
+		// GeneralsX @feature cemlyn007 28/09/2026 Per engine: the cached template is this engine's (PLAN-023 Phase 4).
+		static rts::PerEngineStatic<const ParticleSystemTemplate *> waveSplash_perEngine;
+		const ParticleSystemTemplate *waveSplash = waveSplash_perEngine.get([&](const ParticleSystemTemplate *&value) { value = TheParticleSystemManager->findTemplate( "WaveSplash01" ); });
+#else
 		static const ParticleSystemTemplate *waveSplash = TheParticleSystemManager->findTemplate( "WaveSplash01" );
+#endif
 		ParticleSystem *particleSys;
 
 		// create splash effect

@@ -1206,7 +1206,14 @@ ShellGameLoadScreen::~ShellGameLoadScreen()
 
 void ShellGameLoadScreen::init( GameInfo *game )
 {
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 28/09/2026 Per engine: a headless engine plays replays through this load screen
+	// too, and must not use up the rendering engine's first-load title screen (PLAN-023 Phase 4).
+	static rts::PerEngineStatic<BOOL> firstLoad_perEngine([](BOOL& value) { value = TRUE; });
+	BOOL& firstLoad = firstLoad_perEngine.get();
+#else
 	static BOOL firstLoad = TRUE;
+#endif
 
 
 	// create the layout of the load screen

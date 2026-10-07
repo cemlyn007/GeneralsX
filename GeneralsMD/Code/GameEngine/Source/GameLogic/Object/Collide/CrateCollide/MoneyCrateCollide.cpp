@@ -81,7 +81,13 @@ Int MoneyCrateCollide::getUpgradedSupplyBoost( Object *other ) const
 		upgradePair info = *it;
 
 		// Check if the player has the desired upgrade. If so return the boost
+#if RTS_ENGINE_CONTEXT
+		// GeneralsX @feature cemlyn007 28/09/2026 Per engine: the cached template is this engine's (PLAN-023 Phase 4).
+		static rts::PerEngineStatic<const UpgradeTemplate *> upgradeTemplate_perEngine;
+		const UpgradeTemplate *upgradeTemplate = upgradeTemplate_perEngine.get([&](const UpgradeTemplate *&value) { value = TheUpgradeCenter->findUpgrade( info.type.c_str() ); });
+#else
 		static const UpgradeTemplate *upgradeTemplate = TheUpgradeCenter->findUpgrade( info.type.c_str() );
+#endif
 		if (player && upgradeTemplate && player->hasUpgradeComplete(upgradeTemplate))
 		{
 			return info.amount;

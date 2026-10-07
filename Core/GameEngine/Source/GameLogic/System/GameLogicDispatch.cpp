@@ -178,7 +178,13 @@ static void doSetRallyPoint( Object *obj, const Coord3D& pos )
 			TheInGameUI->message( TheGameText->fetch( "GUI:RallyPointNoPath" ) );
 
 			// play the no can do sound
+#if RTS_ENGINE_CONTEXT
+			// GeneralsX @feature cemlyn007 28/09/2026 Per engine: the event keeps this engine's event info and sound rotation (PLAN-023 Phase 4).
+			static rts::PerEngineStatic<AudioEventRTS> rallyNotSet_perEngine([](AudioEventRTS& event) { event.setEventName("UnableToSetRallyPoint"); });
+			AudioEventRTS& rallyNotSet = rallyNotSet_perEngine.get();
+#else
 			static AudioEventRTS rallyNotSet("UnableToSetRallyPoint");
+#endif
 			rallyNotSet.setPosition(&pos);
 			rallyNotSet.setPlayerIndex(obj->getControllingPlayer()->getPlayerIndex());
 			TheAudio->addAudioEvent(&rallyNotSet);
@@ -200,7 +206,13 @@ static void doSetRallyPoint( Object *obj, const Coord3D& pos )
 		TheInGameUI->message( info );
 
 		// play a sound for setting the rally point
+#if RTS_ENGINE_CONTEXT
+		// GeneralsX @feature cemlyn007 28/09/2026 Per engine: the event keeps this engine's event info and sound rotation (PLAN-023 Phase 4).
+		static rts::PerEngineStatic<AudioEventRTS> rallyPointSet_perEngine([](AudioEventRTS& event) { event.setEventName("RallyPointSet"); });
+		AudioEventRTS& rallyPointSet = rallyPointSet_perEngine.get();
+#else
 		static AudioEventRTS rallyPointSet("RallyPointSet");
+#endif
 		rallyPointSet.setPosition(&pos);
 		rallyPointSet.setPlayerIndex(obj->getControllingPlayer()->getPlayerIndex());
 		TheAudio->addAudioEvent(&rallyPointSet);
@@ -1974,7 +1986,13 @@ bool GameLogic::onDozerConstruct(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &curr
 
 	// place the sound for putting a building down
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 28/09/2026 Per engine: the event keeps this engine's event info and sound rotation (PLAN-023 Phase 4).
+	static rts::PerEngineStatic<AudioEventRTS> placeBuilding_perEngine([](AudioEventRTS& event) { event.setEventName("PlaceBuilding"); });
+	AudioEventRTS& placeBuilding = placeBuilding_perEngine.get();
+#else
 	static AudioEventRTS placeBuilding("PlaceBuilding");
+#endif
 	placeBuilding.setObjectID(constructorObject->getID());
 	TheAudio->addAudioEvent( &placeBuilding );
 
@@ -2153,7 +2171,13 @@ bool GameLogic::onPlaceBeacon(MAYBE_UNUSED GameMessage *msg)
 				TheInGameUI->message( TheGameText->fetch("GUI:TooManyBeacons") );
 
 				// play a sound
+#if RTS_ENGINE_CONTEXT
+				// GeneralsX @feature cemlyn007 28/09/2026 Per engine: the event keeps this engine's event info and sound rotation (PLAN-023 Phase 4).
+				static rts::PerEngineStatic<AudioEventRTS> aSound_perEngine([](AudioEventRTS& event) { event.setEventName("BeaconPlacementFailed"); });
+				AudioEventRTS& aSound = aSound_perEngine.get();
+#else
 				static AudioEventRTS aSound("BeaconPlacementFailed");
+#endif
 				aSound.setPosition(&pos);
 				aSound.setPlayerIndex(msgPlayer->getPlayerIndex());
 				TheAudio->addAudioEvent(&aSound);
@@ -2173,7 +2197,13 @@ bool GameLogic::onPlaceBeacon(MAYBE_UNUSED GameMessage *msg)
 			TheInGameUI->message( s );
 
 			// play a sound
+#if RTS_ENGINE_CONTEXT
+			// GeneralsX @feature cemlyn007 28/09/2026 Per engine: the event keeps this engine's event info and sound rotation (PLAN-023 Phase 4).
+			static rts::PerEngineStatic<AudioEventRTS> aSound_perEngine([](AudioEventRTS& event) { event.setEventName("BeaconPlaced"); });
+			AudioEventRTS& aSound = aSound_perEngine.get();
+#else
 			static AudioEventRTS aSound("BeaconPlaced");
+#endif
 			aSound.setPlayerIndex(msgPlayer->getPlayerIndex());
 			aSound.setPosition(&pos);
 			TheAudio->addAudioEvent(&aSound);
@@ -2215,7 +2245,13 @@ bool GameLogic::onPlaceBeacon(MAYBE_UNUSED GameMessage *msg)
 		TheInGameUI->message( TheGameText->fetch("GUI:BeaconPlacementFailed") );
 
 		// play a sound
+#if RTS_ENGINE_CONTEXT
+		// GeneralsX @feature cemlyn007 28/09/2026 Per engine: the event keeps this engine's event info and sound rotation (PLAN-023 Phase 4).
+		static rts::PerEngineStatic<AudioEventRTS> aSound_perEngine([](AudioEventRTS& event) { event.setEventName("BeaconPlacementFailed"); });
+		AudioEventRTS& aSound = aSound_perEngine.get();
+#else
 		static AudioEventRTS aSound("BeaconPlacementFailed");
+#endif
 		aSound.setPosition(&pos);
 		aSound.setPlayerIndex(msgPlayer->getPlayerIndex());
 		TheAudio->addAudioEvent(&aSound);
