@@ -56,7 +56,9 @@
 
 
 // GLOBALS ////////////////////////////////////////////////////////////////////////////////////////
+#if !RTS_ENGINE_CONTEXT
 Radar *TheRadar = nullptr;  ///< the radar global singleton
+#endif
 
 // PRIVATE ////////////////////////////////////////////////////////////////////////////////////////
 #define RADAR_QUEUE_TERRAIN_REFRESH_DELAY (static_cast<float>(LOGICFRAMES_PER_SECOND) * 3.0f)
@@ -1098,7 +1100,13 @@ void Radar::tryUnderAttackEvent( const Object *obj )
 			TheInGameUI->message( "RADAR:StructureUnderAttack" );
 
 			// play audio event
+#if RTS_ENGINE_CONTEXT
+			// GeneralsX @feature cemlyn007 28/09/2026 Per engine: the event keeps this engine's event info and sound rotation (PLAN-023 Phase 4).
+			static rts::PerEngineStatic<AudioEventRTS> structureAttackSound_perEngine([](AudioEventRTS& event) { event = TheAudio->getMiscAudio()->m_radarStructureUnderAttackSound; });
+			AudioEventRTS& structureAttackSound = structureAttackSound_perEngine.get();
+#else
 			static AudioEventRTS structureAttackSound = TheAudio->getMiscAudio()->m_radarStructureUnderAttackSound;
+#endif
 			structureAttackSound.setPlayerIndex(player->getPlayerIndex());
 			TheAudio->addAudioEvent( &structureAttackSound );
 
@@ -1110,7 +1118,13 @@ void Radar::tryUnderAttackEvent( const Object *obj )
 			TheInGameUI->message( "RADAR:UnderAttack" );
 
 			// play audio event
+#if RTS_ENGINE_CONTEXT
+			// GeneralsX @feature cemlyn007 28/09/2026 Per engine: the event keeps this engine's event info and sound rotation (PLAN-023 Phase 4).
+			static rts::PerEngineStatic<AudioEventRTS> underAttackSound_perEngine([](AudioEventRTS& event) { event = TheAudio->getMiscAudio()->m_radarStructureUnderAttackSound; });
+			AudioEventRTS& underAttackSound = underAttackSound_perEngine.get();
+#else
 			static AudioEventRTS underAttackSound = TheAudio->getMiscAudio()->m_radarStructureUnderAttackSound;
+#endif
 			underAttackSound.setPlayerIndex(player->getPlayerIndex());
 			TheAudio->addAudioEvent( &underAttackSound );
 
@@ -1154,7 +1168,13 @@ void Radar::tryInfiltrationEvent( const Object *obj )
 	TheInGameUI->message( "RADAR:Infiltration" );
 
 	// play audio event
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 28/09/2026 Per engine: the event keeps this engine's event info and sound rotation (PLAN-023 Phase 4).
+	static rts::PerEngineStatic<AudioEventRTS> infiltrationWarningSound_perEngine([](AudioEventRTS& event) { event = TheAudio->getMiscAudio()->m_radarInfiltrationSound; });
+	AudioEventRTS& infiltrationWarningSound = infiltrationWarningSound_perEngine.get();
+#else
 	static AudioEventRTS infiltrationWarningSound = TheAudio->getMiscAudio()->m_radarInfiltrationSound;
+#endif
 	infiltrationWarningSound.setPlayerIndex(player->getPlayerIndex());
 	TheAudio->addAudioEvent( &infiltrationWarningSound );
 

@@ -93,7 +93,9 @@ namespace rts
 };
 
 // GLOBALS ////////////////////////////////////////////////////////////////////////////////////////
+#if !RTS_ENGINE_CONTEXT
 ScriptConditionsInterface *TheScriptConditions = nullptr;
+#endif
 
 class TransportStatus : public MemoryPoolObject
 {
@@ -116,7 +118,14 @@ TransportStatus::~TransportStatus()
 }
 
 //-------------------------------------------------------------------------------------------------
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 28/09/2026 Per engine: the transport-status cache is this engine's scripts'
+// (PLAN-023 Phase 2).
+static rts::PerEngineStatic<TransportStatus *> s_transportStatuses_perEngine;
+#define s_transportStatuses (s_transportStatuses_perEngine.get())
+#else
 static TransportStatus *s_transportStatuses;
+#endif
 
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------

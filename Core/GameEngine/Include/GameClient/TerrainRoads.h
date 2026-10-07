@@ -221,9 +221,13 @@ protected:
 
 	TerrainRoadType *m_roadList;				///< list of available roads
 	TerrainRoadType *m_bridgeList;			///< list of available bridges
+#if !RTS_ENGINE_CONTEXT
 	static UnsignedInt m_idCounter;			///< unique id counter when allocating roads/bridges
+#endif
 
 };
 
 // EXTERNAL ////////////////////////////////////////////////////////////////////////////////////////
+#if !RTS_ENGINE_CONTEXT
 extern TerrainRoadCollection *TheTerrainRoads;
+#endif

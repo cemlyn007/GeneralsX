@@ -172,7 +172,9 @@ GameSpyPeerMessageQueueInterface* GameSpyPeerMessageQueueInterface::createNewMes
 	return NEW GameSpyPeerMessageQueue;
 }
 
+#if !RTS_ENGINE_CONTEXT
 GameSpyPeerMessageQueueInterface *TheGameSpyPeerMessageQueue;
+#endif
 #define MESSAGE_QUEUE ((GameSpyPeerMessageQueue *)TheGameSpyPeerMessageQueue)
 
 //-------------------------------------------------------------------------

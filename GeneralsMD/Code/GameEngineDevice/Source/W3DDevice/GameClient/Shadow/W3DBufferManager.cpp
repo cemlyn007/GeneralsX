@@ -26,7 +26,9 @@
 #include "Common/Debug.h"
 #include "W3DDevice/GameClient/W3DBufferManager.h"
 
+#if !RTS_ENGINE_CONTEXT
 W3DBufferManager *TheW3DBufferManager=nullptr;	//singleton
+#endif
 
 static int FVFTypeIndexList[W3DBufferManager::MAX_FVF]=
 {

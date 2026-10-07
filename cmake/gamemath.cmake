@@ -46,6 +46,13 @@ if(SAGE_USE_DETERMINISTIC_MATH)
     # Make GameMath available (FetchContent_MakeAvailable is idempotent)
     FetchContent_MakeAvailable(gamemath)
 
+    # GeneralsX @build cemlyn007 29/09/2026 RTS_SANITIZE (PLAN-023 Phase 5b item 5)
+    # GameMath sets its own POSITION_INDEPENDENT_CODE (to BUILD_SHARED_LIBS), over CMAKE_POSITION_INDEPENDENT_CODE:
+    # an instrumented libgm.a linked into a shared engine library must be PIC (see compilers.cmake).
+    if(RTS_SANITIZE)
+        set_target_properties(gamemath PROPERTIES POSITION_INDEPENDENT_CODE ON)
+    endif()
+
     # Ensure GameMath includes are available to ALL targets
     # to prevent one-definition-rule violations and ensure USE_DETERMINISTIC_MATH activates consistently.
     include_directories(${gamemath_SOURCE_DIR}/include)

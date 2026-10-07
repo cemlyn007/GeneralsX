@@ -52,7 +52,14 @@
 
 #include "dx8texman.h"
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 30/09/2026 Per engine: the default-pool textures of the engine's own device, which it
+// releases and recreates around a device reset, and Shutdown forgets (PLAN-023 Phase 8, stage RR2b).
+static rts::PerEngineStatic<TextureTrackerList> Managed_Textures_perEngine;
+#define Managed_Textures (Managed_Textures_perEngine.get())
+#else
 TextureTrackerList DX8TextureManagerClass::Managed_Textures;
+#endif
 
 
 /***********************************************************************************************

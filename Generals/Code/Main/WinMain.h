@@ -40,5 +40,6 @@
 
 // EXTERNAL ///////////////////////////////////////////////////////////////////
 extern HINSTANCE ApplicationHInstance;  ///< our application instance
-extern HWND ApplicationHWnd;  ///< our application window handle
+// GeneralsX @refactor cemlyn007 30/09/2026 The window handles (PLAN-023 Phase 8, stage RR2a-2).
+#include "Common/ApplicationWindow.h"
 extern Win32Mouse *TheWin32Mouse;  ///< global for win32 mouse only!

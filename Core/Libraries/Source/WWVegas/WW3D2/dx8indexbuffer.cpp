@@ -47,6 +47,42 @@
 
 #define DEFAULT_IB_SIZE 5000
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 30/09/2026 Per engine: the dynamic index buffers, their cursors and the buffer
+// statistics, so that each render engine draws through buffers made on its own device (PLAN-023 Phase 8, stage
+// RR2b). Do_Onetime_Device_Dependent_Shutdowns releases the buffers (_Deinit) as before.
+namespace
+{
+struct DynamicIndexBufferState
+{
+	bool _DynamicSortingIndexArrayInUse = false;
+	SortingIndexBufferClass* _DynamicSortingIndexArray = nullptr;
+	unsigned short _DynamicSortingIndexArraySize = 0;
+	unsigned short _DynamicSortingIndexArrayOffset = 0;
+
+	bool _DynamicDX8IndexBufferInUse = false;
+	DX8IndexBufferClass* _DynamicDX8IndexBuffer = nullptr;
+	unsigned short _DynamicDX8IndexBufferSize = DEFAULT_IB_SIZE;
+	unsigned short _DynamicDX8IndexBufferOffset = 0;
+
+	int _IndexBufferCount = 0;
+	int _IndexBufferTotalIndices = 0;
+	int _IndexBufferTotalSize = 0;
+};
+rts::PerEngineStatic<DynamicIndexBufferState> DynamicIndexBufferState_perEngine;
+} // namespace
+#define _DynamicSortingIndexArrayInUse (DynamicIndexBufferState_perEngine.get()._DynamicSortingIndexArrayInUse)
+#define _DynamicSortingIndexArray (DynamicIndexBufferState_perEngine.get()._DynamicSortingIndexArray)
+#define _DynamicSortingIndexArraySize (DynamicIndexBufferState_perEngine.get()._DynamicSortingIndexArraySize)
+#define _DynamicSortingIndexArrayOffset (DynamicIndexBufferState_perEngine.get()._DynamicSortingIndexArrayOffset)
+#define _DynamicDX8IndexBufferInUse (DynamicIndexBufferState_perEngine.get()._DynamicDX8IndexBufferInUse)
+#define _DynamicDX8IndexBuffer (DynamicIndexBufferState_perEngine.get()._DynamicDX8IndexBuffer)
+#define _DynamicDX8IndexBufferSize (DynamicIndexBufferState_perEngine.get()._DynamicDX8IndexBufferSize)
+#define _DynamicDX8IndexBufferOffset (DynamicIndexBufferState_perEngine.get()._DynamicDX8IndexBufferOffset)
+#define _IndexBufferCount (DynamicIndexBufferState_perEngine.get()._IndexBufferCount)
+#define _IndexBufferTotalIndices (DynamicIndexBufferState_perEngine.get()._IndexBufferTotalIndices)
+#define _IndexBufferTotalSize (DynamicIndexBufferState_perEngine.get()._IndexBufferTotalSize)
+#else
 static bool _DynamicSortingIndexArrayInUse=false;
 static SortingIndexBufferClass* _DynamicSortingIndexArray;
 static unsigned short _DynamicSortingIndexArraySize=0;
@@ -60,6 +96,7 @@ static unsigned short _DynamicDX8IndexBufferOffset=0;
 static int _IndexBufferCount;
 static int _IndexBufferTotalIndices;
 static int _IndexBufferTotalSize;
+#endif
 
 // ----------------------------------------------------------------------------
 //

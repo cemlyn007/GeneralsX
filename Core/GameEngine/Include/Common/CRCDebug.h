@@ -97,7 +97,14 @@
 
 	extern Bool g_keepCRCSaves;
 	extern Bool g_saveDebugCRCPerFrame;
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @fix cemlyn007 03/10/2026 Per engine: every boot given -saveDebugCRCPerFrame assigns it, and two threads
+	// must not write one AsciiString object (the atomic refcount only covers buffers shared between copies).
+	extern rts::PerEngineStatic<AsciiString> g_saveDebugCRCPerFrameDir_perEngine;
+	#define g_saveDebugCRCPerFrameDir (g_saveDebugCRCPerFrameDir_perEngine.get())
+#else
 	extern AsciiString g_saveDebugCRCPerFrameDir;
+#endif
 
 	extern Bool g_logObjectCRCs;
 
@@ -124,5 +131,11 @@
 #endif
 
 extern Int NET_CRC_INTERVAL;
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 28/09/2026 Per engine (an EngineContext field, 100 to start with): replay
+// playback and -ReplayCRCInterval set it for their engine only (PLAN-023 Phase 2).
+#define REPLAY_CRC_INTERVAL (::rts::ctx()->replayCrcInterval)
+#else
 extern Int REPLAY_CRC_INTERVAL;
+#endif
 extern Bool TheDebugIgnoreSyncErrors;

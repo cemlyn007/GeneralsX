@@ -41,6 +41,7 @@
 #include "WW3D2/textureloader.h"
 #include "Common/GlobalData.h"
 #include "GameLogic/PartitionManager.h"
+#include "W3DDevice/GameClient/W3DDrawClock.h"	// GeneralsX @refactor cemlyn007 01/10/2026 (RR3)
 
 
 //-----------------------------------------------------------------------------
@@ -515,7 +516,8 @@ void W3DShroud::setBorderShroudLevel(W3DShroudLevel level)
 
 //-----------------------------------------------------------------------------
 ///@todo: remove this
-TextureClass *DummyTexture=nullptr;
+// GeneralsX @refactor cemlyn007 01/10/2026 DummyTexture, a global only LOAD_DUMMY_SHROUD's block used, is that block's
+// local (PLAN-023 Phase 8, stage RR3).
 
 //#define LOAD_DUMMY_SHROUD
 
@@ -571,7 +573,7 @@ void W3DShroud::render(CameraClass *cam)
 		src[m_numCellsX*8+9]=(char)0xff;
 		src[m_numCellsX*8+7]=(char)0xff;
 
-		DummyTexture=WW3DAssetManager::Get_Instance()->Get_Texture("shroud1024.tga");
+		TextureClass *DummyTexture=WW3DAssetManager::Get_Instance()->Get_Texture("shroud1024.tga");
 
 		Short *dataDest=(Short *)((char *)m_srcTextureData);	//offset to correct row of full sysmem shroud
 		Int pitchDest = m_srcTexturePitch >> 1;	//2 bytes per pixel so divide byte count by 2.
@@ -729,9 +731,16 @@ void W3DShroud::render(CameraClass *cam)
 //-----------------------------------------------------------------------------
 void W3DShroud::interpolateFogLevels(RECT *rect)
 {
-	static UnsignedInt prevTime = timeGetTime();
+	// GeneralsX @refactor cemlyn007 01/10/2026 The shroud's own clock, on the draw clock (W3DDrawClock.h; PLAN-023
+	// Phase 8, stage RR3).
+	if (!m_fogInterpolationTimeSet)
+	{
+		m_fogInterpolationTime = W3D_DRAW_CLOCK_MS();
+		m_fogInterpolationTimeSet = true;
+	}
+	UnsignedInt& prevTime = m_fogInterpolationTime;
 
-	UnsignedInt timeDiff=timeGetTime()-prevTime;
+	UnsignedInt timeDiff=W3D_DRAW_CLOCK_MS()-prevTime;
 
 	if (!timeDiff)
 		return;	//no time has elapsed

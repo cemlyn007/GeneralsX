@@ -111,7 +111,7 @@ void outputCRCDebugLines()
 
 Int lastCRCDebugFrame = 0;
 Int lastCRCDebugIndex = 0;
-extern Bool inCRCGen;
+extern THREAD_LOCAL Bool inCRCGen;
 
 void CRCDebugStartNewGame()
 {

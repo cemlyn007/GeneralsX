@@ -119,6 +119,16 @@ class WaterTransparencySetting : public Overridable
 EMPTY_DTOR(WaterTransparencySetting)
 
 // EXTERNAL ///////////////////////////////////////////////////////////////////////////////////////
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 28/09/2026 Per engine (PLAN-023 Phase 3, pulled forward): every engine's
+// GameEngine::init parses Water.ini into these, so process-wide ones made the second live engine's parse
+// throw INI_INVALID_DATA. ~GameEngine frees the transparency setting it parsed.
+extern rts::PerEngineStatic<WaterSetting[ TIME_OF_DAY_COUNT ]> WaterSettings_perEngine;
+extern rts::PerEngineStatic<OVERRIDE<WaterTransparencySetting> > TheWaterTransparency_perEngine;
+#define WaterSettings (WaterSettings_perEngine.get())
+#define TheWaterTransparency (TheWaterTransparency_perEngine.get())
+#else
 extern WaterSetting WaterSettings[ TIME_OF_DAY_COUNT ];
 
 extern OVERRIDE<WaterTransparencySetting> TheWaterTransparency;
+#endif

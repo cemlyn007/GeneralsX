@@ -157,12 +157,34 @@ public:
 	AsciiString dumpTimesForAll();
 #endif
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 28/09/2026 Lifecycle nulling (PLAN-023 Phase 1). The engine
+	// context outlives its subsystems, so a singleton left pointing at a deleted subsystem would
+	// dangle into a later engine's boot. initSubsystem records where each subsystem's singleton
+	// lives, and shutdownAll nulls it right after deleting the subsystem (not before, as the
+	// destructors may still read their own singleton).
+	typedef void (*SingletonResetFn)(void* reference);
+	void recordSingletonReference(SubsystemInterface* sys, void* reference, SingletonResetFn reset);
+#endif
+
 private:
 
 	typedef std::vector<SubsystemInterface*> SubsystemList;
 	SubsystemList m_subsystems;
 	SubsystemList m_allSubsystems;
 
+#if RTS_ENGINE_CONTEXT
+	struct SingletonReference
+	{
+		SubsystemInterface* sys;
+		void* reference;
+		SingletonResetFn reset;
+	};
+	std::vector<SingletonReference> m_singletonReferences;
+#endif
+
 };
 
+#if !RTS_ENGINE_CONTEXT
 extern SubsystemInterfaceList* TheSubsystemList;
+#endif

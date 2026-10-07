@@ -647,6 +647,7 @@ GlobalData::GlobalData()
 	m_headless = FALSE;
 	// GeneralsX @bugfix cemlyn007 27/09/2026 Off-screen render mode is off by default, as in Zero Hour.
 	m_headlessRender = FALSE;
+	m_headlessAudio = FALSE;
 	// GeneralsX @feature BenderAI 21/04/2026 Default to TRUE; user can override via Options.ini
 	m_checkForUpdates = TRUE;
 	m_windowed = 0;
@@ -1118,6 +1119,12 @@ GlobalData *GlobalData::newOverride()
 	// copy the data from the latest override (TheWritableGlobalData) to the newly created instance
 	DEBUG_ASSERTCRASH( TheWritableGlobalData, ("GlobalData::newOverride() - no existing data") );
 	*overrideData = *TheWritableGlobalData;
+	// GeneralsX @bugfix cemlyn007 02/10/2026 operator= above is an unimplemented DEBUG_CRASH stub on
+	// VC6 (see GlobalData.h), so it copies nothing there: parseGameDataDefinition's guard (below) relies
+	// on this copy to give every override its user-data directory, since it only derives/creates the
+	// default for the original instance. Set it explicitly so a VC6 override is not left with an empty
+	// m_userDataDir; redundant on compilers where the memberwise copy above already did it.
+	overrideData->m_userDataDir = TheWritableGlobalData->m_userDataDir;
 
 	//
 	// link the override to the previously created one, the link order is important here
@@ -1179,6 +1186,15 @@ void GlobalData::reset()
 //-------------------------------------------------------------------------------------------------
 void GlobalData::parseGameDataDefinition( INI* ini )
 {
+	// GeneralsX @feature cemlyn007 30/09/2026 An off-screen render engine keeps the size its host set.
+	// With m_headlessRender, the host chose m_xResolution/m_yResolution before init (the size of
+	// its observation images), and neither GameData.ini nor the user's Options.ini Resolution,
+	// which the parse below applies and which may be shared with other processes or the game,
+	// may replace it: they are restored in memory at the end instead of pinned on disk.
+	const Bool keepRenderSize = TheWritableGlobalData != nullptr && TheWritableGlobalData->m_headlessRender;
+	const Int renderXResolution = keepRenderSize ? TheWritableGlobalData->m_xResolution : 0;
+	const Int renderYResolution = keepRenderSize ? TheWritableGlobalData->m_yResolution : 0;
+
 	if( TheWritableGlobalData && ini->getLoadType() != INI_LOAD_MULTIFILE)
 	{
 
@@ -1202,12 +1218,27 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 	// parse the ini weapon definition
 	ini->initFromINI( TheWritableGlobalData, s_GlobalDataFieldParseTable );
 
-	TheWritableGlobalData->m_userDataDir.clear();
+	// GeneralsX @bugfix cemlyn007 02/10/2026 Only the original instance derives and creates the
+	// default: newOverride() above has already copied m_userDataDir from the previous
+	// TheWritableGlobalData into this override (a memberwise copy, not implemented on VC6 -- see
+	// newOverride()), so re-deriving and re-creating it here for an override would discard that copy
+	// and just re-read $XDG_DATA_HOME/$HOME, redundantly re-creating the same directory on every
+	// map.ini/solo.ini GameData block (and, while the default cannot be created, e.g. a read-only
+	// $HOME, re-printing createUserDataDirectory's stderr diagnostic each time). Generals has no setPath_UserData, so
+	// unlike GeneralsMD's matching constructor guard there is no separately-set, already-working
+	// directory this could clobber -- it is simply wasted work. One side effect: on Windows,
+	// an override's own UserDataLeafName INI field (parsed into TheWritableGlobalData->m_userDataLeafName
+	// just above by initFromINI) no longer moves that override's user-data directory, because
+	// BuildUserDataPathFromIni (which reads it) is not called for overrides any more.
+	if (TheWritableGlobalData == GlobalData::m_theOriginal)
+	{
+		TheWritableGlobalData->m_userDataDir.clear();
 
-	// GeneralsX @feature Bender 01/04/2026 Cross-platform user data directory handling
-	// Adopts upstream refactoring with extended cross-platform support
-	TheWritableGlobalData->m_userDataDir = BuildUserDataPathFromIni();
-	CreateDirectory(TheWritableGlobalData->m_userDataDir.str(), nullptr);
+		// GeneralsX @feature Bender 01/04/2026 Cross-platform user data directory handling
+		// Adopts upstream refactoring with extended cross-platform support
+		TheWritableGlobalData->m_userDataDir = BuildUserDataPathFromIni();
+		CreateDirectory(TheWritableGlobalData->m_userDataDir.str(), nullptr);
+	}
 
 	// override INI values with user preferences
 	OptionPreferences optionPref;
@@ -1238,11 +1269,20 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 	// GeneralsX @feature felipebraz 17/09/2026 Skirmish simulation tick rate configuration (#281)
 	TheWritableGlobalData->m_skirmishTickRate = optionPref.getSkirmishTickRate();
 
-	TheWritableGlobalData->m_antiAliasLevel = optionPref.getAntiAliasing();
-	TheWritableGlobalData->m_textureFilteringMode = optionPref.getTextureFilterMode();
-	TheWritableGlobalData->m_textureAnisotropyLevel = optionPref.getTextureAnisotropyLevel();
+	// GeneralsX @bugfix cemlyn007 30/09/2026 An off-screen render engine ignores the user's display options.
+	// Anti-aliasing, texture filtering, anisotropy and gamma change what the render device draws
+	// (W3DDisplay::init applies them to it), so with m_headlessRender they take the values an empty
+	// Options.ini gives: the host's observation images must not follow the user's settings, which may
+	// be the game's own file or shared with other processes. Headless and user interface boots are unchanged.
+	OptionPreferences displayPref(optionPref);
+	if (keepRenderSize)
+		displayPref.clear();
 
-	Int val=optionPref.getGammaValue();
+	TheWritableGlobalData->m_antiAliasLevel = displayPref.getAntiAliasing();
+	TheWritableGlobalData->m_textureFilteringMode = displayPref.getTextureFilterMode();
+	TheWritableGlobalData->m_textureAnisotropyLevel = displayPref.getTextureAnisotropyLevel();
+
+	Int val=displayPref.getGammaValue();
 	//generate a value between 0.6 and 2.0.
 	if (val < 50)
 	{	//darker gamma
@@ -1260,6 +1300,12 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 
 	TheWritableGlobalData->m_xResolution = xres;
 	TheWritableGlobalData->m_yResolution = yres;
+
+	if (keepRenderSize)
+	{
+		TheWritableGlobalData->m_xResolution = renderXResolution;
+		TheWritableGlobalData->m_yResolution = renderYResolution;
+	}
 }
 
 void GlobalData::parseCustomDefinition()
@@ -1348,6 +1394,29 @@ UnsignedInt GlobalData::generateExeCRC()
 	return exeCRC.get();
 }
 
+// GeneralsX @refactor cemlyn007 02/10/2026 One place for "make this directory (recursively) and say
+// so on stderr if it cannot be used", instead of the create+report sequence copied at both
+// non-Windows branches below (GeneralsMD's twin of this helper covers its own
+// branches plus setPath_UserData, which Generals does not have).
+// GeneralsX @feature cemlyn007 02/10/2026 Guarded to non-Windows, matching this file's own
+// '#include <filesystem>' above: only the __APPLE__ and Linux branches below call this helper, and
+// its std::filesystem::path parameter and body reference a type this TU never declares on Windows,
+// the same gap GeneralsMD's twin of this helper guards against too.
+#ifndef _WIN32
+static Bool createUserDataDirectory(const std::filesystem::path &path)
+{
+	std::error_code ec;
+	std::filesystem::create_directories(path, ec);
+	if (ec)
+	{
+		fprintf(stderr, "GlobalData: cannot create user data directory %s: %s\n",
+			path.string().c_str(), ec.message().c_str());
+		fflush(stderr);
+	}
+	return ec ? FALSE : TRUE;
+}
+#endif
+
 AsciiString GlobalData::BuildUserDataPathFromIni()
 {
 	AsciiString userDataDir;
@@ -1410,7 +1479,13 @@ AsciiString GlobalData::BuildUserDataPathFromIni()
 		const char* home = getenv("HOME");
 		if (home) {
 			std::filesystem::path path = std::filesystem::path(home) / "Library" / "Application Support" / "GeneralsX" / "Generals";
-			std::filesystem::create_directories(path);
+			// GeneralsX @bugfix cemlyn007 02/10/2026 Backport of GeneralsMD's fix: the throwing overload
+			// crashed parseGameDataDefinition (the GameData INI parse, the only caller of this function --
+			// Generals' constructor never derives the default) whenever the default could not be created,
+			// e.g. a read-only $HOME, faulting the whole engine boot. createUserDataDirectory's error_code
+			// call lets the game boot anyway; it reports the failure on stderr, since DEBUG_LOG compiles out
+			// of release builds.
+			createUserDataDirectory(path);
 			userDataDir = path.string().c_str();
 			if (!userDataDir.endsWith("/"))
 				userDataDir.concat('/');
@@ -1436,7 +1511,11 @@ AsciiString GlobalData::BuildUserDataPathFromIni()
 		}
 
 		path = path / "GeneralsX" / "Generals";
-		std::filesystem::create_directories(path);
+		// GeneralsX @bugfix cemlyn007 02/10/2026 Backport of GeneralsMD's fix: as the macOS branch above, do
+		// not let an uncreatable default (a read-only $HOME) throw out of parseGameDataDefinition (the
+		// GameData INI parse -- Generals' constructor never derives the default) and fault the whole engine;
+		// createUserDataDirectory reports the failure on stderr so it is visible in release builds.
+		createUserDataDirectory(path);
 		userDataDir = path.string().c_str();
 		if (!userDataDir.endsWith("/"))
 			userDataDir.concat('/');

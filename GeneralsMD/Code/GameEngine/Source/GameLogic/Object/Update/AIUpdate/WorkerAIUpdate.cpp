@@ -1477,7 +1477,13 @@ void WorkerAIUpdate::finishBuildingSound()
 Int WorkerAIUpdate::getUpgradedSupplyBoost() const
 {
 	Player *player = getObject()->getControllingPlayer();
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 28/09/2026 Per engine: the cached template is this engine's (PLAN-023 Phase 4).
+	static rts::PerEngineStatic<const UpgradeTemplate *> workerShoeTemplate_perEngine;
+	const UpgradeTemplate *workerShoeTemplate = workerShoeTemplate_perEngine.get([&](const UpgradeTemplate *&value) { value = TheUpgradeCenter->findUpgrade( "Upgrade_GLAWorkerShoes" ); });
+#else
 	static const UpgradeTemplate *workerShoeTemplate = TheUpgradeCenter->findUpgrade( "Upgrade_GLAWorkerShoes" );
+#endif
 
 	if (player && workerShoeTemplate && player->hasUpgradeComplete(workerShoeTemplate))
 		return getWorkerAIUpdateModuleData()->m_upgradedSupplyBoost;

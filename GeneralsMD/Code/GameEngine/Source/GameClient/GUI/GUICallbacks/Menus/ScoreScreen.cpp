@@ -110,7 +110,9 @@
 #include "GameNetwork/GeneralsOnline/NGMP_interfaces.h"
 #include "GameNetwork/GeneralsOnline/NGMP_Helpers.h"
 #include <cinttypes>
+#if !RTS_ENGINE_CONTEXT
 extern NGMPGame* TheNGMPGame;
+#endif
 #endif
 
 

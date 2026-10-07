@@ -113,7 +113,13 @@ const Real HUGE_DIST_SQR = (HUGE_DIST*HUGE_DIST);
 //-----------------------------------------------------------------------------
 
 //-----------------------------------------------------------------------------
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 28/09/2026 Per engine (an EngineContext field): the contact list of the
+// partition update in progress, which another engine's update must not see (PLAN-023 Phase 2).
+#define TheContactList (::rts::ctx()->partitionContactList)
+#else
 static PartitionContactList* TheContactList = nullptr;
+#endif
 
 //-----------------------------------------------------------------------------
 //         Local Types
@@ -978,7 +984,9 @@ static CollideTestProc theCollideTestProcs[] =
 //-----------------------------------------------------------------------------
 //         Public Data
 //-----------------------------------------------------------------------------
+#if !RTS_ENGINE_CONTEXT
 PartitionManager *ThePartitionManager = nullptr;  ///< the object manager singleton
+#endif
 
 //-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
@@ -2189,10 +2197,6 @@ void PartitionData::invalidateShroudedStatusForAllPlayers()
 	}
 }
 
-#if defined(RTS_DEBUG)
-static AsciiString theObjName;
-#endif
-
 //-----------------------------------------------------------------------------
 Int PartitionData::calcMaxCoiForShape(GeometryType geom, Real majorRadius, Real minorRadius, Bool isSmall)
 {
@@ -2251,9 +2255,6 @@ Int PartitionData::calcMaxCoiForObject()
 	Real majorRadius = obj->getGeometryInfo().getMajorRadius();
 	Real minorRadius = obj->getGeometryInfo().getMinorRadius();
 	Bool isSmall = obj->getGeometryInfo().getIsSmall();
-#if defined(RTS_DEBUG)
-theObjName = obj->getTemplate()->getName();
-#endif
 	return calcMaxCoiForShape(geom, majorRadius, minorRadius, isSmall);
 }
 
@@ -3352,7 +3353,14 @@ Object *PartitionManager::getClosestObjects(
 
 	Bool foundAny = false;
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 28/09/2026 The iteration stamp is per engine (an EngineContext field,
+	// starting at 1), not thread_local: a stamp that followed the thread could repeat a stale done-flag once
+	// an engine moves to another thread (PLAN-023 Phase 2).
+	Int& theIterFlag = ::rts::ctx()->partitionIterFlag;
+#else
 	static Int theIterFlag = 1;	// nonzero, thanks
+#endif
 	++theIterFlag;
 
 	/*
@@ -3435,7 +3443,14 @@ Object *PartitionManager::getClosestObjects(
 
 	Bool foundAny = false;
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 28/09/2026 The iteration stamp is per engine (an EngineContext field,
+	// starting at 1), not thread_local: a stamp that followed the thread could repeat a stale done-flag once
+	// an engine moves to another thread (PLAN-023 Phase 2).
+	Int& theIterFlag = ::rts::ctx()->partitionIterFlag;
+#else
 	static Int theIterFlag = 1;	// nonzero, thanks
+#endif
 	++theIterFlag;
 
 	PartitionCell *thisCell;

@@ -74,13 +74,16 @@
 //         Public Data
 //----------------------------------------------------------------------------
 
+#if !RTS_ENGINE_CONTEXT
 IMEManagerInterface *TheIMEManager = nullptr;
+#endif
 
 // GeneralsX @build BenderAI 12/02/2026 Windows-specific IME (Input Method Editor) for CJK text input
 // Linux handles IME via system-level services (ibus, fcitx) through SDL text input APIs
 #ifdef _WIN32
 
-extern HWND ApplicationHWnd;  ///< our application window handle
+// GeneralsX @refactor cemlyn007 30/09/2026 The window handles (PLAN-023 Phase 8, stage RR2a-2).
+#include "Common/ApplicationWindow.h"
 extern Int	IMECandidateWindowLineSpacing;
 
 //----------------------------------------------------------------------------

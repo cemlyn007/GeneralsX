@@ -38,7 +38,9 @@
 
 
 // LAN API Singleton ----------------------------------------------------------------------
+#if !RTS_ENGINE_CONTEXT
 extern LANAPI *TheLAN;
+#endif
 
 //external declarations of the Gadgets the callbacks can use
 // LanLobby

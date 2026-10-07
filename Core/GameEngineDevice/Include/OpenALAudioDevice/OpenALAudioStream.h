@@ -32,6 +32,11 @@ class OpenALAudioStream final
 {
 public:
     OpenALAudioStream();
+    // GeneralsX @bugfix cemlyn007 28/09/2026 A stream with no AL source or buffers, for
+    // OpenALAudioManagerDummy: it makes no AL call (there may be no current context, or another
+    // engine's), drops the data it is given and never plays.
+    struct DeviceFree {};
+    explicit OpenALAudioStream(DeviceFree);
     ~OpenALAudioStream();
 
     void setRequireDataCallback(std::function<void()> callback) { m_requireDataCallback = callback; }
@@ -42,15 +47,16 @@ public:
     void update();
     void reset();
 
-    void play() { alSourcePlay(m_source); }
-    void pause() { alSourcePause(m_source); }
-    void stop() { alSourceStop(m_source); }
+    void play() { if (m_hasSource) alSourcePlay(m_source); }
+    void pause() { if (m_hasSource) alSourcePause(m_source); }
+    void stop() { if (m_hasSource) alSourceStop(m_source); }
 
-    void setVolume(float vol) { alSourcef(m_source, AL_GAIN, vol); }
+    void setVolume(float vol) { if (m_hasSource) alSourcef(m_source, AL_GAIN, vol); }
 
 protected:
     std::function<void()> m_requireDataCallback = nullptr;
     ALuint m_source = 0;
     ALuint m_buffers[AL_STREAM_BUFFER_COUNT] = {};
     unsigned int m_current_buffer_idx = 0;
+    bool m_hasSource = true;
 };

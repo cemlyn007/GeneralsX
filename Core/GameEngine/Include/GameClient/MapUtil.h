@@ -131,7 +131,9 @@ private:
 	Bool m_doLoadUserMapCacheINI;
 };
 
+#if !RTS_ENGINE_CONTEXT
 extern MapCache *TheMapCache;
+#endif
 extern TechAndSupplyImages TheSupplyAndTechImageLocations;
 
 // TheSuperHackers @refactor xezon 28/11/2025 Refactors the map list population implementation

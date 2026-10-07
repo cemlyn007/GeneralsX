@@ -96,7 +96,9 @@
 #include "visrasterizer.h"
 
 
+#if !RTS_ENGINE_CONTEXT
 static bool Ring_Array_Valid = false;
+#endif
 
 
 /**
@@ -143,8 +145,27 @@ private:
 };
 
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 30/09/2026 Per engine, made on the engine's first ring: every ring's draw scales and
+// retiles the shared LOD meshes (Render), so they are draw state, not constants (PLAN-023 Phase 8, stage
+// RR2b; Phase 3 had built them once per process).
+namespace
+{
+struct RingMeshState
+{
+	bool Ring_Array_Valid = false;
+	RingMeshClass RingMeshArray[RING_NUM_LOD];
+	float RingLODCosts[RING_NUM_LOD + 1] = {}; // RING_NUM_LOD doesn't include the null LOD
+};
+rts::PerEngineStatic<RingMeshState> RingMeshState_perEngine;
+} // namespace
+#define Ring_Array_Valid (RingMeshState_perEngine.get().Ring_Array_Valid)
+#define RingMeshArray (RingMeshState_perEngine.get().RingMeshArray)
+#define RingLODCosts (RingMeshState_perEngine.get().RingLODCosts)
+#else
 RingMeshClass RingMeshArray[RING_NUM_LOD];
 float RingLODCosts[RING_NUM_LOD + 1];	// RING_NUM_LOD doesn't include the null LOD
+#endif
 
 
 

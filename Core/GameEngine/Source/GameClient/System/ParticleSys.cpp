@@ -59,7 +59,9 @@
 //-------------------------------------------------------------------------------------------------
 
 // the singleton
+#if !RTS_ENGINE_CONTEXT
 ParticleSystemManager *TheParticleSystemManager = nullptr;
+#endif
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1434,7 +1436,9 @@ void ParticleSystem::attachToObject( const Object *obj )
 // ------------------------------------------------------------------------------------------------
 const Coord3D *ParticleSystem::computePointOnUnitSphere()
 {
-	static Coord3D point;
+	// GeneralsX @feature cemlyn007 28/09/2026 thread_local: returned-by-pointer scratch the caller consumes at once, on its own
+	// thread (PLAN-023 Phase 5b).
+	static THREAD_LOCAL Coord3D point;
 
 	do
 	{
@@ -1454,7 +1458,9 @@ const Coord3D *ParticleSystem::computePointOnUnitSphere()
 // ------------------------------------------------------------------------------------------------
 const Coord3D *ParticleSystem::computeParticleVelocity( const Coord3D *pos )
 {
-	static Coord3D newVel;
+	// GeneralsX @feature cemlyn007 28/09/2026 thread_local: returned-by-pointer scratch the caller consumes at once, on its own
+	// thread (PLAN-023 Phase 5b).
+	static THREAD_LOCAL Coord3D newVel;
 
 	switch( m_emissionVelocityType )
 	{
@@ -1611,7 +1617,9 @@ const Coord3D *ParticleSystem::computeParticleVelocity( const Coord3D *pos )
 // ------------------------------------------------------------------------------------------------
 const Coord3D *ParticleSystem::computeParticlePosition()
 {
-	static Coord3D newPos;
+	// GeneralsX @feature cemlyn007 28/09/2026 thread_local: returned-by-pointer scratch the caller consumes at once, on its own
+	// thread (PLAN-023 Phase 5b).
+	static THREAD_LOCAL Coord3D newPos;
 
 	switch( m_emissionVolumeType )
 	{
@@ -1797,7 +1805,15 @@ Particle *ParticleSystem::createParticle( const ParticleInfo *info,
 // ------------------------------------------------------------------------------------------------
 const ParticleInfo *ParticleSystem::generateParticleInfo( Int particleNum, Int particleCount )
 {
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 28/09/2026 Per engine (PLAN-023 Phase 5b): returned by pointer and consumed at once,
+	// but a ParticleInfo (280 bytes, with a constructor) is too big for the library's static TLS, so a slot rather
+	// than thread_local; one engine is on one thread at a time.
+	static rts::PerEngineStatic<ParticleInfo> info_perEngine;
+	ParticleInfo& info = info_perEngine.get();
+#else
 	static ParticleInfo info;
+#endif
 	if (particleCount == 0) {
 		DEBUG_CRASH(("particleCount must NOT be 0. Set to 1 or greater."));
 		return &info;

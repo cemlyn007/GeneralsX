@@ -58,7 +58,9 @@
 #if defined(SAGE_USE_NGMP)
 #include "GameNetwork/GeneralsOnline/OnlineServices_Manager.h"
 #include "GameNetwork/GeneralsOnline/NGMPGame.h"
+#if !RTS_ENGINE_CONTEXT
 extern NGMPGame* TheNGMPGame;
+#endif
 #endif
 
 #include "GameNetwork/GameSpy/PersistentStorageDefs.h"

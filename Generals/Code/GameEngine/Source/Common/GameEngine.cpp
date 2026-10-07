@@ -28,7 +28,11 @@
 
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
+#include <cstdlib>  // std::getenv (GENERALSX_TEST_FAULT_IN_INIT)
+
 #include "Common/ActionManager.h"
+// GeneralsX @refactor cemlyn007 30/09/2026 The window handles (PLAN-023 Phase 8, stage RR2a-2).
+#include "Common/ApplicationWindow.h"
 #include "Common/AudioAffect.h"
 #include "Common/BuildAssistant.h"
 #include "Common/CRCDebug.h"
@@ -68,6 +72,7 @@
 #include "Common/Xfer.h"
 #include "Common/XferCRC.h"
 #include "Common/GameLOD.h"
+#include "Common/FatalEngineError.h"
 #include "Common/Registry.h"
 
 #include "GameLogic/Armor.h"
@@ -239,7 +244,6 @@ static void updateWindowTitle()
 		AsciiString titleA;
 		titleA.translate(title);	//get ASCII version for Win 9x
 
-		extern HWND ApplicationHWnd;  ///< our application window handle
 		if (ApplicationHWnd) {
 	#ifdef _WIN32
 			//Set it twice because Win 9x does not support SetWindowTextW.
@@ -253,6 +257,9 @@ static void updateWindowTitle()
 //-------------------------------------------------------------------------------------------------
 GameEngine::GameEngine()
 {
+	// GeneralsX @bugfix cemlyn007 28/09/2026 A new engine is not being torn down (see FatalEngineError.h)
+	SetEngineTearingDown(false);
+
 	// initialize to non garbage values
 	m_logicTimeAccumulator = 0.0f;
 	m_quitting = FALSE;
@@ -266,6 +273,10 @@ GameEngine::GameEngine()
 //-------------------------------------------------------------------------------------------------
 GameEngine::~GameEngine()
 {
+	// GeneralsX @bugfix cemlyn007 28/09/2026 From here on an embedded-mode fatal error does not
+	// throw (see FatalEngineError.h)
+	SetEngineTearingDown(true);
+
 	//extern std::vector<std::string>	preloadTextureNamesGlobalHack;
 	//preloadTextureNamesGlobalHack.clear();
 
@@ -361,6 +372,18 @@ void GameEngine::init()
 	try {
 		//create an INI object to use for loading stuff
 		INI ini;
+
+		// GeneralsX @feature cemlyn007 02/10/2026 Test-only fault injection, so an embedded-mode
+		// host's tests can exercise this function's own `catch (const FatalEngineError&) { throw; }`
+		// rethrow site below, not only a throw site a test calls directly (RELEASE_CRASH called
+		// from outside init(), e.g. a host's own unsafe test hook, never passes through this catch
+		// block). Gated on IsEngineEmbeddedMode(), not just the env var: a retail or stock build
+		// never calls SetEngineEmbeddedMode(true), so this is unreachable there regardless of
+		// environment. Checked once per init() call, not cached, since it is an uncached getenv
+		// like any other and init() itself may run more than once per process (rlgenerals'
+		// MULTI_ENGINE_CONSUMER.md stage R1 calls create/destroy/create in one process).
+		if (IsEngineEmbeddedMode() && std::getenv("GENERALSX_TEST_FAULT_IN_INIT"))
+			RELEASE_CRASH("test fault inside GameEngine::init (GENERALSX_TEST_FAULT_IN_INIT)");
 
 		if (TheVersion)
 		{
@@ -705,6 +728,12 @@ void GameEngine::init()
 			RELEASE_CRASH(("Uncaught Exception during initialization."));
 
 	}
+	// GeneralsX @feature cemlyn007 28/09/2026 Embedded mode: a fatal error raised inside init
+	// reaches the host with its own message, instead of being replaced by the generic one below.
+	catch (const FatalEngineError&)
+	{
+		throw;
+	}
 	catch (...)
 	{
 		RELEASE_CRASH(("Uncaught Exception during initialization."));
@@ -874,8 +903,10 @@ void GameEngine::update()
 }
 
 // Horrible reference, but we really, really need to know if we are windowed.
-extern bool DX8Wrapper_IsWindowed;
-extern HWND ApplicationHWnd;
+// GeneralsX @feature cemlyn007 28/09/2026 Atomic: every headless engine's command line writes it and any engine's
+// assert path reads it, so engines on separate threads would race on a plain bool (PLAN-023 Phase 5b).
+#include <atomic>
+extern std::atomic<bool> DX8Wrapper_IsWindowed;
 
 /** -----------------------------------------------------------------------------------------------
  * The "main loop" of the game engine. It will not return until the game exits.
@@ -934,6 +965,11 @@ void GameEngine::execute()
 						RELEASE_CRASH((e.mFailureMessage));
 					else
 						RELEASE_CRASH(("Uncaught Exception in GameEngine::update"));
+				}
+				// GeneralsX @bugfix cemlyn007 28/09/2026 Let an embedded-mode fatal error reach the host.
+				catch (const FatalEngineError&)
+				{
+					throw;
 				}
 				catch (...)
 				{

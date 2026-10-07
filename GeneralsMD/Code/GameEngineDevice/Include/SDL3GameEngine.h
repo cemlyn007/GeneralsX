@@ -38,7 +38,8 @@
 // EXTERNALS
 // GeneralsX @feature felipebraz 16/02/2026
 // SDL3 window created in SDL3Main.cpp before GameEngine instantiation (fighter19 pattern)
-extern SDL_Window* TheSDL3Window;
+// GeneralsX @refactor cemlyn007 30/09/2026 The window handles (PLAN-023 Phase 8, stage RR2a-2).
+#include "Common/ApplicationWindow.h"
 
 // Forward declarations - full definitions in SDL3GameEngine.cpp
 class StdLocalFileSystem;

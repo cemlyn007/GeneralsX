@@ -90,4 +90,6 @@ protected:
 	std::list<QueuedDownload> m_queuedDownloads;
 };
 
+#if !RTS_ENGINE_CONTEXT
 extern DownloadManager *TheDownloadManager;
+#endif

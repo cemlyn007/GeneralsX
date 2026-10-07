@@ -18,7 +18,9 @@
 
 void showNotificationBox( AsciiString nick, UnicodeString message);
 
+#if !RTS_ENGINE_CONTEXT
 NGMPGame* TheNGMPGame = nullptr;
+#endif
 
 NGMPGameSlot::NGMPGameSlot()
 {

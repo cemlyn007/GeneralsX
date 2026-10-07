@@ -60,9 +60,11 @@
 #include <cstring>
 
 // Extern globals for input devices (set by GameClient)
+#if !RTS_ENGINE_CONTEXT
 extern Mouse *TheMouse;
 extern Keyboard *TheKeyboard;
 extern GameWindowManager *TheWindowManager;
+#endif
 
 namespace {
 
@@ -164,10 +166,10 @@ void SDL3GameEngine::init(void)
 {
 	fprintf(stderr, "INFO: SDL3GameEngine::init() starting\n");
 
-	// rlgenerals: render-headless (m_headless && m_headlessRender) DOES have a
-	// hidden SDL window bound by the embed host, so it must fall through to the
-	// window-binding path below to bring up the DXVK device. Only a fully headless
-	// run skips the window.
+	// rlgenerals: render-headless (m_headless && m_headlessRender) falls through:
+	// with a window bound by the embed host (its viewer) to the window-binding
+	// path below, and without one to the windowless render path. Only a fully
+	// headless run skips the device.
 	if (TheGlobalData && TheGlobalData->m_headless && !TheGlobalData->m_headlessRender) {
 		// GeneralsX @bugfix Copilot 17/05/2026 Allow headless replay path to initialize engine subsystems without an SDL window.
 		fprintf(stderr, "INFO: SDL3GameEngine::init() headless mode - skipping SDL window binding\n");
@@ -179,9 +181,19 @@ void SDL3GameEngine::init(void)
 	}
 
 	// Verify window was created by SDL3Main.cpp
-	extern SDL_Window* TheSDL3Window;
-	extern HWND ApplicationHWnd;
-	
+	// GeneralsX @feature cemlyn007 30/09/2026 Windowless render-headless: an embed host that draws
+	// image observations brings the render device up with no window at all (a null HWND: DXVK then
+	// gives the device a back buffer and no presenter), so the engine binds none and makes no SDL
+	// call (PLAN-023 Phase 8, stage RR0c).
+	if (TheGlobalData && TheGlobalData->m_headless && TheGlobalData->m_headlessRender && !TheSDL3Window) {
+		fprintf(stderr, "INFO: SDL3GameEngine::init() windowless render mode - no SDL window\n");
+		m_SDLWindow = nullptr;
+		m_IsInitialized = true;
+		m_IsActive = true;
+		GameEngine::init();
+		return;
+	}
+
 	if (!TheSDL3Window || !ApplicationHWnd) {
 		fprintf(stderr, "FATAL: SDL3 window not initialized before GameEngine::init()\n");
 		fprintf(stderr, "FATAL: TheSDL3Window=%p, ApplicationHWnd=%p\n", TheSDL3Window, ApplicationHWnd);
@@ -576,19 +588,34 @@ WebBrowser *SDL3GameEngine::createWebBrowser(void)
  * Factory method: AudioManager
  * Select audio backend based on compile flags
  * GeneralsX @bugfix Copilot 15/04/2026 Match upstream GameEngine pure-virtual signature after sync.
+ * GeneralsX @feature cemlyn007 28/09/2026 Honour dummy (headless) and -noaudio with a device-free
+ * manager, as Win32GameEngine does, so a headless engine opens no audio device and no audio threads
+ * (PLAN-023 Phase 0). m_headlessAudio lets an embedding host keep real audio in headless mode.
  */
 AudioManager *SDL3GameEngine::createAudioManager(Bool dummy)
 {
-	(void)dummy;
 	fprintf(stderr, "INFO: SDL3GameEngine::createAudioManager()\n");
 
+#if defined(SAGE_USE_MINIAUDIO) || defined(SAGE_USE_OPENAL)
+	const Bool deviceFree = (dummy && !TheGlobalData->m_headlessAudio) || !TheGlobalData->m_audioOn;
+#endif
+
 #ifdef SAGE_USE_MINIAUDIO
+	if (deviceFree) {
+		fprintf(stderr, "INFO: Creating device-free MiniAudio audio backend\n");
+		return NEW MiniAudioManagerDummy;
+	}
 	fprintf(stderr, "INFO: Creating MiniAudio audio backend\n");
 	return new MiniAudioManager();
 #elif defined(SAGE_USE_OPENAL)
+	if (deviceFree) {
+		fprintf(stderr, "INFO: Creating device-free OpenAL audio backend\n");
+		return NEW OpenALAudioManagerDummy;
+	}
 	fprintf(stderr, "INFO: Creating OpenAL audio backend\n");
 	return new OpenALAudioManager();
 #else
+	(void)dummy;
 	fprintf(stderr, "INFO: Audio backend not available (SAGE_USE_OPENAL/SAGE_USE_MINIAUDIO not defined)\n");
 	fprintf(stderr, "WARNING: Falls back to parent implementation or silent mode\n");
 	return GameEngine::createAudioManager();  // Call parent (may return stub)

@@ -37,6 +37,7 @@
 #include "RAWFILE.h"
 #include "bufffile.h"
 #include "realcrc.h"
+#include "strtok_r.h"
 #include <stdlib.h>
 #include	<assert.h>
 
@@ -281,7 +282,9 @@ FileClass * SimpleFileFactoryClass::Get_File( char const *filename )
 			{
 				char *tokstart=subdir.Peek_Buffer();
 				const char *tok;
-				while((tok=strtok(tokstart, ";")) != nullptr) {
+				// GeneralsX @bugfix cemlyn007 28/09/2026 strtok_r: libc strtok's save pointer is process-wide
+				char *tokSave=nullptr;
+				while((tok=strtok_r(tokstart, ";", &tokSave)) != nullptr) {
 					tokstart=nullptr;
 					new_name.Format("%s%s",tok,stripped_name.str());
 					file->Set_Name( new_name );	// Call Set_Name to force an allocated name

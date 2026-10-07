@@ -36,8 +36,12 @@
 #include "GameLogic/TerrainLogic.h"
 
 /* ********* PolygonTrigger class ****************************/
+#if RTS_ENGINE_CONTEXT
+#define s_currentID (::rts::ctx()->polygonTriggerCurrentID)
+#else
 PolygonTrigger *PolygonTrigger::ThePolygonTriggerListPtr = nullptr;
 Int PolygonTrigger::s_currentID = 1;
+#endif
 /**
  PolygonTrigger - Constructor.
 */

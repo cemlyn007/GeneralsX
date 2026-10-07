@@ -181,7 +181,9 @@ protected:
 #endif
 };
 
+#if !RTS_ENGINE_CONTEXT
 extern FileSystem*	TheFileSystem;
+#endif
 
 
 

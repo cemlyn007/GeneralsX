@@ -46,7 +46,9 @@
 
 // Singleton ------------------------------------------
 
+#if !RTS_ENGINE_CONTEXT
 GameSpyGameInfo *TheGameSpyGame = nullptr;
+#endif
 
 // Helper Functions ----------------------------------------
 

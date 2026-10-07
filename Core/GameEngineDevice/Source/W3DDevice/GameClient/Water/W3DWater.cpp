@@ -68,6 +68,7 @@
 #include "W3DDevice/GameClient/W3DPoly.h"
 #include "W3DDevice/GameClient/W3DScene.h"
 #include "W3DDevice/GameClient/W3DCustomScene.h"
+#include "W3DDevice/GameClient/W3DDrawClock.h"	// GeneralsX @bugfix cemlyn007 01/10/2026 (RR3)
 
 
 
@@ -163,10 +164,12 @@ static inline DWORD F2DW( FLOAT f ) { return *((DWORD*)&f); }
 	ShaderClass::SRCBLEND_SRC_ALPHA, ShaderClass::DSTBLEND_ONE_MINUS_SRC_ALPHA, ShaderClass::FOG_DISABLE, ShaderClass::GRADIENT_MODULATE, ShaderClass::SECONDARY_GRADIENT_DISABLE, \
 	ShaderClass::TEXTURING_ENABLE, ShaderClass::ALPHATEST_DISABLE, ShaderClass::CULL_MODE_DISABLE, ShaderClass::DETAILCOLOR_DISABLE, ShaderClass::DETAILALPHA_DISABLE) )
 
-static ShaderClass zFillAlphaShader(SC_ZFILL_BLEND3);
-static ShaderClass blendStagesShader(SC_DETAIL_BLEND);
+static const ShaderClass zFillAlphaShader(SC_ZFILL_BLEND3);
+static const ShaderClass blendStagesShader(SC_DETAIL_BLEND);
 
+#if !RTS_ENGINE_CONTEXT
 WaterRenderObjClass *TheWaterRenderObj=nullptr; ///<global water rendering object
+#endif
 
 static Int getRiverVertexDiffuse(W3DShroud *shroud, Real x, Real y, Real shadeR, Real shadeG, Real shadeB, Int diffuse)
 {
@@ -1018,7 +1021,7 @@ Int WaterRenderObjClass::init(Real waterLevel, Real dx, Real dy, SceneClass *par
 	m_dy=dy;
 	m_level=waterLevel;
 
-	m_LastUpdateTime=timeGetTime();
+	m_LastUpdateTime=W3D_DRAW_CLOCK_MS();	// GeneralsX @bugfix cemlyn007 01/10/2026 the draw clock (W3DDrawClock.h, RR3)
 	m_uScrollPerMs=0.001f;
 	m_vScrollPerMs=0.001f;
 	m_uOffset=0;
@@ -2079,7 +2082,7 @@ void WaterRenderObjClass::renderSky()
 
 	Setting *setting=&m_settings[m_tod];
 
-	timeNow=timeGetTime();
+	timeNow=W3D_DRAW_CLOCK_MS();	// GeneralsX @bugfix cemlyn007 01/10/2026 the draw clock (W3DDrawClock.h, RR3)
 
 	timeDiff=timeNow-m_LastUpdateTime;
 	m_LastUpdateTime=timeNow;

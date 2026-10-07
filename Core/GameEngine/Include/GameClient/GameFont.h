@@ -102,4 +102,6 @@ inline GameFont *FontLibrary::nextFont( GameFont *font )
 }
 
 // EXTERNALS //////////////////////////////////////////////////////////////////////////////////////
+#if !RTS_ENGINE_CONTEXT
 extern FontLibrary *TheFontLibrary;  ///< font library external
+#endif

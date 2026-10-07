@@ -98,13 +98,146 @@
 
 #include "shdlib.h"
 
+#include <atomic>
+#include <cstdint>
+#include <cstdlib>
+#include <mutex>
+#ifndef _WIN32
+#include <sys/mman.h>
+#include <unistd.h>
+#endif
+
+// GeneralsX @feature cemlyn007 30/09/2026 DX8Wrapper's state names as the current engine's W3DRenderState fields,
+// in this file too (PLAN-023 Phase 8, stage RR2a-1; see w3drenderstate.h). After every #include.
+#include "w3drenderstate_names.h"
+
 const int DEFAULT_RESOLUTION_WIDTH = 640;
 const int DEFAULT_RESOLUTION_HEIGHT = 480;
 const int DEFAULT_BIT_DEPTH = 32;
 const int DEFAULT_TEXTURE_BIT_DEPTH = 16;
 const D3DMULTISAMPLE_TYPE DEFAULT_MSAA = D3DMULTISAMPLE_NONE;
 
+#if RTS_ENGINE_CONTEXT
+static_assert(W3DRenderState::DefaultResolutionWidth == DEFAULT_RESOLUTION_WIDTH, "W3DRenderState's default resolution width");
+static_assert(W3DRenderState::DefaultResolutionHeight == DEFAULT_RESOLUTION_HEIGHT, "W3DRenderState's default resolution height");
+static_assert(W3DRenderState::DefaultBitDepth == DEFAULT_BIT_DEPTH, "W3DRenderState's default bit depth");
+static_assert(W3DRenderState::DefaultTextureBitDepth == DEFAULT_TEXTURE_BIT_DEPTH, "W3DRenderState's default texture bit depth");
+static_assert(DEFAULT_MSAA == D3DMULTISAMPLE_NONE, "W3DRenderState's default MSAA mode");
+
+W3DRenderState W3DRenderState::Defaults;
+
+void DX8Wrapper::Create_Render_State(bool ownedByWW3D)
+{
+	::rts::EngineContext* const context = ::rts::ctx();
+	if (context->w3dRender == nullptr)
+		context->w3dRender = new W3DRenderState();
+	// GeneralsX @bugfix cemlyn007 30/09/2026 Who frees them: WW3D::Shutdown once WW3D::Init has taken them, Shutdown
+	// otherwise (PLAN-023 Phase 8, stage RR2b).
+	if (ownedByWW3D)
+		context->w3dRender->OwnedByWW3D = true;
+	// GeneralsX @feature cemlyn007 30/09/2026 WW3D's state comes and goes with DX8Wrapper's (PLAN-023 Phase 8, stage
+	// RR2a-2).
+	if (context->ww3dState == nullptr)
+		context->ww3dState = new WW3DState();
+}
+
+// GeneralsX @feature cemlyn007 30/09/2026 The defaults' guard (PLAN-023 Phase 8, stage RR2a-2; see w3drenderstate.h).
+static bool Protect_Pages(void* object, std::size_t size, bool readOnly)
+{
+#ifdef _WIN32
+	(void)object;
+	(void)size;
+	(void)readOnly;
+	return false;
+#else
+	// GeneralsX @bugfix cemlyn007 30/09/2026 A page larger than rts::renderStateAlignment cannot hold the defaults
+	// alone: say so (PLAN-023 Phase 8, stage RR2b).
+	const long pageSize = sysconf(_SC_PAGESIZE);
+	if (pageSize <= 0 || static_cast<std::size_t>(pageSize) > ::rts::renderStateAlignment)
+	{
+		WWDEBUG_SAY(("W3D_Protect_Render_Defaults: page size %ld is larger than the render state alignment %u", pageSize,
+			(unsigned)::rts::renderStateAlignment));
+		return false;
+	}
+	if (reinterpret_cast<std::uintptr_t>(object) % static_cast<std::uintptr_t>(pageSize) != 0 ||
+		size % static_cast<std::size_t>(pageSize) != 0)
+		return false;
+	return mprotect(object, size, readOnly ? PROT_READ : PROT_READ | PROT_WRITE) == 0;
+#endif
+}
+
+static void Unprotect_Render_Defaults_At_Exit()
+{
+	W3D_Protect_Render_Defaults(false);
+}
+
+bool W3D_Protect_Render_Defaults(bool readOnly)
+{
+	static_assert(alignof(W3DRenderState) == ::rts::renderStateAlignment, "W3DRenderState fills whole pages");
+	static_assert(alignof(WW3DState) == ::rts::renderStateAlignment, "WW3DState fills whole pages");
+	if (readOnly)
+	{
+		static std::once_flag s_exitHandlerOnce;
+		std::call_once(s_exitHandlerOnce, [] { std::atexit(Unprotect_Render_Defaults_At_Exit); });
+	}
+	// GeneralsX @bugfix cemlyn007 30/09/2026 A failed protect changes neither: it puts back only the pages this
+	// call made read-only. Making them writable goes on past a failure (leaving a page read-only is what the exit
+	// handler is there to undo), so a failed unprotect may leave one page writable (PLAN-023 Phase 8, stage RR2b).
+	void* const objects[2] = {&W3DRenderState::Defaults, &WW3DState::Defaults};
+	const std::size_t sizes[2] = {sizeof(W3DRenderState), sizeof(WW3DState)};
+	static bool s_readOnly[2] = {false, false};
+	if (!readOnly)
+	{
+		bool allWritable = true;
+		for (int i = 0; i < 2; ++i)
+		{
+			if (Protect_Pages(objects[i], sizes[i], false))
+				s_readOnly[i] = false;
+			else
+				allWritable = false;
+		}
+		return allWritable;
+	}
+	bool changed[2] = {false, false};
+	for (int i = 0; i < 2; ++i)
+	{
+		if (s_readOnly[i])
+			continue;
+		if (!Protect_Pages(objects[i], sizes[i], true))
+		{
+			for (int j = 0; j < i; ++j)
+			{
+				if (changed[j] && Protect_Pages(objects[j], sizes[j], false))
+					s_readOnly[j] = false;
+			}
+			return false;
+		}
+		s_readOnly[i] = true;
+		changed[i] = true;
+	}
+	return true;
+}
+
+void DX8Wrapper::Destroy_Render_State()
+{
+	::rts::EngineContext* const context = ::rts::ctx();
+	delete context->w3dRender;
+	context->w3dRender = nullptr;
+	delete context->ww3dState;
+	context->ww3dState = nullptr;
+}
+
+// GeneralsX @bugfix cemlyn007 02/10/2026 Frees this engine's W3DRenderState for Init's failure returns, which
+// never reach a device (WW3D::Shutdown's Destroy_Render_State frees it otherwise).
+void DX8Wrapper::Free_Render_State()
+{
+	::rts::EngineContext* const context = ::rts::ctx();
+	delete context->w3dRender;
+	context->w3dRender = nullptr;
+}
+#else
 static D3DPRESENT_PARAMETERS _PresentParameters;
+#endif
 
 // GeneralsX @bugfix Copilot 24/08/2026 Fall back through supported MSAA sample counts instead of disabling AA immediately.
 static D3DMULTISAMPLE_TYPE Normalize_MSAA_Mode(D3DMULTISAMPLE_TYPE mode)
@@ -160,6 +293,7 @@ static bool Is_MSAA_Mode_Supported(
 
 // --- Pillarbox: render game to offscreen RT, blit centered onto backbuffer ---
 // GeneralsX @feature xxorza 15/04/2026 Unified pillarbox for fullscreen and windowed
+#if !RTS_ENGINE_CONTEXT
 DX8Wrapper::DisplaySizeFunc DX8Wrapper::s_getNativeDisplaySize = nullptr;
 DX8Wrapper::DisplaySizeFunc DX8Wrapper::s_getWindowSize = nullptr;
 bool DX8Wrapper::s_pillarboxEnabled = false;
@@ -176,9 +310,15 @@ IDirect3DSurface8* DX8Wrapper::s_offscreenSurf = nullptr;
 IDirect3DSurface8* DX8Wrapper::s_depthSurf = nullptr;
 IDirect3DSurface8* DX8Wrapper::s_savedBackbuffer = nullptr;
 IDirect3DSurface8* DX8Wrapper::s_savedDepth = nullptr;
+#endif
 
 void DX8Wrapper::Set_Display_Size_Provider(DisplaySizeFunc nativeSize, DisplaySizeFunc windowSize)
 {
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 30/09/2026 W3DDisplay::init calls this just before WW3D::Init, on a rendering
+	// engine only: its render state starts here (PLAN-023 Phase 8, stage RR2a-1).
+	Create_Render_State();
+#endif
 	s_getNativeDisplaySize = nativeSize;
 	s_getWindowSize = windowSize;
 }
@@ -395,14 +535,24 @@ static void Resolve_Present_BackBuffer_Size(int gameW, int gameH, bool isWindowe
 	}
 }
 
+#if !RTS_ENGINE_CONTEXT
 DX8FrameStatistics DX8Wrapper::FrameStatistics;
 static DX8FrameStatistics LastFrameStatistics;
+#endif
 
-bool DX8Wrapper_IsWindowed = true;
+// GeneralsX @feature cemlyn007 28/09/2026 Atomic (the process's assert switch): every headless engine's command line writes it and any engine's
+// assert path reads it, so engines on separate threads would race on a plain bool (PLAN-023 Phase 5b).
+std::atomic<bool> DX8Wrapper_IsWindowed(true);
+#if !RTS_ENGINE_CONTEXT
 bool DX8Wrapper_HeadlessRender = false;  // rlgenerals: see dx8wrapper.h
 
 // FPU_PRESERVE
 int DX8Wrapper_PreserveFPU = 0;
+#endif
+
+// GeneralsX @feature cemlyn007 30/09/2026 The host's check before a render device's or Direct3D interface's last
+// release (PLAN-023 Phase 8, stage RR1): see dx8wrapper.h.
+void (*DX8Wrapper_FinalReleaseHook)(const char* what) = nullptr;
 
 /***********************************************************************************
 **
@@ -410,6 +560,7 @@ int DX8Wrapper_PreserveFPU = 0;
 **
 ***********************************************************************************/
 
+#if !RTS_ENGINE_CONTEXT
 static HWND						_Hwnd															= nullptr;
 bool								DX8Wrapper::IsInitted									= false;
 bool								DX8Wrapper::_EnableTriangleDraw						= true;
@@ -480,13 +631,16 @@ bool								_DX8SingleThreaded										= false;
 static DynamicVectorClass<StringClass>					_RenderDeviceNameTable;
 static DynamicVectorClass<StringClass>					_RenderDeviceShortNameTable;
 static DynamicVectorClass<RenderDeviceDescClass>	_RenderDeviceDescriptionTable;
+#endif
 
 
 typedef IDirect3D8* (WINAPI *Direct3DCreate8Type) (UINT SDKVersion);
 Direct3DCreate8Type	Direct3DCreate8Ptr = nullptr;
 HINSTANCE D3D8Lib = nullptr;
 
+#if !RTS_ENGINE_CONTEXT
 DX8_CleanupHook	 *DX8Wrapper::m_pCleanupHook=nullptr;
+#endif
 #ifdef EXTENDED_STATS
 DX8_Stats	 DX8Wrapper::stats;
 #endif
@@ -494,7 +648,11 @@ DX8_Stats	 DX8Wrapper::stats;
 // changed since last frame and reconfigures pillarbox accordingly.
 void DX8Wrapper::Pillarbox_Process_Resize()
 {
-	if (!D3DDevice) return;
+	// GeneralsX @bugfix cemlyn007 30/09/2026 Through the accessor, which is null for every engine but the one
+	// that owns the device: W3DDisplay::draw calls this first thing on headless engines too, which read the
+	// renderer's device (and could reset it) from their own threads (PLAN-023 Phase 8, stage RR0a; found by
+	// ThreadSanitizer).
+	if (!_Get_D3D_Device8()) return;
 
 	int physW = 0, physH = 0;
 	float density = 1.0f;
@@ -590,6 +748,11 @@ void MoveRectIntoOtherRect(const RECT& inner, const RECT& outer, int* x, int* y)
 
 bool DX8Wrapper::Init(void * hwnd, bool lite)
 {
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 30/09/2026 This engine's render state, freed by Destroy_Render_State at the end of
+	// WW3D::Shutdown (PLAN-023 Phase 8, stages RR2a-1, RR2a-2).
+	Create_Render_State();
+#endif
 	WWASSERT(!IsInitted);
 
 	// zero memory
@@ -634,37 +797,58 @@ bool DX8Wrapper::Init(void * hwnd, bool lite)
 	Invalidate_Cached_Render_States();
 
 	if (!lite) {
-		// GeneralsX @build BenderAI 10/02/2026 - Platform-specific DLL/SO/DYLIB loading (Phase 5: macOS)
+		// GeneralsX @bugfix cemlyn007 30/09/2026 The D3D8 library is loaded for the process and never freed
+		// (PLAN-023 Phase 8, stage RR1). A process may bring a render device up, shut it down and bring another
+		// up, and render engines may come and go while others run: unloading DXVK in one engine's Shutdown would
+		// pull its code from under the next device (and from the host's own IDirect3D8), so no FreeLibrary.
+		// A failed load is retried by the next Init, so a transient failure does not stick for the process.
+		static std::mutex s_d3d8LibMutex;
+		bool d3d8Loaded;
+		{
+		std::lock_guard<std::mutex> d3d8LibLock(s_d3d8LibMutex);
+		if (D3D8Lib == nullptr || Direct3DCreate8Ptr == nullptr) [] {
+			// GeneralsX @build BenderAI 10/02/2026 - Platform-specific DLL/SO/DYLIB loading (Phase 5: macOS)
 #ifdef _WIN32
-		D3D8Lib = LoadLibrary("D3D8.DLL");
+			D3D8Lib = LoadLibrary("D3D8.DLL");
 #elif defined(__APPLE__)
-		fprintf(stderr, "DEBUG: DX8Wrapper::Init() - Loading libdxvk_d3d8.dylib (macOS)...\n");
-		D3D8Lib = LoadLibrary("libdxvk_d3d8.dylib");
-		fprintf(stderr, "DEBUG: DX8Wrapper::Init() - LoadLibrary result: %p\n", (void*)D3D8Lib);
-		if (D3D8Lib == nullptr) {
-			const char* error = dlerror();
-			fprintf(stderr, "ERROR: DX8Wrapper::Init() - dlerror(): %s\n", error ? error : "unknown");
-		}
+			fprintf(stderr, "DEBUG: DX8Wrapper::Init() - Loading libdxvk_d3d8.dylib (macOS)...\n");
+			D3D8Lib = LoadLibrary("libdxvk_d3d8.dylib");
+			fprintf(stderr, "DEBUG: DX8Wrapper::Init() - LoadLibrary result: %p\n", (void*)D3D8Lib);
+			if (D3D8Lib == nullptr) {
+				const char* error = dlerror();
+				fprintf(stderr, "ERROR: DX8Wrapper::Init() - dlerror(): %s\n", error ? error : "unknown");
+			}
 #else
-		fprintf(stderr, "DEBUG: DX8Wrapper::Init() - Loading libdxvk_d3d8.so (Linux)...\n");
-		D3D8Lib = LoadLibrary("libdxvk_d3d8.so");
-		fprintf(stderr, "DEBUG: DX8Wrapper::Init() - LoadLibrary result: %p\n", (void*)D3D8Lib);
-		if (D3D8Lib == nullptr) {
-			const char* error = dlerror();
-			fprintf(stderr, "ERROR: DX8Wrapper::Init() - dlerror(): %s\n", error ? error : "unknown");
-		}
+			fprintf(stderr, "DEBUG: DX8Wrapper::Init() - Loading libdxvk_d3d8.so (Linux)...\n");
+			D3D8Lib = LoadLibrary("libdxvk_d3d8.so");
+			fprintf(stderr, "DEBUG: DX8Wrapper::Init() - LoadLibrary result: %p\n", (void*)D3D8Lib);
+			if (D3D8Lib == nullptr) {
+				const char* error = dlerror();
+				fprintf(stderr, "ERROR: DX8Wrapper::Init() - dlerror(): %s\n", error ? error : "unknown");
+			}
 #endif
 
-		if (D3D8Lib == nullptr) {
-			fprintf(stderr, "ERROR: DX8Wrapper::Init() - Failed to load D3D8 library\n");
-			return false;	// Return false at this point if init failed
-		}
+			if (D3D8Lib == nullptr) {
+				fprintf(stderr, "ERROR: DX8Wrapper::Init() - Failed to load D3D8 library\n");
+				return;
+			}
 
-		fprintf(stderr, "DEBUG: DX8Wrapper::Init() - Getting Direct3DCreate8 function pointer...\n");
-		Direct3DCreate8Ptr = (Direct3DCreate8Type) GetProcAddress(D3D8Lib, "Direct3DCreate8");
-		if (Direct3DCreate8Ptr == nullptr) {
-			fprintf(stderr, "ERROR: DX8Wrapper::Init() - Failed to get Direct3DCreate8 function\n");
-			return false;
+			fprintf(stderr, "DEBUG: DX8Wrapper::Init() - Getting Direct3DCreate8 function pointer...\n");
+			Direct3DCreate8Ptr = (Direct3DCreate8Type) GetProcAddress(D3D8Lib, "Direct3DCreate8");
+			if (Direct3DCreate8Ptr == nullptr) {
+				fprintf(stderr, "ERROR: DX8Wrapper::Init() - Failed to get Direct3DCreate8 function\n");
+			}
+
+		}();
+		d3d8Loaded = D3D8Lib != nullptr && Direct3DCreate8Ptr != nullptr;
+		}
+		if (!d3d8Loaded) {
+#if RTS_ENGINE_CONTEXT
+			// GeneralsX @bugfix cemlyn007 02/10/2026 Create_Render_State() above already allocated this
+			// engine's state; nothing else frees it on this failure return.
+			Free_Render_State();
+#endif
+			return false;	// Return false at this point if init failed
 		}
 
 		/*
@@ -683,6 +867,11 @@ bool DX8Wrapper::Init(void * hwnd, bool lite)
 		fprintf(stderr, "DEBUG: DX8Wrapper::Init() - Direct3DCreate8 returned: %p\n", (void*)D3DInterface);
 		if (D3DInterface == nullptr) {
 			fprintf(stderr, "ERROR: DX8Wrapper::Init() - Direct3DCreate8 returned NULL (DXVK failed to create D3D8 interface)\n");
+#if RTS_ENGINE_CONTEXT
+			// GeneralsX @bugfix cemlyn007 02/10/2026 Same as the D3D8Lib failure above: free what
+			// Create_Render_State() allocated before this engine gives up on a device.
+			Free_Render_State();
+#endif
 			return(false);
 		}
 		IsInitted = true;
@@ -700,6 +889,12 @@ bool DX8Wrapper::Init(void * hwnd, bool lite)
 
 void DX8Wrapper::Shutdown()
 {
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 30/09/2026 Nothing to shut down without a render state (PLAN-023 Phase 8, stage
+	// RR2a-1): the defaults hold no device, interface or caps, and are never written.
+	if (::rts::ctx()->w3dRender == nullptr)
+		return;
+#endif
 	if (D3DDevice) {
 
 		Set_Render_Target ((IDirect3DSurface8 *)nullptr);
@@ -707,6 +902,7 @@ void DX8Wrapper::Shutdown()
 	}
 
 	if (D3DInterface) {
+		if (DX8Wrapper_FinalReleaseHook) DX8Wrapper_FinalReleaseHook("a Direct3D interface");
 		D3DInterface->Release();
 		D3DInterface=nullptr;
 
@@ -725,10 +921,7 @@ void DX8Wrapper::Shutdown()
 		}
 	}
 
-	if (D3D8Lib) {
-		FreeLibrary(D3D8Lib);
-		D3D8Lib = nullptr;
-	}
+	// GeneralsX @bugfix cemlyn007 30/09/2026 D3D8Lib stays loaded for the process (see Init).
 
 	_RenderDeviceNameTable.Clear();		 // note - Delete_All() resizes the vector, causing a reallocation.  Clear is better. jba.
 	_RenderDeviceShortNameTable.Clear();
@@ -736,6 +929,15 @@ void DX8Wrapper::Shutdown()
 
 	DX8Caps::Shutdown();
 	IsInitted = false;		// 010803 srj
+	// GeneralsX @feature cemlyn007 30/09/2026 With RTS_ENGINE_CONTEXT the engine's render state outlives its device
+	// until the end of WW3D::Shutdown, which writes WW3D's own after this (PLAN-023 Phase 8, stages RR2a-1 and
+	// RR2a-2): Destroy_Render_State.
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @bugfix cemlyn007 30/09/2026 Unless WW3D::Init never took it: an Init and Shutdown pair on its own
+	// would otherwise leave both states to the engine's end (PLAN-023 Phase 8, stage RR2b).
+	if (!W3D_Render_State().OwnedByWW3D)
+		Destroy_Render_State();
+#endif
 }
 
 void DX8Wrapper::Do_Onetime_Device_Dependent_Inits()
@@ -972,6 +1174,19 @@ bool DX8Wrapper::Create_Device()
 
 	dbgHelpGuard.deactivate();
 
+	// GeneralsX @feature cemlyn007 30/09/2026 The formats the device was made with, once per device
+	// (so once per engine): an embed host's windowless device must match its windowed one, since
+	// W3DWater's soft shore edge blends on destination alpha (PLAN-023 Phase 8, stage RR0c).
+	{
+		StringClass backbufferFormat;
+		StringClass depthFormat;
+		Get_Format_Name(_PresentParameters.BackBufferFormat, &backbufferFormat);
+		Get_Format_Name(_PresentParameters.AutoDepthStencilFormat, &depthFormat);
+		fprintf(stderr, "INFO: DX8Wrapper::Create_Device: window=%s BackBufferFormat=%s AutoDepthStencilFormat=%s %ux%u\n",
+			_Hwnd ? "yes" : "none", backbufferFormat.str(), depthFormat.str(),
+			(unsigned)_PresentParameters.BackBufferWidth, (unsigned)_PresentParameters.BackBufferHeight);
+	}
+
 	/*
 	** Initialize all subsystems
 	*/
@@ -1080,6 +1295,7 @@ void DX8Wrapper::Release_Device()
 		// the GPU driver. A process that exits next unloads the driver under them and dies with
 		// SIGSEGV, most often when a cold shader cache and a loaded machine leave more compiles
 		// in flight. Only destroying the device joins those threads, so any leak is a bug.
+		if (DX8Wrapper_FinalReleaseHook) DX8Wrapper_FinalReleaseHook("a render device");
 		const ULONG refs = D3DDevice->Release();
 		if (refs != 0) {
 			fprintf(stderr, "ERROR: DX8Wrapper::Release_Device() - %lu leaked reference(s) keep the device alive\n", (unsigned long)refs);
@@ -1268,6 +1484,12 @@ void DX8Wrapper::Get_Format_Name(unsigned int format, StringClass *tex_format)
 
 void DX8Wrapper::Resize_And_Position_Window()
 {
+	// GeneralsX @feature cemlyn007 30/09/2026 A windowless device (a null _Hwnd: an embed host's image
+	// observations) has no window to size; its back buffer takes the resolution as it is (PLAN-023
+	// Phase 8, stage RR0c).
+	if (_Hwnd == nullptr)
+		return;
+
 	// Get the current dimensions of the 'render area' of the window
 	RECT rect = { 0 };
 	::GetClientRect (_Hwnd, &rect);
@@ -1396,9 +1618,9 @@ bool DX8Wrapper::Set_Render_Device(int dev, int width, int height, int bits, int
 	// DXVK's SDL3 WSI calls SDL_SetWindowPosition during fullscreen entry which Wayland rejects.
 	// SDL3 native fullscreen is applied separately after device creation (see W3DDisplay::init).
 	_PresentParameters.Windowed = TRUE;
-	#else
+#else
 	_PresentParameters.Windowed = IsWindowed;
-	#endif
+#endif
 
 	_PresentParameters.EnableAutoDepthStencil = TRUE;				// Driver will attempt to match Z-buffer depth
 	_PresentParameters.Flags=0;											// We're not going to lock the backbuffer
@@ -1415,7 +1637,14 @@ bool DX8Wrapper::Set_Render_Device(int dev, int width, int height, int bits, int
 
 		D3DDISPLAYMODE desktop_mode;
 		::ZeroMemory(&desktop_mode, sizeof(D3DDISPLAYMODE));
-		D3DInterface->GetAdapterDisplayMode( CurRenderDevice, &desktop_mode );
+		const HRESULT display_mode_result = D3DInterface->GetAdapterDisplayMode( CurRenderDevice, &desktop_mode );
+
+		// GeneralsX @feature cemlyn007 30/09/2026 A windowless device has no desktop to match: if the
+		// adapter reports no display mode, take the 32-bit format the promotion below expects from a
+		// desktop, so it keeps the same back buffer as a windowed one. No driver tested (NVIDIA, lavapipe)
+		// reports no mode, so this fallback has not been run (PLAN-023 Phase 8, stage RR0c).
+		if (_Hwnd == nullptr && (FAILED(display_mode_result) || desktop_mode.Format == D3DFMT_UNKNOWN))
+			desktop_mode.Format = D3DFMT_X8R8G8B8;
 
 		DisplayFormat=_PresentParameters.BackBufferFormat = desktop_mode.Format;
 
@@ -1860,14 +2089,15 @@ bool DX8Wrapper::Registry_Load_Render_Device( const char * sub_key, char *device
 
 bool DX8Wrapper::Find_Color_And_Z_Mode(int resx,int resy,int bitdepth,D3DFORMAT * set_colorbuffer,D3DFORMAT * set_backbuffer,D3DFORMAT * set_zmode)
 {
-	static D3DFORMAT _formats16[] =
+	// GeneralsX @refactor cemlyn007 30/09/2026 const: only read, so process-wide (PLAN-023 Phase 8, stage RR2a-1).
+	static const D3DFORMAT _formats16[] =
 	{
 		D3DFMT_R5G6B5,
 		D3DFMT_X1R5G5B5,
 		D3DFMT_A1R5G5B5
 	};
 
-	static D3DFORMAT _formats32[] =
+	static const D3DFORMAT _formats32[] =
 	{
 		D3DFMT_A8R8G8B8,
 		D3DFMT_X8R8G8B8,
@@ -1877,7 +2107,7 @@ bool DX8Wrapper::Find_Color_And_Z_Mode(int resx,int resy,int bitdepth,D3DFORMAT 
 	/*
 	** Select the table that we're going to use to search for a valid backbuffer format
 	*/
-	D3DFORMAT * format_table = nullptr;
+	const D3DFORMAT * format_table = nullptr;
 	int format_count = 0;
 
 	if (BitDepth == 16) {

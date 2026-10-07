@@ -2,6 +2,7 @@ set(GAMEENGINE_SRC
     Include/Common/AcademyStats.h
 #    Include/Common/ActionManager.h
     Include/Common/AddonCompat.h
+    Include/Common/ApplicationWindow.h
     Include/Common/ArchiveFile.h
     Include/Common/ArchiveFileSystem.h
     Include/Common/AsciiString.h
@@ -34,9 +35,14 @@ set(GAMEENGINE_SRC
     Include/Common/DiscreteCircle.h
 #    Include/Common/DrawModule.h
     Include/Common/DynamicAudioEventInfo.h
+    Include/Common/EngineContext.h
+    Include/Common/EngineContextFields.inl
+    Include/Common/EngineSingletonMacros.h
+    Include/Common/EngineSingletons.inl
 #    Include/Common/encrypt.h
 #    Include/Common/Energy.h
     Include/Common/Errors.h
+    Include/Common/FatalEngineError.h
     Include/Common/file.h
     Include/Common/FileSystem.h
     Include/Common/FramePacer.h
@@ -98,6 +104,7 @@ set(GAMEENGINE_SRC
     Include/Common/Radar.h
     Include/Common/RAMFile.h
     Include/Common/RandomValue.h
+    Include/Common/RandomValueSeeds.h
 #    Include/Common/Recorder.h
 #    Include/Common/Registry.h
     Include/Common/ReplaySimulation.h
@@ -578,6 +585,7 @@ set(GAMEENGINE_SRC
     Source/Common/Diagnostic/SimulationMathCrc.cpp
     Source/Common/Dict.cpp
     Source/Common/DiscreteCircle.cpp
+    Source/Common/EngineContext.cpp
     Source/Common/FramePacer.cpp
     Source/Common/FrameRateLimit.cpp
 #    Source/Common/GameEngine.cpp

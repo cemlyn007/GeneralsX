@@ -42,7 +42,9 @@
 #include "WW3D2/sortingrenderer.h"
 
 
+#if !RTS_ENGINE_CONTEXT
 SmudgeManager *TheSmudgeManager=nullptr;
+#endif
 
 W3DSmudgeManager::W3DSmudgeManager()
 {

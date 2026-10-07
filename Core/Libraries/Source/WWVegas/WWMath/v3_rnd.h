@@ -87,12 +87,23 @@ class Vector3Randomizer {
 		// Derived classes should have protected copy CTors so users use the Clone() function
 
 		// Utility functions
+#if RTS_ENGINE_CONTEXT
+		// GeneralsX @feature cemlyn007 30/09/2026 The generator is per engine, with the same seed, so that each
+		// engine's emitters draw the numbers they draw alone (PLAN-023 Phase 8, stage RR2b).
+		float Get_Random_Float_Minus1_To_1()	{ return Randomizer_State() * OOIntMax; }
+		float Get_Random_Float_0_To_1()			{ return ((unsigned int)Randomizer_State()) * OOUIntMax; }
+#else
 		float Get_Random_Float_Minus1_To_1()	{ return Randomizer * OOIntMax; }
 		float Get_Random_Float_0_To_1()			{ return ((unsigned int)Randomizer) * OOUIntMax; }
+#endif
 
 		static const float OOIntMax;
 		static const float OOUIntMax;
+#if RTS_ENGINE_CONTEXT
+		static Random3Class& Randomizer_State();
+#else
 		static Random3Class	Randomizer;
+#endif
 
 	private:
 

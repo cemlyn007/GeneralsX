@@ -40,6 +40,8 @@
 // for now we maintain old legacy files
 // #define MAINTAIN_LEGACY_FILES
 
+#include <cstdio>
+
 #include "Common/ArchiveFile.h"
 #include "Common/Debug.h"
 #include "Common/file.h"
@@ -479,15 +481,76 @@ void GameFileClass::Close()
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // W3DFileSystem Class ////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////
+#if !RTS_ENGINE_CONTEXT
 W3DFileSystem *TheW3DFileSystem = nullptr;
+#endif
 
 //-------------------------------------------------------------------------------------------------
 /** Constructor.  Creating an instance of this class overrides the default
 W3D file factory.  */
 //-------------------------------------------------------------------------------------------------
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 28/09/2026 One permanent, process-wide W3D file factory that forwards to
+// the current engine's W3DFileSystem (PLAN-023 Phase 3). Each engine's W3DFileSystem used to install itself
+// in _TheFileFactory and null it on destruction, so a second engine's teardown left the first reading
+// through null. With no W3DFileSystem in the current engine it reads through a plain file factory of its
+// own, as _TheFileFactory does before the first W3DFileSystem is made. It reads the current engine's
+// W3DFileSystem, so a thread that loads files must run in its engine's context: the texture loader thread enters each
+// task's engine (TextureLoadTaskClass::Get_Engine_Context). The factory, and the plain one inside it, are
+// immortal (made on first use and never destroyed) since _TheFileFactory keeps pointing at it until the
+// process exits, past static destruction. Its first use installs it in _TheFileFactory, once, so no later
+// W3DFileSystem writes that global.
+namespace
+{
+class EngineW3DFileFactoryClass : public FileFactoryClass
+{
+public:
+	EngineW3DFileFactoryClass()
+	{
+		// Only over the library's default: a factory something else installed is refused rather than replaced
+		// under the engines already reading it (PLAN-023 Phase 5b).
+		if (_TheFileFactory == static_cast<FileFactoryClass *>(_TheSimpleFileFactory))
+			_TheFileFactory = this;
+		else
+		{
+			fprintf(stderr, "W3DFileSystem - another file factory is installed process-wide; the engine's is refused\n");
+			fflush(stderr);
+			DEBUG_CRASH(("W3DFileSystem - another file factory is installed process-wide; the engine's is refused"));
+		}
+	}
+	virtual FileClass * Get_File( char const *filename ) override
+	{
+		if (TheW3DFileSystem != nullptr)
+			return TheW3DFileSystem->Get_File(filename);
+		return m_fallback.Get_File(filename);
+	}
+	virtual void Return_File( FileClass *file ) override
+	{
+		if (TheW3DFileSystem != nullptr)
+			TheW3DFileSystem->Return_File(file);
+		else
+			m_fallback.Return_File(file);
+	}
+
+private:
+	SimpleFileFactoryClass m_fallback;
+};
+
+FileFactoryClass *engineW3DFileFactory()
+{
+	static EngineW3DFileFactoryClass *const factory = new EngineW3DFileFactoryClass;
+	return factory;
+}
+}
+#endif
+
 W3DFileSystem::W3DFileSystem()
 {
+#if RTS_ENGINE_CONTEXT
+	engineW3DFileFactory(); // installs the one permanent factory on its first use
+#else
 	_TheFileFactory = this; // override the w3d file factory.
+#endif
 
 #if RTS_ZEROHOUR && PRIORITIZE_TEXTURES_BY_SIZE
 	reprioritizeTexturesBySize();
@@ -500,7 +563,9 @@ after W3D is shutdown.  */
 //-------------------------------------------------------------------------------------------------
 W3DFileSystem::~W3DFileSystem()
 {
+#if !RTS_ENGINE_CONTEXT
 	_TheFileFactory = nullptr; // remove the w3d file factory.
+#endif
 }
 
 //-------------------------------------------------------------------------------------------------

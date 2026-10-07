@@ -65,9 +65,16 @@
 
 
 
-static ShaderClass detailOpaqueShader(SC_ALPHA);
+static const ShaderClass detailOpaqueShader(SC_ALPHA);
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 28/09/2026 Per engine (PLAN-023 Phase 4; see W3DStatusCircle.h), blue at first.
+rts::PerEngineStatic<W3DStatusCircle::StatusColor> W3DStatusCircle::s_statusColor_perEngine([](W3DStatusCircle::StatusColor& color) { color.diffuse = 255; color.needUpdate = false; });
+#define m_diffuse (s_statusColor_perEngine.get().diffuse)
+#define m_needUpdate (s_statusColor_perEngine.get().needUpdate)
+#else
 Bool W3DStatusCircle::m_needUpdate;
 Int W3DStatusCircle::m_diffuse=255; // blue.
+#endif
 
 W3DStatusCircle::~W3DStatusCircle()
 {

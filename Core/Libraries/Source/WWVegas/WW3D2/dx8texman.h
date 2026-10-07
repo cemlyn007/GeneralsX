@@ -166,6 +166,10 @@ public:
 	static void Remove(TextureBaseClass *tex);
 	static void Release_Textures();
 	static void Recreate_Textures();
+#if !RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 30/09/2026 With RTS_ENGINE_CONTEXT, per engine: dx8texman.cpp (PLAN-023 Phase 8,
+	// stage RR2b).
 private:
 	static TextureTrackerList Managed_Textures;
+#endif
 };

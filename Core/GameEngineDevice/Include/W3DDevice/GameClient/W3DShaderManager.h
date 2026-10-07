@@ -80,19 +80,32 @@ public:
 	static void shutdown();	///<release resources used by shaders
 	static void updateCloud();	///<update the cloud position once every render frame.
 	static ChipsetType getChipset();	///<return current device chipset.
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 01/10/2026 Out of line: the state is the current engine's (W3DShaderManager.cpp,
+	// W3DShaderManagerData; PLAN-023 Phase 8, stage RR3). The same for the other accessors below.
+	static GraphicsVenderID getCurrentVendor();	///<return current card vendor.
+	static Int64 getCurrentDriverVersion();	///<return current driver version.
+#else
 	static GraphicsVenderID getCurrentVendor() {return m_currentVendor;}	///<return current card vendor.
 	// GeneralsX @bugfix BenderAI 13/02/2026 Use Int64 instead of __int64 for cross-platform builds
 	static Int64 getCurrentDriverVersion() {return m_driverVersion; }	///<return current driver version.
+#endif
 	static Int getShaderPasses(ShaderTypes shader);	///<rendering passes required for shader
 	static Int setShader(ShaderTypes shader, Int pass);	///<enable specific shader pass.
 	static Int setShroudTex(Int stage);	///<Set shroud in a texture stage.
 	static void resetShader(ShaderTypes shader);	///<make sure W3D2 gets restored to normal
+#if RTS_ENGINE_CONTEXT
+	static void setTexture(Int stage,TextureClass* texture);
+	static TextureClass *getShaderTexture(Int stage);
+	static ShaderTypes getCurrentShader();
+#else
 	///Specify all textures (up to 8) which can be accessed by the shaders.
 	static void setTexture(Int stage,TextureClass* texture) {m_Textures[stage]=texture;}
 	///Return current texture available to shaders.
 	static TextureClass *getShaderTexture(Int stage) { return m_Textures[stage];}	///<returns currently selected texture for given stage
 	///Return last activated shader.
 	static ShaderTypes getCurrentShader() {return m_currentShader;}
+#endif
 	/// Loads a .vso file and creates a vertex shader for it
 	static HRESULT LoadAndCreateD3DShader(const char* strFilePath, const DWORD* pDeclaration, DWORD Usage, Bool ShaderType, DWORD* pHandle);
 
@@ -106,14 +119,26 @@ public:
 	static Bool filterSetup(FilterTypes filter, FilterModes mode);
 
 	// Support routines for filter methods.
+#if RTS_ENGINE_CONTEXT
+	static Bool canRenderToTexture();
+#else
 	static Bool canRenderToTexture() { return (m_oldRenderSurface && m_newRenderSurface);}
+#endif
 	static void startRenderToTexture(); ///< Sets render target to texture.
 	static IDirect3DTexture8 * endRenderToTexture(); ///< Ends render to texture, & returns texture.
 	static IDirect3DTexture8 * getRenderTexture();	///< returns last used render target texture
+#if RTS_ENGINE_CONTEXT
+	static Bool isRenderingToTexture();
+#else
 	static Bool isRenderingToTexture() {return m_renderingToTexture; }
+#endif
 	static void drawViewport(Int color);	///<draws 2 triangles covering the current tactical viewport
 
 
+#if !RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 01/10/2026 With RTS_ENGINE_CONTEXT these are the current engine's: fields of
+	// W3DShaderManagerData, behind macros of these names in W3DShaderManager.cpp (PLAN-023 Phase 8, stage RR3). The
+	// same for the filters' statics below.
 protected:
 	static TextureClass *m_Textures[8];	///textures assigned to each of the possible stages
 	static ChipsetType m_currentChipset;	///<last video card chipset that was detected.
@@ -130,6 +155,7 @@ protected:
 	static IDirect3DTexture8 *m_renderTexture;		///<texture into which rendering will be redirected.
 	static IDirect3DSurface8 *m_newRenderSurface;	///<new render target inside m_renderTexture
 	static IDirect3DSurface8 *m_oldDepthSurface;	///<previous depth buffer surface
+#endif
 
 
 };
@@ -163,7 +189,11 @@ public:
 	virtual Bool setup(FilterModes mode) override; ///< Called when the filter is started, one time before the first prerender.
 	ScreenMotionBlurFilter();
 
+#if RTS_ENGINE_CONTEXT
+	static void setZoomToPos(const Coord3D *pos);
+#else
 	static void setZoomToPos(const Coord3D *pos) {m_zoomToPos = *pos; m_zoomToValid = true;}
+#endif
 
 protected:
 	enum {MAX_COUNT = 60,
@@ -180,8 +210,10 @@ protected:
 	Int m_panFactor;
 
 
+#if !RTS_ENGINE_CONTEXT
 	static Coord3D m_zoomToPos;
 	static Bool m_zoomToValid;
+#endif
 } ;
 
 /*=========  ScreenBWFilter	=============================================================*/
@@ -195,19 +227,25 @@ public:
 	virtual Bool preRender(Bool &skipRender, CustomScenePassModes &scenePassMode) override; ///< Set up at start of render.  Only applies to screen filter shaders.
 	virtual Bool postRender(FilterModes mode, Coord2D &scrollDelta,Bool &doExtraRender) override; ///< Called after render.  Only applies to screen filter shaders.
 	virtual Bool setup(FilterModes mode) override {return true;} ///< Called when the filter is started, one time before the first prerender.
+#if RTS_ENGINE_CONTEXT
+	static void setFadeParameters(Int fadeFrames, Int direction);
+#else
 	static void setFadeParameters(Int fadeFrames, Int direction)
 	{
 		m_curFadeFrame = 0;
 		m_fadeFrames = fadeFrames;
 		m_fadeDirection = direction;
 	}
+#endif
 protected:
 	virtual Int set(FilterModes mode) override;		///<setup shader for the specified rendering pass.
 	virtual void reset() override;		///<do any custom resetting necessary to bring W3D in sync.
+#if !RTS_ENGINE_CONTEXT
 	static Int m_fadeFrames;
 	static Int m_fadeDirection;
 	static Int m_curFadeFrame;
 	static Real m_curFadeValue;
+#endif
 };
 
 class ScreenBWFilterDOT3 : public ScreenBWFilter
@@ -233,22 +271,33 @@ public:
 	virtual Bool preRender(Bool &skipRender, CustomScenePassModes &scenePassMode) override; ///< Set up at start of render.  Only applies to screen filter shaders.
 	virtual Bool postRender(FilterModes mode, Coord2D &scrollDelta,Bool &doExtraRender) override; ///< Called after render.  Only applies to screen filter shaders.
 	virtual Bool setup(FilterModes mode) override {return true;} ///< Called when the filter is started, one time before the first prerender.
+#if RTS_ENGINE_CONTEXT
+	static void setFadeParameters(Int fadeFrames, Int direction);
+#else
 	static void setFadeParameters(Int fadeFrames, Int direction)
 	{
 		m_curFadeFrame = 0;
 		m_fadeFrames = fadeFrames;
 		m_fadeDirection = direction;
 	}
+#endif
+#if RTS_ENGINE_CONTEXT
+	static Real getCurrentFadeValue();
+	static TextureClass *getCurrentMaskTexture();
+#else
 	static Real getCurrentFadeValue()	{ return m_curFadeValue;}
 	static TextureClass *getCurrentMaskTexture() { return m_fadePatternTexture;}
+#endif
 protected:
 	virtual Int set(FilterModes mode) override;		///<setup shader for the specified rendering pass.
 	virtual void reset() override;		///<do any custom resetting necessary to bring W3D in sync.
 	Bool updateFadeLevel();		///<updated current state of fade and return true if not finished.
+#if !RTS_ENGINE_CONTEXT
 	static Int m_fadeFrames;
 	static Int m_fadeDirection;
 	static Int m_curFadeFrame;
 	static Real m_curFadeValue;
 	static Bool m_skipRender;
 	static TextureClass *m_fadePatternTexture;	///<shape/pattern of the fade
+#endif
 };

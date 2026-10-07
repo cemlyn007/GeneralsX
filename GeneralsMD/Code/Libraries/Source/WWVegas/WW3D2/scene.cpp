@@ -517,6 +517,13 @@ float SimpleSceneClass::Compute_Point_Visibility
 }
 
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 30/09/2026 Per engine: Customized_Render's light environment. Each draw rebuilds it,
+// but rinfo keeps a pointer to it for the draw, so it is this engine's, not a local. A file static, so that its slot
+// is taken at static initialisation, not at the first draw (PLAN-023 Phase 8, stage RR2b).
+static rts::PerEngineStatic<LightEnvironmentClass> Customized_Render_lenv_perEngine;
+#endif
+
 /***********************************************************************************************
  * SimpleSceneClass::Render -- Render this scene                                               *
  *                                                                                             *
@@ -583,7 +590,11 @@ void SimpleSceneClass::Customized_Render(RenderInfoClass & rinfo)
 	// adding light environment for new shader system
 	if (!rinfo.light_environment)
 	{
+#if RTS_ENGINE_CONTEXT
+		LightEnvironmentClass& lenv = Customized_Render_lenv_perEngine.get();
+#else
 		static LightEnvironmentClass lenv;
+#endif
 
 		lenv.Reset(Vector3(0,0,0),AmbientLight);
 

@@ -69,6 +69,7 @@
 #include "GameNetwork/GameSpy/ThreadUtils.h"
 #include "GameNetwork/GameSpy/MainMenuUtils.h"
 #include "GameNetwork/WOLBrowser/WebBrowser.h"
+#include "Common/EngineContext.h" // GeneralsX @feature cemlyn007 28/09/2026 rts::withCurrentEngine
 
 #if defined(SAGE_USE_NGMP)
 #include "GameNetwork/GeneralsOnline/OnlineServices_Manager.h"
@@ -746,9 +747,9 @@ void WOLWelcomeMenuInit( WindowLayout *layout, void *userData )
 #if defined(SAGE_USE_NGMP)
 	if (TheGameSpyInfo && TheGameSpyInfo->getMOTD().isEmpty())
 	{
-		std::thread([]() {
+		std::thread(::rts::withCurrentEngine([]() {
 			NGMP::FetchMOTD();
-		}).detach();
+		})).detach();
 	}
 #endif
 	updateNumPlayersOnline();

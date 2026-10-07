@@ -30,6 +30,11 @@
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
 #include "PreRTS.h"
 
+#include <algorithm>  // std::find (m_scratchPadMaps dedupe)
+#ifndef _WIN32
+#include <cerrno>     // errno, ENOENT, ENOTDIR (scratchPadMapIsDefinitelyGone)
+#endif
+
 #include "Common/file.h"
 #include "Common/FileSystem.h"
 #include "Common/GameState.h"
@@ -44,7 +49,9 @@
 #include "GameNetwork/GameInfo.h"
 
 // GLOBALS ////////////////////////////////////////////////////////////////////////////////////////
+#if !RTS_ENGINE_CONTEXT
 GameStateMap *TheGameStateMap = nullptr;
+#endif
 
 
 // METHODS ////////////////////////////////////////////////////////////////////////////////////////
@@ -159,31 +166,49 @@ static void embedInUseMap( AsciiString map, Xfer *xfer )
 	// rewind file back to start
 	fseek( fp, 0, SEEK_SET );
 
-	// allocate a buffer big enough for the entire file
-	char *buffer = new char[ fileSize ];
-	if( buffer == nullptr )
+	// GeneralsX @bugfix cemlyn007 03/10/2026 Close fp (and free buffer) on every throw path below:
+	// the allocation failure, the fread failure, and xfer->xferUser/endBlock's XFER_WRITE_ERROR
+	// (for example on a full disk) all now share this one catch, which closes fp and frees buffer
+	// before rethrowing. Before this change none of them did; an open handle on this tracked
+	// scratch-pad map fails a later DeleteFile of it on Windows, and leaks one file descriptor per
+	// failed save otherwise, in a long-lived embedded host.
+	char *buffer = nullptr;
+	try
 	{
 
-		DEBUG_CRASH(( "embedInUseMap - Unable to allocate buffer for file '%s'", map.str() ));
-		throw SC_INVALID_DATA;
+		// allocate a buffer big enough for the entire file
+		buffer = new char[ fileSize ];
+		if( buffer == nullptr )
+		{
+
+			DEBUG_CRASH(( "embedInUseMap - Unable to allocate buffer for file '%s'", map.str() ));
+			throw SC_INVALID_DATA;
+
+		}
+
+		// read the entire file
+		if( fread( buffer, 1, fileSize, fp ) != fileSize )
+		{
+
+			DEBUG_CRASH(( "embedInUseMap - Error reading from file '%s'", map.str() ));
+			throw SC_INVALID_DATA;
+
+		}
+
+		// embed file into xfer stream
+		xfer->beginBlock();
+		xfer->xferUser( buffer, fileSize );
+		xfer->endBlock();
 
 	}
-
-	// read the entire file
-	if( fread( buffer, 1, fileSize, fp ) != fileSize )
+	catch (...)
 	{
 
-		delete[] buffer;
-
-		DEBUG_CRASH(( "embedInUseMap - Error reading from file '%s'", map.str() ));
-		throw SC_INVALID_DATA;
+		delete [] buffer;
+		fclose( fp );
+		throw;
 
 	}
-
-	// embed file into xfer stream
-	xfer->beginBlock();
-	xfer->xferUser( buffer, fileSize );
-	xfer->endBlock();
 
 	// close the file
 	fclose( fp );
@@ -210,30 +235,55 @@ static void extractAndSaveMap( AsciiString mapToSave, Xfer *xfer )
 
 	}
 
-	// read data size from file
-	dataSize = xfer->beginBlock();
-
-	// allocate buffer big enough for the entire map file
-	char *buffer = new char[ dataSize ];
-	if( buffer == nullptr )
+	// GeneralsX @bugfix cemlyn007 03/10/2026 Close fp (and free buffer) on every throw path below,
+	// not just the explicit DEBUG_CRASH/throw ones that already did. On a truncated save, both
+	// the size read and the body read end up throwing XFER_READ_ERROR out of XferLoad: beginBlock()
+	// itself never throws (on a short read it DEBUG_CRASHes and returns 0), but the
+	// xferUser(buffer, 0) that follows still reaches XferLoad::xferImplementation's
+	// fread(data, 0, 1, fp), which returns 0 rather than the 1 it checks for, so it throws there
+	// instead. The allocation's null check below never fires either way, since new throws rather
+	// than returning null: with a size of 0 it returns a valid pointer, while a corrupt (as
+	// opposed to merely truncated) save can hand beginBlock() a bogus size that makes the
+	// allocation itself throw ERROR_OUT_OF_MEMORY instead of XFER_READ_ERROR. Leaving fp open on
+	// any of these paths meant the caller's now-tracked partial file (see m_scratchPadMaps above)
+	// failed to delete on Windows (DeleteFile of an open handle fails) and leaked one file
+	// descriptor per failed load everywhere else, in a long-lived embedded host.
+	char *buffer = nullptr;
+	try
 	{
 
-		DEBUG_CRASH(( "extractAndSaveMap - Unable to allocate buffer for file '%s'", mapToSave.str() ));
-		throw SC_INVALID_DATA;
+		// read data size from file
+		dataSize = xfer->beginBlock();
+
+		// allocate buffer big enough for the entire map file
+		buffer = new char[ dataSize ];
+		if( buffer == nullptr )
+		{
+
+			DEBUG_CRASH(( "extractAndSaveMap - Unable to allocate buffer for file '%s'", mapToSave.str() ));
+			throw SC_INVALID_DATA;
+
+		}
+
+		// read map file
+		xfer->xferUser( buffer, dataSize );
+
+		// write contents of buffer to new file
+		if( fwrite( buffer, 1, dataSize, fp ) != dataSize )
+		{
+
+			DEBUG_CRASH(( "extractAndSaveMap - Error writing to file '%s'", mapToSave.str() ));
+			throw SC_INVALID_DATA;
+
+		}
 
 	}
-
-	// read map file
-	xfer->xferUser( buffer, dataSize );
-
-	// write contents of buffer to new file
-	if( fwrite( buffer, 1, dataSize, fp ) != dataSize )
+	catch (...)
 	{
 
-		delete[] buffer;
-
-		DEBUG_CRASH(( "extractAndSaveMap - Error writing to file '%s'", mapToSave.str() ));
-		throw SC_INVALID_DATA;
+		delete [] buffer;
+		fclose( fp );
+		throw;
 
 	}
 
@@ -400,6 +450,26 @@ void GameStateMap::xfer( Xfer *xfer )
 		// take the embedded map file out of the save file, and save as its own .map file
 		// in the save directory temporarily
 		//
+		// GeneralsX @bugfix cemlyn007 02/10/2026 Record the path before calling extractAndSaveMap,
+		// not after: that function fopen("w+b")s the file before beginBlock/xferUser/fwrite; a
+		// truncated save then throws XFER_READ_ERROR out of xferUser, whether the short read
+		// happens in beginBlock's own header read or in the body read that follows it, while a
+		// corrupt (as opposed to merely truncated) size can instead make the allocation itself
+		// throw ERROR_OUT_OF_MEMORY before xferUser is ever reached -- either way leaving a
+		// partial file on disk. Recording first means clearScratchPadMaps still deletes that
+		// partial file even though extraction itself never returned to record it the old way.
+		//
+		// GeneralsX @bugfix cemlyn007 03/10/2026 The std::find guard below is load-bearing, not
+		// purely defensive: clearScratchPadMaps keeps a path whose DeleteFile failed while the
+		// file is still on disk (for retry), so this vector can already hold entries when a load
+		// starts. While a kept path stays undeletable, the guard stops each further load of the
+		// same map leaf from appending another copy of it; without the guard, the vector would
+		// grow by one per load, and every clearScratchPadMaps call would print one "Unable to
+		// delete" line per copy.
+		if( std::find( m_scratchPadMaps.begin(), m_scratchPadMaps.end(), saveGameInfo->saveGameMapName )
+		    == m_scratchPadMaps.end() )
+			m_scratchPadMaps.push_back( saveGameInfo->saveGameMapName );
+
 		extractAndSaveMap( saveGameInfo->saveGameMapName, xfer );
 
 	}
@@ -459,6 +529,31 @@ void GameStateMap::xfer( Xfer *xfer )
 
 }
 
+// GeneralsX @bugfix cemlyn007 03/10/2026 A GetFileAttributes/stat failure is not by itself proof
+// that a scratch-pad map is gone: on non-Windows, file_compat.h's GetFileAttributes wraps stat()
+// and returns INVALID_FILE_ATTRIBUTES for *any* stat() failure, not only "no such file" (EACCES
+// on an ancestor directory losing its search bit, or ESTALE/EIO from a network-mounted user-data
+// root, fail the same way). Answer only a definite not-found, so clearScratchPadMaps below can
+// tell "really gone" apart from "could not be checked" and keep retrying (and reporting) the
+// latter instead of silently dropping it from m_scratchPadMaps.
+#if defined(_WIN32)
+static Bool scratchPadMapIsDefinitelyGone( const AsciiString &path )
+{
+	if( GetFileAttributes( path.str() ) != 0xFFFFFFFF )
+		return FALSE; // still there
+	DWORD err = ::GetLastError();
+	return ( err == ERROR_FILE_NOT_FOUND || err == ERROR_PATH_NOT_FOUND );
+}
+#else
+static Bool scratchPadMapIsDefinitelyGone( const AsciiString &path )
+{
+	struct stat st;
+	if( stat( path.str(), &st ) == 0 )
+		return FALSE; // still there
+	return ( errno == ENOENT || errno == ENOTDIR );
+}
+#endif
+
 // ------------------------------------------------------------------------------------------------
 /** Delete any scratch pad maps in the save directory.  Scratch pad maps are maps that
 	* were embedded in previously loaded save game files and temporarily written out as
@@ -469,33 +564,59 @@ void GameStateMap::clearScratchPadMaps()
 {
 
 	// GeneralsX @bugfix cemlyn007 27/09/2026 Use the save directory cached in init(): ~GameStateMap calls
-	// this at shutdown, after shutdownAll has deleted TheGameState (initialized after TheGameStateMap).
+	// this at shutdown, after shutdownAll has deleted TheGameState (initialised after TheGameStateMap).
 	if( m_saveDirectory.isEmpty() )
 		return;
 
-	// GeneralsX @bugfix cemlyn007 27/09/2026 List and delete by absolute path instead of switching the process
-	// into the save directory. On macOS/Linux the switch failed silently while the save directory did not exist
-	// yet (nothing saved so far), so every *.map in the working directory (usually the install directory) was
-	// deleted. The switch also changed the working directory under every other thread. The local file system
-	// lists the directory on every platform, and a save directory that does not exist yet lists nothing.
-	// TheLocalFileSystem is initialized before TheGameStateMap, so it is still alive in ~GameStateMap.
-	FilenameList mapFiles;
-	TheLocalFileSystem->getFileListInDirectory( AsciiString::TheEmptyString, m_saveDirectory, "*.map", mapFiles, FALSE );
-
-	for( FilenameList::const_iterator it = mapFiles.begin(); it != mapFiles.end(); ++it )
+	// GeneralsX @bugfix cemlyn007 02/10/2026 Delete only the scratch-pad maps this instance's
+	// extractAndSaveMap wrote (tracked in m_scratchPadMaps), instead of every *.map that happens to
+	// be sitting in m_saveDirectory. m_saveDirectory is the shared, process-wide user-data Save
+	// directory until PLAN-023 Phase 5's per-engine user-data root (BootConfig) lands, so another
+	// live engine can have its own scratch-pad map in the same directory; deleting the whole
+	// directory would remove that map out from under it (its next embedInUseMap would then fail with
+	// SC_INVALID_DATA). This also only ever matches exact paths this instance wrote, so it cannot
+	// be fooled by a case-variant name the way a case-insensitive directory listing could.
+	//
+	// GeneralsX @bugfix cemlyn007 03/10/2026 Keep an entry whose DeleteFile below failed while the
+	// file is still on disk, instead of unconditionally clearing the whole vector afterwards.
+	// Before per-instance tracking, the whole-directory sweep ran again on every loadGame and in
+	// ~GameStateMap, so a map that failed to delete once (a transient sharing violation on
+	// Windows, or EBUSY/EPERM on Linux) was retried on the next sweep. Clearing the vector
+	// regardless of DeleteFile's result drops that retry: the path joins the "tracked by nobody"
+	// set GameStateMap.h documents for killed or faulted engines, except now a live engine that
+	// never crashed can land it there too. A later clearScratchPadMaps call, or this instance's
+	// own destructor, retries whatever is left in m_scratchPadMaps.
+	//
+	// GeneralsX @bugfix cemlyn007 03/10/2026 The "is it still there" check below must stay
+	// exact-case, like DeleteFile itself (std::filesystem::remove), not go through
+	// TheLocalFileSystem->doesFileExist: on a case-sensitive filesystem that falls back to a
+	// case-insensitive directory scan (StdLocalFileSystem::fixFilenameFromWindowsPath) once the
+	// exact path is gone, which would keep retrying -- and printing the message below for -- a
+	// path that no longer exists under its tracked name, just because some unrelated case-variant
+	// happens to share the directory. That would also undermine the exact-path claim in the
+	// comment above: this cleanup would no longer be unfoolable by a case-variant name.
+	// scratchPadMapIsDefinitelyGone (above) answers only for the exact path, and only when the
+	// path is definitely not found -- any other GetFileAttributes/stat failure is treated the
+	// same as the path still being there, so it is reported and retried rather than silently
+	// dropped.
+	std::vector<AsciiString> stillPending;
+	for( std::vector<AsciiString>::const_iterator it = m_scratchPadMaps.begin(); it != m_scratchPadMaps.end(); ++it )
 	{
 
-		// Win32 wildcards also match longer extensions through 8.3 short names, so check the extension itself
-		if( it->endsWithNoCase( ".map" ) == FALSE )
-			continue;
-
-		// a scratch pad map left behind would be picked up by a later load, so say when one cannot be deleted
-		if( DeleteFile( it->str() ) == 0 )
+		// a scratch pad map left behind would be picked up by a later load; a DeleteFile failure is
+		// reported and retried unless scratchPadMapIsDefinitelyGone says the exact tracked path is
+		// definitely already gone (another thread or process beat us to it, or whose only remaining
+		// match is a case-variant name) -- one whose existence could not even be checked is treated
+		// the same as one that is still there, not dropped silently
+		if( DeleteFile( it->str() ) == 0 && !scratchPadMapIsDefinitelyGone( *it ) )
 		{
 			fprintf( stderr, "GameStateMap::clearScratchPadMaps - Unable to delete scratch pad map '%s'\n", it->str() );
 			fflush( stderr );
+			stillPending.push_back( *it );
 		}
 
 	}
+
+	m_scratchPadMaps.swap( stillPending );
 
 }

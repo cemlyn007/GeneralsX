@@ -78,11 +78,27 @@ public:
 
 	int updateBlock();
 	Int freeMapResources();
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 28/09/2026 Per engine: every engine's W3DGameClient::setTeamColor (headless too,
+	// at game start) sets the local player's colour here, and every engine's scene makes a status circle
+	// (initData), so shared, a headless engine would recolour the rendering engine's circle (PLAN-023 Phase 4).
+	// W3DStatusCircle.cpp stands m_diffuse and m_needUpdate in for its fields.
+	struct StatusColor
+	{
+		Int diffuse;
+		Bool needUpdate;
+	};
+	static rts::PerEngineStatic<StatusColor> s_statusColor_perEngine;
+	void static setColor(Int r, Int g, Int b) {StatusColor &color = s_statusColor_perEngine.get(); color.needUpdate = true; color.diffuse = (b) + (g<<8) + (r<<16);};
+protected:
+	Int	m_numTriangles;	//dimensions of list
+#else
 	void static setColor(Int r, Int g, Int b) {m_needUpdate = true; m_diffuse = (b) + (g<<8) + (r<<16);};
 protected:
 	Int	m_numTriangles;	//dimensions of list
 	static Int m_diffuse;
 	static Bool			 m_needUpdate;
+#endif
 
 	DX8IndexBufferClass			*m_indexBuffer;	//indices defining a triangle strip the covers full terrain
 	ShaderClass m_shaderClass; //shader or rendering state for heightmap

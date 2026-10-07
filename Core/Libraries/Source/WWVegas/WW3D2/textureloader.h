@@ -87,7 +87,13 @@ public:
 	static void Suspend_Texture_Load();
 	static void Continue_Texture_Load();
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 30/09/2026 Out of line: the time is per engine (textureloader.cpp; PLAN-023
+	// Phase 8, stage RR2b).
+	static void Set_Texture_Inactive_Override_Time(int time_ms);
+#else
 	static void Set_Texture_Inactive_Override_Time(int time_ms) {TextureInactiveOverrideTime = time_ms;}
+#endif
 
 private:
 	static void Process_Foreground_Load			(TextureLoadTaskClass *task);
@@ -96,11 +102,15 @@ private:
 	static void Begin_Load_And_Queue				(TextureLoadTaskClass *task);
 	static void Load_Thumbnail						(TextureBaseClass *tc);
 
+#if !RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 30/09/2026 With RTS_ENGINE_CONTEXT, per engine: textureloader.cpp (PLAN-023
+	// Phase 8, stage RR2b).
 	static bool TextureLoadSuspended;
 
 	// The time in ms before a texture is thrown out.
 	// The default is zero.  The scripted movies set this to reduce texture stalls in movies.
 	static int	TextureInactiveOverrideTime;
+#endif
 };
 
 class TextureLoadTaskListNodeClass
@@ -202,7 +212,7 @@ class TextureLoadTaskClass : public TextureLoadTaskListNodeClass
 
 
 		TextureLoadTaskClass();
-		~TextureLoadTaskClass();
+		virtual ~TextureLoadTaskClass();
 
 		static TextureLoadTaskClass *	Create			(TextureBaseClass *tc, TaskType type, PriorityType priority);
 		static void				Delete_Free_Pool			();
@@ -237,6 +247,19 @@ class TextureLoadTaskClass : public TextureLoadTaskListNodeClass
 		void						Finish_Load					();
 		void						Apply_Missing_Texture	();
 
+#if RTS_ENGINE_CONTEXT
+		// GeneralsX @bugfix cemlyn007 01/10/2026 Drops a begun load's Direct3D texture (its surfaces unlocked first),
+		// applying nothing, for an engine's TextureLoader::Deinit while its device is still up (PLAN-023 Phase 8,
+		// stage RR3). The task is then left as if never begun, for Destroy().
+		void						Abandon_Load				();
+
+		// GeneralsX @feature cemlyn007 28/09/2026 The engine that queued this task for the background loader,
+		// which the loader thread enters while it loads the task (PLAN-023 Phase 3): the W3D file factory
+		// reads the current engine's file system, and one process-wide loader thread serves every engine.
+		void						Set_Engine_Context		(::rts::EngineContext* context) { QueuedEngineContext = context; }
+		::rts::EngineContext*	Get_Engine_Context		() const { return QueuedEngineContext; }
+#endif
+
 	protected:
 		virtual bool			Begin_Compressed_Load	();
 		virtual bool			Begin_Uncompressed_Load	();
@@ -265,6 +288,9 @@ class TextureLoadTaskClass : public TextureLoadTaskListNodeClass
 		TaskType					Type;
 		PriorityType			Priority;
 		StateType				State;
+#if RTS_ENGINE_CONTEXT
+		::rts::EngineContext*	QueuedEngineContext = nullptr;
+#endif
 };
 
 class CubeTextureLoadTaskClass : public TextureLoadTaskClass

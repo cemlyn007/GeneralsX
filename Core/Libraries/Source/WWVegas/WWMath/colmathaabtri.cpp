@@ -107,6 +107,8 @@ enum
 	constructor of this object and testing determined that re-using the same static
 	struct was slightly faster anyway.
 	NOTE: this makes the code not Thread-Safe!!!!
+	GeneralsX @tweak cemlyn007 03/10/2026 The context is now a stack local of CollisionMath::Collide and
+	Intersection_Test, passed to the helpers, so these routines are thread-safe again.
 
 
 ******************************************************************************************/
@@ -180,7 +182,8 @@ private:
 	BTCollisionStruct & operator = (const BTCollisionStruct &);
 };
 
-static BTCollisionStruct CollisionContext;
+// GeneralsX @feature cemlyn007 28/09/2026 No file-static context (PLAN-023 Phase 5b): CollisionMath::Collide makes
+// one on its stack and passes it to the helpers below, so concurrent engine threads do not share it.
 
 /***********************************************************************************************
  * aabtri_separation_test -- test the projected extents for separation                         *
@@ -200,6 +203,7 @@ static BTCollisionStruct CollisionContext;
  *=============================================================================================*/
 static inline bool aabtri_separation_test
 (
+	BTCollisionStruct &	CollisionContext,
 	float lp,float leb0,float leb1
 )
 {
@@ -265,7 +269,7 @@ static inline bool aabtri_separation_test
  *   4/8/99     GTH : Created.                                                                 *
  *   7/12/99    GTH : converted to AABox                                                       *
  *=============================================================================================*/
-static inline bool aabtri_check_axis()
+static inline bool aabtri_check_axis(BTCollisionStruct & CollisionContext)
 {
 	float		dist;						// separation along the axis
 	float		axismove;				// size of the move along the axis.
@@ -299,7 +303,7 @@ static inline bool aabtri_check_axis()
 	tmp = Vector3::Dot_Product(CollisionContext.E[1],CollisionContext.TestAxis); if (tmp < lp) lp = tmp;
 	lp = dist + lp;
 
-	return aabtri_separation_test(/*CollisionContext,*/lp,leb0,leb1);
+	return aabtri_separation_test(CollisionContext,lp,leb0,leb1);
 }
 
 
@@ -321,6 +325,7 @@ static inline bool aabtri_check_axis()
  *=============================================================================================*/
 static inline bool aabtri_check_cross_axis
 (
+	BTCollisionStruct &	CollisionContext,
 	float						dp,
 	int						dpi,
 	float						leb0
@@ -353,7 +358,7 @@ static inline bool aabtri_check_cross_axis
 	if (dp < 0) { lp = dp; CollisionContext.TestPoint = dpi; }
 	lp = p0 + lp;
 
-	return aabtri_separation_test(/*CollisionContext,*/lp,leb0,leb1);
+	return aabtri_separation_test(CollisionContext,lp,leb0,leb1);
 }
 
 
@@ -375,6 +380,7 @@ static inline bool aabtri_check_cross_axis
  *=============================================================================================*/
 static inline bool aabtri_check_basis_axis
 (
+	BTCollisionStruct &	CollisionContext,
 	float leb0,
 	float dp1,
 	float dp2
@@ -409,7 +415,7 @@ static inline bool aabtri_check_basis_axis
 	if (dp2 < lp) { lp = dp2; CollisionContext.TestPoint = 2; }
 	lp = dist + lp;
 
-	return aabtri_separation_test(/*CollisionContext,*/lp,leb0,leb1);
+	return aabtri_separation_test(CollisionContext,lp,leb0,leb1);
 }
 
 
@@ -428,7 +434,7 @@ static inline bool aabtri_check_basis_axis
  * HISTORY:                                                                                    *
  *   4/8/99     GTH : Created.                                                                 *
  *=============================================================================================*/
-static inline bool aabtri_check_normal_axis()
+static inline bool aabtri_check_normal_axis(BTCollisionStruct & CollisionContext)
 {
 	float		dist;						// separation along the axis
 	float		axismove;				// size of the move along the axis.
@@ -456,7 +462,7 @@ static inline bool aabtri_check_normal_axis()
 	CollisionContext.TestPoint = 0;
 	lp = dist;	// this is the "optimization", don't have to find lp
 
-	return aabtri_separation_test(/*CollisionContext,*/lp,leb0,leb1);
+	return aabtri_separation_test(CollisionContext,lp,leb0,leb1);
 }
 
 /***********************************************************************************************
@@ -496,6 +502,7 @@ static inline float eval_side(float val,int side)
  *=============================================================================================*/
 static inline void aabtri_compute_contact_normal
 (
+	BTCollisionStruct &	CollisionContext,
 	Vector3 &						set_norm
 )
 {
@@ -602,6 +609,7 @@ bool CollisionMath::Collide
 
 	float dp,leb0;
 
+	BTCollisionStruct CollisionContext; // GeneralsX @feature cemlyn007 28/09/2026 Per call (PLAN-023 Phase 5b)
 	CollisionContext.Init(box,move,tri,Vector3(0,0,0));
 
 	/*
@@ -612,7 +620,7 @@ bool CollisionMath::Collide
 	CollisionContext.AN[0] = CollisionContext.N.X;
 	CollisionContext.AN[1] = CollisionContext.N.Y;
 	CollisionContext.AN[2] = CollisionContext.N.Z;
-	if (aabtri_check_normal_axis()) goto exit;
+	if (aabtri_check_normal_axis(CollisionContext)) goto exit;
 
 	/*
 	** AXIS_A0
@@ -621,7 +629,7 @@ bool CollisionMath::Collide
 	CollisionContext.TestAxisId = AXIS_A0;
 	CollisionContext.AE[0][0] = CollisionContext.E[0].X;
 	CollisionContext.AE[0][1] = CollisionContext.E[1].X;
-	if (aabtri_check_basis_axis(box.Extent.X,CollisionContext.AE[0][0],CollisionContext.AE[0][1])) goto exit;
+	if (aabtri_check_basis_axis(CollisionContext,box.Extent.X,CollisionContext.AE[0][0],CollisionContext.AE[0][1])) goto exit;
 
 	/*
 	** AXIS_A1
@@ -630,7 +638,7 @@ bool CollisionMath::Collide
 	CollisionContext.TestAxisId = AXIS_A1;
 	CollisionContext.AE[1][0] = CollisionContext.E[0].Y;
 	CollisionContext.AE[1][1] = CollisionContext.E[1].Y;
-	if (aabtri_check_basis_axis(box.Extent.Y,CollisionContext.AE[1][0],CollisionContext.AE[1][1])) goto exit;
+	if (aabtri_check_basis_axis(CollisionContext,box.Extent.Y,CollisionContext.AE[1][0],CollisionContext.AE[1][1])) goto exit;
 
 	/*
 	** AXIS_A2
@@ -639,7 +647,7 @@ bool CollisionMath::Collide
 	CollisionContext.TestAxisId = AXIS_A2;
 	CollisionContext.AE[2][0] = CollisionContext.E[0].Z;
 	CollisionContext.AE[2][1] = CollisionContext.E[1].Z;
-	if (aabtri_check_basis_axis(box.Extent.Z,CollisionContext.AE[2][0],CollisionContext.AE[2][1])) goto exit;
+	if (aabtri_check_basis_axis(CollisionContext,box.Extent.Z,CollisionContext.AE[2][0],CollisionContext.AE[2][1])) goto exit;
 
 	/*
 	** AXIS_A0xE0
@@ -651,7 +659,7 @@ bool CollisionMath::Collide
 	if (CollisionContext.TestAxis.Length2() > AXISLEN_EPSILON2) {
 		dp = CollisionContext.AN[0];
 		leb0 = box.Extent[1]*WWMath::Fabs(CollisionContext.AE[2][0]) + box.Extent[2]*WWMath::Fabs(CollisionContext.AE[1][0]);
-		if (aabtri_check_cross_axis(dp,2,leb0)) goto exit;
+		if (aabtri_check_cross_axis(CollisionContext,dp,2,leb0)) goto exit;
 	}
 
 	/*
@@ -664,7 +672,7 @@ bool CollisionMath::Collide
 	if (CollisionContext.TestAxis.Length2() > AXISLEN_EPSILON2) {
 		dp = -CollisionContext.AN[0];
 		leb0 = box.Extent[1]*WWMath::Fabs(CollisionContext.AE[2][1]) + box.Extent[2]*WWMath::Fabs(CollisionContext.AE[1][1]);
-		if (aabtri_check_cross_axis(dp,1,leb0)) goto exit;
+		if (aabtri_check_cross_axis(CollisionContext,dp,1,leb0)) goto exit;
 	}
 
 	/*
@@ -682,7 +690,7 @@ bool CollisionMath::Collide
 	if (CollisionContext.TestAxis.Length2() > AXISLEN_EPSILON2) {
 		dp = -CollisionContext.AN[0];
 		leb0 = box.Extent[1]*WWMath::Fabs(CollisionContext.AE[2][2]) + box.Extent[2]*WWMath::Fabs(CollisionContext.AE[1][2]);
-		if (aabtri_check_cross_axis(dp,1,leb0)) goto exit;
+		if (aabtri_check_cross_axis(CollisionContext,dp,1,leb0)) goto exit;
 	}
 
 	/*
@@ -695,7 +703,7 @@ bool CollisionMath::Collide
 	if (CollisionContext.TestAxis.Length2() > AXISLEN_EPSILON2) {
 		dp = CollisionContext.AN[1];
 		leb0 = box.Extent[0]*WWMath::Fabs(CollisionContext.AE[2][0]) + box.Extent[2]*WWMath::Fabs(CollisionContext.AE[0][0]);
-		if (aabtri_check_cross_axis(dp,2,leb0)) goto exit;
+		if (aabtri_check_cross_axis(CollisionContext,dp,2,leb0)) goto exit;
 	}
 
 	/*
@@ -708,7 +716,7 @@ bool CollisionMath::Collide
 	if (CollisionContext.TestAxis.Length2() > AXISLEN_EPSILON2) {
 		dp = -CollisionContext.AN[1];
 		leb0 = box.Extent[0]*WWMath::Fabs(CollisionContext.AE[2][1]) + box.Extent[2]*WWMath::Fabs(CollisionContext.AE[0][1]);
-		if (aabtri_check_cross_axis(dp,1,leb0)) goto exit;
+		if (aabtri_check_cross_axis(CollisionContext,dp,1,leb0)) goto exit;
 	}
 
 	/*
@@ -721,7 +729,7 @@ bool CollisionMath::Collide
 	if (CollisionContext.TestAxis.Length2() > AXISLEN_EPSILON2) {
 		dp = -CollisionContext.AN[1];
 		leb0 = box.Extent[0]*WWMath::Fabs(CollisionContext.AE[2][2]) + box.Extent[2]*WWMath::Fabs(CollisionContext.AE[0][2]);
-		if (aabtri_check_cross_axis(dp,1,leb0)) goto exit;
+		if (aabtri_check_cross_axis(CollisionContext,dp,1,leb0)) goto exit;
 	}
 
 	/*
@@ -734,7 +742,7 @@ bool CollisionMath::Collide
 	if (CollisionContext.TestAxis.Length2() > AXISLEN_EPSILON2) {
 		dp = CollisionContext.AN[2];
 		leb0 = box.Extent[0]*WWMath::Fabs(CollisionContext.AE[1][0]) + box.Extent[1]*WWMath::Fabs(CollisionContext.AE[0][0]);
-		if (aabtri_check_cross_axis(dp,2,leb0)) goto exit;
+		if (aabtri_check_cross_axis(CollisionContext,dp,2,leb0)) goto exit;
 	}
 
 	/*
@@ -747,7 +755,7 @@ bool CollisionMath::Collide
 	if (CollisionContext.TestAxis.Length2() > AXISLEN_EPSILON2) {
 		dp = -CollisionContext.AN[2];
 		leb0 = box.Extent[0]*WWMath::Fabs(CollisionContext.AE[1][1]) + box.Extent[1]*WWMath::Fabs(CollisionContext.AE[0][1]);
-		if (aabtri_check_cross_axis(dp,1,leb0)) goto exit;
+		if (aabtri_check_cross_axis(CollisionContext,dp,1,leb0)) goto exit;
 	}
 
 	/*
@@ -760,7 +768,7 @@ bool CollisionMath::Collide
 	if (CollisionContext.TestAxis.Length2() > AXISLEN_EPSILON2) {
 		dp = -CollisionContext.AN[2];
 		leb0 = box.Extent[0]*WWMath::Fabs(CollisionContext.AE[1][2]) + box.Extent[1]*WWMath::Fabs(CollisionContext.AE[0][2]);
-		if (aabtri_check_cross_axis(dp,1,leb0)) goto exit;
+		if (aabtri_check_cross_axis(CollisionContext,dp,1,leb0)) goto exit;
 	}
 
 	/*
@@ -773,17 +781,17 @@ bool CollisionMath::Collide
 		CollisionContext.TestAxis.Set(0,-CollisionContext.Move.Z,CollisionContext.Move.Y);						// A0 X Move
 		VERIFY_CROSS(Vector3(1,0,0),CollisionContext.Move,CollisionContext.TestAxis);
 		if (CollisionContext.TestAxis.Length2() > AXISLEN_EPSILON2) {
-			if (aabtri_check_axis()) goto exit;
+			if (aabtri_check_axis(CollisionContext)) goto exit;
 		}
 		CollisionContext.TestAxis.Set(CollisionContext.Move.Z,0,-CollisionContext.Move.X);						// A1 X Move
 		VERIFY_CROSS(Vector3(0,1,0),CollisionContext.Move,CollisionContext.TestAxis);
 		if (CollisionContext.TestAxis.Length2() > AXISLEN_EPSILON2) {
-			if (aabtri_check_axis()) goto exit;
+			if (aabtri_check_axis(CollisionContext)) goto exit;
 		}
 		CollisionContext.TestAxis.Set(-CollisionContext.Move.Y,CollisionContext.Move.X,0);						// A2 X Move
 		VERIFY_CROSS(Vector3(0,0,1),CollisionContext.Move,CollisionContext.TestAxis);
 		if (CollisionContext.TestAxis.Length2() > AXISLEN_EPSILON2) {
-			if (aabtri_check_axis()) goto exit;
+			if (aabtri_check_axis(CollisionContext)) goto exit;
 		}
 	}
 
@@ -821,7 +829,7 @@ exit:
 		** (probably hitting the back side of a polygon)
 		*/
 		Vector3 tmp_norm(0.0f,0.0f,0.0f);
-		aabtri_compute_contact_normal(tmp_norm);
+		aabtri_compute_contact_normal(CollisionContext,tmp_norm);
 //		if (Vector3::Dot_Product(tmp_norm,move) > 0.0f) {
 //			tmp_norm = -tmp_norm;
 //		}
@@ -896,7 +904,8 @@ private:
 	AABTIntersectStruct & operator = (const AABTIntersectStruct &);
 };
 
-static AABTIntersectStruct IntersectContext;
+// GeneralsX @feature cemlyn007 28/09/2026 No file-static context (PLAN-023 Phase 5b): Intersection_Test makes one on
+// its stack and passes it to the helpers below.
 
 
 /***********************************************************************************************
@@ -915,6 +924,7 @@ static AABTIntersectStruct IntersectContext;
  *=============================================================================================*/
 static inline bool aabtri_intersect_cross_axis
 (
+	AABTIntersectStruct &	IntersectContext,
 	Vector3 &					axis,
 	float							dp,
 	float							leb0
@@ -957,6 +967,7 @@ static inline bool aabtri_intersect_cross_axis
  *=============================================================================================*/
 static inline bool aabtri_intersect_basis_axis
 (
+	AABTIntersectStruct &	IntersectContext,
 	Vector3 &					axis,
 	float							leb0,
 	float							dp1,
@@ -1002,6 +1013,7 @@ static inline bool aabtri_intersect_basis_axis
  *=============================================================================================*/
 static inline bool aabtri_intersect_normal_axis
 (
+	AABTIntersectStruct &	IntersectContext,
 	Vector3 &					axis
 )
 {
@@ -1043,6 +1055,7 @@ bool CollisionMath::Intersection_Test(const AABoxClass & box,const TriClass & tr
 	Vector3 axis;
 	float dp,leb0;
 
+	AABTIntersectStruct IntersectContext; // GeneralsX @feature cemlyn007 28/09/2026 Per call (PLAN-023 Phase 5b)
 	IntersectContext.Init(box,tri);
 
 	/*
@@ -1052,7 +1065,7 @@ bool CollisionMath::Intersection_Test(const AABoxClass & box,const TriClass & tr
 	IntersectContext.AN[0] = IntersectContext.N.X;
 	IntersectContext.AN[1] = IntersectContext.N.Y;
 	IntersectContext.AN[2] = IntersectContext.N.Z;
-	if (aabtri_intersect_normal_axis(axis)) return false;
+	if (aabtri_intersect_normal_axis(IntersectContext,axis)) return false;
 
 	/*
 	** AXIS_A0
@@ -1060,7 +1073,7 @@ bool CollisionMath::Intersection_Test(const AABoxClass & box,const TriClass & tr
 	axis.Set(1,0,0);
 	IntersectContext.AE[0][0] = IntersectContext.E[0].X;
 	IntersectContext.AE[0][1] = IntersectContext.E[1].Y;
-	if (aabtri_intersect_basis_axis(axis,box.Extent.X,IntersectContext.AE[0][0],IntersectContext.AE[0][1])) return false;
+	if (aabtri_intersect_basis_axis(IntersectContext,axis,box.Extent.X,IntersectContext.AE[0][0],IntersectContext.AE[0][1])) return false;
 
 	/*
 	** AXIS_A1
@@ -1068,7 +1081,7 @@ bool CollisionMath::Intersection_Test(const AABoxClass & box,const TriClass & tr
 	axis.Set(0,1,0);
 	IntersectContext.AE[1][0] = IntersectContext.E[0].Y;
 	IntersectContext.AE[1][1] = IntersectContext.E[1].Y;
-	if (aabtri_intersect_basis_axis(axis,box.Extent.Y,IntersectContext.AE[1][0],IntersectContext.AE[1][1])) return false;
+	if (aabtri_intersect_basis_axis(IntersectContext,axis,box.Extent.Y,IntersectContext.AE[1][0],IntersectContext.AE[1][1])) return false;
 
 	/*
 	** AXIS_A2
@@ -1076,7 +1089,7 @@ bool CollisionMath::Intersection_Test(const AABoxClass & box,const TriClass & tr
 	axis.Set(0,0,1);
 	IntersectContext.AE[2][0] = IntersectContext.E[0].Z;
 	IntersectContext.AE[2][1] = IntersectContext.E[1].Z;
-	if (aabtri_intersect_basis_axis(axis,box.Extent.Z,IntersectContext.AE[2][0],IntersectContext.AE[2][1])) return false;
+	if (aabtri_intersect_basis_axis(IntersectContext,axis,box.Extent.Z,IntersectContext.AE[2][0],IntersectContext.AE[2][1])) return false;
 
 	/*
 	** AXIS_A0xE0
@@ -1086,7 +1099,7 @@ bool CollisionMath::Intersection_Test(const AABoxClass & box,const TriClass & tr
 	if (axis.Length2() > AXISLEN_EPSILON2) {
 		dp = IntersectContext.AN[0];
 		leb0 = box.Extent[1]*WWMath::Fabs(IntersectContext.AE[2][0]) + box.Extent[2]*WWMath::Fabs(IntersectContext.AE[1][0]);
-		if (aabtri_intersect_cross_axis(axis,dp,leb0)) return false;
+		if (aabtri_intersect_cross_axis(IntersectContext,axis,dp,leb0)) return false;
 	}
 
 	/*
@@ -1097,7 +1110,7 @@ bool CollisionMath::Intersection_Test(const AABoxClass & box,const TriClass & tr
 	if (axis.Length2() > AXISLEN_EPSILON2) {
 		dp = -IntersectContext.AN[0];
 		leb0 = box.Extent[1]*WWMath::Fabs(IntersectContext.AE[2][1]) + box.Extent[2]*WWMath::Fabs(IntersectContext.AE[1][1]);
-		if (aabtri_intersect_cross_axis(axis,dp,leb0)) return false;
+		if (aabtri_intersect_cross_axis(IntersectContext,axis,dp,leb0)) return false;
 	}
 
 	/*
@@ -1110,7 +1123,7 @@ bool CollisionMath::Intersection_Test(const AABoxClass & box,const TriClass & tr
 	if (axis.Length2() > AXISLEN_EPSILON2) {
 		dp = -IntersectContext.AN[0];
 		leb0 = box.Extent[1]*WWMath::Fabs(IntersectContext.AE[2][2]) + box.Extent[2]*WWMath::Fabs(IntersectContext.AE[1][2]);
-		if (aabtri_intersect_cross_axis(axis,dp,leb0)) return false;
+		if (aabtri_intersect_cross_axis(IntersectContext,axis,dp,leb0)) return false;
 	}
 
 	/*
@@ -1121,7 +1134,7 @@ bool CollisionMath::Intersection_Test(const AABoxClass & box,const TriClass & tr
 	if (axis.Length2() > AXISLEN_EPSILON2) {
 		dp = IntersectContext.AN[1];
 		leb0 = box.Extent[0]*WWMath::Fabs(IntersectContext.AE[2][0]) + box.Extent[2]*WWMath::Fabs(IntersectContext.AE[0][0]);
-		if (aabtri_intersect_cross_axis(axis,dp,leb0)) return false;
+		if (aabtri_intersect_cross_axis(IntersectContext,axis,dp,leb0)) return false;
 	}
 
 	/*
@@ -1132,7 +1145,7 @@ bool CollisionMath::Intersection_Test(const AABoxClass & box,const TriClass & tr
 	if (axis.Length2() > AXISLEN_EPSILON2) {
 		dp = -IntersectContext.AN[1];
 		leb0 = box.Extent[0]*WWMath::Fabs(IntersectContext.AE[2][1]) + box.Extent[2]*WWMath::Fabs(IntersectContext.AE[0][1]);
-		if (aabtri_intersect_cross_axis(axis,dp,leb0)) return false;
+		if (aabtri_intersect_cross_axis(IntersectContext,axis,dp,leb0)) return false;
 	}
 
 	/*
@@ -1144,7 +1157,7 @@ bool CollisionMath::Intersection_Test(const AABoxClass & box,const TriClass & tr
 	if (axis.Length2() > AXISLEN_EPSILON2) {
 		dp = -IntersectContext.AN[1];
 		leb0 = box.Extent[0]*WWMath::Fabs(IntersectContext.AE[2][2]) + box.Extent[2]*WWMath::Fabs(IntersectContext.AE[0][2]);
-		if (aabtri_intersect_cross_axis(axis,dp,leb0)) return false;
+		if (aabtri_intersect_cross_axis(IntersectContext,axis,dp,leb0)) return false;
 	}
 
 	/*
@@ -1155,7 +1168,7 @@ bool CollisionMath::Intersection_Test(const AABoxClass & box,const TriClass & tr
 	if (axis.Length2() > AXISLEN_EPSILON2) {
 		dp = IntersectContext.AN[2];
 		leb0 = box.Extent[0]*WWMath::Fabs(IntersectContext.AE[1][0]) + box.Extent[1]*WWMath::Fabs(IntersectContext.AE[0][0]);
-		if (aabtri_intersect_cross_axis(axis,dp,leb0)) return false;
+		if (aabtri_intersect_cross_axis(IntersectContext,axis,dp,leb0)) return false;
 	}
 
 	/*
@@ -1166,7 +1179,7 @@ bool CollisionMath::Intersection_Test(const AABoxClass & box,const TriClass & tr
 	if (axis.Length2() > AXISLEN_EPSILON2) {
 		dp = -IntersectContext.AN[2];
 		leb0 = box.Extent[0]*WWMath::Fabs(IntersectContext.AE[1][1]) + box.Extent[1]*WWMath::Fabs(IntersectContext.AE[0][1]);
-		if (aabtri_intersect_cross_axis(axis,dp,leb0)) return false;
+		if (aabtri_intersect_cross_axis(IntersectContext,axis,dp,leb0)) return false;
 	}
 
 	/*
@@ -1177,7 +1190,7 @@ bool CollisionMath::Intersection_Test(const AABoxClass & box,const TriClass & tr
 	if (axis.Length2() > AXISLEN_EPSILON2) {
 		dp = -IntersectContext.AN[2];
 		leb0 = box.Extent[0]*WWMath::Fabs(IntersectContext.AE[1][2]) + box.Extent[1]*WWMath::Fabs(IntersectContext.AE[0][2]);
-		if (aabtri_intersect_cross_axis(axis,dp,leb0)) return false;
+		if (aabtri_intersect_cross_axis(IntersectContext,axis,dp,leb0)) return false;
 	}
 
 	return true;

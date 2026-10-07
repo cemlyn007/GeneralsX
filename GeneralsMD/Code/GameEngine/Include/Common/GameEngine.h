@@ -111,7 +111,9 @@ inline void GameEngine::setQuitting( Bool quitting ) { m_quitting = quitting; }
 inline Bool GameEngine::getQuitting() { return m_quitting; }
 
 	// the game engine singleton
+#if !RTS_ENGINE_CONTEXT
 extern GameEngine *TheGameEngine;
+#endif
 
 /// This function creates a new game engine instance, and is device specific
 extern GameEngine *CreateGameEngine();

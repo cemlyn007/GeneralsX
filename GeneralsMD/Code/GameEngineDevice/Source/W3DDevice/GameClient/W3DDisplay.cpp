@@ -117,6 +117,10 @@ static void drawFramerateBar();
 #endif
 
 #include "WinMain.h"
+// GeneralsX @refactor cemlyn007 30/09/2026 The window handles (PLAN-023 Phase 8, stage RR2a-2).
+#include "Common/ApplicationWindow.h"
+// GeneralsX @bugfix cemlyn007 01/10/2026 The draw clock (PLAN-023 Phase 8, stage RR3).
+#include "W3DDevice/GameClient/W3DDrawClock.h"
 
 
 // DEFINE AND ENUMS ///////////////////////////////////////////////////////////
@@ -363,10 +367,12 @@ StatDumpClass TheStatDump("StatisticsDump.txt");
 ///////////////////////////////////////////////////////////////////////////////
 
 //=============================================================================
+#if !RTS_ENGINE_CONTEXT
 RTS3DScene *W3DDisplay::m_3DScene = nullptr;
 RTS2DScene *W3DDisplay::m_2DScene = nullptr;
 RTS3DInterfaceScene *W3DDisplay::m_3DInterfaceScene = nullptr;
 W3DAssetManager *W3DDisplay::m_assetManager = nullptr;
+#endif
 
 //=============================================================================
 	// note, can't use the ones from PerfTimer.h 'cuz they are currently
@@ -409,6 +415,7 @@ W3DDisplay::W3DDisplay()
 	m_2DScene = nullptr;
 	m_3DInterfaceScene = nullptr;
 	m_averageFPS = TheGlobalData->m_framesPerSecondLimit;
+	m_loggedCooperativeLevel = FALSE;
 #if defined(RTS_DEBUG)
 	m_timerAtCumuFPSStart = 0;
 #endif
@@ -480,18 +487,28 @@ W3DDisplay::~W3DDisplay()
 	for (Int j=0; j<LightEnvironmentClass::MAX_LIGHTS; j++)
 		REF_PTR_RELEASE( m_myLight[j] );
 
-	PredictiveLODOptimizerClass::Free();
+	// GeneralsX @bugfix cemlyn007 30/09/2026 Only an engine that renders has the predictive LOD arrays and
+	// the render statistics' string to free: only the render path (Prepare_LOD, End_Statistics) fills them, and
+	// both are per engine, so a headless engine's are empty (PLAN-023 Phase 8, stage RR2b).
+	const Bool renders = !TheGlobalData->m_headless || TheGlobalData->m_headlessRender;
+	if (renders)
+		PredictiveLODOptimizerClass::Free();
 
 	// shutdown
-	Debug_Statistics::Shutdown_Statistics();
-	if (!TheGlobalData->m_headless || TheGlobalData->m_headlessRender)
+	if (renders)
+	{
+		Debug_Statistics::Shutdown_Statistics();
 		W3DShaderManager::shutdown();
+	}
 	m_assetManager->Free_Assets();
 	delete m_assetManager;
-	if (!TheGlobalData->m_headless || TheGlobalData->m_headlessRender)
+	// GeneralsX @bugfix cemlyn007 28/09/2026 Null it: with RTS_ENGINE_CONTEXT it is this engine's context
+	// field, which the context's lifecycle checks expect null after the teardown (PLAN-023 Phase 3).
+	m_assetManager = nullptr;
+	if (renders)
 		WW3D::Shutdown();
 	WWMath::Shutdown();
-	if (!TheGlobalData->m_headless || TheGlobalData->m_headlessRender)
+	if (renders)
 		DX8WebBrowser::Shutdown();
 	delete TheW3DFileSystem;
 	TheW3DFileSystem = nullptr;
@@ -510,7 +527,6 @@ inline Bool isResolutionSupported(const ResolutionDescClass &res)
 #ifdef SAGE_USE_SDL3
 static bool SDL3_GetNativeDisplaySize(int& outW, int& outH, float& outDensity)
 {
-	extern SDL_Window* TheSDL3Window;
 	if (!TheSDL3Window) return false;
 	SDL_DisplayID displayId = SDL_GetDisplayForWindow(TheSDL3Window);
 	const SDL_DisplayMode* mode = SDL_GetCurrentDisplayMode(displayId);
@@ -523,7 +539,6 @@ static bool SDL3_GetNativeDisplaySize(int& outW, int& outH, float& outDensity)
 
 static bool SDL3_GetWindowSizeInPixels(int& outW, int& outH, float& outDensity)
 {
-	extern SDL_Window* TheSDL3Window;
 	if (!TheSDL3Window) return false;
 	int logW = 0, logH = 0, physW = 0, physH = 0;
 	SDL_GetWindowSize(TheSDL3Window, &logW, &logH);
@@ -589,7 +604,6 @@ static void SDL3_CenterWindowOnCurrentDisplay(SDL_Window* window, Int width, Int
 // GeneralsX @bugfix GitHub Copilot 27/04/2026 Apply SDL3 window sizing/fullscreen only after the final render resolution is known.
 static void SDL3_ApplyWindowModeForRenderConfig(Bool windowed, Int renderWidth, Int renderHeight)
 {
-	extern SDL_Window* TheSDL3Window;
 	if (!TheSDL3Window) return;
 
 	if (!windowed) {
@@ -658,6 +672,9 @@ static bool s_filteredDirty = true;
 static void buildFilteredResolutions()
 {
 	s_filteredResolutions.clear();
+	// GeneralsX @bugfix cemlyn007 03/10/2026 A driver that reports no display modes adds no device, and the table's first
+	// entry is then a null reference: init's last resolution attempt would fault, so that attempt falls back to the default size.
+	if (WW3D::Get_Render_Device_Count() <= 0) return;
 	const RenderDeviceDescClass &devDesc = WW3D::Get_Render_Device_Desc(0);
 	const DynamicVectorClass<ResolutionDescClass> &resolutions = devDesc.Enumerate_Resolutions();
 
@@ -1012,7 +1029,6 @@ void W3DDisplay::init()
 
 		// GeneralsX @bugfix felipebraz 16/02/2026 Show window after DirectX8/DXVK initialized
 		#ifndef _WIN32
-		extern SDL_Window* TheSDL3Window;
 		// rlgenerals: keep the window HIDDEN in off-screen render mode — we render
 		// to its backbuffer and read it back, never presenting to a visible window.
 		if (TheSDL3Window && !TheGlobalData->m_headlessRender) {
@@ -1104,7 +1120,9 @@ void W3DDisplay::init()
 
 			++attempt;
 		}
-		while (attempt < 3 && renderDeviceError != WW3D_ERROR_OK);
+		// GeneralsX @bugfix cemlyn007 03/10/2026 A render-headless host owns the image size, so the last attempt's fallback to the
+		// default size is not made: a size the adapter cannot back fails the boot.
+		while (attempt < (TheGlobalData->m_headlessRender ? 2 : 3) && renderDeviceError != WW3D_ERROR_OK);
 
 		if (renderDeviceError != WW3D_ERROR_OK)
 		{
@@ -1219,11 +1237,10 @@ const UnsignedInt START_CUMU_FRAME = LOGICFRAMES_PER_SECOND / 2;	// skip first h
 
 void W3DDisplay::updateAverageFPS()
 {
-	constexpr const Int FPS_HISTORY_SIZE = 30;
-
-	static Int64 lastUpdateTime64 = 0;
-	static Int historyOffset = 0;
-	static Real fpsHistory[FPS_HISTORY_SIZE] = {0};
+	// GeneralsX @refactor cemlyn007 30/09/2026 The display's own, not function-local statics (PLAN-023 Phase 8, stage
+	// RR2a-2): each render engine's draw keeps its own FPS history and statistics.
+	Int64& lastUpdateTime64 = m_fpsLastUpdateTime64;
+	Int& historyOffset = m_fpsHistoryOffset;
 
 	const Int64 freq64 = getPerformanceCounterFrequency();
 	const Int64 time64 = getPerformanceCounter();
@@ -1245,10 +1262,10 @@ void W3DDisplay::updateAverageFPS()
 		historyOffset = 0;
 
 	m_currentFPS = 1.0f/elapsedSeconds;
-	fpsHistory[historyOffset++] = m_currentFPS;
+	m_fpsHistory[historyOffset++] = m_currentFPS;
 
 	// determine average frame rate over our past history.
-	const Real sum = std::accumulate(fpsHistory, fpsHistory + FPS_HISTORY_SIZE, 0.0f);
+	const Real sum = std::accumulate(m_fpsHistory, m_fpsHistory + FPS_HISTORY_SIZE, 0.0f);
 	m_averageFPS = sum / FPS_HISTORY_SIZE;
 
 	lastUpdateTime64 = time64;
@@ -1263,12 +1280,7 @@ ICoord2D TheMousePos;
 //=============================================================================
 void W3DDisplay::gatherDebugStats()
 {
-	static UnsignedInt s_framesRenderedSinceLastUpdate = 0;
-	static Int64 s_lastUpdateTime64 = 0;
-	static double s_timeSinceLastUpdateInSecs = 0.0;
-	static Int s_drawCallsSinceLastUpdate = 0;
-	static Int s_sortedPolysSinceLastUpdate = 0;
-
+	// GeneralsX @refactor cemlyn007 30/09/2026 The display's own members, not function-local statics (PLAN-023 Phase 8, stage RR2a-2).
 	// allocate the display strings if needed
 	if( m_displayStrings[0] == nullptr )
 	{
@@ -1303,14 +1315,14 @@ void W3DDisplay::gatherDebugStats()
 		m_benchmarkDisplayString->setFont( thisFont );
 	}
 
-	++s_framesRenderedSinceLastUpdate;
-  s_drawCallsSinceLastUpdate += Debug_Statistics::Get_Draw_Calls();
-	s_sortedPolysSinceLastUpdate += Debug_Statistics::Get_Sorting_Polygons();
+	++m_statsFramesRenderedSinceLastUpdate;
+  m_statsDrawCallsSinceLastUpdate += Debug_Statistics::Get_Draw_Calls();
+	m_statsSortedPolysSinceLastUpdate += Debug_Statistics::Get_Sorting_Polygons();
 
 	Int64 freq64 = getPerformanceCounterFrequency();
 	Int64 time64 = getPerformanceCounter();
 
-	s_timeSinceLastUpdateInSecs = ((double)(time64 - s_lastUpdateTime64) / (double)(freq64));
+	m_statsTimeSinceLastUpdateInSecs = ((double)(time64 - m_statsLastUpdateTime64) / (double)(freq64));
 
 #ifdef EXTENDED_STATS
 		static FILE *pListFile = nullptr;
@@ -1329,7 +1341,7 @@ void W3DDisplay::gatherDebugStats()
 
 	// we update stats on a delay
 	const Real UPDATE_RATE_SECS = 2.0;
-	if( s_timeSinceLastUpdateInSecs >= UPDATE_RATE_SECS || TheGlobalData->m_constantDebugUpdate )
+	if( m_statsTimeSinceLastUpdateInSecs >= UPDATE_RATE_SECS || TheGlobalData->m_constantDebugUpdate )
 	{
 		UnicodeString unibuffer, unibuffer2;
 		UnicodeString fpsString;
@@ -1338,9 +1350,9 @@ void W3DDisplay::gatherDebugStats()
 		Debug_Statistics::Record_Texture_Mode(Debug_Statistics::RECORD_TEXTURE_SIMPLE/*RECORD_TEXTURE_NONE*/);
 
 		// frames per second
-		double fps = (Real)s_framesRenderedSinceLastUpdate / s_timeSinceLastUpdateInSecs;
-		double drawsPerFrame = Debug_Statistics::Get_Draw_Calls(); //(Real)s_drawCallsSinceLastUpdate / (Real)s_framesRenderedSinceLastUpdate;
-		double sortPolysPerFrame = Debug_Statistics::Get_Sorting_Polygons();  //(Real)s_sortedPolysSinceLastUpdate / (Real)s_framesRenderedSinceLastUpdate;
+		double fps = (Real)m_statsFramesRenderedSinceLastUpdate / m_statsTimeSinceLastUpdateInSecs;
+		double drawsPerFrame = Debug_Statistics::Get_Draw_Calls(); //(Real)m_statsDrawCallsSinceLastUpdate / (Real)m_statsFramesRenderedSinceLastUpdate;
+		double sortPolysPerFrame = Debug_Statistics::Get_Sorting_Polygons();  //(Real)m_statsSortedPolysSinceLastUpdate / (Real)m_statsFramesRenderedSinceLastUpdate;
 		double skinDrawsPerFrame = Debug_Statistics::Get_DX8_Skin_Renders();
 
 		if (fps<0.1) fps = 0.1;
@@ -1549,11 +1561,11 @@ void W3DDisplay::gatherDebugStats()
 		unibuffer.format( L"Video RAM: %d", Debug_Statistics::Get_Record_Texture_Size() - 1376256 );
 		m_displayStrings[VideoRam]->setText( unibuffer );
 
-		s_lastUpdateTime64 = time64;
-		s_timeSinceLastUpdateInSecs = 0.0f;
-		s_framesRenderedSinceLastUpdate = 0;
-		s_drawCallsSinceLastUpdate = 0;
-		s_sortedPolysSinceLastUpdate = 0;
+		m_statsLastUpdateTime64 = time64;
+		m_statsTimeSinceLastUpdateInSecs = 0.0f;
+		m_statsFramesRenderedSinceLastUpdate = 0;
+		m_statsDrawCallsSinceLastUpdate = 0;
+		m_statsSortedPolysSinceLastUpdate = 0;
 
 		// terrain stats
 		unibuffer.format( L"3-Way Blends: %d/%d, Shoreline Blends: %d/%d", TheTerrainRenderObject->getNumExtraBlendTiles(TRUE),
@@ -2013,7 +2025,6 @@ void W3DDisplay::draw()
 	// GeneralsX @feature xxorza 15/04/2026 Process deferred window resize for pillarbox
 	DX8Wrapper::Pillarbox_Process_Resize();
 
-	extern HWND ApplicationHWnd;
 	if (ApplicationHWnd && ::IsIconic(ApplicationHWnd)) {
 		return;
 	}
@@ -2136,17 +2147,28 @@ AGAIN:
 		}
 	}
 
-	WW3D::Update_Logic_Frame_Time(TheFramePacer->getLogicTimeStepMilliseconds());
+	// GeneralsX @bugfix cemlyn007 30/09/2026 Render-headless (an embed host's image observations) advances
+	// WW3D's clock only by the logic frames it draws. Every draw adds a frame's time to the clock's pending
+	// time, which the next Sync with a logic update takes in whole, so the draws the load screen and the
+	// start-of-game fade make while the map loads (paced by the wall clock: about 180,000-310,000 of them,
+	// fewer on a busy machine) set every animation's phase for the rest of the game, and the images of two
+	// runs of one game differed (PLAN-023 Phase 8, stage RR0c).
+	// A draw with no logic update passes zero, so LogicFrameTimeMs, which the draw path's own animations
+	// (cloud scroll, rings, spheres) multiply once per draw, holds them still too.
+	const Bool renderHeadless = TheGlobalData->m_headless && TheGlobalData->m_headlessRender;
+	WW3D::Update_Logic_Frame_Time(!renderHeadless || TheGameLogic->hasUpdated() ? TheFramePacer->getLogicTimeStepMilliseconds() : 0.0f);
 
 	// TheSuperHackers @info This binds the WW3D update to the logic update.
 	WW3D::Sync(TheGameLogic->hasUpdated());
 
-	static Int now;
-	now=timeGetTime();
+	// GeneralsX @bugfix cemlyn007 01/10/2026 The letterbox fade's clock: the draw clock (logic-frame time for an
+	// embedding host's image observations, W3DDrawClock.h), set at every draw, so a local (PLAN-023 Phase 8, stage
+	// RR3).
+	const Int now = W3D_DRAW_CLOCK_MS();
 
 	if (TheTacticalView->getTimeMultiplier()>1)
 	{
-		static Int timeMultiplierCounter = 1;
+		Int& timeMultiplierCounter = m_timeMultiplierCounter;	// GeneralsX @refactor cemlyn007 01/10/2026 (RR3)
 		timeMultiplierCounter--;
 		if (timeMultiplierCounter>1)
 			return;
@@ -2157,7 +2179,17 @@ AGAIN:
 	do {
 
 		// update all views of the world - recomputes data which will affect drawing
-		if (DX8Wrapper::_Get_D3D_Device8() && (DX8Wrapper::_Get_D3D_Device8()->TestCooperativeLevel()) == D3D_OK)
+		// GeneralsX @feature cemlyn007 30/09/2026 The first result logged once per engine: whether a hidden
+		// or windowless device reports D3D_OK here (WW3D::Begin_Render skips the check for them) decides
+		// whether updateViews runs (PLAN-023 Phase 8, stage RR0c).
+		const HRESULT cooperativeLevel = DX8Wrapper::_Get_D3D_Device8() ? DX8Wrapper::_Get_D3D_Device8()->TestCooperativeLevel() : D3DERR_INVALIDCALL;
+		if (DX8Wrapper::_Get_D3D_Device8() && !m_loggedCooperativeLevel)
+		{
+			m_loggedCooperativeLevel = TRUE;
+			fprintf(stderr, "DEBUG: W3DDisplay::draw: TestCooperativeLevel = 0x%08x%s\n", (unsigned)cooperativeLevel,
+				cooperativeLevel == D3D_OK ? " (D3D_OK)" : "");
+		}
+		if (DX8Wrapper::_Get_D3D_Device8() && cooperativeLevel == D3D_OK)
 		{	//Checking if we have the device before updating views because the heightmap crashes otherwise while
 			//trying to refresh the visible terrain geometry.
 //			if(TheGlobalData->m_loadScreenRender != TRUE)
@@ -2198,7 +2230,7 @@ AGAIN:
     #endif
 		{
 			//USE_PERF_TIMER(BigAssRenderLoop)
-			static Bool couldRender = true;
+			Bool& couldRender = m_couldRender;	// GeneralsX @refactor cemlyn007 01/10/2026 the display's own (RR3)
 			if ((TheGlobalData->m_breakTheMovie == FALSE) && (TheGlobalData->m_disableRender == false) && WW3D::Begin_Render( true, true, Vector3( 0.0f, 0.0f, 0.0f ), TheWaterTransparency->m_minWaterOpacity ) == WW3D_ERROR_OK)
 			{
 
@@ -2440,7 +2472,7 @@ void W3DDisplay::createLightPulse( const Coord3D *pos, const RGBColor *color,
 void W3DDisplay::toggleLetterBox()
 {
 	m_letterBoxEnabled = !m_letterBoxEnabled;
-	m_letterBoxFadeStartTime = timeGetTime();
+	m_letterBoxFadeStartTime = W3D_DRAW_CLOCK_MS();	// GeneralsX @bugfix cemlyn007 01/10/2026 the draw clock (RR3)
 
 	//WST  9/18/2002 This is not a script api to prevent cheat. JSC Integrated 5/20/03
 	if( TheTacticalView )
@@ -2456,7 +2488,7 @@ void W3DDisplay::enableLetterBox(Bool enable)
 		if (!m_letterBoxEnabled)
 		{	//letterbox mode not previously enabled
 			m_letterBoxEnabled = TRUE;
-			m_letterBoxFadeStartTime = timeGetTime();
+			m_letterBoxFadeStartTime = W3D_DRAW_CLOCK_MS();	// GeneralsX @bugfix cemlyn007 01/10/2026 the draw clock (RR3)
 
 			//WST  9/18/2002 - This is not a script api to prevent cheat.  JSC Integrated 5/20/03
 			if( TheTacticalView )
@@ -2470,7 +2502,7 @@ void W3DDisplay::enableLetterBox(Bool enable)
 		if (m_letterBoxEnabled)
 		{	//letterbox mode no previously disabled
 			m_letterBoxEnabled = FALSE;
-			m_letterBoxFadeStartTime = timeGetTime();
+			m_letterBoxFadeStartTime = W3D_DRAW_CLOCK_MS();	// GeneralsX @bugfix cemlyn007 01/10/2026 the draw clock (RR3)
 
 			//WST  9/18/2002. JSC Integrated 5/20/03
 			if( TheTacticalView )

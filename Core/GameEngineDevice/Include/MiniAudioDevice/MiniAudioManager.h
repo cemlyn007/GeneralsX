@@ -223,6 +223,13 @@ protected:
 	std::list<PlayingAudio *> m_stoppedAudio;
 
 	void *m_binkHandle;
+	// GeneralsX @bugfix cemlyn007 28/09/2026 One flag per openDevice stage, so closeDevice
+	// uninitialises exactly what was initialised (-noaudio, a partly failed open, or the
+	// device-free MiniAudioManagerDummy). m_engineInitialized also covers the four sound groups.
+	Bool m_resourceManagerInitialized;
+	Bool m_logInitialized;
+	Bool m_contextInitialized;
+	Bool m_engineInitialized;
 
 #if defined(_DEBUG) || defined(_INTERNAL)
 	typedef std::set<AsciiString> SetAsciiString;
@@ -230,4 +237,60 @@ protected:
 	SetAsciiString m_allEventsLoaded;
 	void dumpAllAssetsUsed();
 #endif
+};
+
+// GeneralsX @feature cemlyn007 28/09/2026 Device-free MiniAudio audio manager (PLAN-023 Phase 0)
+// SDL3GameEngine::createAudioManager returns this for headless engines and for -noaudio.
+// It loads the audio INI data like the real manager, but never initialises a MiniAudio
+// context, engine or device, so it starts no audio threads. Audio requests are dropped on
+// every update, so nothing is ever playing. getFileLengthMS is inherited unchanged (it only
+// decodes the file through a standalone ma_decoder), so script timings that read audio lengths
+// match the real MiniAudio backend. Every other inherited method that touches MiniAudio state
+// (the engine, its groups or the device list) is overridden here or is only reached with a
+// playing sound, which never exists. Keep in step with OpenALAudioManagerDummy
+// (OpenALAudioManager.h); PLAN-023 notes the one known difference (getFileLengthMS).
+//
+// GeneralsX @bugfix cemlyn007 02/10/2026 This class's own closeDevice() override below is a
+// no-op, but ~MiniAudioManager (no destructor is declared here, so the base one runs last) calls
+// closeDevice() during its own destruction, when the object's dynamic type is back to
+// MiniAudioManager and the call resolves to the *base* closeDevice(), not this override. That is
+// the real, staged teardown (MiniAudioManager.cpp), guarded by m_resourceManagerInitialized /
+// m_logInitialized / m_contextInitialized / m_engineInitialized; since openDevice() is never
+// called on this class, every flag is still FALSE, so every guarded step is skipped and the call
+// is a safe no-op. Keep every closeDevice step behind its own flag: an unguarded addition there
+// would run uninitialised against a dummy instance with no MiniAudio state to tear down.
+class MiniAudioManagerDummy : public MiniAudioManager
+{
+public:
+	virtual void init() override { AudioManager::init(); }
+	virtual void update() override { AudioManager::update(); removeAllAudioRequests(); }
+
+	virtual void openDevice(void) override {}
+	virtual void closeDevice(void) override {}
+	virtual void *getDevice(void) override { return nullptr; }
+
+	virtual void stopAudio(AudioAffect which) override {}
+	virtual void pauseAudio(AudioAffect which) override {}
+	virtual void resumeAudio(AudioAffect which) override {}
+	virtual void pauseAmbient(Bool shouldPause) override {}
+
+	virtual Bool isMusicPlaying(void) const override { return FALSE; }
+
+	virtual void selectProvider(UnsignedInt providerNdx) override {}
+	virtual void unselectProvider(void) override {}
+	virtual void setSpeakerType(UnsignedInt speakerType) override {}
+	virtual void setHardwareAccelerated(Bool accel) override { AudioManager::setHardwareAccelerated(accel); }
+	virtual void setSpeakerSurround(Bool surround) override { AudioManager::setSpeakerSurround(surround); }
+
+	virtual void *getHandleForBink(void) override;
+
+	virtual void friend_forcePlayAudioEventRTS(const AudioEventRTS *eventToPlay) override {}
+	virtual void processRequestList(void) override { removeAllAudioRequests(); }
+
+	// GeneralsX @performance cemlyn007 29/09/2026 No sound is ever audible (pending requests are dropped at the next audio update), so client code may skip
+	// work that only restarts sounds (PLAN-023 Phase 5b, perf2). Same in OpenALAudioManagerDummy.
+	virtual Bool canPlaySounds() const override { return FALSE; }
+
+protected:
+	virtual void setDeviceListenerPosition(void) override {}
 };

@@ -223,7 +223,9 @@ AsciiString HotKeyManager::searchHotKey( const UnicodeString& uStr )
 }
 
 //-----------------------------------------------------------------------------
+#if !RTS_ENGINE_CONTEXT
 HotKeyManager *TheHotKeyManager = nullptr;
+#endif
 
 //-----------------------------------------------------------------------------
 // PRIVATE FUNCTIONS //////////////////////////////////////////////////////////

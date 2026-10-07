@@ -165,7 +165,9 @@ void SDL3GameEngine::init(void)
 {
 	fprintf(stderr, "INFO: SDL3GameEngine::init() starting\n");
 
-	if (TheGlobalData && TheGlobalData->m_headless) {
+	// GeneralsX @feature cemlyn007 30/09/2026 As Zero Hour's: render-headless with a window bound by the
+	// embed host falls through to the window-binding path below (PLAN-023 Phase 8, stage RR0c).
+	if (TheGlobalData && TheGlobalData->m_headless && !TheGlobalData->m_headlessRender) {
 		// GeneralsX @bugfix Copilot 17/05/2026 Allow headless replay path to initialize engine subsystems without an SDL window.
 		fprintf(stderr, "INFO: SDL3GameEngine::init() headless mode - skipping SDL window binding\n");
 		m_SDLWindow = nullptr;
@@ -176,8 +178,19 @@ void SDL3GameEngine::init(void)
 	}
 
 	// Verify window was created by SDL3Main.cpp
-	extern SDL_Window* TheSDL3Window;
-	extern HWND ApplicationHWnd;
+	// GeneralsX @feature cemlyn007 30/09/2026 Windowless render-headless: an embed host that draws
+	// image observations brings the render device up with no window at all (a null HWND: DXVK then
+	// gives the device a back buffer and no presenter), so the engine binds none and makes no SDL
+	// call. Generals' W3DDisplay brings no device up and draws nothing while m_headless is set, so
+	// only Zero Hour renders windowless (PLAN-023 Phase 8, stage RR0c).
+	if (TheGlobalData && TheGlobalData->m_headless && TheGlobalData->m_headlessRender && !TheSDL3Window) {
+		fprintf(stderr, "INFO: SDL3GameEngine::init() windowless render mode - no SDL window\n");
+		m_SDLWindow = nullptr;
+		m_IsInitialized = true;
+		m_IsActive = true;
+		GameEngine::init();
+		return;
+	}
 
 	if (!TheSDL3Window || !ApplicationHWnd) {
 		fprintf(stderr, "FATAL: SDL3 window not initialized before GameEngine::init()\n");
@@ -577,16 +590,29 @@ WebBrowser *SDL3GameEngine::createWebBrowser(void)
  */
 AudioManager *SDL3GameEngine::createAudioManager(Bool dummy)
 {
-	(void)dummy;
 	fprintf(stderr, "INFO: SDL3GameEngine::createAudioManager()\n");
 
+	// GeneralsX @feature cemlyn007 28/09/2026 Honour dummy (headless) and -noaudio with a
+	// device-free manager, as Win32GameEngine does (PLAN-023 Phase 0). m_headlessAudio lets an
+	// embedding host keep real audio in headless mode (as in Zero Hour).
+	const Bool deviceFree = (dummy && !TheGlobalData->m_headlessAudio) || !TheGlobalData->m_audioOn;
+
 #ifdef SAGE_USE_MINIAUDIO
+	if (deviceFree) {
+		fprintf(stderr, "INFO: Creating device-free MiniAudio audio backend\n");
+		return NEW MiniAudioManagerDummy;
+	}
 	fprintf(stderr, "INFO: Creating MiniAudio audio backend\n");
 	return NEW MiniAudioManager;
 #elif defined(SAGE_USE_OPENAL)
+	if (deviceFree) {
+		fprintf(stderr, "INFO: Creating device-free OpenAL audio backend\n");
+		return NEW OpenALAudioManagerDummy;
+	}
 	fprintf(stderr, "INFO: Using OpenAL audio backend\n");
 	return NEW OpenALAudioManager;
 #else
+	(void)deviceFree;
 	fprintf(stderr, "INFO: No audio backend available - using AudioManagerDummy\n");
 	return NEW AudioManagerDummy;
 #endif

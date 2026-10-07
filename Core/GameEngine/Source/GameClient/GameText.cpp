@@ -223,7 +223,9 @@ static Bool						lutContainsLabel( StringLookUp *lut, Int count, const AsciiStri
 //         Public Data
 //----------------------------------------------------------------------------
 
+#if !RTS_ENGINE_CONTEXT
 GameTextInterface *TheGameText = nullptr;
+#endif
 
 //----------------------------------------------------------------------------
 //         Private Prototypes

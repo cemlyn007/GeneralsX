@@ -109,7 +109,9 @@ std::vector<StateID> * State::getTransitions()
  */
 StateReturnType State::friend_checkForTransitions( StateReturnType status )
 {
-	static Int checkfortransitionsnum = 0;
+	// GeneralsX @feature cemlyn007 28/09/2026 thread_local: the counter measures this thread's call-stack depth, so
+	// engines stepped on other threads must not add to it (PLAN-023 Phase 2).
+	static THREAD_LOCAL Int checkfortransitionsnum = 0;
 
 	StIncrementer inc(checkfortransitionsnum);
 	if (checkfortransitionsnum >= 20)
@@ -202,7 +204,9 @@ StateReturnType State::friend_checkForTransitions( StateReturnType status )
  */
 StateReturnType State::friend_checkForSleepTransitions( StateReturnType status )
 {
-	static Int checkfortransitionsnum = 0;
+	// GeneralsX @feature cemlyn007 28/09/2026 thread_local: the counter measures this thread's call-stack depth, so
+	// engines stepped on other threads must not add to it (PLAN-023 Phase 2).
+	static THREAD_LOCAL Int checkfortransitionsnum = 0;
 
 	StIncrementer inc(checkfortransitionsnum);
 	if (checkfortransitionsnum >= 20)

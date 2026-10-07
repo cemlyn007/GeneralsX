@@ -117,6 +117,10 @@ protected:
 	Real m_drawOriginY;
 	Bool m_drawFogOfWar;					///<switch to draw alternate fog style instead of solid black
 	Bool m_clearDstTexture;				///<flag indicating we must clear video memory destination texture
+	// GeneralsX @refactor cemlyn007 01/10/2026 interpolateFogLevels' clock, set at its first call: was a function-local
+	// static on the wall clock (PLAN-023 Phase 8, stage RR3).
+	UnsignedInt m_fogInterpolationTime = 0;
+	Bool m_fogInterpolationTimeSet = false;
 	W3DShroudLevel m_boderShroudLevel;			///<color used to clear the shroud border
 	W3DShroudLevel *m_finalFogData;			///<copy of logical shroud in an easier to access array.
 	W3DShroudLevel *m_currentFogData;		///<copy of intermediate logical shroud while it's interpolated.

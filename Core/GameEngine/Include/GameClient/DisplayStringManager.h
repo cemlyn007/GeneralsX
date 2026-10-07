@@ -62,4 +62,6 @@ protected:
 };
 
 // EXTERNALS //////////////////////////////////////////////////////////////////////////////////////
+#if !RTS_ENGINE_CONTEXT
 extern DisplayStringManager *TheDisplayStringManager;  ///< singleton extern
+#endif

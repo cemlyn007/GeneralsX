@@ -83,3 +83,39 @@ if(RTS_BUILD_OPTION_ASAN)
         add_link_options(-fsanitize=address)
     endif()
 endif()
+
+# GeneralsX @feature cemlyn007 29/09/2026 RTS_SANITIZE for instrumented embedding builds (PLAN-023 Phase 5b item 5)
+# RTS_SANITIZE=thread|address adds -fsanitize=<value> to the compile and link lines of every target
+# configured after this point: the engine, its Core libraries and the FetchContent dependencies built
+# with it (SDL3, SDL3_image, gamespy, GameMath, lzhl). vcpkg ports and DXVK (built by their own
+# toolchains) are not instrumented. A host links the resulting library into an executable built with
+# the same sanitiser (rlgenerals' --config=tsan / --config=asan). Empty (the default) changes nothing.
+# RTS_SANITIZE=address also turns RTS_GAMEMEMORY_ENABLE off (cmake/config-memory.cmake), the same as
+# RTS_BUILD_OPTION_ASAN: Game Memory's own operator new/delete and its pools would otherwise hide
+# allocations from ASan.
+set(RTS_SANITIZE "" CACHE STRING "Sanitizer for every engine target: empty, thread or address (GCC/Clang only)")
+set_property(CACHE RTS_SANITIZE PROPERTY STRINGS "" thread address)
+if(RTS_SANITIZE)
+    if(MSVC)
+        message(FATAL_ERROR "RTS_SANITIZE is for GCC/Clang; use RTS_BUILD_OPTION_ASAN with MSVC")
+    endif()
+    if(NOT RTS_SANITIZE MATCHES "^(thread|address)$")
+        message(FATAL_ERROR "RTS_SANITIZE must be empty, 'thread' or 'address', not '${RTS_SANITIZE}'")
+    endif()
+    if(RTS_SANITIZE STREQUAL "address" AND RTS_BUILD_OPTION_ASAN)
+        message(STATUS "RTS_SANITIZE=address: RTS_BUILD_OPTION_ASAN adds the same flag")
+    endif()
+    if(RTS_SANITIZE STREQUAL "thread" AND RTS_BUILD_OPTION_ASAN)
+        # GeneralsX @bugfix cemlyn007 02/10/2026 GCC/Clang refuse to link -fsanitize=thread together with
+        # -fsanitize=address, but without this check configuration succeeds and the first compile fails with
+        # an error that names neither cache option.
+        message(FATAL_ERROR "RTS_SANITIZE=thread cannot be combined with RTS_BUILD_OPTION_ASAN=ON (ThreadSanitizer and AddressSanitizer cannot be linked together)")
+    endif()
+    add_compile_options(-fsanitize=${RTS_SANITIZE} -fno-omit-frame-pointer -g)
+    add_link_options(-fsanitize=${RTS_SANITIZE})
+    # The static libraries linked into a shared engine library must then be
+    # position independent: ASan's instrumentation refers to runtime data (__asan_option_*) that a
+    # non-PIC object cannot reach from a shared object (GameMath overrides it: see gamemath.cmake).
+    set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+    message(STATUS "RTS_SANITIZE: engine targets built with -fsanitize=${RTS_SANITIZE}")
+endif()

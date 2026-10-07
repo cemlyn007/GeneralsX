@@ -71,7 +71,9 @@ const FieldParse HeaderTemplateManager::m_headerFieldParseTable[] =
 	{ nullptr, nullptr, nullptr, 0 },
 };
 
+#if !RTS_ENGINE_CONTEXT
 HeaderTemplateManager *TheHeaderTemplateManager = nullptr;
+#endif
 //-----------------------------------------------------------------------------
 // PUBLIC FUNCTIONS ///////////////////////////////////////////////////////////
 //-----------------------------------------------------------------------------

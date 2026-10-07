@@ -298,5 +298,9 @@ void CameraShakeSystemClass::Update_Camera_Shaker(Vector3 camera_position, Vecto
 }
 
 // The Instance of the system
+#if RTS_ENGINE_CONTEXT
+rts::PerEngineStatic<CameraShakeSystemClass> CameraShakerSystem_perEngine;
+#else
 CameraShakeSystemClass CameraShakerSystem; //WST 11/12/2002 This is the new Camera Shaker system upgrade
+#endif
 

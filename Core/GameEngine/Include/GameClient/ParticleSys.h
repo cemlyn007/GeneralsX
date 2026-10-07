@@ -895,7 +895,9 @@ protected:
 };
 
 /// The particle system manager singleton
+#if !RTS_ENGINE_CONTEXT
 extern ParticleSystemManager *TheParticleSystemManager;
+#endif
 
 class DebugDisplayInterface;
 extern void ParticleSystemDebugDisplay( DebugDisplayInterface *dd, void *, FILE *fp = nullptr );

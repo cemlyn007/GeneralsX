@@ -82,7 +82,12 @@ void INI::parseOnlineChatColorDefinition( INI* ini )
 }
 
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 28/09/2026 The defaults each engine's GameSpyColor starts from (PLAN-023 Phase 5b).
+static const Color GameSpyColorDefaults[GSCOLOR_MAX] =
+#else
 Color GameSpyColor[GSCOLOR_MAX] =
+#endif
 {
 	GameMakeColor(255,255,255,255),	// GSCOLOR_DEFAULT
 	GameMakeColor(255,255,  0,255),	// GSCOLOR_CURRENTROOM
@@ -120,6 +125,14 @@ Color GameSpyColor[GSCOLOR_MAX] =
 	GameMakeColor(255,255,255,255),	// GSCOLOR_MOTD,
 	GameMakeColor(255,255,  0,255),	// GSCOLOR_MOTD_HEADING,
 };
+
+#if RTS_ENGINE_CONTEXT
+rts::PerEngineStatic<Color[GSCOLOR_MAX]> GameSpyColor_perEngine([](Color (&colors)[GSCOLOR_MAX])
+{
+	for (Int i = 0; i < GSCOLOR_MAX; ++i)
+		colors[i] = GameSpyColorDefaults[i];
+});
+#endif
 
 Bool GameSpyInfo::sendChat( UnicodeString message, Bool isAction, GameWindow *playerListbox )
 {

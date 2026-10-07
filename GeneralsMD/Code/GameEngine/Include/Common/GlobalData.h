@@ -135,6 +135,12 @@ public:
 	// `!(m_headless && !m_headlessRender)`. Set by the RL embed (RlgBridge.cpp).
 	Bool m_headlessRender;
 
+	// GeneralsX @feature cemlyn007 28/09/2026 Audio in headless mode: when TRUE *together with*
+	// m_headless, SDL3GameEngine::createAudioManager still creates the real audio manager, which
+	// opens an audio device. Otherwise a headless engine gets the device-free audio manager, as
+	// with -noaudio. Set by an embedding host that wants sound from a headless engine (rlgenerals).
+	Bool m_headlessAudio;
+
 	// GeneralsX @feature BenderAI 21/04/2026 Opt-out toggle for the in-game update checker.
 	Bool m_checkForUpdates;
 
@@ -596,18 +602,56 @@ public:
 	// the trailing '\' is included!
   const AsciiString &getPath_UserData() const { return m_userDataDir; }
 
+	// GeneralsX @feature cemlyn007 28/09/2026 An embedding host's per-engine user data directory (PLAN-023
+	// Phase 5's user-data root): a host with several engines in one process gives each its own, so their
+	// replays, SagePatch.ini and MapCache.ini do not overwrite each other. Set on the original instance
+	// right after the startup parse creates it, before GameEngine::init reads the path; `dir` need not end
+	// with the path separator or already exist (the setter appends the separator and creates the directory
+	// itself, as the constructor's default does). Nothing upstream calls it, so an engine that is not
+	// embedded is unchanged.
+	// GeneralsX @feature cemlyn007 02/10/2026 Returns FALSE (and leaves the directory unchanged) for an
+	// empty `dir`, which would otherwise resolve to the filesystem root, or one that cannot be
+	// made/used as a directory, instead of silently accepting it. Callers that want a refused boot,
+	// rather than one that silently loses every later write, must check the return value.
+	// GeneralsX @feature cemlyn007 02/10/2026 `dir` is also an input, not only an output location:
+	// GlobalData::parseGameDataDefinition reads <dir>/Options.ini (OptionPreferences) and
+	// GameEngine::init reads <dir>/SagePatch.ini, both overriding GameData, so a host that wants
+	// identical play across engines must seed the directory (as rlgenerals does for its automatic
+	// per-engine ones) or accept that an empty or differently-seeded directory changes gameplay settings.
+	Bool setPath_UserData(const AsciiString &dir);
+
 private:
 
 	static UnsignedInt generateExeCRC();
 
 	static const FieldParse s_GlobalDataFieldParseTable[];
 
+	// GeneralsX @feature cemlyn007 02/10/2026 No longer true upstream: an embedding host may replace
+	// it once, on the original instance, through setPath_UserData (above) before GameEngine::init
+	// reads it (rlgenerals does so for every engine that does not hold the process default; one that
+	// does keeps the registry/XDG default instead). Apart from GlobalData's own constructor and
+	// newOverride()'s copy of the current directory onto a new override, only setPath_UserData writes
+	// it.
 	// this is private, since we read the info from Windows and cache it for
 	// future use. No one is allowed to change it, ever. (srj)
 	AsciiString m_userDataDir;
 	AsciiString BuildUserDataPathFromRegistry();
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 28/09/2026 The original instance is per engine (PLAN-023 Phase 2's
+	// m_theOriginal row, done in Phase 1b): a field of the engine context, which this stand-in reads and
+	// writes, so the upstream code that uses m_theOriginal is unchanged. A process-wide one would outlive
+	// its engine: an engine whose init failed (and is leaked, never torn down) would leave it pointing at
+	// its instance, and the next engine's GlobalData::reset would never return.
+	struct OriginalInContext
+	{
+		operator GlobalData*() const;
+		OriginalInContext& operator=(GlobalData* original);
+	};
+	static OriginalInContext m_theOriginal;	///< the original global data instance (no overrides)
+#else
 	static GlobalData *m_theOriginal;		///< the original global data instance (no overrides)
+#endif
 	GlobalData *m_next;									///< next instance (for overrides)
 	virtual GlobalData *newOverride();		/** create a new override, copy data from previous
 																			override, and return it */
@@ -623,10 +667,15 @@ private:
 };
 
 // singleton
+#if !RTS_ENGINE_CONTEXT
 extern GlobalData* TheWritableGlobalData;
+#endif
 
 // use TheGlobalData for all read-only accesses
-#if __cplusplus >= 201703L
+// GeneralsX @bugfix cemlyn007 28/09/2026 With RTS_ENGINE_CONTEXT, TheWritableGlobalData is a macro over the
+// current engine context, and the reference below would bind once, during static initialisation, to the
+// no-engine context's field: it would compile and silently read the wrong engine. Use the macro instead.
+#if __cplusplus >= 201703L && !RTS_ENGINE_CONTEXT
 inline const GlobalData* const& TheGlobalData = TheWritableGlobalData;
 #else
 #define TheGlobalData ((const GlobalData*)TheWritableGlobalData)

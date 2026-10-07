@@ -33,7 +33,9 @@
 #include "Common/Player.h"
 #include "Common/Science.h"
 
+#if !RTS_ENGINE_CONTEXT
 ScienceStore* TheScienceStore = nullptr;
+#endif
 
 
 //-----------------------------------------------------------------------------

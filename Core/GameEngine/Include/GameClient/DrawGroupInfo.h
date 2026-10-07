@@ -61,4 +61,6 @@ struct DrawGroupInfo
 	const FieldParse *getFieldParse() const { return s_fieldParseTable; }
 };
 
+#if !RTS_ENGINE_CONTEXT
 extern DrawGroupInfo *TheDrawGroupInfo;
+#endif

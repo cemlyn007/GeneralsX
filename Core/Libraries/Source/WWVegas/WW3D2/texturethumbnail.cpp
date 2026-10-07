@@ -23,14 +23,32 @@
 #include "ww3dformat.h"
 #include "ddsfile.h"
 #include "textureloader.h"
+#include "dx8wrapper.h"
 #include "bitmaphandler.h"
 #include "WWLib/ffactory.h"
 #include "WWLib/RAWFILE.h"
 #include "WWDebug/wwprofile.h"
 #include <windows.h>
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 30/09/2026 Per engine: the thumbnail managers the render engine's
+// TextureLoader::Init makes and its Deinit frees, so one engine's Deinit cannot free another's (PLAN-023 Phase 8,
+// stage RR2b).
+namespace
+{
+struct ThumbnailManagerState
+{
+	DLListClass<ThumbnailManagerClass> ThumbnailManagerList;
+	ThumbnailManagerClass* GlobalThumbnailManager = nullptr;
+};
+rts::PerEngineStatic<ThumbnailManagerState> ThumbnailManagerState_perEngine;
+} // namespace
+#define ThumbnailManagerList (ThumbnailManagerState_perEngine.get().ThumbnailManagerList)
+#define GlobalThumbnailManager (ThumbnailManagerState_perEngine.get().GlobalThumbnailManager)
+#else
 static DLListClass<ThumbnailManagerClass> ThumbnailManagerList;
 static ThumbnailManagerClass* GlobalThumbnailManager;
+#endif
 bool ThumbnailManagerClass::CreateThumbnailIfNotFound=false;
 
 static void Create_Hash_Name(StringClass& name, const StringClass& thumb_name)
@@ -338,6 +356,14 @@ ThumbnailManagerClass::~ThumbnailManagerClass()
 // ----------------------------------------------------------------------------
 ThumbnailManagerClass* ThumbnailManagerClass::Peek_Thumbnail_Manager(const char* thumbnail_filename)
 {
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @bugfix cemlyn007 30/09/2026 As in Peek_Thumbnail_Instance_From_Any_Manager: none for an
+	// engine without the device.
+	if (!DX8Wrapper::Is_Initted())
+	{
+		return nullptr;
+	}
+#endif
 	ThumbnailManagerClass* man=ThumbnailManagerList.Head();
 	while (man) {
 		if (man->ThumbnailFileName==thumbnail_filename) return man;
@@ -392,6 +418,18 @@ ThumbnailClass* ThumbnailManagerClass::Peek_Thumbnail_Instance(const StringClass
 ThumbnailClass* ThumbnailManagerClass::Peek_Thumbnail_Instance_From_Any_Manager(const StringClass& filename)
 {
 	WWPROFILE(("Peek_Thumbnail_Instance_From_Any_Manager"));
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @bugfix cemlyn007 30/09/2026 The thumbnail managers belong to the render device: the render
+	// engine's TextureLoader::Init (Do_Onetime_Device_Dependent_Inits) makes them and its Deinit frees them.
+	// Every engine's TextureClass constructor looks its texture up here, so a headless engine beside a
+	// renderer read the renderer's managers on its own thread (a race with their Init and Deinit, a
+	// use-after-free once they were freed) and took its textures' sizes from them, unlike its solo run,
+	// where there are none. Only the engine that owns the device sees them (PLAN-023 Phase 8, stage RR1).
+	if (!DX8Wrapper::Is_Initted())
+	{
+		return nullptr;
+	}
+#endif
 	ThumbnailManagerClass* thumb_man=ThumbnailManagerList.Head();
 	while (thumb_man) {
 		ThumbnailClass* thumb=thumb_man->Peek_Thumbnail_Instance(filename);

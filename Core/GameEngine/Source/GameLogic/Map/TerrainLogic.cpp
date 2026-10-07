@@ -59,10 +59,13 @@
 
 #include "WWMath/plane.h"
 #include "WWMath/tri.h"
+#include "Common/FatalEngineError.h"
 
 
 // GLOBALS ////////////////////////////////////////////////////////////////////////////////////////
+#if !RTS_ENGINE_CONTEXT
 TerrainLogic *TheTerrainLogic = nullptr;
+#endif
 
 // STATIC /////////////////////////////////////////////////////////////////////////////////////////
 WaterHandle TerrainLogic::m_gridWaterHandle;
@@ -230,7 +233,13 @@ m_bridgeInfo(theInfo)
 	m_bridgeInfo.curDamageState = BODY_PRISTINE;
 
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 28/09/2026 Per engine: the cached template is this engine's (PLAN-023 Phase 4).
+	static rts::PerEngineStatic<const ThingTemplate *> genericBridgeTemplate_perEngine;
+	const ThingTemplate *genericBridgeTemplate = genericBridgeTemplate_perEngine.get([&](const ThingTemplate *&value) { value = TheThingFactory->findTemplate("GenericBridge"); });
+#else
 	static const ThingTemplate* genericBridgeTemplate = TheThingFactory->findTemplate("GenericBridge");
+#endif
 	if (!genericBridgeTemplate) {
 		DEBUG_LOG(("*** GenericBridge template not found."));
 		return;
@@ -1241,6 +1250,8 @@ Bool TerrainLogic::loadMap( AsciiString filename, Bool query )
 			}
 		}
 		theInputStream.close();
+	} catch (const FatalEngineError&) { // GeneralsX @bugfix cemlyn007 28/09/2026 Let an embedded-mode fatal error reach the host.
+		throw;
 	} catch (...) {
 		// Eat the error - legacy files are not valid chunk format (and don't have waypoint info.)
 		DEBUG_LOG(("Unable to read waypoint info."));

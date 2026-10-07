@@ -90,7 +90,9 @@ static const int CmdMsgLen = 6; //< Minimum size of a command packet (Int + Unsi
 // PUBLIC DATA ////////////////////////////////////////////////////////////////
 
 /// The Network singleton instance
+#if !RTS_ENGINE_CONTEXT
 NetworkInterface *TheNetwork = nullptr;
+#endif
 
 // PRIVATE PROTOTYPES /////////////////////////////////////////////////////////
 
