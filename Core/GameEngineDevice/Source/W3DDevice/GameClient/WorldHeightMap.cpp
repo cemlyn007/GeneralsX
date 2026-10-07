@@ -80,8 +80,12 @@ public:
 
 
 /* ********* MapObject class ****************************/
+#if RTS_ENGINE_CONTEXT
+/*static*/ rts::PerEngineStatic<Dict> MapObject::TheWorldDict_perEngine;
+#else
 /*static*/ MapObject *MapObject::TheMapObjectListPtr = nullptr;
 /*static*/ Dict MapObject::TheWorldDict;
+#endif
 
 MapObject::MapObject(Coord3D loc, AsciiString name, Real angle, Int flags, const Dict* props,
 										 const ThingTemplate *thingTemplate )

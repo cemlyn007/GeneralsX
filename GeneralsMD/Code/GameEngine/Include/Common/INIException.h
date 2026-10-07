@@ -43,8 +43,22 @@ public:
 		}
 	}
 
+	// GeneralsX @bugfix cemlyn007 28/09/2026 Copy the message rather than the pointer: GameEngine::init
+	// catches this by value, and the implicit copy's destructor freed the thrower's buffer a second time
+	// (a double free on every INI parse error that reaches it).
+	INIException(const INIException& other) : mFailureMessage(nullptr)
+	{
+		if (other.mFailureMessage) {
+			mFailureMessage = new char[strlen(other.mFailureMessage) + 1];
+			strcpy(mFailureMessage, other.mFailureMessage);
+		}
+	}
+
 	~INIException()
 	{
 		delete [] mFailureMessage;
 	}
+
+private:
+	INIException& operator=(const INIException& other);	// not implemented (VC6 has no "= delete")
 };

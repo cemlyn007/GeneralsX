@@ -1794,6 +1794,23 @@ def rule_const_object(sym, symbols=None, is_function_name=None):
     return CONST, "", "const object: initialized once, never written"
 
 
+PER_ENGINE_STATIC_DECL_RE = re.compile(
+    r"^(?:static\s+)?(?:/\*static\*/\s*)?rts::PerEngineStatic\s*<.*>\s+[\w:]+\s*(?:\(|;|$)"
+)
+
+
+def rule_per_engine_static(sym):
+    """A PER_ENGINE_STATIC (rts::PerEngineStatic<T>, EngineContext.h): the static holds only a slot index,
+    allocated once at static initialisation; the object it stands for lives in each engine's context. It
+    is checked before the hand list, since what it is does not depend on the file it is in. The declared
+    type must be PerEngineStatic itself, not merely mention it somewhere in the declaration (a container
+    or pointer of them is still mutable process-wide state): the match is anchored on the whole
+    declaration, with no '*' or '&' after the closing '>', rather than searched for anywhere inside it."""
+    if all(PER_ENGINE_STATIC_DECL_RE.search(d.split("=")[0].strip()) for d in declarations(sym)):
+        return GLOBAL, "", "PER_ENGINE_STATIC slot index, written once at static initialization; the object lives in each engine's EngineContext"
+    return None
+
+
 RULES = [
     ("toolchain", rule_toolchain),
     ("libstdc++", rule_libstdcxx),
@@ -1810,8 +1827,11 @@ RULES = [
 # here, however they match: a `re:` or `file:` pattern names the symbols its author read, and a new symbol
 # that happens to match it (a new `static Int key_count` under `re:.*::key_\w+`) would otherwise inherit a
 # classification nobody gave it. A guard variable is safe when its static is listed (see `new_symbol_error`).
-# A rule added here must be as sound for an unseen symbol as these.
-SAFE_FOR_NEW = {f"rule:{name}" for name, _rule in RULES}
+# A rule added here must be as sound for an unseen symbol as these. `rule:per-engine-static` is included
+# here directly rather than as a RULES entry: `classify` already calls it once of its own accord, ahead of
+# the hand list (see its docstring), so it must never also sit in RULES, whose loop calls every rule with
+# `(sym, symbols, is_function_name)` — a signature `rule_per_engine_static` does not have.
+SAFE_FOR_NEW = {f"rule:{name}" for name, _rule in RULES} | {"rule:per-engine-static"}
 
 
 def classify(sym, symbols, is_function_name=None):
@@ -1825,6 +1845,11 @@ def classify(sym, symbols, is_function_name=None):
             sym.note = f"guard variable of that static: {target.note}" if target.note else "guard variable of that static"
             sym.by = "guard"
             return
+    result = rule_per_engine_static(sym)
+    if result:
+        sym.cls, sym.phase, sym.note = result
+        sym.by = "rule:per-engine-static"
+        return
     for hand in HAND:
         if hand.matches(sym):
             sym.cls, sym.phase, sym.note = hand.cls, hand.phase, hand.note

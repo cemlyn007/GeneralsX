@@ -76,7 +76,14 @@ class WeatherSetting : public Overridable
 
 EMPTY_DTOR(WeatherSetting)
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 28/09/2026 Per engine (PLAN-023 Phase 3, pulled forward): every engine's
+// GameEngine::init parses Weather.ini into it; see Water.h's TheWaterTransparency.
+extern rts::PerEngineStatic<OVERRIDE<WeatherSetting> > TheWeatherSetting_perEngine;
+#define TheWeatherSetting (TheWeatherSetting_perEngine.get())
+#else
 extern OVERRIDE<WeatherSetting> TheWeatherSetting;
+#endif
 
 class SnowManager : public SubsystemInterface
 {

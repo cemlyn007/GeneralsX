@@ -48,6 +48,64 @@ class FakeLookup:
         return sym.key in self._written
 
 
+class RulePerEngineStaticTest(unittest.TestCase):
+    """rule:per-engine-static is SAFE_FOR_NEW: it must classify only a declaration whose type is itself
+    rts::PerEngineStatic<...>, not merely one that mentions it somewhere else in the declaration (a
+    container or pointer of them is still mutable process-wide state, not a single write-once slot)."""
+
+    def assert_rule(self, decl, expect, msg=None):
+        got = m.rule_per_engine_static(make_symbol("s", [decl])) is not None
+        self.assertEqual(got, expect, msg or decl)
+
+    def test_plain_declaration_is_a_slot_index(self):
+        self.assert_rule("rts::PerEngineStatic<Dict> TheWorldDict_perEngine;", True)
+
+    def test_static_declaration_is_a_slot_index(self):
+        self.assert_rule("static rts::PerEngineStatic<Random4Class> rand4_perEngine;", True)
+
+    def test_nested_template_argument_is_a_slot_index(self):
+        self.assert_rule("rts::PerEngineStatic<OVERRIDE<WeatherSetting> > TheWeatherSetting_perEngine;", True)
+
+    def test_array_type_argument_is_a_slot_index(self):
+        self.assert_rule(
+            "static rts::PerEngineStatic<AsciiString[MAX_PLAYER_COUNT]> static_readPlayerNames_perEngine;", True
+        )
+
+    def test_pointer_template_argument_is_a_slot_index(self):
+        # The pointee, not the PerEngineStatic itself, is a pointer: still a single slot index.
+        self.assert_rule("static rts::PerEngineStatic<TransportStatus *> s_transportStatuses_perEngine;", True)
+
+    def test_container_of_per_engine_static_is_not_a_slot_index(self):
+        # The declared type is std::vector<...>, which merely mentions PerEngineStatic; it is not safe.
+        self.assert_rule("static std::vector<rts::PerEngineStatic<Foo>*> s_registry;", False)
+
+    def test_pointer_to_per_engine_static_is_not_a_slot_index(self):
+        # The pointer itself, unlike the slot it points to, can be reassigned to point at any engine's slot.
+        self.assert_rule("static rts::PerEngineStatic<Foo>* s_cache;", False)
+
+    def test_reference_to_per_engine_static_is_not_a_slot_index(self):
+        self.assert_rule("static rts::PerEngineStatic<Foo>& s_ref = x;", False)
+
+
+class RulePerEngineStaticNotDuplicatedTest(unittest.TestCase):
+    """rule_per_engine_static must run exactly once per symbol, from `classify`'s own explicit call ahead
+    of the hand list, never again from the RULES loop: that loop calls every entry as
+    `rule(sym, symbols, is_function_name)`, a signature rule_per_engine_static does not have, so a second
+    registration there raises TypeError for every symbol that rule rejects and none of the hand entries or
+    earlier RULES claim."""
+
+    def test_classify_does_not_raise_on_a_symbol_no_rule_classifies(self):
+        sym = make_symbol("s", ["static int s_other;"], source="x.cpp:1", sections={".bss"})
+        m.classify(sym, {})
+        self.assertEqual(sym.cls, m.UNREVIEWED)
+
+    def test_is_not_registered_twice_in_rules(self):
+        self.assertNotIn(m.rule_per_engine_static, [rule for _name, rule in m.RULES])
+
+    def test_is_still_safe_for_new(self):
+        self.assertIn("rule:per-engine-static", m.SAFE_FOR_NEW)
+
+
 class RuleConstObjectTest(unittest.TestCase):
     """rule:const is SAFE_FOR_NEW: it must never pass a reassignable pointer or reference."""
 
@@ -2113,6 +2171,27 @@ class HandMatchesTest(unittest.TestCase):
         h = m.Hand((m.RENDER, "", "file:/GUI/", "note"))
         self.assertTrue(h.matches(make_symbol("k", [], source="a/GUI/x.cpp:1")))
         self.assertFalse(h.matches(make_symbol("k", [], source="a/GUI/x.cpp:1;b/Logic/y.cpp:2")))
+
+
+class CheckedInTsvMatchesHandListTest(unittest.TestCase):
+    """The checked-in list's by-hand and by-file rows must agree with the hand list, so a merge of two
+    branches' edits to one of them cannot leave `check` failing on a changed class (it needs no library)."""
+
+    def test_every_hand_row_matches_its_entry(self):
+        root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        rows = m.read_tsv(os.path.join(root, m.TSV))
+        checked = 0
+        for key, row in rows.items():
+            if row["by"] not in ("hand", "file"):
+                continue
+            sym = make_symbol(key, [], source=row["source"])
+            hand = next((h for h in m.HAND if h.matches(sym)), None)
+            self.assertIsNotNone(hand, f"{key}: no hand entry matches")
+            self.assertEqual(
+                (row["class"], row["phase"], row["note"]), (hand.cls, hand.phase, m.clean(hand.note)), key
+            )
+            checked += 1
+        self.assertGreater(checked, 0)
 
 
 class NewSymbolErrorTest(unittest.TestCase):

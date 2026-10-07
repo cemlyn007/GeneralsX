@@ -124,5 +124,11 @@
 #endif
 
 extern Int NET_CRC_INTERVAL;
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 28/09/2026 Per engine (an EngineContext field, 100 to start with): replay
+// playback and -ReplayCRCInterval set it for their engine only (PLAN-023 Phase 2).
+#define REPLAY_CRC_INTERVAL (::rts::ctx()->replayCrcInterval)
+#else
 extern Int REPLAY_CRC_INTERVAL;
+#endif
 extern Bool TheDebugIgnoreSyncErrors;

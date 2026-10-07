@@ -31,6 +31,34 @@
 
 namespace
 {
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 28/09/2026 Per engine (PLAN-023 Phase 2): each engine has its own
+	// observer (setAIDecisionObserver acts on the current engine) and its own scope, depth and sequence
+	// state, all value-initialised like the statics below (AI_DECISION_REFLEX is 0).
+	struct ObserverPerEngine
+	{
+		AIDecisionObserverFn observer;
+		void *userData;
+		Bool scopeActive;
+		AIDecisionOrigin origin;
+		const char *script;
+		UnsignedByte depth;
+		Int muted;
+		UnsignedInt seq;
+	};
+	rts::PerEngineStatic<ObserverPerEngine> s_observerPerEngine;
+	inline ObserverPerEngine &observerState() { return s_observerPerEngine.get(); }
+	// Each s_xxx macro is its own out-of-line slot lookup, so functions touching several fields
+	// fetch `ope` once instead.
+#define s_observer (observerState().observer)
+#define s_userData (observerState().userData)
+#define s_scopeActive (observerState().scopeActive)
+#define s_origin (observerState().origin)
+#define s_script (observerState().script)
+#define s_depth (observerState().depth)
+#define s_muted (observerState().muted)
+#define s_seq (observerState().seq)
+#else
 	AIDecisionObserverFn s_observer = nullptr;
 	void *s_userData = nullptr;
 
@@ -41,15 +69,23 @@ namespace
 	UnsignedByte s_depth = 0;
 	Int s_muted = 0;
 	UnsignedInt s_seq = 0;
+#endif
 
 	AIDecision makeDecision(AIDecisionKind kind, const Object *actor)
 	{
 		AIDecision d = {};
 		d.m_frame = TheGameLogic ? TheGameLogic->getFrame() : 0;
+#if RTS_ENGINE_CONTEXT
+		ObserverPerEngine &ope = observerState();
+		d.m_seq = ope.seq++;
+		d.m_origin = ope.scopeActive ? ope.origin : AI_DECISION_REFLEX;
+		d.m_depth = ope.depth;
+#else
 		d.m_seq = s_seq++;
 		d.m_origin = s_scopeActive ? s_origin : AI_DECISION_REFLEX;
-		d.m_kind = kind;
 		d.m_depth = s_depth;
+#endif
+		d.m_kind = kind;
 		d.m_player = -1;
 		if (actor)
 		{
@@ -61,18 +97,32 @@ namespace
 		d.m_aiCommand = AICMD_NO_COMMAND;
 		d.m_commandSource = (CommandSourceType)-1;
 		d.m_science = SCIENCE_INVALID;
+#if RTS_ENGINE_CONTEXT
+		d.m_script = ope.script;
+#else
 		d.m_script = s_script;
+#endif
 		return d;
 	}
 
 	Bool active()
 	{
+#if RTS_ENGINE_CONTEXT
+		ObserverPerEngine &ope = observerState();
+		return ope.observer != nullptr && ope.muted == 0;
+#else
 		return s_observer != nullptr && s_muted == 0;
+#endif
 	}
 
 	void emit(const AIDecision &d)
 	{
+#if RTS_ENGINE_CONTEXT
+		ObserverPerEngine &ope = observerState();
+		ope.observer(d, ope.userData);
+#else
 		s_observer(d, s_userData);
+#endif
 	}
 
 	// What a decision does on the way is reported one level deeper.
@@ -88,27 +138,60 @@ namespace
 //-------------------------------------------------------------------------------------------------
 void setAIDecisionObserver(AIDecisionObserverFn fn, void *userData)
 {
+#if RTS_ENGINE_CONTEXT
+	// With no engine current there is no slot to install on: leave g_noEngine untouched.
+	if (rts::ctx() == &rts::g_noEngine)
+		return;
+	ObserverPerEngine &ope = observerState();
+	ope.observer = fn;
+	ope.userData = fn ? userData : nullptr;
+	ope.seq = 0;
+#else
 	s_observer = fn;
 	s_userData = fn ? userData : nullptr;
 	s_seq = 0;
+#endif
 }
 
 //-------------------------------------------------------------------------------------------------
 AIDecisionScope::AIDecisionScope(AIDecisionOrigin origin, const char *script)
+#if RTS_ENGINE_CONTEXT
+	: m_savedOrigin(AI_DECISION_REFLEX), m_savedScript(nullptr), m_savedActive(FALSE)
+#else
 	: m_savedOrigin(s_origin), m_savedScript(s_script), m_savedActive(s_scopeActive)
+#endif
 {
+#if RTS_ENGINE_CONTEXT
+	ObserverPerEngine &ope = observerState();
+	m_savedOrigin = ope.origin;
+	m_savedScript = ope.script;
+	m_savedActive = ope.scopeActive;
+	if (!ope.scopeActive)
+		ope.origin = origin;
+	if (script)
+		ope.script = script;
+	ope.scopeActive = TRUE;
+#else
 	if (!s_scopeActive)
 		s_origin = origin;
 	if (script)
 		s_script = script;
 	s_scopeActive = TRUE;
+#endif
 }
 
 AIDecisionScope::~AIDecisionScope()
 {
+#if RTS_ENGINE_CONTEXT
+	ObserverPerEngine &ope = observerState();
+	ope.origin = m_savedOrigin;
+	ope.script = m_savedScript;
+	ope.scopeActive = m_savedActive;
+#else
 	s_origin = m_savedOrigin;
 	s_script = m_savedScript;
 	s_scopeActive = m_savedActive;
+#endif
 }
 
 //-------------------------------------------------------------------------------------------------
