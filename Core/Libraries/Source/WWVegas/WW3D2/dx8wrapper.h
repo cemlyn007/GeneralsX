@@ -142,6 +142,13 @@ struct DX8FrameStatistics
 #define DX8_RECORD_DX8_CALLS()					FrameStatistics.dx8_calls++
 #define DX8_RECORD_DRAW_CALLS()					FrameStatistics.draw_calls++
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 30/09/2026 The current engine's (PLAN-023 Phase 8, stage RR2a-1): _DX8SingleThreaded
+// is its W3DRenderState's field (w3drenderstate.h), and the two render switches, which the host (and -preserveFPU)
+// set before the engine's device exists, its EngineContext's.
+#define DX8Wrapper_HeadlessRender (::rts::ctx()->dx8HeadlessRender)
+#define DX8Wrapper_PreserveFPU (::rts::ctx()->dx8PreserveFPU)
+#else
 extern bool _DX8SingleThreaded;
 
 // rlgenerals: off-screen render mode. When true, WW3D::Begin_Render does NOT
@@ -149,6 +156,10 @@ extern bool _DX8SingleThreaded;
 // hidden window, but the device can still render into the backbuffer, which the
 // RL embed reads back (it never presents).
 extern bool DX8Wrapper_HeadlessRender;
+
+// D3DCREATE_FPU_PRESERVE for the device Create_Device makes (-preserveFPU, or the host).
+extern int DX8Wrapper_PreserveFPU;
+#endif
 
 // GeneralsX @feature cemlyn007 30/09/2026 Called, when set, just before DX8Wrapper drops its last reference to a
 // render device (Release_Device) or to its Direct3D interface (Shutdown), with what it releases (PLAN-023 Phase 8,
@@ -242,6 +253,11 @@ struct RenderStateStruct
 	RenderStateStruct& operator= (const RenderStateStruct& src);
 };
 
+// GeneralsX @feature cemlyn007 30/09/2026 The state below is the current engine's W3DRenderState with
+// RTS_ENGINE_CONTEXT (PLAN-023 Phase 8, stage RR2a-1): its names are macros until the end of this header.
+#include "w3drenderstate.h"
+#include "w3drenderstate_names.h"
+
 /**
 ** DX8Wrapper
 **
@@ -307,15 +323,10 @@ public:
 	static void Do_Onetime_Device_Dependent_Shutdowns();
 
 	static bool Is_Device_Lost() { return IsDeviceLost; }
-#if RTS_ENGINE_CONTEXT
-	// GeneralsX @bugfix cemlyn007 30/09/2026 Only the engine that created the device sees it: every other
-	// engine gets false here and null from _Get_D3D_Device8, as in a headless solo run (PLAN-023 Phase 8,
-	// stage RR0a; see EngineContext::ownsRenderDevice). The engine's own flag comes first, so that another
-	// engine never reads IsInitted, which the renderer's Init and Shutdown write.
-	static bool Is_Initted() { return ::rts::ctx()->ownsRenderDevice && IsInitted; }
-#else
+	// GeneralsX @bugfix cemlyn007 30/09/2026 With RTS_ENGINE_CONTEXT, the engine's own: false, and no device or caps
+	// below, for an engine that did not create one, as in a headless solo run (PLAN-023 Phase 8, stages RR0a and
+	// RR2a-1; see EngineContext::w3dRender).
 	static bool Is_Initted() { return IsInitted; }
-#endif
 
 	static bool Has_Stencil ();
 	static void Get_Format_Name(unsigned int format, StringClass *tex_format);
@@ -578,29 +589,13 @@ public:
 
 
 
-#if RTS_ENGINE_CONTEXT
-	// GeneralsX @bugfix cemlyn007 30/09/2026 Null for an engine that did not create the device (see Is_Initted).
-	static IDirect3DDevice8* _Get_D3D_Device8() { return ::rts::ctx()->ownsRenderDevice ? D3DDevice : nullptr; }
-#else
 	static IDirect3DDevice8* _Get_D3D_Device8() { return D3DDevice; }
-#endif
 	static IDirect3D8* _Get_D3D8() { return D3DInterface; }
 	/// Returns the display format - added by TR for video playback - not part of W3D
 	static WW3DFormat	getBackBufferFormat();
 	static bool Reset_Device(bool reload_assets=true);
 
-#if RTS_ENGINE_CONTEXT
-	// GeneralsX @bugfix cemlyn007 30/09/2026 Null for an engine that did not create the device (see Is_Initted),
-	// as in a headless solo run, so it never reads the renderer's caps, which DX8Wrapper::Shutdown frees.
-	static const DX8Caps*	Get_Current_Caps()
-	{
-		const DX8Caps* caps = ::rts::ctx()->ownsRenderDevice ? CurrentCaps : nullptr;
-		WWASSERT(caps);
-		return caps;
-	}
-#else
 	static const DX8Caps*	Get_Current_Caps() { WWASSERT(CurrentCaps); return CurrentCaps; }
-#endif
 
 	static bool Registry_Save_Render_Device( const char * sub_key );
 	static bool Registry_Load_Render_Device( const char * sub_key, bool resize_window );
@@ -695,6 +690,28 @@ protected:
 	** Protected Member Variables
 	*/
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 30/09/2026 The current engine's W3DRenderState fields (PLAN-023 Phase 8, stage
+	// RR2a-1): macros (w3drenderstate_names.h), except these two, which are also members of other classes used here.
+	static constexpr rts::IndirectContextField<W3DRenderState, &rts::EngineContext::w3dRender, W3DRenderState::Defaults, int, &W3DRenderState::BitDepth> BitDepth{};
+	static constexpr rts::IndirectContextField<W3DRenderState, &rts::EngineContext::w3dRender, W3DRenderState::Defaults, IDirect3DBaseTexture8*[MAX_TEXTURE_STAGES], &W3DRenderState::Textures> Textures{};
+	static_assert(rts::isStandInGuarded<decltype(BitDepth)> && rts::isStandInGuarded<decltype(Textures)>,
+		"an IndirectContextField must not be copyable or have unary operator&");
+
+	// Declared upstream, never defined or used.
+	static void *							Hwnd;
+	static D3DMATRIX						old_world;
+	static D3DMATRIX						old_view;
+	static D3DMATRIX						old_prj;
+	static RenderInfoClass*				Render_Info;
+
+	// Allocates this engine's W3DRenderState if it has none (Init, Set_Display_Size_Provider).
+	static void Create_Render_State();
+	// GeneralsX @bugfix cemlyn007 02/10/2026 Frees this engine's W3DRenderState if it has one, without
+	// touching any device or interface: Shutdown's own cleanup, and Init's failure returns, which
+	// never create a device (a lite backend reaches this only through Shutdown, never directly).
+	static void Free_Render_State();
+#else
 	static DX8_CleanupHook *m_pCleanupHook;
 
 	static RenderStateStruct			render_state;
@@ -786,8 +803,6 @@ protected:
 	static IDirect3DSurface8*			s_savedBackbuffer;
 	static IDirect3DSurface8*			s_savedDepth;
 
-	static bool								Pillarbox_Setup(int gameW, int gameH);
-	static void								Pillarbox_Cleanup();
 
 	static int								ZBias;
 	static float							ZNear;
@@ -795,6 +810,11 @@ protected:
 	// GeneralsX @refactor BenderAI 10/02/2026
 	// Changed from D3DMATRIX to Matrix4x4 - fighter19 pattern
 	static Matrix4x4					ProjectionMatrix;
+
+#endif
+
+	static bool								Pillarbox_Setup(int gameW, int gameH);
+	static void								Pillarbox_Cleanup();
 
 	friend void DX8_Assert();
 	friend class WW3D;
@@ -1580,3 +1600,5 @@ WWINLINE RenderStateStruct& RenderStateStruct::operator= (const RenderStateStruc
 
 	return *this;
 }
+
+#include "w3drenderstate_names_end.h"

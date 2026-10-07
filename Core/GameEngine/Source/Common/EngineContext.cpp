@@ -101,15 +101,15 @@ EngineContext::~EngineContext()
 {
 #ifdef DEBUG_CRASHING
 	if (this != &g_noEngine && (countLiveSingletons() != 0 || originalGlobalData != nullptr || wwMathInitialized
-			|| ownsRenderDevice || drawableModelLockCount != 0))
+			|| drawableModelLockCount != 0))
 	{
 		LiveFieldNames names;
 		const std::size_t live = forEachLiveSingleton(&appendLiveFieldName, &names);
 		DEBUG_CRASH(("EngineContext destroyed before its engine was shut down, or its shutdown left state: "
 			"%u live singleton/pointer fields (%s), originalGlobalData %s, wwMathInitialized %s, "
-			"ownsRenderDevice %s, drawableModelLockCount %d",
+			"drawableModelLockCount %d",
 			(unsigned)live, live != 0 ? names.text : "none", originalGlobalData != nullptr ? "set" : "null",
-			wwMathInitialized ? "true" : "false", ownsRenderDevice ? "true" : "false", drawableModelLockCount));
+			wwMathInitialized ? "true" : "false", drawableModelLockCount));
 	}
 #endif
 	DEBUG_ASSERTCRASH(this == &g_noEngine || noEngineIsPristine(), ("g_noEngine was written: engine state leaked outside every Scope"));
@@ -387,6 +387,9 @@ void leaveEngineThreadInvariants(const ThreadInvariants& saved) noexcept
 #endif
 #endif
 }
+
+static_assert(isStandInGuarded<ContextField<::W3DRenderState*, &EngineContext::w3dRender>>,
+	"a ContextField must not be copyable or have unary operator& (ContextFieldOps)");
 
 bool noEngineIsPristine()
 {

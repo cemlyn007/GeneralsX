@@ -36,34 +36,60 @@
 //
 // ----------------------------------------------------------------------------
 
-static int texture_memory;
-static int texture_count;
-static int lightmap_texture_memory;
-static int lightmap_texture_count;
-static int procedural_texture_memory;
-static int procedural_texture_count;
-static int record_count;
-static int texture_change_count;
-static int last_frame_texture_memory;
-static int last_frame_texture_count;
-static int last_frame_lightmap_texture_memory;
-static int last_frame_lightmap_texture_count;
-static int last_frame_procedural_texture_memory;
-static int last_frame_procedural_texture_count;
-static int last_frame_record_count;
-static int last_frame_texture_change_count;
-static TextureClass* latest_texture;
-static Debug_Statistics::RecordTextureMode record_texture_mode;
-static StringClass texture_statistics_string;
-
-struct TextureStatisticsStruct
+// GeneralsX @feature cemlyn007 30/09/2026 The counters are one DebugStatisticsState (w3drenderstate.h): with
+// RTS_ENGINE_CONTEXT the current engine's W3DRenderState's, since every render engine's draw counts (PLAN-023 Phase 8,
+// stage RR2a-1). The names below stand for its fields.
+#if RTS_ENGINE_CONTEXT
+static DebugStatisticsState& Statistics()
 {
-	TextureClass* tex;
-	int usage_count;
-	int change_count;
-};
+	return W3D_Render_State().DebugStatistics;
+}
+#else
+static DebugStatisticsState TheStatistics;
+static DebugStatisticsState& Statistics()
+{
+	return TheStatistics;
+}
+#endif
 
-static SimpleDynVecClass<TextureStatisticsStruct> texture_statistics;
+typedef DebugStatisticsState::TextureStatisticsStruct TextureStatisticsStruct;
+
+#define texture_memory (Statistics().texture_memory)
+#define texture_count (Statistics().texture_count)
+#define lightmap_texture_memory (Statistics().lightmap_texture_memory)
+#define lightmap_texture_count (Statistics().lightmap_texture_count)
+#define procedural_texture_memory (Statistics().procedural_texture_memory)
+#define procedural_texture_count (Statistics().procedural_texture_count)
+#define record_count (Statistics().record_count)
+#define texture_change_count (Statistics().texture_change_count)
+#define last_frame_texture_memory (Statistics().last_frame_texture_memory)
+#define last_frame_texture_count (Statistics().last_frame_texture_count)
+#define last_frame_lightmap_texture_memory (Statistics().last_frame_lightmap_texture_memory)
+#define last_frame_lightmap_texture_count (Statistics().last_frame_lightmap_texture_count)
+#define last_frame_procedural_texture_memory (Statistics().last_frame_procedural_texture_memory)
+#define last_frame_procedural_texture_count (Statistics().last_frame_procedural_texture_count)
+#define last_frame_record_count (Statistics().last_frame_record_count)
+#define last_frame_texture_change_count (Statistics().last_frame_texture_change_count)
+#define latest_texture (Statistics().latest_texture)
+#define record_texture_mode (Statistics().record_texture_mode)
+#define texture_statistics_string (Statistics().texture_statistics_string)
+#define texture_statistics (Statistics().texture_statistics)
+#define dx8_skin_renders (Statistics().dx8_skin_renders)
+#define last_frame_dx8_skin_renders (Statistics().last_frame_dx8_skin_renders)
+#define dx8_skin_polygons (Statistics().dx8_skin_polygons)
+#define last_frame_dx8_skin_polygons (Statistics().last_frame_dx8_skin_polygons)
+#define dx8_skin_vertices (Statistics().dx8_skin_vertices)
+#define last_frame_dx8_skin_vertices (Statistics().last_frame_dx8_skin_vertices)
+#define dx8_polygons (Statistics().dx8_polygons)
+#define last_frame_dx8_polygons (Statistics().last_frame_dx8_polygons)
+#define dx8_vertices (Statistics().dx8_vertices)
+#define last_frame_dx8_vertices (Statistics().last_frame_dx8_vertices)
+#define sorting_polygons (Statistics().sorting_polygons)
+#define last_frame_sorting_polygons (Statistics().last_frame_sorting_polygons)
+#define sorting_vertices (Statistics().sorting_vertices)
+#define last_frame_sorting_vertices (Statistics().last_frame_sorting_vertices)
+#define draw_calls (Statistics().draw_calls)
+#define last_frame_draw_calls (Statistics().last_frame_draw_calls)
 
 static void Record_Texture_Begin()
 {
@@ -265,22 +291,6 @@ const StringClass& Debug_Statistics::Get_Record_Texture_String()
 
 // ----------------------------------------------------------------------------
 
-static int dx8_skin_renders;
-static int last_frame_dx8_skin_renders;
-static int dx8_skin_polygons;
-static int last_frame_dx8_skin_polygons;
-static int dx8_skin_vertices;
-static int last_frame_dx8_skin_vertices;
-static int dx8_polygons;
-static int last_frame_dx8_polygons;
-static int dx8_vertices;
-static int last_frame_dx8_vertices;
-static int sorting_polygons;
-static int last_frame_sorting_polygons;
-static int sorting_vertices;
-static int last_frame_sorting_vertices;
-static int draw_calls;
-static int last_frame_draw_calls;
 
 void Debug_Statistics::Record_DX8_Skin_Polys_And_Vertices(int pcount,int vcount)
 {

@@ -101,13 +101,44 @@
 #include <atomic>
 #include <mutex>
 
+// GeneralsX @feature cemlyn007 30/09/2026 DX8Wrapper's state names as the current engine's W3DRenderState fields,
+// in this file too (PLAN-023 Phase 8, stage RR2a-1; see w3drenderstate.h). After every #include.
+#include "w3drenderstate_names.h"
+
 const int DEFAULT_RESOLUTION_WIDTH = 640;
 const int DEFAULT_RESOLUTION_HEIGHT = 480;
 const int DEFAULT_BIT_DEPTH = 32;
 const int DEFAULT_TEXTURE_BIT_DEPTH = 16;
 const D3DMULTISAMPLE_TYPE DEFAULT_MSAA = D3DMULTISAMPLE_NONE;
 
+#if RTS_ENGINE_CONTEXT
+static_assert(W3DRenderState::DefaultResolutionWidth == DEFAULT_RESOLUTION_WIDTH, "W3DRenderState's default resolution width");
+static_assert(W3DRenderState::DefaultResolutionHeight == DEFAULT_RESOLUTION_HEIGHT, "W3DRenderState's default resolution height");
+static_assert(W3DRenderState::DefaultBitDepth == DEFAULT_BIT_DEPTH, "W3DRenderState's default bit depth");
+static_assert(W3DRenderState::DefaultTextureBitDepth == DEFAULT_TEXTURE_BIT_DEPTH, "W3DRenderState's default texture bit depth");
+static_assert(DEFAULT_MSAA == D3DMULTISAMPLE_NONE, "W3DRenderState's default MSAA mode");
+
+W3DRenderState W3DRenderState::Defaults;
+
+void DX8Wrapper::Create_Render_State()
+{
+	::rts::EngineContext* const context = ::rts::ctx();
+	if (context->w3dRender == nullptr)
+		context->w3dRender = new W3DRenderState();
+}
+
+// GeneralsX @bugfix cemlyn007 02/10/2026 Create_Render_State's inverse, for a caller that allocated this
+// engine's state but never reaches a device: Init's failure returns; a lite backend reaches it through
+// Shutdown, which ~DX8Backend now calls unconditionally with RTS_ENGINE_CONTEXT (Backend/DX8Backend.cpp).
+void DX8Wrapper::Free_Render_State()
+{
+	::rts::EngineContext* const context = ::rts::ctx();
+	delete context->w3dRender;
+	context->w3dRender = nullptr;
+}
+#else
 static D3DPRESENT_PARAMETERS _PresentParameters;
+#endif
 
 // GeneralsX @bugfix Copilot 24/08/2026 Fall back through supported MSAA sample counts instead of disabling AA immediately.
 static D3DMULTISAMPLE_TYPE Normalize_MSAA_Mode(D3DMULTISAMPLE_TYPE mode)
@@ -163,6 +194,7 @@ static bool Is_MSAA_Mode_Supported(
 
 // --- Pillarbox: render game to offscreen RT, blit centered onto backbuffer ---
 // GeneralsX @feature xxorza 15/04/2026 Unified pillarbox for fullscreen and windowed
+#if !RTS_ENGINE_CONTEXT
 DX8Wrapper::DisplaySizeFunc DX8Wrapper::s_getNativeDisplaySize = nullptr;
 DX8Wrapper::DisplaySizeFunc DX8Wrapper::s_getWindowSize = nullptr;
 bool DX8Wrapper::s_pillarboxEnabled = false;
@@ -179,9 +211,15 @@ IDirect3DSurface8* DX8Wrapper::s_offscreenSurf = nullptr;
 IDirect3DSurface8* DX8Wrapper::s_depthSurf = nullptr;
 IDirect3DSurface8* DX8Wrapper::s_savedBackbuffer = nullptr;
 IDirect3DSurface8* DX8Wrapper::s_savedDepth = nullptr;
+#endif
 
 void DX8Wrapper::Set_Display_Size_Provider(DisplaySizeFunc nativeSize, DisplaySizeFunc windowSize)
 {
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 30/09/2026 W3DDisplay::init calls this just before WW3D::Init, on a rendering
+	// engine only: its render state starts here (PLAN-023 Phase 8, stage RR2a-1).
+	Create_Render_State();
+#endif
 	s_getNativeDisplaySize = nativeSize;
 	s_getWindowSize = windowSize;
 }
@@ -398,16 +436,20 @@ static void Resolve_Present_BackBuffer_Size(int gameW, int gameH, bool isWindowe
 	}
 }
 
+#if !RTS_ENGINE_CONTEXT
 DX8FrameStatistics DX8Wrapper::FrameStatistics;
 static DX8FrameStatistics LastFrameStatistics;
+#endif
 
 // GeneralsX @feature cemlyn007 28/09/2026 Atomic (the process's assert switch): every headless engine's command line writes it and any engine's
 // assert path reads it, so engines on separate threads would race on a plain bool (PLAN-023 Phase 5b).
 std::atomic<bool> DX8Wrapper_IsWindowed(true);
+#if !RTS_ENGINE_CONTEXT
 bool DX8Wrapper_HeadlessRender = false;  // rlgenerals: see dx8wrapper.h
 
 // FPU_PRESERVE
 int DX8Wrapper_PreserveFPU = 0;
+#endif
 
 // GeneralsX @feature cemlyn007 30/09/2026 The host's check before a render device's or Direct3D interface's last
 // release (PLAN-023 Phase 8, stage RR1): see dx8wrapper.h.
@@ -419,6 +461,7 @@ void (*DX8Wrapper_FinalReleaseHook)(const char* what) = nullptr;
 **
 ***********************************************************************************/
 
+#if !RTS_ENGINE_CONTEXT
 static HWND						_Hwnd															= nullptr;
 bool								DX8Wrapper::IsInitted									= false;
 bool								DX8Wrapper::_EnableTriangleDraw						= true;
@@ -489,13 +532,16 @@ bool								_DX8SingleThreaded										= false;
 static DynamicVectorClass<StringClass>					_RenderDeviceNameTable;
 static DynamicVectorClass<StringClass>					_RenderDeviceShortNameTable;
 static DynamicVectorClass<RenderDeviceDescClass>	_RenderDeviceDescriptionTable;
+#endif
 
 
 typedef IDirect3D8* (WINAPI *Direct3DCreate8Type) (UINT SDKVersion);
 Direct3DCreate8Type	Direct3DCreate8Ptr = nullptr;
 HINSTANCE D3D8Lib = nullptr;
 
+#if !RTS_ENGINE_CONTEXT
 DX8_CleanupHook	 *DX8Wrapper::m_pCleanupHook=nullptr;
+#endif
 #ifdef EXTENDED_STATS
 DX8_Stats	 DX8Wrapper::stats;
 #endif
@@ -603,6 +649,11 @@ void MoveRectIntoOtherRect(const RECT& inner, const RECT& outer, int* x, int* y)
 
 bool DX8Wrapper::Init(void * hwnd, bool lite)
 {
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 30/09/2026 This engine's render state, freed by Shutdown (PLAN-023 Phase 8, stage
+	// RR2a-1).
+	Create_Render_State();
+#endif
 	WWASSERT(!IsInitted);
 
 	// zero memory
@@ -693,6 +744,11 @@ bool DX8Wrapper::Init(void * hwnd, bool lite)
 		d3d8Loaded = D3D8Lib != nullptr && Direct3DCreate8Ptr != nullptr;
 		}
 		if (!d3d8Loaded) {
+#if RTS_ENGINE_CONTEXT
+			// GeneralsX @bugfix cemlyn007 02/10/2026 Create_Render_State() above already allocated this
+			// engine's state; nothing else frees it on this failure return.
+			Free_Render_State();
+#endif
 			return false;	// Return false at this point if init failed
 		}
 
@@ -712,13 +768,14 @@ bool DX8Wrapper::Init(void * hwnd, bool lite)
 		fprintf(stderr, "DEBUG: DX8Wrapper::Init() - Direct3DCreate8 returned: %p\n", (void*)D3DInterface);
 		if (D3DInterface == nullptr) {
 			fprintf(stderr, "ERROR: DX8Wrapper::Init() - Direct3DCreate8 returned NULL (DXVK failed to create D3D8 interface)\n");
+#if RTS_ENGINE_CONTEXT
+			// GeneralsX @bugfix cemlyn007 02/10/2026 Same as the D3D8Lib failure above: free what
+			// Create_Render_State() allocated before this engine gives up on a device.
+			Free_Render_State();
+#endif
 			return(false);
 		}
 		IsInitted = true;
-#if RTS_ENGINE_CONTEXT
-		// GeneralsX @bugfix cemlyn007 30/09/2026 This engine owns the render device (PLAN-023 Phase 8, stage RR0a).
-		::rts::ctx()->ownsRenderDevice = true;
-#endif
 
 		/*
 		** Enumerate the available devices
@@ -733,6 +790,12 @@ bool DX8Wrapper::Init(void * hwnd, bool lite)
 
 void DX8Wrapper::Shutdown()
 {
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 30/09/2026 Nothing to shut down without a render state (PLAN-023 Phase 8, stage
+	// RR2a-1): the defaults hold no device, interface or caps, and are never written.
+	if (::rts::ctx()->w3dRender == nullptr)
+		return;
+#endif
 	if (D3DDevice) {
 
 		Set_Render_Target ((IDirect3DSurface8 *)nullptr);
@@ -768,7 +831,9 @@ void DX8Wrapper::Shutdown()
 	DX8Caps::Shutdown();
 	IsInitted = false;		// 010803 srj
 #if RTS_ENGINE_CONTEXT
-	::rts::ctx()->ownsRenderDevice = false;
+	// GeneralsX @feature cemlyn007 30/09/2026 The engine's render state goes with its device (PLAN-023 Phase 8,
+	// stage RR2a-1); a later Init starts a fresh one, as a fresh process did.
+	Free_Render_State();
 #endif
 }
 
@@ -1921,14 +1986,15 @@ bool DX8Wrapper::Registry_Load_Render_Device( const char * sub_key, char *device
 
 bool DX8Wrapper::Find_Color_And_Z_Mode(int resx,int resy,int bitdepth,D3DFORMAT * set_colorbuffer,D3DFORMAT * set_backbuffer,D3DFORMAT * set_zmode)
 {
-	static D3DFORMAT _formats16[] =
+	// GeneralsX @refactor cemlyn007 30/09/2026 const: only read, so process-wide (PLAN-023 Phase 8, stage RR2a-1).
+	static const D3DFORMAT _formats16[] =
 	{
 		D3DFMT_R5G6B5,
 		D3DFMT_X1R5G5B5,
 		D3DFMT_A1R5G5B5
 	};
 
-	static D3DFORMAT _formats32[] =
+	static const D3DFORMAT _formats32[] =
 	{
 		D3DFMT_A8R8G8B8,
 		D3DFMT_X8R8G8B8,
@@ -1938,7 +2004,7 @@ bool DX8Wrapper::Find_Color_And_Z_Mode(int resx,int resy,int bitdepth,D3DFORMAT 
 	/*
 	** Select the table that we're going to use to search for a valid backbuffer format
 	*/
-	D3DFORMAT * format_table = nullptr;
+	const D3DFORMAT * format_table = nullptr;
 	int format_count = 0;
 
 	if (BitDepth == 16) {

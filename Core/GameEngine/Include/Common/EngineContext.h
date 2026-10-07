@@ -95,6 +95,7 @@ class RTS2DScene;
 class RTS3DInterfaceScene;
 class W3DAssetManager;
 class WW3DAssetManager;
+struct W3DRenderState;
 
 namespace rts
 {
@@ -332,48 +333,147 @@ private:
 	void (*m_initialize)(T& object);
 };
 
-// GeneralsX @feature cemlyn007 28/09/2026 A stand-in for a class's static data member whose value is a
-// direct EngineContext field (PLAN-023 Phase 2), for statics that are also used qualified
-// (`MapObject::TheMapObjectListPtr`), where a macro cannot stand in: declare it as
-// `static constexpr rts::ContextField<T, &rts::EngineContext::field> name{};` and the upstream reads,
-// assignments, `->` and comparisons compile unchanged. Taking its address gives the stand-in's, not the
-// field's, so a static whose address is taken needs a macro instead.
-template <typename T, T EngineContext::*Field>
-struct ContextField
+// GeneralsX @refactor cemlyn007 02/10/2026 ContextField and IndirectContextField are the same family (one
+// operator set over a `T&` the stand-in locates differently): factor that set into this CRTP base, which calls
+// `Derived::get()`, so a later operator (PLAN-023 Phase 8, stage RR2a-1) is added once for both instead
+// of being copied and risking the two kinds diverging.
+//
+// GeneralsX @fix cemlyn007 02/10/2026 The deleted copy constructor and unary operator& turn two of the gate's
+// (scripts/cpp/engine_context_standins.py) regex checks into compiler diagnostics instead: copying a stand-in
+// (`auto x = C::name;`, or passing it by value to a variadic logger, which must copy it to place it in `...`)
+// now fails with "use of deleted function", and so does `&name` (operator&). `sizeof(name)` and
+// `std::addressof(name)` still compile, so the gate keeps checking those.
+template <typename Derived, typename T>
+struct ContextFieldOps
 {
+	constexpr ContextFieldOps() noexcept = default;
+	ContextFieldOps(const ContextFieldOps&) = delete;
+	ContextFieldOps& operator=(const ContextFieldOps&) = delete;
+	Derived* operator&() const = delete;
+
 	operator T&() const noexcept
 	{
-		return ctx()->*Field;
+		return Derived::get();
 	}
 	T operator->() const noexcept
 	{
-		return ctx()->*Field;
+		return Derived::get();
 	}
-	const ContextField& operator=(T value) const noexcept
+	const Derived& operator=(T value) const noexcept
 	{
-		ctx()->*Field = value;
-		return *this;
+		Derived::get() = value;
+		return static_cast<const Derived&>(*this);
 	}
 	T& operator++() const noexcept
 	{
-		return ++(ctx()->*Field);
+		return ++Derived::get();
 	}
 	T operator++(int) const noexcept
 	{
-		return (ctx()->*Field)++;
+		return Derived::get()++;
 	}
 	// Compound assignment needs members: a built-in `+=` takes no user-defined conversion of its left operand.
 	template <typename U>
 	T& operator+=(const U& value) const noexcept
 	{
-		return ctx()->*Field += value;
+		return Derived::get() += value;
 	}
 	template <typename U>
 	T& operator-=(const U& value) const noexcept
 	{
-		return ctx()->*Field -= value;
+		return Derived::get() -= value;
 	}
 };
+
+// GeneralsX @feature cemlyn007 28/09/2026 A stand-in for a class's static data member whose value is a
+// direct EngineContext field (PLAN-023 Phase 2), for statics that are also used qualified
+// (`MapObject::TheMapObjectListPtr`), where a macro cannot stand in: declare it as
+// `static constexpr rts::ContextField<T, &rts::EngineContext::field> name{};` and the upstream reads,
+// assignments, `->` and comparisons compile unchanged. Its copy constructor and unary `operator&` are deleted
+// (see ContextFieldOps), but `sizeof` and `std::addressof` give the stand-in's, not the field's, so a static
+// used with either needs a macro instead.
+template <typename T, T EngineContext::*Field>
+struct ContextField : ContextFieldOps<ContextField<T, Field>, T>
+{
+	// A derived class's own operator=, even the implicitly-declared copy assignment, hides every base
+	// class operator= by name; without this, `field = value` stops finding the base's and falls back to
+	// (and fails to match) the implicit one, which takes only a `const ContextField&`.
+	using ContextFieldOps<ContextField<T, Field>, T>::operator=;
+
+	static T& get() noexcept
+	{
+		return ctx()->*Field;
+	}
+};
+
+// GeneralsX @feature cemlyn007 30/09/2026 ContextField's indirect variant (PLAN-023 Phase 8, stage RR2a-1): state
+// that a direct EngineContext field points to (`S* EngineContext::*Pointer`, allocated only for some engines),
+// read through that pointer, or through `Defaults` (an S with every field at its default) while it is null.
+template <typename S, S* EngineContext::*Pointer, S& Defaults>
+inline S& indirectContext() noexcept
+{
+	S* const state = ctx()->*Pointer;
+	return state != nullptr ? *state : Defaults;
+}
+
+// A stand-in for a class's static data member that moved into such a struct (member `Field`), declared as
+// `static constexpr rts::IndirectContextField<S, &rts::EngineContext::p, S::Defaults, T, &S::name> name{};`.
+// Like ContextField: the upstream reads, assignments, `->` and comparisons compile unchanged, but `sizeof` and
+// `std::addressof` give the stand-in's size and address, not the field's (scripts/cpp/engine_context_standins.py
+// fails on those), so a name used that way, or with `.`, needs a reference-returning macro instead. An array field also
+// takes `[]` and decays to a pointer to its first element.
+template <typename S, S* EngineContext::*Pointer, S& Defaults, typename T, T S::*Field>
+struct IndirectContextField
+	: ContextFieldOps<IndirectContextField<S, Pointer, Defaults, T, Field>, T>
+{
+	// See ContextField's same `using`: without it the implicit copy assignment hides the base's operator=.
+	using ContextFieldOps<IndirectContextField<S, Pointer, Defaults, T, Field>, T>::operator=;
+
+	static T& get() noexcept
+	{
+		return indirectContext<S, Pointer, Defaults>().*Field;
+	}
+};
+
+template <typename S, S* EngineContext::*Pointer, S& Defaults, typename E, std::size_t N, E (S::*Field)[N]>
+struct IndirectContextField<S, Pointer, Defaults, E[N], Field>
+{
+	// Same deleted copy/operator& backstop as ContextFieldOps (this specialisation does not derive from
+	// it: an array field decays to E* rather than converting to E&, so it needs its own operator[]/
+	// operator E*() instead of ContextFieldOps's operator T&()/operator->()).
+	constexpr IndirectContextField() noexcept = default;
+	IndirectContextField(const IndirectContextField&) = delete;
+	IndirectContextField& operator=(const IndirectContextField&) = delete;
+	IndirectContextField* operator&() const = delete;
+
+	static E (&get() noexcept)[N]
+	{
+		return indirectContext<S, Pointer, Defaults>().*Field;
+	}
+	operator E*() const noexcept
+	{
+		return get();
+	}
+	E& operator[](std::size_t index) const noexcept
+	{
+		return get()[index];
+	}
+};
+
+// True when a stand-in type cannot be copied or have its address taken with unary `&`: the compile-time half
+// of what scripts/cpp/engine_context_standins.py checks. A static_assert on it where a stand-in is declared
+// keeps those two deleted operations from being dropped.
+template <typename Field, typename = void>
+struct HasUnaryAddressOf : std::false_type
+{
+};
+template <typename Field>
+struct HasUnaryAddressOf<Field, std::void_t<decltype(&std::declval<const Field&>())>> : std::true_type
+{
+};
+template <typename Field>
+inline constexpr bool isStandInGuarded =
+	!std::is_copy_constructible_v<std::remove_cv_t<Field>> && !HasUnaryAddressOf<std::remove_cv_t<Field>>::value;
 
 // A callable that runs `function` inside a Scope for the context that was current when it was made. For
 // thread functions: see withCurrentEngine.
