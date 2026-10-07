@@ -30,6 +30,8 @@
 
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
+#include "Common/FatalEngineError.h"	// GeneralsX @bugfix cemlyn007 28/09/2026 ReleaseCrashNoReturn
+
 // Public Data ////////////////////////////////////////////////////////////////////////////////////
 NameKeyGenerator *TheNameKeyGenerator = nullptr;  ///< name key gen. singleton
 
@@ -38,6 +40,7 @@ NameKeyGenerator::NameKeyGenerator()
 {
 
 	m_nextID = (UnsignedInt)NAMEKEY_INVALID;  // uninitialized system
+	m_descendingID = 0;  // GeneralsX @feature cemlyn007 28/09/2026 upwards (perturbForTesting)
 
 	for (Int i = 0; i < SOCKET_COUNT; ++i)
 		m_sockets[i] = nullptr;
@@ -61,6 +64,7 @@ void NameKeyGenerator::init()
 	// start keys at the beginning again
 	freeSockets();
 	m_nextID = 1;
+	m_descendingID = 0;  // GeneralsX @feature cemlyn007 28/09/2026 upwards (perturbForTesting)
 
 }
 
@@ -69,6 +73,7 @@ void NameKeyGenerator::reset()
 {
 	freeSockets();
 	m_nextID = 1;
+	m_descendingID = 0;  // GeneralsX @feature cemlyn007 28/09/2026 upwards (perturbForTesting)
 
 }
 
@@ -223,8 +228,18 @@ NameKeyType NameKeyGenerator::nameToLowercaseKey(const char *name)
 //-------------------------------------------------------------------------------------------------
 NameKeyType NameKeyGenerator::createNameKey(UnsignedInt hash, const AsciiString& name)
 {
+	// GeneralsX @feature cemlyn007 28/09/2026 Downwards once perturbForTesting asked for it. The keys
+	// handed out downwards would meet those handed out upwards (a duplicate key) or, reaching 0, turn
+	// back into upwards ones: a hard failure in every build, like running out of keys upwards. (perturbForTesting keeps
+	// NAMEKEY_PERTURB_RESERVE keys between the two, so only a test hook's misuse gets here.)
+	if (m_descendingID != 0 && m_descendingID <= m_nextID)
+		ReleaseCrashNoReturn("NameKey space exhausted: the keys handed out downwards (perturbForTesting) met "
+			"those handed out upwards");
+	// Upwards, the keys must keep fitting into the bits the code that stores them relies on.
+	if (m_descendingID == 0 && m_nextID >= (UnsignedInt)NAMEKEY_MAX)
+		ReleaseCrashNoReturn("NameKey space exhausted: the keys handed out upwards reached NAMEKEY_MAX");
 	Bucket *b = newInstance(Bucket);
-	b->m_key = (NameKeyType)m_nextID++;
+	b->m_key = (NameKeyType)(m_descendingID != 0 ? m_descendingID-- : m_nextID++);
 	b->m_nameString = name;
 	b->m_nextInSocket = m_sockets[hash];
 	m_sockets[hash] = b;
@@ -253,6 +268,40 @@ NameKeyType NameKeyGenerator::createNameKey(UnsignedInt hash, const AsciiString&
 #endif
 
 	return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+// GeneralsX @feature cemlyn007 28/09/2026 PLAN-023 Decision 2's perturbation gate (see the header)
+Bool NameKeyGenerator::perturbForTesting(Int junkNames, Int skippedIds, Bool descending)
+{
+	if (junkNames < 0 || skippedIds < 0)
+		return FALSE;
+	{
+		// Keys are handed out from m_nextID upwards, or from m_descendingID downwards to m_nextID.
+		const UnsignedInt top = m_descendingID != 0 ? m_descendingID : (UnsignedInt)NAMEKEY_MAX - 1;
+		const Int64 room = (Int64)top + 1 - (Int64)m_nextID;
+		if ((Int64)junkNames + (Int64)skippedIds + (Int64)NAMEKEY_PERTURB_RESERVE > room)
+			return FALSE;
+		if (descending && m_descendingID == 0)
+			m_descendingID = top;
+	}
+
+	static UnsignedInt calls = 0;
+	++calls;
+	for (Int i = 0; i < junkNames; ++i)
+	{
+		AsciiString junk;
+		junk.format("GeneralsXNameKeyPerturbation%u_%d", calls, i);
+		nameToKey(junk);
+	}
+
+	{
+		if (m_descendingID != 0)
+			m_descendingID -= (UnsignedInt)skippedIds;
+		else
+			m_nextID += (UnsignedInt)skippedIds;
+	}
+	return TRUE;
 }
 
 //-------------------------------------------------------------------------------------------------

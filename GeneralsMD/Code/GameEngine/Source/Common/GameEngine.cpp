@@ -28,7 +28,7 @@
 
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
-#include <cstdlib>  // std::getenv (GENERALSX_TEST_FAULT_IN_INIT)
+#include <cstdlib>  // std::getenv (the GENERALSX_TEST_* hooks)
 
 #include "Common/ActionManager.h"
 #include "Common/AudioAffect.h"
@@ -100,6 +100,9 @@
 #include "GameClient/GameText.h"
 #include "GameClient/ParticleSys.h"
 #include "GameClient/Water.h"
+#if RTS_ENGINE_CONTEXT
+#include "GameClient/Snow.h"
+#endif
 #include "GameClient/TerrainRoads.h"
 #include "GameClient/MetaEvent.h"
 #include "GameClient/MapUtil.h"
@@ -176,6 +179,15 @@ void initSubsystem(
 {
 	sysref = sys;
 	TheSubsystemList->initSubsystem(sys, path1, path2, pXfer, name);
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 28/09/2026 shutdownAll nulls sysref once it deletes sys, so the
+	// engine context holds no dangling singleton after teardown (PLAN-023 Phase 1)
+	struct Reset
+	{
+		static void apply(void* reference) { *static_cast<SUBSYSTEM**>(reference) = nullptr; }
+	};
+	TheSubsystemList->recordSingletonReference(sys, &sysref, &Reset::apply);
+#endif
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -315,14 +327,40 @@ GameEngine::~GameEngine()
 	delete TheChallengeGameInfo;
 	TheChallengeGameInfo = nullptr;
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 28/09/2026 It points at one of the game infos deleted above (or the
+	// recorder's); an engine context must hold no dangling singleton after teardown (PLAN-023 Phase 1)
+	TheGameInfo = nullptr;
+
+	// GeneralsX @bugfix cemlyn007 28/09/2026 GameEngine::init parses Water.ini and Weather.ini into these
+	// process-wide settings, and only the render device's W3DWater (and the snow manager) free them. Left
+	// set, the next engine's parse finds them and throws INI_INVALID_DATA (PLAN-023 Phase 3 makes them
+	// per engine; until then they are freed with the engine that parsed them).
+	if (TheWaterTransparency != nullptr)
+	{
+		deleteInstance((WaterTransparencySetting*)TheWaterTransparency.getNonOverloadedPointer());
+		TheWaterTransparency = nullptr;
+	}
+	if (TheWeatherSetting != nullptr)
+	{
+		deleteInstance((WeatherSetting*)TheWeatherSetting.getNonOverloadedPointer());
+		TheWeatherSetting = nullptr;
+	}
+#endif
+
 	delete TheNetwork;
 	TheNetwork = nullptr;
 
 	delete TheCommandList;
 	TheCommandList = nullptr;
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 28/09/2026 The NameKey generator is process-wide and immortal: the
+	// keys cached in function-local statics outlive every engine (PLAN-023 Decision 2)
+#else
 	delete TheNameKeyGenerator;
 	TheNameKeyGenerator = nullptr;
+#endif
 
 	delete TheFileSystem;
 	TheFileSystem = nullptr;
@@ -386,6 +424,16 @@ Bool GameEngine::isGameHalted()
  */
 void GameEngine::init()
 {
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 28/09/2026 The first engine in a process primes the shared NameKey
+	// generator, alone; a later engine may intern no new name until its upgrades are loaded; a failed
+	// priming poisons the process (PLAN-023 Decision 2). Released as failed unless init() completes.
+	NameKeyGenerator::PrimingLatch primingLatch;
+	// GeneralsX @bugfix cemlyn007 28/09/2026 Whether the try block below ran to its end: the catch
+	// (ErrorCode) below swallows every code but ERROR_INVALID_D3D, and a priming engine that stopped
+	// partway must not mark the generator primed
+	Bool initBodyCompleted = FALSE;
+#endif
 	try {
 		//create an INI object to use for loading stuff
 		INI ini;
@@ -448,9 +496,15 @@ void GameEngine::init()
 		// Create the low-level file system interface
 		TheFileSystem = createFileSystem();
 
+#if RTS_ENGINE_CONTEXT
+		// GeneralsX @feature cemlyn007 28/09/2026 The process-wide generator, made by the priming
+		// engine and reused by every later one (primingLatch, above; PLAN-023 Decision 2)
+		DEBUG_ASSERTCRASH(TheNameKeyGenerator != nullptr, ("no NameKey generator after the priming latch"));
+#else
 		// not part of the subsystem list, because it should normally never be reset!
 		TheNameKeyGenerator = MSGNEW("GameEngineSubsystem") NameKeyGenerator;
 		TheNameKeyGenerator->init();
+#endif
 
 
     	#ifdef DUMP_PERF_STATS///////////////////////////////////////////////////////////////////////////
@@ -732,6 +786,20 @@ void GameEngine::init()
 #endif
 
 		initSubsystem(TheUpgradeCenter,"TheUpgradeCenter", MSGNEW("GameEngineSubsystem") UpgradeCenter, &xferCRC, "Data\\INI\\Default\\Upgrade", "Data\\INI\\Upgrade");
+#if RTS_ENGINE_CONTEXT
+		// GeneralsX @feature cemlyn007 03/10/2026 Test hook (embedded mode only, like
+		// GENERALSX_TEST_FAULT_IN_INIT): a later engine looks the given name up inside its frozen window,
+		// and any engine interns it right after its own frozen window ends, so a host test can reach both
+		// frozen-window refusals, including a name the priming engine interned just after its window.
+		const char* testInternName = IsEngineEmbeddedMode() ? std::getenv("GENERALSX_TEST_INTERN_IN_FROZEN_WINDOW") : nullptr;
+		if (testInternName && rts::ctx()->nameKeysFrozen)
+			TheNameKeyGenerator->nameToKey(testInternName);
+		// GeneralsX @feature cemlyn007 28/09/2026 Every name key a later engine needs to share with
+		// the priming engine (the science and upgrade keys that orders carry) is interned by now.
+		primingLatch.endFrozenNames();
+		if (testInternName)
+			TheNameKeyGenerator->nameToKey(testInternName);
+#endif
 		initSubsystem(TheGameClient,"TheGameClient", createGameClient(), nullptr);
 
 #ifdef SAGE_USE_NGMP
@@ -900,6 +968,9 @@ void GameEngine::init()
 			}
 		}
 
+#if RTS_ENGINE_CONTEXT
+		initBodyCompleted = TRUE;
+#endif
 	}
 	catch (ErrorCode ec)
 	{
@@ -927,9 +998,26 @@ void GameEngine::init()
 		RELEASE_CRASH(("Uncaught Exception during initialization."));
 	}
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @bugfix cemlyn007 28/09/2026 The try block stopped partway and a catch above returned (the
+	// ErrorCode one swallows every code but ERROR_INVALID_D3D; RELEASE_CRASH returns with no TheGlobalData).
+	// Upstream carries on with a partly initialised engine; with several engines in a process that must be
+	// a clear failure instead. The latch, left incomplete, then poisons the process (see PrimingLatch).
+	// GeneralsX @bugfix cemlyn007 28/09/2026 Embedded hosts only: the game executable (one engine, not
+	// embedded) keeps upstream's behaviour and carries on, its latch left incomplete (it boots no other
+	// engine, so the poisoned process state is never consulted).
+	if (!initBodyCompleted && IsEngineEmbeddedMode())
+		ReleaseCrashNoReturn("GameEngine::init stopped partway (an error its catch blocks swallowed)");
+#endif
+
 	resetSubsystems();
 
 	HideControlBar();
+
+#if RTS_ENGINE_CONTEXT
+	if (initBodyCompleted)
+		primingLatch.complete();
+#endif
 }
 
 /** -----------------------------------------------------------------------------------------------

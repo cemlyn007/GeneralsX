@@ -613,7 +613,21 @@ private:
 	AsciiString m_userDataDir;
 	AsciiString BuildUserDataPathFromRegistry();
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 28/09/2026 The original instance is per engine (PLAN-023 Phase 2's
+	// m_theOriginal row, done in Phase 1b): a field of the engine context, which this stand-in reads and
+	// writes, so the upstream code that uses m_theOriginal is unchanged. A process-wide one would outlive
+	// its engine: an engine whose init failed (and is leaked, never torn down) would leave it pointing at
+	// its instance, and the next engine's GlobalData::reset would never return.
+	struct OriginalInContext
+	{
+		operator GlobalData*() const;
+		OriginalInContext& operator=(GlobalData* original);
+	};
+	static OriginalInContext m_theOriginal;	///< the original global data instance (no overrides)
+#else
 	static GlobalData *m_theOriginal;		///< the original global data instance (no overrides)
+#endif
 	GlobalData *m_next;									///< next instance (for overrides)
 	virtual GlobalData *newOverride();		/** create a new override, copy data from previous
 																			override, and return it */
