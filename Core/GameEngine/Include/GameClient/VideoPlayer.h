@@ -308,7 +308,9 @@ class NullVideoPlayer : public VideoPlayer
 		virtual void setVolume( Real ) override { }
 };
 
+#if !RTS_ENGINE_CONTEXT
 extern VideoPlayerInterface *TheVideoPlayer;
+#endif
 
 //----------------------------------------------------------------------------
 //           Inlining

@@ -131,8 +131,24 @@ void VisPolyClass::Clip(const PlaneClass & plane,VisPolyClass & dest) const
 	}
 }
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 30/09/2026 Per engine: the clipping polygons, filled and consumed within one
+// visibility rasterisation (PLAN-023 Phase 8, stage RR2b).
+namespace
+{
+struct VisClipState
+{
+	VisPolyClass _VisPoly0;
+	VisPolyClass _VisPoly1;
+};
+rts::PerEngineStatic<VisClipState> VisClipState_perEngine;
+} // namespace
+#define _VisPoly0 (VisClipState_perEngine.get()._VisPoly0)
+#define _VisPoly1 (VisClipState_perEngine.get()._VisPoly1)
+#else
 static VisPolyClass _VisPoly0;
 static VisPolyClass _VisPoly1;
+#endif
 
 
 

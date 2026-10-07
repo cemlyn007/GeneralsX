@@ -6,6 +6,7 @@
 #include <cstdio>
 #include <cstring>
 #include "GameNetwork/GeneralsOnline/NGMP_json.h"
+#include "Common/EngineContext.h" // GeneralsX @feature cemlyn007 28/09/2026 rts::withCurrentEngine
 
 using json = nlohmann::json;
 
@@ -71,7 +72,7 @@ bool NGMPWebSocket::connect(const std::string& wsUrl, const std::string& authTok
     fflush(stderr);
 
     m_running = true;
-    m_recvThread = std::thread(&NGMPWebSocket::receiveLoop, this);
+    m_recvThread = std::thread(::rts::withCurrentEngine(&NGMPWebSocket::receiveLoop), this);
     return true;
 }
 

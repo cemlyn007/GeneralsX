@@ -80,7 +80,7 @@ extern void DoParticles(RenderInfoClass & rinfo);
 	ShaderClass::SRCBLEND_ONE, ShaderClass::DSTBLEND_ZERO, ShaderClass::FOG_DISABLE, ShaderClass::GRADIENT_MODULATE, ShaderClass::SECONDARY_GRADIENT_DISABLE, \
 	ShaderClass::TEXTURING_DISABLE, ShaderClass::ALPHATEST_DISABLE, ShaderClass::CULL_MODE_ENABLE, \
 	ShaderClass::DETAILCOLOR_DISABLE, ShaderClass::DETAILALPHA_DISABLE) )
-static ShaderClass PlayerColorShader(SC_PLAYER_COLOR);
+static const ShaderClass PlayerColorShader(SC_PLAYER_COLOR);
 
 //=============================================================================
 // RTS3DScene::RTS3DScene

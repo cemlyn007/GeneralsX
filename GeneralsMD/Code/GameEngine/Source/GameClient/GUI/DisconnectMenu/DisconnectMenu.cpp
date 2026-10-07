@@ -84,7 +84,9 @@ const char *const DisconnectMenu::m_textDisplayControlName = "DisconnectScreen.w
 
 static const Color chatNormalColor =  GameMakeColor(255,0,0,255);
 
+#if !RTS_ENGINE_CONTEXT
 DisconnectMenu *TheDisconnectMenu = nullptr;
+#endif
 
 DisconnectMenu::DisconnectMenu() {
 	m_disconnectManager = nullptr;

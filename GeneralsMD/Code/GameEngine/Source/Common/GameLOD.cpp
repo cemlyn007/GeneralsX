@@ -47,7 +47,9 @@
 //Hack to get access to a static method on the W3DDevice side. -MW
 extern Bool testMinimumRequirements(ChipsetType *videoChipType, CpuType *cpuType, Int *cpuFreq, MemValueType *numRAM, Real *intBenchIndex, Real *floatBenchIndex, Real *memBenchIndex);
 
+#if !RTS_ENGINE_CONTEXT
 GameLODManager *TheGameLODManager=nullptr;
+#endif
 
 static const FieldParse TheStaticGameLODFieldParseTable[] =
 {

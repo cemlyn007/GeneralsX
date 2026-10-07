@@ -139,7 +139,9 @@ static const FieldParse audioSettingsFieldParseTable[] =
 };
 
 // Singleton TheAudio /////////////////////////////////////////////////////////////////////////////
+#if !RTS_ENGINE_CONTEXT
 AudioManager *TheAudio = nullptr;
+#endif
 
 const char *const AudioManager::MuteAudioReasonNames[] =
 {
@@ -1084,6 +1086,13 @@ AudioHandle AudioManager::allocateNewHandle()
 {
 	// note, intentionally a post increment rather than a pre increment.
 	return theAudioHandlePool++;
+}
+
+//-------------------------------------------------------------------------------------------------
+// GeneralsX @feature cemlyn007 03/10/2026 Test hook for rlgenerals' fault_test (see GameAudio.h).
+AudioHandle AudioManager::getHandlesAllocated() const
+{
+	return theAudioHandlePool - AHSV_FirstHandle;
 }
 
 //-------------------------------------------------------------------------------------------------

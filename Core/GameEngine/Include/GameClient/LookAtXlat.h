@@ -89,4 +89,6 @@ private:
 	Bool canScrollAtScreenEdge() const;
 };
 
+#if !RTS_ENGINE_CONTEXT
 extern LookAtTranslator *TheLookAtTranslator;
+#endif

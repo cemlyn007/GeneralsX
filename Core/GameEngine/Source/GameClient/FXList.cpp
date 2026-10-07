@@ -56,7 +56,9 @@
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 
+#if !RTS_ENGINE_CONTEXT
 FXListStore *TheFXListStore = nullptr;					///< the FXList store definition
+#endif
 
 //-------------------------------------------------------------------------------------------------
 static void adjustVector(Coord3D *vec, const Matrix3D* mtx)

@@ -60,12 +60,25 @@
 #include "GameClient/GadgetPushButton.h"
 
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 28/09/2026 This engine's rank images (PLAN-023 Phase 4; see ControlBar.h).
+#define m_rankVeteranIcon (s_rankIcons_perEngine.get().veteran)
+#define m_rankEliteIcon (s_rankIcons_perEngine.get().elite)
+#define m_rankHeroicIcon (s_rankIcons_perEngine.get().heroic)
+#endif
+
 // PRIVATE DATA ///////////////////////////////////////////////////////////////////////////////////
 static GameWindow *commandWindows[ MAX_COMMANDS_PER_SET ];
 Bool commandWindowsInitialized = FALSE;
 static Color BuildClockColor = GameMakeColor(0,0,0,100);
 // STATIC DATA STORAGE ////////////////////////////////////////////////////////////////////////////
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 28/09/2026 Per engine (PLAN-023 Phase 4; see ControlBar.h).
+rts::PerEngineStatic<ControlBar::ContainData> ControlBar::s_containData_perEngine;
+#define m_containData (s_containData_perEngine.get().entries)
+#else
 ControlBar::ContainEntry ControlBar::m_containData[ MAX_COMMANDS_PER_SET ];
+#endif
 
 //-------------------------------------------------------------------------------------------------
 /** Note, this iterate callback assumes that the inventory exit buttons appear in a

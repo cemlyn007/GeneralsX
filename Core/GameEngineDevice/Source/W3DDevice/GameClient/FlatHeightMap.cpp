@@ -90,7 +90,9 @@
 #include "Common/UnitTimings.h" //Contains the DO_UNIT_TIMINGS define jba.
 
 
+#if !RTS_ENGINE_CONTEXT
 FlatHeightMapRenderObjClass *TheFlatHeightMap = nullptr;
+#endif
 
 //-----------------------------------------------------------------------------
 //         Private Data
@@ -99,7 +101,7 @@ FlatHeightMapRenderObjClass *TheFlatHeightMap = nullptr;
 	ShaderClass::DSTBLEND_ZERO, ShaderClass::FOG_DISABLE, ShaderClass::GRADIENT_MODULATE, ShaderClass::SECONDARY_GRADIENT_DISABLE, ShaderClass::TEXTURING_ENABLE, \
 	ShaderClass::ALPHATEST_DISABLE, ShaderClass::CULL_MODE_ENABLE, ShaderClass::DETAILCOLOR_SCALE, ShaderClass::DETAILALPHA_DISABLE) )
 
-static ShaderClass detailOpaqueShader(SC_DETAIL_BLEND);
+static const ShaderClass detailOpaqueShader(SC_DETAIL_BLEND);
 
 
 #define DEFAULT_MAX_BATCH_SHORELINE_TILES		512	//maximum number of terrain tiles rendered per call (must fit in one VB)
@@ -417,11 +419,13 @@ void FlatHeightMapRenderObjClass::updateCenter(CameraClass *camera, const Vector
 	m_needFullUpdate = false;
 	Int i, j;
 	Int culled = 0;
-	static Int prevCulled = 0;
+	// GeneralsX @refactor cemlyn007 01/10/2026 The last counts logged: the height map's own, not function-local statics
+	// every render engine's terrain wrote (PLAN-023 Phase 8, stage RR3).
+	Int& prevCulled = m_prevCulled;
 	Int t2X = 0;
-	static Int prevT2X = 0;
+	Int& prevT2X = m_prevT2X;
 	Int t4X = 0;
-	static Int prevT4X = 0;
+	Int& prevT4X = m_prevT4X;
 	for	(i=0; i<m_tilesWidth; i++) {
 		for (j=0; j<m_tilesHeight; j++) {
 			W3DTerrainBackground *tile = m_tiles+j*m_tilesWidth+i;

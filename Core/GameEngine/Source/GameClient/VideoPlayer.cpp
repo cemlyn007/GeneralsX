@@ -78,7 +78,9 @@
 //         Public Data
 //----------------------------------------------------------------------------
 
+#if !RTS_ENGINE_CONTEXT
 VideoPlayerInterface *TheVideoPlayer = nullptr;
+#endif
 
 //----------------------------------------------------------------------------
 //         Private Prototypes

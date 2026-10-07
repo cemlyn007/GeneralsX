@@ -51,7 +51,9 @@
 
 
 // PUBLIC DATA ////////////////////////////////////////////////////////////////////////////////////
+#if !RTS_ENGINE_CONTEXT
 Mouse *TheMouse = nullptr;
+#endif
 
 const char *const Mouse::RedrawModeName[] = {
 	"Mouse:Windows",

@@ -35,6 +35,11 @@
 #include "Common/GameMemory.h"
 #include "Common/AsciiString.h"
 
+#if RTS_ENGINE_CONTEXT
+#include <atomic>
+#include <mutex>
+#endif
+
 //-------------------------------------------------------------------------------------------------
 // Note that NameKeyType isn't a "real" enum, but an enum type used to enforce the
 // fact that NameKeys are really magic cookies, and aren't really interchangeable
@@ -64,9 +69,16 @@ public:
 	Bucket				*m_nextInSocket;
 	NameKeyType		m_key;
 	AsciiString		m_nameString;
+#if RTS_ENGINE_CONTEXT
+	Bool					m_afterPriming;	///< interned after the priming engine's frozen window ended (see PrimingLatch)
+#endif
 };
 
+#if RTS_ENGINE_CONTEXT
+inline Bucket::Bucket() : m_nextInSocket(nullptr), m_key(NAMEKEY_INVALID), m_afterPriming(FALSE) { }
+#else
 inline Bucket::Bucket() : m_nextInSocket(nullptr), m_key(NAMEKEY_INVALID) { }
+#endif
 inline Bucket::~Bucket() { }
 
 //-------------------------------------------------------------------------------------------------
@@ -106,11 +118,78 @@ public:
 	// Get a string out of the INI. Store it into a NameKeyType
 	static void parseStringAsNameKeyType( INI *ini, void *instance, void *store, const void* userData );
 
+	// GeneralsX @feature cemlyn007 28/09/2026 Test hook for PLAN-023 Decision 2's perturbation gate:
+	// interns `junkNames` names no data uses, then skips `skippedIds` ids, so every key interned
+	// afterwards differs from an unperturbed run. With `descending`, the generator also switches, for
+	// good, to handing out every later key from the top of the key space downwards, so keys interned
+	// afterwards also come in the reverse of their interning order (with several engines sharing the
+	// generator, an engine finds keys another interned in that engine's order). The simulation must
+	// notice neither. Returns FALSE, changing nothing, if that would leave fewer than
+	// NAMEKEY_PERTURB_RESERVE keys free below NAMEKEY_MAX. Never call it in play.
+	Bool perturbForTesting(Int junkNames, Int skippedIds, Bool descending);
+	enum { NAMEKEY_PERTURB_RESERVE = 1 << 20 };
+
 #if RETAIL_COMPATIBLE_CRC
 #if RTS_ZEROHOUR
 	void syncNameKeyID();
 #endif
 	void verifyNameKeyID(UnsignedInt expectedNextID) const;
+#endif
+
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 28/09/2026 The shared, immortal generator (PLAN-023 Decision 2).
+	// With several engines in one process there is one generator for all of them, never deleted:
+	// about 1,250 function-local and file statics cache keys, and those outlive every engine. It is
+	// thread-safe: lookups read the bucket chains lock-free (atomic heads, buckets immutable once
+	// published), inserts take a mutex, and keyToName returns a copy of the name.
+	//
+	// Priming: the first engine in the process (the priming engine) makes the generator and runs
+	// GameEngine::init alone. Every later engine boots from the same data, so it finds every boot
+	// name already interned, with the same key, and must intern nothing new until its upgrades are
+	// loaded (the science and upgrade keys are what orders carry): a new name there means different
+	// data, which is a fatal error. A name first interned after the priming engine's own frozen window
+	// ended counts as new there too. If the priming engine fails partway, the generator holds a
+	// partial prefix that a retry would extend differently, so the process is poisoned: every later
+	// engine fails in GameEngine::init, and the host has to restart the process. So is it if a later
+	// engine's init fails partway: that leaves process-wide state half built, and ~GameEngine cannot
+	// tear a partly initialised engine down, so the host must leak it (never delete it).
+	//
+	// The frozen-window refusals, and in embedded mode GameEngine::init's stopped-partway failure, end
+	// through ReleaseCrashNoReturn (FatalEngineError when embedded, otherwise ReleaseCrash's own exit,
+	// or abort() if it returned); the game executable carries on after a swallowed init error, as upstream does.
+	// The refusals that repeat an earlier failure or are host usage errors (init while another engine
+	// is priming, outside every context, or in an already poisoned process) raise FatalEngineError (or
+	// abort()) directly, leaving the crash report alone.
+	enum PrimingState
+	{
+		PRIMING_NOT_STARTED,	///< no engine has started GameEngine::init in this process
+		PRIMING_IN_PROGRESS,	///< the priming engine is inside GameEngine::init
+		PRIMED,								///< the priming engine completed GameEngine::init
+		PRIMING_FAILED,				///< an engine's GameEngine::init failed partway: no engine can boot in this process
+	};
+	static PrimingState getPrimingState();
+
+	// Held by GameEngine::init for its whole run, inside the engine's context. The constructor makes
+	// the generator if this is the priming engine (or fails if another engine is priming, or the process
+	// is poisoned, or no engine context is current); complete() at the end of a successful init;
+	// destroyed without complete(), it poisons the process.
+	class PrimingLatch
+	{
+	public:
+		PrimingLatch();
+		~PrimingLatch();
+		// This engine may intern new names from here on (its upgrades are loaded). For the priming
+		// engine this also starts the names a later engine's frozen window must not meet.
+		void endFrozenNames();
+		void complete();
+
+	private:
+		PrimingLatch(const PrimingLatch&);
+		PrimingLatch& operator=(const PrimingLatch&);
+
+		Bool m_priming;
+		Bool m_completed;
+	};
 #endif
 
 private:
@@ -122,11 +201,24 @@ private:
 	};
 
 	NameKeyType createNameKey(UnsignedInt hash, const AsciiString& name);
+#if RTS_ENGINE_CONTEXT
+	NameKeyType keyOfExisting(const Bucket* b) const;
+	bool m_primed;	///< the priming engine's frozen window has ended; guarded by m_insertMutex
+#endif
 
 	void freeSockets();
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 28/09/2026 Thread-safe with several engines (see PrimingLatch)
+	std::atomic<Bucket*>	m_sockets[SOCKET_COUNT];	///< Catalogue of all Buckets already generated; a bucket is immutable once published
+	UnsignedInt		m_nextID;											///< Next available ID; guarded by m_insertMutex
+	UnsignedInt		m_descendingID;								///< Next ID handed out downwards, or 0 (perturbForTesting); guarded by m_insertMutex
+	std::mutex		m_insertMutex;								///< Held by every insert
+#else
 	Bucket*				m_sockets[SOCKET_COUNT];			///< Catalog of all Buckets already generated
 	UnsignedInt		m_nextID;											///< Next available ID
+	UnsignedInt		m_descendingID;								///< GeneralsX @feature cemlyn007 28/09/2026 Next ID handed out downwards, or 0 (perturbForTesting)
+#endif
 
 };
 
@@ -145,7 +237,12 @@ inline AsciiString KEYNAME(NameKeyType nk) { return TheNameKeyGenerator->keyToNa
 class StaticNameKey
 {
 private:
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 28/09/2026 Written lazily by whichever engine reads it first
+	mutable std::atomic<NameKeyType> m_key;
+#else
 	mutable NameKeyType m_key;
+#endif
 	const char* m_name;
 public:
 	StaticNameKey(const char* p) : m_key(NAMEKEY_INVALID), m_name(p) {}

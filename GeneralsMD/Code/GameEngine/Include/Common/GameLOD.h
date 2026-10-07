@@ -253,4 +253,6 @@ ParticlePriorityType GameLODManager::getMinDynamicParticleSkipPriority()
 	return m_minDynamicParticleSkipPriority;
 }
 
+#if !RTS_ENGINE_CONTEXT
 extern GameLODManager *TheGameLODManager;
+#endif

@@ -88,11 +88,21 @@
 
 
 // PUBLIC /////////////////////////////////////////////////////////////////////////////////////////
+#if !RTS_ENGINE_CONTEXT
 ControlBar *TheControlBar = nullptr;
+#endif
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 28/09/2026 Per engine (PLAN-023 Phase 4; see ControlBar.h).
+rts::PerEngineStatic<ControlBar::RankIcons> ControlBar::s_rankIcons_perEngine;
+#define m_rankVeteranIcon (s_rankIcons_perEngine.get().veteran)
+#define m_rankEliteIcon (s_rankIcons_perEngine.get().elite)
+#define m_rankHeroicIcon (s_rankIcons_perEngine.get().heroic)
+#else
 const Image* ControlBar::m_rankVeteranIcon	= nullptr;
 const Image* ControlBar::m_rankEliteIcon		= nullptr;
 const Image* ControlBar::m_rankHeroicIcon		= nullptr;
+#endif
 
 // GeneralsX @bugfix Copilot 19/09/2026 Preserve full-resolution HUD card sizing.
 // Additional horizontal aspect fitting makes ultrawide thumbnails too small.
@@ -1058,7 +1068,9 @@ ControlBar::~ControlBar()
 
 	if (m_rightHUDCameoWindow && m_rightHUDCameoWindow->winGetUserData())
 	{
-		delete m_rightHUDCameoWindow->winGetUserData();
+		// GeneralsX @bugfix cemlyn007 29/09/2026 Delete the portrait's user data as the PushButtonData it is, not as
+		// void (undefined behaviour, and its altSound string was never destroyed).
+		delete (PushButtonData *)m_rightHUDCameoWindow->winGetUserData();
 		m_rightHUDCameoWindow->winSetUserData(nullptr);
 	}
 

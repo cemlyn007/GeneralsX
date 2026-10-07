@@ -91,10 +91,29 @@
 #include "sortingrenderer.h"
 #include "visrasterizer.h"
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 30/09/2026 Per engine, made on the engine's first sphere: every sphere's draw sets its
+// alpha vector on the shared LOD meshes (Render), so they are draw state, not constants, and they take
+// the first sphere's alpha vector (PLAN-023 Phase 8, stage RR2b; Phase 3 had built them once per process).
+namespace
+{
+struct SphereMeshState
+{
+	bool Sphere_Array_Valid = false;
+	SphereMeshClass SphereMeshArray[SPHERE_NUM_LOD];
+	float SphereLODCosts[SPHERE_NUM_LOD + 1] = {}; // SPHERE_NUM_LOD doesn't include the null LOD
+};
+rts::PerEngineStatic<SphereMeshState> SphereMeshState_perEngine;
+} // namespace
+#define Sphere_Array_Valid (SphereMeshState_perEngine.get().Sphere_Array_Valid)
+#define SphereMeshArray (SphereMeshState_perEngine.get().SphereMeshArray)
+#define SphereLODCosts (SphereMeshState_perEngine.get().SphereLODCosts)
+#else
 static bool Sphere_Array_Valid = false;
 
 SphereMeshClass SphereMeshArray[SPHERE_NUM_LOD];
 float SphereLODCosts[SPHERE_NUM_LOD + 1];	// SPHERE_NUM_LOD doesn't include the null LOD
+#endif
 
 
 /*

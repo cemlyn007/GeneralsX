@@ -81,7 +81,7 @@ extern void DoParticles(RenderInfoClass & rinfo);
 	ShaderClass::SRCBLEND_ONE, ShaderClass::DSTBLEND_ZERO, ShaderClass::FOG_DISABLE, ShaderClass::GRADIENT_MODULATE, ShaderClass::SECONDARY_GRADIENT_DISABLE, \
 	ShaderClass::TEXTURING_DISABLE, ShaderClass::ALPHATEST_DISABLE, ShaderClass::CULL_MODE_ENABLE, \
 	ShaderClass::DETAILCOLOR_DISABLE, ShaderClass::DETAILALPHA_DISABLE) )
-static ShaderClass PlayerColorShader(SC_PLAYER_COLOR);
+static const ShaderClass PlayerColorShader(SC_PLAYER_COLOR);
 
 //=============================================================================
 // RTS3DScene::RTS3DScene
@@ -918,7 +918,7 @@ void RTS3DScene::updateFixedLightEnvironments(RenderInfoClass & rinfo)
 		m_globalLight[globalLightIndex]->Get_Ambient(&oldAmbient);
     oldDiffuse *= infantryLightScale;
     oldAmbient *= infantryLightScale;
-    static Vector3 id (1.0f, 1.0f, 1.0f);
+    const Vector3 id (1.0f, 1.0f, 1.0f);	// GeneralsX @refactor cemlyn007 01/10/2026 a constant local, not a static (RR3)
     oldDiffuse.Cap_Absolute_To(id);
     oldAmbient.Cap_Absolute_To(id);
 		m_infantryLight[globalLightIndex]->Set_Ambient(oldAmbient);//CLAMPED

@@ -56,7 +56,9 @@
 #include "GameLogic/ScriptEngine.h"
 
 
+#if !RTS_ENGINE_CONTEXT
 SkirmishGameInfo *TheChallengeGameInfo = nullptr;
+#endif
 
 // defines
 static const Int DEFAULT_GENERAL = 0;

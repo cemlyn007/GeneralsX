@@ -48,6 +48,7 @@
 #include "WWMath/vp.h"
 #include "meshmatdesc.h"
 #include <stdlib.h>
+#include "WWLib/RANDOM.h"
 
 /*
 ** Debug logging for the shatter system
@@ -213,11 +214,36 @@ protected:
 ***********************************************************************************************/
 
 enum { MAX_MESH_FRAGMENTS = 32 };
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 30/09/2026 Per engine: the shatter patterns Init loads and Shutdown frees, and
+// the clipping scratch (clip pools, fragments, vertex workspaces) of one shatter (PLAN-023 Phase 8, stage RR2b).
+namespace
+{
+struct ShatterState
+{
+	SimpleDynVecClass<BSPClass*> ShatterPatterns;
+	SimpleDynVecClass<PolygonClass> ClipPools[MAX_MESH_FRAGMENTS];
+	SimpleDynVecClass<DynamicMeshClass*> MeshFragments{MAX_MESH_FRAGMENTS};
+	SimpleVecClass<Vector3> TmpVertPositions{256};
+	SimpleVecClass<Vector3> TmpVertNormals{256};
+	// GeneralsX @bugfix cemlyn007 01/10/2026 The pattern choice's generator, seeded the same for every engine, not the C
+	// library's process-wide rand() (PLAN-023 Phase 8, stage RR3).
+	Random3Class PatternRandom;
+};
+rts::PerEngineStatic<ShatterState> ShatterState_perEngine;
+} // namespace
+#define ShatterPatterns (ShatterState_perEngine.get().ShatterPatterns)
+#define ClipPools (ShatterState_perEngine.get().ClipPools)
+#define MeshFragments (ShatterState_perEngine.get().MeshFragments)
+#define TmpVertPositions (ShatterState_perEngine.get().TmpVertPositions)
+#define TmpVertNormals (ShatterState_perEngine.get().TmpVertNormals)
+#else
 static SimpleDynVecClass<BSPClass *>				ShatterPatterns;
 static SimpleDynVecClass<PolygonClass>				ClipPools[MAX_MESH_FRAGMENTS];
 static SimpleDynVecClass<DynamicMeshClass	*>		MeshFragments(MAX_MESH_FRAGMENTS);
 static SimpleVecClass<Vector3>						TmpVertPositions(256);
 static SimpleVecClass<Vector3>						TmpVertNormals(256);
+#endif
 
 
 /***********************************************************************************************
@@ -896,7 +922,11 @@ void ShatterSystem::Shatter_Mesh(MeshClass * mesh,const Vector3 & point,const Ve
 	/*
 	** Grab a random shatter pattern
 	*/
+#if RTS_ENGINE_CONTEXT
+	BSPClass * clipper = ShatterPatterns[(unsigned)ShatterState_perEngine.get().PatternRandom() % (unsigned)ShatterPatterns.Count()];
+#else
 	BSPClass * clipper = ShatterPatterns[rand() % ShatterPatterns.Count()];
+#endif
 
 	/*
 	** Compute transforms which take vertices from mesh-space to shatter-space

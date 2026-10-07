@@ -266,7 +266,9 @@ RankPoints::RankPoints()
 	m_disconnectMultiplier = -1.0f;
 }
 
+#if !RTS_ENGINE_CONTEXT
 RankPoints *TheRankPointValues = nullptr;
+#endif
 
 void SetLookAtPlayer( Int id, AsciiString nick)
 {

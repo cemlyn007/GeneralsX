@@ -89,6 +89,9 @@ protected:
 	Int *m_extraBlendTilePositions;	///<array holding x,y tile positions of all extra blend tiles. (used for 3 textures per tile).
 	Int m_numExtraBlendTiles;		///<number of blend tiles in m_extraBlendTilePositions.
 	Int	m_numVisibleExtraBlendTiles; ///<number rendered last frame.
+	// GeneralsX @refactor cemlyn007 01/10/2026 renderExtraBlendTiles' buffer size in tiles, grown as needed: was a
+	// function-local static (PLAN-023 Phase 8, stage RR3).
+	Int m_maxExtraBlendTiles;
 	Int m_extraBlendTilePositionsSize; //<total size of array including unused memory.
 	DX8VertexBufferClass **m_vertexBufferTiles; ///<collection of smaller vertex buffers that make up 1 heightmap
 	VERTEX_FORMAT *m_vertexBufferBackup; ///< In memory copy of the vertex buffer data for quick update of dynamic lighting.

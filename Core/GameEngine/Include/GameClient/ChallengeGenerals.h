@@ -151,5 +151,7 @@ protected:
 
 
 // EXTERNALS //////////////////////////////////////////////////////////////////////////////////////
+#if !RTS_ENGINE_CONTEXT
 extern ChallengeGenerals *TheChallengeGenerals;
+#endif
 extern ChallengeGenerals *createChallengeGenerals();

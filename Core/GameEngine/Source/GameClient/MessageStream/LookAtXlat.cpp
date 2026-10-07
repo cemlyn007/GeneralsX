@@ -53,7 +53,9 @@
 
 #include "Common/GlobalData.h"			// for camera pitch angle only
 
+#if !RTS_ENGINE_CONTEXT
 LookAtTranslator *TheLookAtTranslator = nullptr;
+#endif
 
 enum
 {

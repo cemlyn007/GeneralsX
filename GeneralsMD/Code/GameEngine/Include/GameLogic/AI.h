@@ -308,7 +308,9 @@ protected:
 	FormationID m_nextFormationID;
 };
 
+#if !RTS_ENGINE_CONTEXT
 extern AI *TheAI;												///< the Artificial Intelligence singleton
+#endif
 
 
 class Waypoint;

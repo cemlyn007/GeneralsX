@@ -203,7 +203,9 @@ void XferLoad::xferAsciiString( AsciiString *asciiStringData )
 
 	// read all the string data
 	const Int MAX_XFER_LOAD_STRING_BUFFER = 1024;
-	static Char buffer[ MAX_XFER_LOAD_STRING_BUFFER ];
+	// GeneralsX @feature cemlyn007 28/09/2026 A local, not a static: scratch consumed before return, so a load on another
+	// thread's engine does not share it (PLAN-023 Phase 2; too big for the library's static TLS block).
+	Char buffer[ MAX_XFER_LOAD_STRING_BUFFER ];
 
 	if( len > 0 )
 		xferUser( buffer, sizeof( Byte ) * len );
@@ -226,7 +228,8 @@ void XferLoad::xferUnicodeString( UnicodeString *unicodeStringData )
 
 	// read all the string data
 	const Int MAX_XFER_LOAD_STRING_BUFFER = 1024;
-	static WideChar buffer[ MAX_XFER_LOAD_STRING_BUFFER ];
+	// GeneralsX @feature cemlyn007 28/09/2026 A local, like xferAsciiString's buffer (PLAN-023 Phase 2).
+	WideChar buffer[ MAX_XFER_LOAD_STRING_BUFFER ];
 
 	if( len > 0 )
 		xferUser( buffer, sizeof( WideChar ) * len );

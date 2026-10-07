@@ -54,7 +54,9 @@ public:
 	// Called by the script engine in postProcessLoad()
 	virtual void doEnableOrDisableObjectDifficultyBonuses(Bool enableBonuses) = 0;
 };
+#if !RTS_ENGINE_CONTEXT
 extern ScriptActionsInterface *TheScriptActions;   ///< singleton definition
+#endif
 
 
 //-----------------------------------------------------------------------------
@@ -81,8 +83,17 @@ public:
 
 protected:
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 28/09/2026 Per engine: doVictory/doDefeat/doLocalDefeat (map scripts, headless
+	// too) store this engine's message window here, a real window with GameWindowManagerDummy, and closeWindows
+	// destroys it through the current engine's window manager; shared, one engine would destroy another's window
+	// (PLAN-023 Phase 4). ScriptActions.cpp stands m_messageWindow in for its value.
+	static rts::PerEngineStatic<GameWindow *> s_messageWindow_perEngine;
+	static void clearWindow() {s_messageWindow_perEngine.get()=nullptr;};
+#else
 	static GameWindow *m_messageWindow;
 	static void clearWindow() {m_messageWindow=nullptr;};
+#endif
 
 	Bool m_suppressNewWindows;
 	AsciiString m_unnamedUnit;

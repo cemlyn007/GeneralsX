@@ -66,7 +66,7 @@
 #define VERTS_IN_BLOCK_ROW			(VERTEX_BUFFER_TILE_LENGTH+1)
 
 
-static ShaderClass detailOpaqueShader(SC_ALPHA);
+static const ShaderClass detailOpaqueShader(SC_ALPHA);
 Bool W3DStatusCircle::m_needUpdate;
 Int W3DStatusCircle::m_diffuse=255; // blue.
 

@@ -30,9 +30,21 @@
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the Game
 #include "GameClient/Snow.h"
 #include "GameClient/View.h"
+#if RTS_ENGINE_CONTEXT
+#include "WWLib/RANDOM.h"
+
+// GeneralsX @bugfix cemlyn007 01/10/2026 The snow's starting heights came from the C library's rand(), one sequence
+// for the whole process, so an engine's table depended on what every other engine had drawn from it before (its
+// headless engines included: every engine builds the table). Each engine draws them from its own generator, seeded
+// the same for every engine, so its table equals its solo run's (PLAN-023 Phase 8, stage RR3). It continues across
+// updateIniSettings calls, as rand()'s sequence did.
+static rts::PerEngineStatic<Random3Class> SnowRandom_perEngine;
+#endif
 
 
+#if !RTS_ENGINE_CONTEXT
 SnowManager *TheSnowManager=nullptr;
+#endif
 
 SnowManager::SnowManager()
 {
@@ -56,11 +68,19 @@ void SnowManager::updateIniSettings()
 	Real *dst=m_startingHeights;
 	//initialize a table of random starting positions for each particle.
 	Int boxDimensions = (Int)TheWeatherSetting->m_snowBoxDimensions;
+#if RTS_ENGINE_CONTEXT
+	// The engine's generator, bound once rather than looked up per particle.
+	Random3Class& snowRandom = SnowRandom_perEngine.get();
+#endif
 	for (Int y=0; y<SNOW_NOISE_Y; y++)
 	{
 		for (Int x=0; x<SNOW_NOISE_X; x++)
 		{
+#if RTS_ENGINE_CONTEXT
+			*dst=(Real)((unsigned)snowRandom()%(unsigned)(boxDimensions));
+#else
 			*dst=(Real)(rand()%(boxDimensions));
+#endif
 			dst++;
 		}
 	}
@@ -100,7 +120,11 @@ SnowManager::~SnowManager()
 	TheWeatherSetting=nullptr;
 }
 
+#if RTS_ENGINE_CONTEXT
+rts::PerEngineStatic<OVERRIDE<WeatherSetting> > TheWeatherSetting_perEngine;
+#else
 OVERRIDE<WeatherSetting> TheWeatherSetting = nullptr;
+#endif
 
 // PRIVATE DATA ///////////////////////////////////////////////////////////////////////////////////
 const FieldParse WeatherSetting::m_weatherSettingFieldParseTable[] =

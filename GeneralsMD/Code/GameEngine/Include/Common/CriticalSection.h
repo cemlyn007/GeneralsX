@@ -100,6 +100,16 @@ class ScopedCriticalSection
 
 // These should be null on creation then non-null in WinMain or equivalent.
 // This allows us to be silently non-threadsafe for WB and other single-threaded apps.
+// GeneralsX @fix cemlyn007 03/10/2026 That "silently non-threadsafe" remark no longer applies to
+// TheAsciiStringCriticalSection/TheUnicodeStringCriticalSection: AsciiString and UnicodeString stopped
+// reading them, so null or non-null makes no difference to either type any more. It still applies to
+// TheDmaCriticalSection/TheMemoryPoolCriticalSection/TheDebugLogCriticalSection below. WinMain/SDL3Main
+// still install the string sections, unused, so the host code and upstream merges are unchanged.
+// GeneralsX @performance cemlyn007 29/09/2026 AsciiString's and UnicodeString's buffer reference counts
+// are atomic, so a buffer shared between distinct string copies is safe to free without either section.
+// That does not extend to one string object written by more than one thread: a process-global static
+// AsciiString/UnicodeString must not be assigned or mutated after the first engine's boot (priming) instead
+// (PLAN-023 Phase 5b item 2).
 extern CriticalSection *TheAsciiStringCriticalSection;
 extern CriticalSection *TheUnicodeStringCriticalSection;
 extern CriticalSection *TheDmaCriticalSection;

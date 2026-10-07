@@ -79,7 +79,9 @@ class GraphDraw
 		DisplayString *m_displayStrings[MAX_GRAPH_VALUES];
 };
 
+#if !RTS_ENGINE_CONTEXT
 extern GraphDraw *TheGraphDraw;
+#endif
 
 
 #endif /* PERF_TIMERS */

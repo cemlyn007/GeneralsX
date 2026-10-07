@@ -102,7 +102,9 @@ private:
 	typedef std::map<AsciiString, HotKey> HotKeyMap;
 	HotKeyMap m_hotKeyMap;
 };
+#if !RTS_ENGINE_CONTEXT
 extern HotKeyManager *TheHotKeyManager;
+#endif
 //-----------------------------------------------------------------------------
 // INLINING ///////////////////////////////////////////////////////////////////
 //-----------------------------------------------------------------------------

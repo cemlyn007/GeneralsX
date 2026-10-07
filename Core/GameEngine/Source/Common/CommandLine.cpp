@@ -41,18 +41,29 @@
 #include "GameClient/GameText.h"
 #include "GameNetwork/NetworkDefs.h"
 
+#include <atomic>
+
 
 
 
 Bool TheDebugIgnoreSyncErrors = FALSE;
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 30/09/2026 The engine's own (WW3D2/dx8wrapper.h; PLAN-023 Phase 8, stage RR2a-1).
+#define DX8Wrapper_PreserveFPU (::rts::ctx()->dx8PreserveFPU)
+#else
 extern Int DX8Wrapper_PreserveFPU;
+#endif
 
 #ifdef DEBUG_CRC
 Int TheCRCFirstFrameToLog = -1;
 UnsignedInt TheCRCLastFrameToLog = 0xffffffff;
 Bool g_keepCRCSaves = FALSE;
 Bool g_saveDebugCRCPerFrame = FALSE;
+#if RTS_ENGINE_CONTEXT
+rts::PerEngineStatic<AsciiString> g_saveDebugCRCPerFrameDir_perEngine;
+#else
 AsciiString g_saveDebugCRCPerFrameDir;
+#endif
 Bool g_crcModuleDataFromLogic = FALSE;
 Bool g_crcModuleDataFromClient = FALSE;
 Bool g_verifyClientCRC = FALSE; // verify that GameLogic CRC doesn't change from client
@@ -421,7 +432,8 @@ Int parseHeadless(char *args[], int num)
 	// TheSuperHackers @fix bobtista 03/02/2026 Set DX8Wrapper_IsWindowed to false in headless
 	// mode so that ignoringAsserts() works correctly throughout the entire process lifetime,
 	// including during shutdown after TheGlobalData has been destroyed.
-	extern bool DX8Wrapper_IsWindowed;
+	// GeneralsX @feature cemlyn007 28/09/2026 Atomic (see dx8wrapper.cpp; PLAN-023 Phase 5b).
+	extern std::atomic<bool> DX8Wrapper_IsWindowed;
 	DX8Wrapper_IsWindowed = false;
 
 	return 1;

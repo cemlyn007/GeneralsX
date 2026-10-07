@@ -65,6 +65,8 @@
 // vc6/vc6-debug/vc6-profile presets (which still build this shared Core file) keep working.
 #if !(defined(_MSC_VER) && _MSC_VER < 1300)
 #include <atomic>
+#include <cstdlib>
+#include <exception>
 #endif
 #include "Common/CRCDebug.h"
 #include "Common/UnicodeString.h"
@@ -86,8 +88,12 @@
 #endif
 
 // Horrible reference, but we really, really need to know if we are windowed.
-extern bool DX8Wrapper_IsWindowed;
-extern HWND ApplicationHWnd;
+// GeneralsX @feature cemlyn007 28/09/2026 Atomic: every headless engine's command line writes it and any engine's
+// assert path reads it, so engines on separate threads would race on a plain bool (PLAN-023 Phase 5b).
+#include <atomic>
+extern std::atomic<bool> DX8Wrapper_IsWindowed;
+// GeneralsX @refactor cemlyn007 30/09/2026 The window handles (PLAN-023 Phase 8, stage RR2a-2).
+#include "Common/ApplicationWindow.h"
 
 extern const char *gAppPrefix; /// So WB can have a different log file name.
 
@@ -736,7 +742,9 @@ double SimpleProfiler::getAverageTime()
 	#define RELEASECRASH_FILE_NAME				"ReleaseCrashInfo.txt"
 	#define RELEASECRASH_FILE_NAME_PREV		"ReleaseCrashInfoPrev.txt"
 
-	static FILE *theReleaseCrashLogFile = nullptr;
+	// GeneralsX @bugfix cemlyn007 03/10/2026 Per thread: engines fault on their own threads, and a shared handle
+	// would be opened, written and closed by two faulting engines at once.
+	static THREAD_LOCAL FILE *theReleaseCrashLogFile = nullptr;
 
 	static void releaseCrashLogOutput(const char *buffer)
 	{
@@ -780,9 +788,75 @@ static std::atomic<bool> theEngineEmbeddedMode(false);
 static volatile bool theEngineEmbeddedMode = false;
 #endif
 
+#if !RTS_ENGINE_CONTEXT
+#if !(defined(_MSC_VER) && _MSC_VER < 1300)
+static std::atomic<bool> theFatalErrorThrown(false);
+static std::atomic<bool> theFatalErrorReturned(false);
+#else
+static volatile bool theFatalErrorThrown = false;
+static volatile bool theFatalErrorReturned = false;
+#endif
+#endif
+
+// GeneralsX @bugfix cemlyn007 03/10/2026 See TakeEngineFatalErrorThrown (FatalEngineError.h)
+FatalEngineError::FatalEngineError(const std::string& reason)
+	: std::runtime_error(reason)
+{
+#if RTS_ENGINE_CONTEXT
+	// g_noEngine stays pristine.
+	rts::EngineContext* context = rts::ctx();
+	if (context != &rts::g_noEngine)
+		context->fatalErrorThrown = true;
+#elif !(defined(_MSC_VER) && _MSC_VER < 1300)
+	theFatalErrorThrown.store(true);
+#else
+	theFatalErrorThrown = true;
+#endif
+}
+
 // GeneralsX @bugfix cemlyn007 02/10/2026 `= default` is C++11; VC6 cannot parse it, so give the
 // destructor an explicit empty body instead (see the <atomic> guard above for the same reasoning).
 FatalEngineError::~FatalEngineError() {}
+
+bool TakeEngineFatalErrorThrown()
+{
+#if RTS_ENGINE_CONTEXT
+	rts::EngineContext* context = rts::ctx();
+	if (context == &rts::g_noEngine)
+		return false;
+	const bool thrown = context->fatalErrorThrown;
+	context->fatalErrorThrown = false;
+	return thrown;
+#elif !(defined(_MSC_VER) && _MSC_VER < 1300)
+	return theFatalErrorThrown.exchange(false);
+#else
+	const bool thrown = theFatalErrorThrown;
+	theFatalErrorThrown = false;
+	return thrown;
+#endif
+}
+
+bool TakeEngineFatalErrorRaised()
+{
+#if RTS_ENGINE_CONTEXT
+	rts::EngineContext* context = rts::ctx();
+	if (context == &rts::g_noEngine)
+		return false;
+	const bool raised = context->fatalErrorThrown || context->fatalErrorReturned;
+	context->fatalErrorThrown = false;
+	context->fatalErrorReturned = false;
+	return raised;
+#elif !(defined(_MSC_VER) && _MSC_VER < 1300)
+	const bool thrown = theFatalErrorThrown.exchange(false);
+	const bool returned = theFatalErrorReturned.exchange(false);
+	return thrown || returned;
+#else
+	const bool raised = theFatalErrorThrown || theFatalErrorReturned;
+	theFatalErrorThrown = false;
+	theFatalErrorReturned = false;
+	return raised;
+#endif
+}
 
 void SetEngineEmbeddedMode(bool embedded)
 {
@@ -829,20 +903,108 @@ void ClearEngineFault()
 #endif
 }
 
-// GeneralsX @bugfix cemlyn007 02/10/2026 Single place for the embedded-mode throw, used by both
-// ReleaseCrash and ReleaseCrashLocalized's two throw sites each, so a future change (for example
-// the sticky fault latch above) only needs to touch one function instead of drifting across four
-// copies.
-static void ThrowIfEmbedded(const char *reason)
+// GeneralsX @bugfix cemlyn007 28/09/2026 The teardown window (see FatalEngineError.h)
+#if RTS_ENGINE_CONTEXT
+void SetEngineTearingDown(bool tearingDown)
 {
-	if (IsEngineEmbeddedMode()) {
-#if !(defined(_MSC_VER) && _MSC_VER < 1300)
-		theEngineHasFaulted.store(true);
+	// g_noEngine stays pristine: no engine is being torn down there.
+	rts::EngineContext* context = rts::ctx();
+	if (context != &rts::g_noEngine)
+		context->engineTearingDown = tearingDown;
+}
+
+bool IsEngineTearingDown()
+{
+	// Outside every engine (rts::g_noEngine) no engine is being torn down: false.
+	return rts::ctx()->engineTearingDown;
+}
 #else
-		theEngineHasFaulted = true;
+static bool theEngineTearingDown = false;
+
+void SetEngineTearingDown(bool tearingDown)
+{
+	theEngineTearingDown = tearingDown;
+}
+
+bool IsEngineTearingDown()
+{
+	return theEngineTearingDown;
+}
 #endif
-		throw FatalEngineError(reason ? reason : "");
+
+// GeneralsX @feature cemlyn007 02/10/2026 Sets the fault latch (see FatalEngineError.h). A fatal error that
+// returns instead of throwing (the teardown window, another exception propagating) constructs no
+// FatalEngineError, so `returns` also records it on the current engine, apart from the thrown kind: the
+// exception leaving the engine is not that fatal error.
+static void latchEngineFault(bool returns)
+{
+#if !(defined(_MSC_VER) && _MSC_VER < 1300)
+	theEngineHasFaulted.store(true);
+#else
+	theEngineHasFaulted = true;
+#endif
+	if (!returns)
+		return;
+#if RTS_ENGINE_CONTEXT
+	// g_noEngine stays pristine.
+	rts::EngineContext* context = rts::ctx();
+	if (context != &rts::g_noEngine)
+		context->fatalErrorReturned = true;
+#elif !(defined(_MSC_VER) && _MSC_VER < 1300)
+	theFatalErrorReturned.store(true);
+#else
+	theFatalErrorReturned = true;
+#endif
+}
+
+// GeneralsX @bugfix cemlyn007 28/09/2026 Whether this thread is inside ReleaseCrashNoReturn, which
+// reports a ReleaseCrash that returned itself (see throwWithoutGlobalData).
+static THREAD_LOCAL bool theInReleaseCrashNoReturn = false;
+
+// Embedded mode with no TheGlobalData: latch the fault, then throw, unless that would end the process
+// through std::terminate (the engine is being torn down, or another exception is already propagating).
+static bool throwWithoutGlobalData(const char *reason)
+{
+	if (!IsEngineEmbeddedMode())
+		return false;
+	const bool returns = IsEngineTearingDown() || std::uncaught_exceptions() != 0;
+	latchEngineFault(returns);
+	if (returns)
+		return false;
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @bugfix cemlyn007 28/09/2026 Outside every engine context (rts::g_noEngine, where
+	// TheGlobalData is always null) the caller is either a host call that entered no engine or a static
+	// destructor or exit handler, and there is no telling which: a static built at any time (a
+	// function-local one first reached during play, say) is destroyed at exit, in no engine's scope.
+	// A throw out of a destructor ends the process through std::terminate, so it returns there, as
+	// upstream does once TheGlobalData is gone, but says so on stderr rather than swallow the error.
+	if (rts::ctx() == &rts::g_noEngine)
+	{
+		// ReleaseCrashNoReturn reports it itself, and raises it after all in embedded mode.
+		if (!theInReleaseCrashNoReturn)
+			fprintf(stderr, "GeneralsX: fatal engine error outside every engine context, not raised%s%s\n",
+				reason ? ": " : "", reason ? reason : "");
+		return false;
 	}
+#endif
+	return true;
+}
+
+// GeneralsX @bugfix cemlyn007 02/10/2026 Single place for the embedded-mode fatal error where
+// TheGlobalData exists, used by ReleaseCrash and ReleaseCrashLocalized's sites alike. Returns false
+// outside embedded mode (the caller carries on with the normal crash path). Otherwise it latches the
+// fault and then throws, unless that would end the process through std::terminate (the engine is being
+// torn down, or another exception is already propagating): then it returns true without throwing and
+// the caller returns. The embedded-mode flag is read once, so the latch and the decision cannot disagree.
+static bool HandleEmbeddedFatalError(const char *reason)
+{
+	if (!IsEngineEmbeddedMode())
+		return false;
+	const bool returns = IsEngineTearingDown() || std::uncaught_exceptions() != 0;
+	latchEngineFault(returns);
+	if (returns)
+		return true;
+	throw FatalEngineError(reason ? reason : "");
 }
 
 void ReleaseCrash(const char *reason)
@@ -870,7 +1032,10 @@ void ReleaseCrash(const char *reason)
 	if (TheGlobalData==nullptr) {
 		// GeneralsX @bugfix cemlyn007 28/09/2026 Embedded mode: there is no crash file to write, but
 		// the caller still must not carry on, so hand the error to the host (see FatalEngineError.h).
-		ThrowIfEmbedded(reason);
+		// GeneralsX @bugfix cemlyn007 28/09/2026 Not in the teardown window, though.
+		if (throwWithoutGlobalData(reason)) {
+			throw FatalEngineError(reason ? reason : "");
+		}
 		return; // We are shutting down, and TheGlobalData has been freed.  jba. [4/15/2003]
 	}
 
@@ -911,7 +1076,10 @@ void ReleaseCrash(const char *reason)
 
 	// GeneralsX @feature cemlyn007 28/09/2026 Embedded mode: hand the error to the host instead of
 	// showing a message box and exiting the process.
-	ThrowIfEmbedded(reason);
+	// GeneralsX @bugfix cemlyn007 03/10/2026 Not in the teardown window or while another exception is
+	// propagating, though: return there, as with no TheGlobalData above.
+	if (HandleEmbeddedFatalError(reason))
+		return;
 
 	if (!DX8Wrapper_IsWindowed) {
 		if (ApplicationHWnd) {
@@ -943,6 +1111,28 @@ void ReleaseCrash(const char *reason)
 #endif
 
 	_exit(1);
+}
+
+// GeneralsX @bugfix cemlyn007 28/09/2026 See FatalEngineError.h
+void ReleaseCrashNoReturn(const char *reason)
+{
+	struct InNoReturn
+	{
+		InNoReturn() { theInReleaseCrashNoReturn = true; }
+		~InNoReturn() { theInReleaseCrashNoReturn = false; }
+	};
+	{
+		InNoReturn inNoReturn;
+		ReleaseCrash(reason);
+	}
+	// ReleaseCrash returned: no TheGlobalData, and it did not throw.
+	const bool raise = IsEngineEmbeddedMode();
+	fprintf(stderr, "GeneralsX: fatal engine error, %s: %s\n", raise ? "raised" : "aborting",
+		reason ? reason : "");
+	fflush(stderr);
+	if (raise)
+		throw FatalEngineError(reason ? reason : "");
+	abort();
 }
 
 void ReleaseCrashLocalized(const AsciiString& p, const AsciiString& m)
@@ -1014,8 +1204,16 @@ void ReleaseCrashLocalized(const AsciiString& p, const AsciiString& m)
 
 	// GeneralsX @bugfix cemlyn007 28/09/2026 Embedded mode: with no TheGlobalData there is no crash
 	// file path, so hand the error straight to the host (see FatalEngineError.h).
+	// GeneralsX @bugfix cemlyn007 28/09/2026 In the teardown window return instead, as ReleaseCrash does
+	// (the code below needs TheGlobalData).
 	if (TheGlobalData == nullptr) {
-		ThrowIfEmbedded(reason.str());
+		// (The message is on stderr already.)
+		if (throwWithoutGlobalData(nullptr)) {
+			AsciiString reason;
+			reason.translate(mesg);
+			throw FatalEngineError(reason.str());
+		}
+		return;
 	}
 
 	char prevbuf[ _MAX_PATH ];
@@ -1058,7 +1256,10 @@ void ReleaseCrashLocalized(const AsciiString& p, const AsciiString& m)
 
 	// GeneralsX @feature cemlyn007 28/09/2026 Embedded mode: hand the error to the host instead of
 	// exiting the process (see FatalEngineError.h).
-	ThrowIfEmbedded(reason.str());
+	// GeneralsX @bugfix cemlyn007 03/10/2026 Not in the teardown window or while another exception is
+	// propagating: return, as ReleaseCrash does.
+	if (HandleEmbeddedFatalError(reason.str()))
+		return;
 
 	_exit(1);
 }

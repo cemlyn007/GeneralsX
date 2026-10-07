@@ -181,4 +181,6 @@ protected:
 	W3DIndexBufferSlot *allocateSlotStorage(Int size);
 };
 
+#if !RTS_ENGINE_CONTEXT
 extern W3DBufferManager *TheW3DBufferManager;	//singleton
+#endif

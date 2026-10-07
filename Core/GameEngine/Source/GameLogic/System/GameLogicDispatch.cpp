@@ -89,9 +89,27 @@
 
 
 #define MAX_PATH_SUBJECTS 64
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 28/09/2026 Per engine: the build plan being recorded belongs to this
+// engine's command stream (PLAN-023 Phase 2).
+namespace
+{
+struct BuildPlanPerEngine
+{
+	Bool buildPlan;
+	Object *planSubject[ MAX_PATH_SUBJECTS ];
+	int planSubjectCount;
+};
+rts::PerEngineStatic<BuildPlanPerEngine> s_buildPlanPerEngine;
+}
+#define theBuildPlan (s_buildPlanPerEngine.get().buildPlan)
+#define thePlanSubject (s_buildPlanPerEngine.get().planSubject)
+#define thePlanSubjectCount (s_buildPlanPerEngine.get().planSubjectCount)
+#else
 static Bool theBuildPlan = false;
 static Object *thePlanSubject[ MAX_PATH_SUBJECTS ];
 static int thePlanSubjectCount = 0;
+#endif
 //static WindowLayout *background = nullptr;
 
 // ------------------------------------------------------------------------------------------------
@@ -160,7 +178,13 @@ static void doSetRallyPoint( Object *obj, const Coord3D& pos )
 			TheInGameUI->message( TheGameText->fetch( "GUI:RallyPointNoPath" ) );
 
 			// play the no can do sound
+#if RTS_ENGINE_CONTEXT
+			// GeneralsX @feature cemlyn007 28/09/2026 Per engine: the event keeps this engine's event info and sound rotation (PLAN-023 Phase 4).
+			static rts::PerEngineStatic<AudioEventRTS> rallyNotSet_perEngine([](AudioEventRTS& event) { event.setEventName("UnableToSetRallyPoint"); });
+			AudioEventRTS& rallyNotSet = rallyNotSet_perEngine.get();
+#else
 			static AudioEventRTS rallyNotSet("UnableToSetRallyPoint");
+#endif
 			rallyNotSet.setPosition(&pos);
 			rallyNotSet.setPlayerIndex(obj->getControllingPlayer()->getPlayerIndex());
 			TheAudio->addAudioEvent(&rallyNotSet);
@@ -182,7 +206,13 @@ static void doSetRallyPoint( Object *obj, const Coord3D& pos )
 		TheInGameUI->message( info );
 
 		// play a sound for setting the rally point
+#if RTS_ENGINE_CONTEXT
+		// GeneralsX @feature cemlyn007 28/09/2026 Per engine: the event keeps this engine's event info and sound rotation (PLAN-023 Phase 4).
+		static rts::PerEngineStatic<AudioEventRTS> rallyPointSet_perEngine([](AudioEventRTS& event) { event.setEventName("RallyPointSet"); });
+		AudioEventRTS& rallyPointSet = rallyPointSet_perEngine.get();
+#else
 		static AudioEventRTS rallyPointSet("RallyPointSet");
+#endif
 		rallyPointSet.setPosition(&pos);
 		rallyPointSet.setPlayerIndex(obj->getControllingPlayer()->getPlayerIndex());
 		TheAudio->addAudioEvent(&rallyPointSet);
@@ -258,6 +288,10 @@ void GameLogic::clearGameData( Bool showScoreScreen )
 	}
 
 	setClearingGameData( TRUE );
+
+	// GeneralsX @bugfix cemlyn007 03/10/2026 A path build left open must not leave its subjects dangling into the next game.
+	theBuildPlan = false;
+	thePlanSubjectCount = 0;
 
 //	m_background = TheWindowManager->winCreateLayout("Menus/BlankWindow.wnd");
 //	DEBUG_ASSERTCRASH(m_background,("We Couldn't Load Menus/BlankWindow.wnd"));
@@ -1952,7 +1986,13 @@ bool GameLogic::onDozerConstruct(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &curr
 
 	// place the sound for putting a building down
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 28/09/2026 Per engine: the event keeps this engine's event info and sound rotation (PLAN-023 Phase 4).
+	static rts::PerEngineStatic<AudioEventRTS> placeBuilding_perEngine([](AudioEventRTS& event) { event.setEventName("PlaceBuilding"); });
+	AudioEventRTS& placeBuilding = placeBuilding_perEngine.get();
+#else
 	static AudioEventRTS placeBuilding("PlaceBuilding");
+#endif
 	placeBuilding.setObjectID(constructorObject->getID());
 	TheAudio->addAudioEvent( &placeBuilding );
 
@@ -2131,7 +2171,13 @@ bool GameLogic::onPlaceBeacon(MAYBE_UNUSED GameMessage *msg)
 				TheInGameUI->message( TheGameText->fetch("GUI:TooManyBeacons") );
 
 				// play a sound
+#if RTS_ENGINE_CONTEXT
+				// GeneralsX @feature cemlyn007 28/09/2026 Per engine: the event keeps this engine's event info and sound rotation (PLAN-023 Phase 4).
+				static rts::PerEngineStatic<AudioEventRTS> aSound_perEngine([](AudioEventRTS& event) { event.setEventName("BeaconPlacementFailed"); });
+				AudioEventRTS& aSound = aSound_perEngine.get();
+#else
 				static AudioEventRTS aSound("BeaconPlacementFailed");
+#endif
 				aSound.setPosition(&pos);
 				aSound.setPlayerIndex(msgPlayer->getPlayerIndex());
 				TheAudio->addAudioEvent(&aSound);
@@ -2151,7 +2197,13 @@ bool GameLogic::onPlaceBeacon(MAYBE_UNUSED GameMessage *msg)
 			TheInGameUI->message( s );
 
 			// play a sound
+#if RTS_ENGINE_CONTEXT
+			// GeneralsX @feature cemlyn007 28/09/2026 Per engine: the event keeps this engine's event info and sound rotation (PLAN-023 Phase 4).
+			static rts::PerEngineStatic<AudioEventRTS> aSound_perEngine([](AudioEventRTS& event) { event.setEventName("BeaconPlaced"); });
+			AudioEventRTS& aSound = aSound_perEngine.get();
+#else
 			static AudioEventRTS aSound("BeaconPlaced");
+#endif
 			aSound.setPlayerIndex(msgPlayer->getPlayerIndex());
 			aSound.setPosition(&pos);
 			TheAudio->addAudioEvent(&aSound);
@@ -2193,7 +2245,13 @@ bool GameLogic::onPlaceBeacon(MAYBE_UNUSED GameMessage *msg)
 		TheInGameUI->message( TheGameText->fetch("GUI:BeaconPlacementFailed") );
 
 		// play a sound
+#if RTS_ENGINE_CONTEXT
+		// GeneralsX @feature cemlyn007 28/09/2026 Per engine: the event keeps this engine's event info and sound rotation (PLAN-023 Phase 4).
+		static rts::PerEngineStatic<AudioEventRTS> aSound_perEngine([](AudioEventRTS& event) { event.setEventName("BeaconPlacementFailed"); });
+		AudioEventRTS& aSound = aSound_perEngine.get();
+#else
 		static AudioEventRTS aSound("BeaconPlacementFailed");
+#endif
 		aSound.setPosition(&pos);
 		aSound.setPlayerIndex(msgPlayer->getPlayerIndex());
 		TheAudio->addAudioEvent(&aSound);

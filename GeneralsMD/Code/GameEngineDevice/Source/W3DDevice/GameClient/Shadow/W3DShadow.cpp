@@ -54,14 +54,12 @@
 #define SUN_DISTANCE_FROM_GROUND	10000.0f	//distance of sun (our only light source).
 
 // Global Variables and Functions /////////////////////////////////////////////
+#if !RTS_ENGINE_CONTEXT
 W3DShadowManager *TheW3DShadowManager=nullptr;
-const FrustumClass *shadowCameraFrustum;
-
-Vector3 LightPosWorld[ MAX_SHADOW_LIGHTS ] =
-{
-
-	Vector3( 94.0161f, 50.499f, 200.0f)
-};
+#endif
+// GeneralsX @refactor cemlyn007 01/10/2026 shadowCameraFrustum and LightPosWorld are W3DShadowManager members
+// (PLAN-023 Phase 8, stage RR3).
+#define LightPosWorld (m_lightPosWorld)
 
 void PrepareShadows()
 {
@@ -73,7 +71,8 @@ void PrepareShadows()
 void DoShadows(RenderInfoClass & rinfo, Bool stencilPass)
 {
 	//USE_PERF_TIMER(shadowsRender)
-	shadowCameraFrustum=&rinfo.Camera.Get_Frustum();
+	if (TheW3DShadowManager)	// GeneralsX @refactor cemlyn007 01/10/2026 the manager's (RR3)
+		TheW3DShadowManager->setShadowCameraFrustum(&rinfo.Camera.Get_Frustum());
 	Int projectionCount=0;
 
 	//Projected shadows render first because they may fill the stencil buffer

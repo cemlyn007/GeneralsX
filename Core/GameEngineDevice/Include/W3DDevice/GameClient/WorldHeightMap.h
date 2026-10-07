@@ -196,7 +196,14 @@ protected:
 	Int m_drawHeightY;
 
 	/// Tiles that hold the alpha channel info.
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 28/09/2026 A member: every map's destructor releases the tiles, so a
+	// shared array was freed under another engine's live map. The tiles are built from constants, the
+	// same for every map (PLAN-023 Phase 3).
+	TileData *m_alphaTiles[NUM_ALPHA_TILES] = {};
+#else
 	static TileData *m_alphaTiles[NUM_ALPHA_TILES];
+#endif
 
 
 protected:
@@ -318,7 +325,11 @@ public:  // tile and texture info.
 public:  // Flat tile texture info.
 	TerrainTextureClass *getFlatTexture(Int xCell, Int yCell, Int cellWidth, Int pixelsPerCell);  //< generates and returns the terrain texture
 
+#if RTS_ENGINE_CONTEXT
+	void setupAlphaTiles();
+#else
 	static void setupAlphaTiles();
+#endif
 	UnsignedByte *getPointerToTileData(Int xIndex, Int yIndex, Int width);
 	Bool getRawTileData(Short tileNdx, Int width, UnsignedByte *buffer, Int bufLen);
 	UnsignedByte *getRGBAlphaDataForWidth(Int width, TBlendTileInfo *pBlend);

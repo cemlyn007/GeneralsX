@@ -237,7 +237,9 @@ inline SidesInfo * SidesList::getSkirmishSideInfo(Int side)
 
 
 // ----------------------------------------------------------------------------------------------
+#if !RTS_ENGINE_CONTEXT
 extern SidesList *TheSidesList;	 ///< singleton instance of SidesList
+#endif
 
 
 // ----------------------------------------------------------------------------------------------

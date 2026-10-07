@@ -61,7 +61,9 @@
 #include "GameClient/Keyboard.h"
 #endif
 
+#if !RTS_ENGINE_CONTEXT
 MetaMap *TheMetaMap = nullptr;
+#endif
 
 
 

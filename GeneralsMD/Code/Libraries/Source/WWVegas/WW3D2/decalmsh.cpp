@@ -175,8 +175,24 @@ void DecalPolyClass::Clip(const PlaneClass & plane,DecalPolyClass & dest) const
 	}
 }
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 30/09/2026 Per engine: the decal clipping polygons, filled and consumed
+// within one decal (PLAN-023 Phase 8, stage RR2b).
+namespace
+{
+struct DecalClipState
+{
+	DecalPolyClass _DecalPoly0;
+	DecalPolyClass _DecalPoly1;
+};
+rts::PerEngineStatic<DecalClipState> DecalClipState_perEngine;
+} // namespace
+#define _DecalPoly0 (DecalClipState_perEngine.get()._DecalPoly0)
+#define _DecalPoly1 (DecalClipState_perEngine.get()._DecalPoly1)
+#else
 static DecalPolyClass _DecalPoly0;
 static DecalPolyClass _DecalPoly1;
+#endif
 
 
 /*
@@ -700,8 +716,17 @@ bool RigidDecalMeshClass::Delete_Decal(uint32 id)
 ** These buffers are used by the skin code for temporary storage of the deformed vertices and
 ** vertex normals.
 */
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 28/09/2026 Per engine, so that engines on separate threads do not share them
+// (PLAN-023 Phase 5b).
+static rts::PerEngineStatic<SimpleVecClass<Vector3> > _TempVertexBuffer_perEngine;
+static rts::PerEngineStatic<SimpleVecClass<Vector3> > _TempNormalBuffer_perEngine;
+#define _TempVertexBuffer (_TempVertexBuffer_perEngine.get())
+#define _TempNormalBuffer (_TempNormalBuffer_perEngine.get())
+#else
 static SimpleVecClass<Vector3>	_TempVertexBuffer;
 static SimpleVecClass<Vector3>	_TempNormalBuffer;
+#endif
 
 
 /*
@@ -794,9 +819,12 @@ void SkinDecalMeshClass::Render()
 	** Skin decals have to get the deformed vertices of their parent meshes.  For this
 	** reason, decals on skins is not a very good idea...
 	*/
-	_TempVertexBuffer.Uninitialised_Grow(model->Get_Vertex_Count());
-	_TempNormalBuffer.Uninitialised_Grow(model->Get_Vertex_Count());
-	Parent->Get_Deformed_Vertices(&(_TempVertexBuffer[0]),&(_TempNormalBuffer[0]));
+	// GeneralsX @performance cemlyn007 03/10/2026 Looked up once: with RTS_ENGINE_CONTEXT each use of the name is a slot lookup.
+	SimpleVecClass<Vector3> & temp_vertices = _TempVertexBuffer;
+	SimpleVecClass<Vector3> & temp_normals = _TempNormalBuffer;
+	temp_vertices.Uninitialised_Grow(model->Get_Vertex_Count());
+	temp_normals.Uninitialised_Grow(model->Get_Vertex_Count());
+	Parent->Get_Deformed_Vertices(&(temp_vertices[0]),&(temp_normals[0]));
 
 	/*
 	** Copy the vertices into the dynamic vb
@@ -808,13 +836,13 @@ void SkinDecalMeshClass::Render()
 
 		for (int i=0; i<ParentVertexIndices.Count(); i++) {
 			int src_i = ParentVertexIndices[i];
-			vertex->x = _TempVertexBuffer[src_i].X;
-			vertex->y = _TempVertexBuffer[src_i].Y;
-			vertex->z = _TempVertexBuffer[src_i].Z;
+			vertex->x = temp_vertices[src_i].X;
+			vertex->y = temp_vertices[src_i].Y;
+			vertex->z = temp_vertices[src_i].Z;
 
-			vertex->nx = _TempNormalBuffer[src_i].X;
-			vertex->ny = _TempNormalBuffer[src_i].Y;
-			vertex->nz = _TempNormalBuffer[src_i].Z;
+			vertex->nx = temp_normals[src_i].X;
+			vertex->ny = temp_normals[src_i].Y;
+			vertex->nz = temp_normals[src_i].Z;
 
 			vertex->diffuse = 0xFFFFFFFF;
 

@@ -267,7 +267,9 @@ protected:
 	Bool m_useShroud;
 };
 
+#if !RTS_ENGINE_CONTEXT
 extern GameInfo *TheGameInfo;
+#endif
 
 // Inline functions
 Int					GameInfo::getGameID() const								{ return m_gameID; }
@@ -319,5 +321,7 @@ public:
 	}
 };
 
+#if !RTS_ENGINE_CONTEXT
 extern SkirmishGameInfo *TheSkirmishGameInfo;
 extern SkirmishGameInfo *TheChallengeGameInfo;
+#endif

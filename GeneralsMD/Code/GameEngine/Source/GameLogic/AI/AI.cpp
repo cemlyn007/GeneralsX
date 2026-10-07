@@ -293,7 +293,9 @@ void AI::parseSkirmishBuildList(INI *ini, void *instance, void* /*store*/, const
 //--------------------------------------------------------------------------------------------------------
 
 /// The AI system singleton
+#if !RTS_ENGINE_CONTEXT
 AI *TheAI = nullptr;
+#endif
 
 
 /**

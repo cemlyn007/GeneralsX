@@ -61,8 +61,10 @@ const unsigned int ParticleBufferClass::PermutationArray[16] = {
 // Maximum size of randomizer tables
 const static unsigned int MAX_RANDOM_ENTRIES = 32;	// MUST be power of two!
 
-// Total Active Particle Buffer Count
-unsigned int ParticleBufferClass::TotalActiveCount = 0;
+// GeneralsX @bugfix cemlyn007 02/10/2026 Removed TotalActiveCount: a process-wide counter every engine's
+// own thread wrote on its own construction/copy-construction/destruction path, with no reader left but
+// Get_Total_Active_Count, which nothing called. Nothing needs it; deleting it removes the race instead of
+// synchronising it, the same choice LocalFile's s_totalOpen made.
 
 // Static array of screen-size clamps for the 17 possible LOD levels a particle buffer can have.
 // We can change these from being global to being per-buffer later if we wish. Default is
@@ -75,7 +77,14 @@ float ParticleBufferClass::LODMaxScreenSizes[17] = {
 	NO_MAX_SCREEN_SIZE
 };
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 28/09/2026 Per engine: the particle buffers' generator, so one engine's particles do
+// not advance another's sequence (PLAN-023 Phase 3).
+static rts::PerEngineStatic<Random4Class> rand_gen_perEngine;
+#define rand_gen (rand_gen_perEngine.get())
+#else
 static Random4Class rand_gen;
+#endif
 const float oo_intmax = 1.0f / (float)INT_MAX;
 
 // Default Line Emitter Properties
@@ -316,9 +325,6 @@ ParticleBufferClass::ParticleBufferClass
 
 	// Ensure lod is no less than minimum allowed
 	if (Get_LOD_Level() < minlod) Set_LOD_Level(minlod);
-
-	// Update Global Count
-	TotalActiveCount++;
 
 	//lorenzen
 	// If the render mode is W3D_EMITTER_RENDER_MODE_LINE and we are supplied with
@@ -709,9 +715,6 @@ ParticleBufferClass::ParticleBufferClass(const ParticleBufferClass & src) :
 
 	// Ensure lod is no less than minimum allowed
 	if (Get_LOD_Level() < minlod) Set_LOD_Level(minlod);
-
-	// Update Global Count
-	TotalActiveCount++;
 }
 
 
@@ -791,9 +794,6 @@ ParticleBufferClass::~ParticleBufferClass()
 		// Emitter->Release_Ref();
 		Emitter = nullptr;
 	}
-
-	// Update Global Count
-	TotalActiveCount--;
 }
 
 
@@ -984,6 +984,22 @@ void ParticleBufferClass::Render_Particles(RenderInfoClass & rinfo)
 }
 
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 30/09/2026 Per engine: Render_Line's scratch, filled and consumed within one draw. A
+// file static, so that its slot is taken at static initialisation, not at the first draw (PLAN-023 Phase 8, stage
+// RR2b).
+namespace
+{
+struct RenderLineScratch
+{
+	SimpleDynVecClass<Vector3> tmp_points;
+	SimpleDynVecClass<Vector4> tmp_diffuse;
+	SimpleDynVecClass<unsigned char> tmp_id;
+};
+rts::PerEngineStatic<RenderLineScratch> RenderLineScratch_perEngine;
+} // namespace
+#endif
+
 void ParticleBufferClass::Render_Line(RenderInfoClass & rinfo)
 {
 
@@ -996,9 +1012,16 @@ void ParticleBufferClass::Render_Line(RenderInfoClass & rinfo)
 	}
 
 	// Unroll the circular buffer while skipping LOD'd particles
+#if RTS_ENGINE_CONTEXT
+	RenderLineScratch& scratch = RenderLineScratch_perEngine.get();
+	SimpleDynVecClass<Vector3>& tmp_points = scratch.tmp_points;
+	SimpleDynVecClass<Vector4>& tmp_diffuse = scratch.tmp_diffuse;
+	SimpleDynVecClass<unsigned char>& tmp_id = scratch.tmp_id;
+#else
 	static SimpleDynVecClass<Vector3> tmp_points;
 	static SimpleDynVecClass<Vector4> tmp_diffuse;
 	static SimpleDynVecClass<unsigned char> tmp_id;
+#endif
 
 	Vector3 * positions = Position[pingpong]->Get_Array();
 	Vector4 * diffuse = nullptr;

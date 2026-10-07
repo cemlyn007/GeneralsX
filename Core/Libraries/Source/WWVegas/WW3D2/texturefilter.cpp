@@ -58,9 +58,27 @@ TextureFilterClass::TextureFilterMode TextureFilterClass::getTextureFilterMode(c
 	return TextureFilterClass::TEXTURE_FILTER_NONE;
 }
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 30/09/2026 Per engine: the filter tables _Init_Filters fills from the render
+// engine's own device caps (PLAN-023 Phase 8, stage RR2b).
+namespace
+{
+struct TextureFilterState
+{
+	unsigned _MinTextureFilters[MAX_TEXTURE_STAGES][TextureFilterClass::FILTER_TYPE_COUNT];
+	unsigned _MagTextureFilters[MAX_TEXTURE_STAGES][TextureFilterClass::FILTER_TYPE_COUNT];
+	unsigned _MipMapFilters[MAX_TEXTURE_STAGES][TextureFilterClass::FILTER_TYPE_COUNT];
+};
+rts::PerEngineStatic<TextureFilterState> TextureFilterState_perEngine;
+} // namespace
+#define _MinTextureFilters (TextureFilterState_perEngine.get()._MinTextureFilters)
+#define _MagTextureFilters (TextureFilterState_perEngine.get()._MagTextureFilters)
+#define _MipMapFilters (TextureFilterState_perEngine.get()._MipMapFilters)
+#else
 unsigned _MinTextureFilters[MAX_TEXTURE_STAGES][TextureFilterClass::FILTER_TYPE_COUNT];
 unsigned _MagTextureFilters[MAX_TEXTURE_STAGES][TextureFilterClass::FILTER_TYPE_COUNT];
 unsigned _MipMapFilters[MAX_TEXTURE_STAGES][TextureFilterClass::FILTER_TYPE_COUNT];
+#endif
 
 /*************************************************************************
 **                             TextureFilterClass

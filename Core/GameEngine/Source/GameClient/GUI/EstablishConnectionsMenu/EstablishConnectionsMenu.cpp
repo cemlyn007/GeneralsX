@@ -34,7 +34,9 @@
 #include "GameClient/GadgetStaticText.h"
 #include "GameClient/GameText.h"
 
+#if !RTS_ENGINE_CONTEXT
 EstablishConnectionsMenu *TheEstablishConnectionsMenu = nullptr;
+#endif
 
 const char *const EstablishConnectionsMenu::m_playerReadyControlNames[] = {
 	"EstablishConnectionsScreen.wnd:ButtonAccept1",

@@ -43,7 +43,9 @@
 #include "GameNetwork/GameSpy/PeerDefsImplementation.h"
 
 // PUBLIC DATA ////////////////////////////////////////////////////////////////////////////////////
+#if !RTS_ENGINE_CONTEXT
 Shell *TheShell = nullptr;  ///< the shell singleton definition
+#endif
 
 
 // PUBLIC FUNCTIONS ///////////////////////////////////////////////////////////////////////////////
@@ -197,7 +199,14 @@ void Shell::reset()
 //-------------------------------------------------------------------------------------------------
 void Shell::update()
 {
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 28/09/2026 Per engine: every engine's GameClient::update (headless too) runs
+	// this, so shared, one engine's update would hold back another's shell updates (PLAN-023 Phase 4).
+	static rts::PerEngineStatic<Int> lastUpdate_perEngine([](Int& value) { value = timeGetTime(); });
+	Int& lastUpdate = lastUpdate_perEngine.get();
+#else
 	static Int lastUpdate = timeGetTime();
+#endif
 	static const Int shellUpdateDelay = 30;  // try to update 30 frames a second
 	Int now = timeGetTime();
 

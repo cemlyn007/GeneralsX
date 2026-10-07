@@ -87,4 +87,6 @@ protected:
 };
 
 // EXTERN /////////////////////////////////////////////////////////////////////////////////////////
+#if !RTS_ENGINE_CONTEXT
 extern RayEffectSystem *TheRayEffects;  ///< the ray effects singleton external
+#endif

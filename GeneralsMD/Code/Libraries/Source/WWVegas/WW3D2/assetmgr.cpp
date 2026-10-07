@@ -79,6 +79,7 @@
 
 #include "assetmgr.h"
 #include <assert.h>
+#include <atomic>
 
 #include "WWLib/bittype.h"
 #include "WWLib/chunkio.h"
@@ -120,10 +121,14 @@
 
 #include "shdlib.h"
 
+#include <atomic>
+
 /*
 ** Static member variable which keeps track of the single instanced asset manager
 */
+#if !RTS_ENGINE_CONTEXT
 WW3DAssetManager *		WW3DAssetManager::TheInstance = nullptr;
+#endif
 
 /*
 ** Static instance of the Null prototype.  This render object is special cased
@@ -816,7 +821,8 @@ RenderObjClass * WW3DAssetManager::Create_Render_Obj(const char * name)
 	}
 
 	if (proto == nullptr) {
-		static int warning_count = 0;
+		// GeneralsX @bugfix cemlyn007 30/09/2026 Atomic: any engine's thread may count a missing asset (PLAN-023 Phase 5b).
+		static std::atomic<int> warning_count(0);
 		// Note - objects named "#..." are scaled cached objects, so don't warn...
 		if (name[0] != '#') {
 			if (++warning_count <= 20) {

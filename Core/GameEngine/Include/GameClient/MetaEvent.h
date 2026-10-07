@@ -404,4 +404,6 @@ public:
 	const MetaMapRec *getFirstMetaMapRec() const { return m_metaMaps; }
 };
 
+#if !RTS_ENGINE_CONTEXT
 extern MetaMap *TheMetaMap;
+#endif

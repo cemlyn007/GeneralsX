@@ -61,7 +61,9 @@
 //-----------------------------------------------------------------------------
 // DEFINES ////////////////////////////////////////////////////////////////////
 //-----------------------------------------------------------------------------
+#if !RTS_ENGINE_CONTEXT
 CreditsManager *TheCredits = nullptr;
+#endif
 
 const FieldParse CreditsManager::m_creditsFieldParseTable[] =
 {

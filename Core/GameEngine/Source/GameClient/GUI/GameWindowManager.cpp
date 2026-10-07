@@ -57,7 +57,9 @@
 #include "Common/NameKeyGenerator.h"
 
 // PUBLIC DATA ////////////////////////////////////////////////////////////////////////////////////
+#if !RTS_ENGINE_CONTEXT
 GameWindowManager *TheWindowManager = nullptr;
+#endif
 UnsignedInt WindowLayoutCurrentVersion = 2;
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -183,6 +185,7 @@ GameWindowManager::GameWindowManager()
 
 	m_cursorBitmap = nullptr;
 	m_captureFlags = 0;
+	m_parsedScript = FALSE;
 
 }
 
@@ -193,7 +196,10 @@ GameWindowManager::~GameWindowManager()
 
 	// destroy all windows
 	winDestroyAll();
-	freeStaticStrings();
+	// GeneralsX @feature cemlyn007 28/09/2026 Only a manager that parsed a .wnd file clears the parser's scratch (PLAN-023
+	// Phase 5b; see m_parsedScript).
+	if (m_parsedScript)
+		freeStaticStrings();
 
 	delete TheTransitionHandler;
 	TheTransitionHandler = nullptr;

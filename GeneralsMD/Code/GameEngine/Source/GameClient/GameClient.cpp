@@ -90,7 +90,9 @@
 #define DRAWABLE_HASH_SIZE	8192
 
 /// The GameClient singleton instance
+#if !RTS_ENGINE_CONTEXT
 GameClient *TheGameClient = nullptr;
+#endif
 
 //-------------------------------------------------------------------------------------------------
 GameClient::GameClient()
@@ -1160,7 +1162,14 @@ void GameClient::preloadAssets( TimeOfDay timeOfDay )
 	*/
 
 	GlobalMemoryStatus(&before);
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 28/09/2026 This engine's debris model names (PLAN-023 Phase 4; see
+	// ObjectCreationList.cpp).
+	extern rts::PerEngineStatic<std::vector<AsciiString> > debrisModelNamesGlobalHack_perEngine;
+	std::vector<AsciiString>& debrisModelNamesGlobalHack = debrisModelNamesGlobalHack_perEngine.get();
+#else
 	extern std::vector<AsciiString>	debrisModelNamesGlobalHack;
+#endif
 	size_t i=0;
 	for (; i<debrisModelNamesGlobalHack.size(); ++i)
 	{

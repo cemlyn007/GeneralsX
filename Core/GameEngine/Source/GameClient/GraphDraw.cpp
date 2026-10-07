@@ -119,6 +119,8 @@ void GraphDraw::clear()
 	m_graphEntries.clear();
 }
 
+#if !RTS_ENGINE_CONTEXT
 GraphDraw *TheGraphDraw = nullptr;
+#endif
 
 #endif /* PERF_TIMERS */

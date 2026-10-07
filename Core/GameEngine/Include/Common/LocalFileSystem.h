@@ -52,4 +52,6 @@ public:
 protected:
 };
 
+#if !RTS_ENGINE_CONTEXT
 extern LocalFileSystem *TheLocalFileSystem;
+#endif

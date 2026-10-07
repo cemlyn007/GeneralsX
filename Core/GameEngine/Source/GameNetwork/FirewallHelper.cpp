@@ -57,7 +57,9 @@
 #include "GameNetwork/GameSpy/GSConfig.h"
 
 
+#if !RTS_ENGINE_CONTEXT
 FirewallHelperClass *TheFirewallHelper = nullptr;
+#endif
 
 FirewallHelperClass * createFirewallHelper()
 {

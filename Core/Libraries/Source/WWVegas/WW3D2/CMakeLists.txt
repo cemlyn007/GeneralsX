@@ -230,6 +230,9 @@ set(WW3D2_SRC
     w3derr.h
     w3dexclusionlist.cpp
     w3dexclusionlist.h
+    w3drenderstate.h
+    w3drenderstate_names.h
+    w3drenderstate_names_end.h
     ww3d.cpp
     ww3d.h
     ww3dformat.cpp

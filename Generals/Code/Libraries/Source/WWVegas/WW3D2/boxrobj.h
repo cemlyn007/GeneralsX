@@ -107,8 +107,12 @@ protected:
 	Vector3								ObjSpaceExtent;
 	float									Opacity;
 
+#if !RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 30/09/2026 With RTS_ENGINE_CONTEXT, per engine: boxrobj.cpp (PLAN-023 Phase 8,
+	// stage RR2b).
 	static bool							IsInitted;
 	static int							DisplayMask;
+#endif
 };
 
 inline void BoxRenderObjClass::Set_Local_Center_Extent(const Vector3 & center,const Vector3 & extent)

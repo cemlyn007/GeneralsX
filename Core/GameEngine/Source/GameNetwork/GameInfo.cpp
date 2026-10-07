@@ -48,7 +48,9 @@
 
 
 
+#if !RTS_ENGINE_CONTEXT
 GameInfo *TheGameInfo = nullptr;
+#endif
 
 static AsciiString percentEncodeMapName(const AsciiString& mapName);
 static AsciiString percentDecodeMapName(const AsciiString& encodedMapName);

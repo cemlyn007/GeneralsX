@@ -86,8 +86,6 @@
 //         Private Data
 //----------------------------------------------------------------------------
 
-static Int s_totalOpen = 0;
-
 //----------------------------------------------------------------------------
 //         Public Data
 //----------------------------------------------------------------------------
@@ -268,8 +266,9 @@ Bool LocalFile::open( const Char *filename, Int access, size_t bufferSize )
 
 #endif
 
-	++s_totalOpen;
-///	DEBUG_LOG(("LocalFile::open %s (total %d)",filename,s_totalOpen));
+	// GeneralsX @bugfix cemlyn007 02/10/2026 Removed s_totalOpen: a process-wide counter every engine's
+	// own thread wrote on the release open/close path, with no reader left but a
+	// commented-out DEBUG_LOG. Nothing needs it; deleting it removes the race instead of synchronising it.
 	if ( m_access & APPEND )
 	{
 		if ( seek ( 0, END ) < 0 )
@@ -320,14 +319,12 @@ void LocalFile::closeFile()
 	{
 		fclose(m_file);
 		m_file = nullptr;
-		--s_totalOpen;
 	}
 #else
 	if( m_handle != -1 )
 	{
 		_close( m_handle );
 		m_handle = -1;
-		--s_totalOpen;
 	}
 #endif
 }

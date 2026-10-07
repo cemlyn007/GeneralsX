@@ -56,6 +56,10 @@
 #include "GameLogic/Object.h"
 #include "GameLogic/Module/ProductionUpdate.h"
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 28/09/2026 This engine's contain data (PLAN-023 Phase 4; see ControlBar.h).
+#define m_containData (s_containData_perEngine.get().entries)
+#endif
 
 
 //-------------------------------------------------------------------------------------------------

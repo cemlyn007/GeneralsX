@@ -135,9 +135,21 @@ static UnicodeString formatIncomeValue(UnsignedInt cashPerMin)
 
 //-------------------------------------------------------------------------------------------------
 /// The InGameUI singleton instance.
+#if !RTS_ENGINE_CONTEXT
 InGameUI *TheInGameUI = nullptr;
+#endif
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 28/09/2026 Per engine: InGameUI::init (headless too) stores this engine's replay
+// control here, a real window with GameWindowManagerDummy, and Show/HideControlBar (GameLogic::startNewGame,
+// clearGameData, ScriptActions, GameEngine::init, InGameUI::init's createControlBar) hide it; shared, one engine
+// would hide another's window, or one its own window manager has freed (PLAN-023 Phase 4). The macro keeps the
+// uses unchanged.
+static rts::PerEngineStatic<GameWindow *> s_replayWindow_perEngine;
+#define m_replayWindow (s_replayWindow_perEngine.get())
+#else
 GameWindow *m_replayWindow = nullptr;
+#endif
 
 // ------------------------------------------------------------------------------------------------
 struct KindOfSelectionData
@@ -2017,7 +2029,13 @@ void InGameUI::update()
 					m_militarySubtitle->blockPos.x = m_militarySubtitle->position.x + width;
 
 					// lets make a sound
+#if RTS_ENGINE_CONTEXT
+					// GeneralsX @feature cemlyn007 28/09/2026 Per engine: the event keeps this engine's event info and sound rotation (PLAN-023 Phase 4).
+					static rts::PerEngineStatic<AudioEventRTS> click_perEngine([](AudioEventRTS& event) { event.setEventName("MilitarySubtitlesTyping"); });
+					AudioEventRTS& click = click_perEngine.get();
+#else
 					static AudioEventRTS click("MilitarySubtitlesTyping");
+#endif
 					TheAudio->addAudioEvent(&click);
 					if(TheGlobalLanguageData)
 						m_militarySubtitle->incrementOnFrame = currLogicFrame + TheGlobalLanguageData->m_militaryCaptionSpeed;
@@ -2052,8 +2070,17 @@ void InGameUI::update()
 
 	// update the player money window if the money amount has changed
 	// this seems like as good a place as any to do the power hide/show
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 28/09/2026 Per engine: this engine's last shown money and income (InGameUI::update
+	// runs headless too; PLAN-023 Phase 4).
+	static rts::PerEngineStatic<UnsignedInt> lastMoney_perEngine([](UnsignedInt& value) { value = ~0u; });
+	UnsignedInt& lastMoney = lastMoney_perEngine.get();
+	static rts::PerEngineStatic<UnsignedInt> lastIncome_perEngine([](UnsignedInt& value) { value = ~0u; });
+	UnsignedInt& lastIncome = lastIncome_perEngine.get();
+#else
 	static UnsignedInt lastMoney = ~0u;
 	static UnsignedInt lastIncome = ~0u;
+#endif
 	static NameKeyType moneyWindowKey = TheNameKeyGenerator->nameToKey( "ControlBar.wnd:MoneyDisplay" );
 	static NameKeyType powerWindowKey = TheNameKeyGenerator->nameToKey( "ControlBar.wnd:PowerWindow" );
 
@@ -5402,7 +5429,13 @@ void InGameUI::updateFloatingText()
 	UnsignedInt currLogicFrame = TheGameLogic->getFrame();			// the current logic frame
 	UnsignedByte r, g, b, a;	// we'll need to break apart our color so we can modify the alpha
 	Int amount;								// The amount we'll change the alpha
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 28/09/2026 Per engine: this engine's last floating-text frame (PLAN-023 Phase 4).
+	static rts::PerEngineStatic<UnsignedInt> lastLogicFrameUpdate_perEngine;
+	UnsignedInt& lastLogicFrameUpdate = lastLogicFrameUpdate_perEngine.get([&](UnsignedInt& value) { value = currLogicFrame; });
+#else
 	static UnsignedInt lastLogicFrameUpdate = currLogicFrame;		// We need to make sure our current frame is different then our last frame we updated.
+#endif
 
 	// only update the position if we're incrementing frames
 	if(lastLogicFrameUpdate == currLogicFrame)

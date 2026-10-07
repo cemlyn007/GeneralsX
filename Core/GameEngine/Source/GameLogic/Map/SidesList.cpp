@@ -201,7 +201,9 @@ Int SidesInfo::removeFromBuildList(BuildListInfo *pBuildList)
 }
 
 /* ********* SidesList class ****************************/
+#if !RTS_ENGINE_CONTEXT
 /*extern*/ SidesList *TheSidesList = nullptr;	 ///< singleton instance of SidesList
+#endif
 /**
  SidesList - Constructor.
 */
@@ -421,7 +423,14 @@ SidesInfo *SidesList::findSkirmishSideInfo(AsciiString name, Int* index /*= null
 	return nullptr;
 }
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 28/09/2026 Per engine: the player names read from the map, which another
+// engine's map load would otherwise overwrite before this one's sides are matched (PLAN-023 Phase 2).
+static rts::PerEngineStatic<AsciiString[MAX_PLAYER_COUNT]> static_readPlayerNames_perEngine;
+#define static_readPlayerNames (static_readPlayerNames_perEngine.get())
+#else
 static AsciiString static_readPlayerNames[MAX_PLAYER_COUNT];
+#endif
 
 /**
 * ParsePlayersDataChunk - read players names data chunk.

@@ -94,7 +94,9 @@
 #define no_OPTIMIZED_HEIGHTMAP_LIGHTING	01
 // Doesn't work well.  jba.
 
+#if !RTS_ENGINE_CONTEXT
 HeightMapRenderObjClass *TheHeightMap = nullptr;
+#endif
 //-----------------------------------------------------------------------------
 //         Private Data
 //-----------------------------------------------------------------------------
@@ -102,7 +104,7 @@ HeightMapRenderObjClass *TheHeightMap = nullptr;
 	ShaderClass::DSTBLEND_ZERO, ShaderClass::FOG_DISABLE, ShaderClass::GRADIENT_MODULATE, ShaderClass::SECONDARY_GRADIENT_DISABLE, ShaderClass::TEXTURING_ENABLE, \
 	ShaderClass::ALPHATEST_DISABLE, ShaderClass::CULL_MODE_ENABLE, ShaderClass::DETAILCOLOR_SCALE, ShaderClass::DETAILALPHA_DISABLE) )
 
-static ShaderClass detailOpaqueShader(SC_DETAIL_BLEND);
+static const ShaderClass detailOpaqueShader(SC_DETAIL_BLEND);
 
 #define DEFAULT_MAX_FRAME_EXTRABLEND_TILES		256	//default number of terrain tiles rendered per call (must fit in one VB)
 #define DEFAULT_MAX_MAP_EXTRABLEND_TILES		2048	//default size of array allocated to hold all map extra blend tiles.
@@ -1026,6 +1028,11 @@ Int HeightMapRenderObjClass::updateBlock(Int x0, Int y0, Int x1, Int y1,  WorldH
 //=============================================================================
 HeightMapRenderObjClass::~HeightMapRenderObjClass()
 {
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 28/09/2026 No dangling singleton after teardown (PLAN-023 Phase 1)
+	if (TheHeightMap == this)
+		TheHeightMap = nullptr;
+#endif
 	freeMapResources();
 
 	delete [] m_extraBlendTilePositions;
@@ -1041,6 +1048,7 @@ HeightMapRenderObjClass::HeightMapRenderObjClass():
 m_extraBlendTilePositions(nullptr),
 m_numExtraBlendTiles(0),
 m_numVisibleExtraBlendTiles(0),
+m_maxExtraBlendTiles(DEFAULT_MAX_FRAME_EXTRABLEND_TILES),
 m_extraBlendTilePositionsSize(0),
 m_vertexBufferTiles(nullptr),
 m_vertexBufferBackup(nullptr),
@@ -1541,31 +1549,37 @@ void HeightMapRenderObjClass::staticLightingChanged()
 #define BIG_JUMP 16
 #define WIDE_STEP 32
 
-static Int visMinX, visMinY, visMaxX, visMaxY;
-static Bool check(const FrustumClass & frustum, WorldHeightMap *pMap, Int x, Int y)
+// GeneralsX @refactor cemlyn007 01/10/2026 The visible cell box calcVis grows, which was four file statics: it is
+// filled and read back within one updateCenter call, so it is that call's local, passed down (PLAN-023 Phase 8,
+// stage RR3).
+struct VisibleCellBox
+{
+	Int visMinX, visMinY, visMaxX, visMaxY;
+};
+static Bool check(VisibleCellBox &vis, const FrustumClass & frustum, WorldHeightMap *pMap, Int x, Int y)
 {
 	if (x<0 || y<0) return(false);
 	if (x>= pMap->getXExtent() || y>= pMap->getYExtent()) return(false);
-	if (x >= visMinX && y >= visMinY && x <=visMaxX && y <= visMaxY) {
+	if (x >= vis.visMinX && y >= vis.visMinY && x <=vis.visMaxX && y <= vis.visMaxY) {
 		return(true);
 	}
 	Int height = pMap->getHeight(x, y);
 	Vector3 loc((x-pMap->getBorderSizeInline())*MAP_XY_FACTOR, (y-pMap->getBorderSizeInline())*MAP_XY_FACTOR, height*MAP_HEIGHT_SCALE);
 	if (CollisionMath::Overlap_Test(frustum,loc) == CollisionMath::INSIDE) {
-		if (x<visMinX) visMinX=x;
-		if (x>visMaxX) visMaxX=x;
-		if (y<visMinY) visMinY=y;
-		if (y>visMaxY) visMaxY=y;
+		if (x<vis.visMinX) vis.visMinX=x;
+		if (x>vis.visMaxX) vis.visMaxX=x;
+		if (y<vis.visMinY) vis.visMinY=y;
+		if (y>vis.visMaxY) vis.visMaxY=y;
 		return(true);
 	}
 	return(false);
 }
 
-static void calcVis(const FrustumClass & frustum, WorldHeightMap *pMap, Int minX, Int minY, Int maxX, Int maxY, Int limit)
+static void calcVis(VisibleCellBox &vis, const FrustumClass & frustum, WorldHeightMap *pMap, Int minX, Int minY, Int maxX, Int maxY, Int limit)
 {
 	if (maxX-minX<2) return;
 	if (maxY-minY<2) return;
-	if (minX >=visMinX && minY >= visMinY && maxX <=visMaxX && maxY <= visMaxY) {
+	if (minX >=vis.visMinX && minY >= vis.visMinY && maxX <=vis.visMaxX && maxY <= vis.visMaxY) {
 		return;
 	}
 	Int midX = (minX+maxX)/2;
@@ -1581,39 +1595,39 @@ static void calcVis(const FrustumClass & frustum, WorldHeightMap *pMap, Int minX
 
 			3			4 */
 
-	if (check(frustum, pMap, midX, maxY)) {
+	if (check(vis, frustum, pMap, midX, maxY)) {
 		recurse1=true;
 		recurse2=true;
 	}
-	if (check(frustum, pMap, midX, minY)) {
+	if (check(vis, frustum, pMap, midX, minY)) {
 		recurse3=true;
 		recurse4=true;
 	}
-	if (check(frustum, pMap, midX, midY)) {
+	if (check(vis, frustum, pMap, midX, midY)) {
 		recurse1=true;
 		recurse2=true;
 		recurse3=true;
 		recurse4=true;
 	}
-	if (check(frustum, pMap, minX, midY)) {
+	if (check(vis, frustum, pMap, minX, midY)) {
 		recurse1=true;
 		recurse3=true;
 	}
-	if (check(frustum, pMap, maxX, midY)) {
+	if (check(vis, frustum, pMap, maxX, midY)) {
 		recurse2=true;
 		recurse4=true;
 	}
 	if (recurse1) {
-		calcVis(frustum, pMap, minX, midY, midX, maxY, limit);
+		calcVis(vis, frustum, pMap, minX, midY, midX, maxY, limit);
 	}
 	if (recurse2) {
-		calcVis(frustum, pMap, midX, midY, maxX, maxY, limit);
+		calcVis(vis, frustum, pMap, midX, midY, maxX, maxY, limit);
 	}
 	if (recurse3) {
-		calcVis(frustum, pMap, minX, minY, midX, midY, limit);
+		calcVis(vis, frustum, pMap, minX, minY, midX, midY, limit);
 	}
 	if (recurse4) {
-		calcVis(frustum, pMap, midX, minY, maxX, midY, limit);
+		calcVis(vis, frustum, pMap, midX, minY, maxX, midY, limit);
 	}
 }
 
@@ -1734,26 +1748,27 @@ void HeightMapRenderObjClass::updateCenter(CameraClass *camera, const Vector3 *c
 		minY += m_map->getBorderSizeInline();
 		maxY += m_map->getBorderSizeInline();
 
-		visMinX = m_map->getXExtent();
-		visMinY = m_map->getYExtent();
-		visMaxX = 0;
-		visMaxY = 0;
+		VisibleCellBox vis;	// GeneralsX @refactor cemlyn007 01/10/2026 a local (RR3; see VisibleCellBox)
+		vis.visMinX = m_map->getXExtent();
+		vis.visMinY = m_map->getYExtent();
+		vis.visMaxX = 0;
+		vis.visMaxY = 0;
 
 		///< @todo find out why values go out of range
 		if (minX<0) minX=0;
 		if (minY<0) minY=0;
-		if (maxX > visMinX) maxX = visMinX;
-		if (maxY > visMinY) maxY = visMinY;
+		if (maxX > vis.visMinX) maxX = vis.visMinX;
+		if (maxY > vis.visMinY) maxY = vis.visMinY;
 
 		const FrustumClass & frustum = camera->Get_Frustum();
 		Int limit = (maxX-minX)/2;
 		if (limit > WIDE_STEP/2) {
 			limit=WIDE_STEP/2;
 		}
-		calcVis(frustum, m_map, minX-WIDE_STEP/2, minY-WIDE_STEP/2, maxX+WIDE_STEP/2, maxY+WIDE_STEP/2, limit);
+		calcVis(vis, frustum, m_map, minX-WIDE_STEP/2, minY-WIDE_STEP/2, maxX+WIDE_STEP/2, maxY+WIDE_STEP/2, limit);
 
-		newOrgX = (visMaxX+visMinX)/2 - m_x/2;
-		newOrgY = (visMaxY+visMinY)/2 - m_y/2;
+		newOrgX = (vis.visMaxX+vis.visMinX)/2 - m_x/2;
+		newOrgY = (vis.visMaxY+vis.visMinY)/2 - m_y/2;
 	}
 	else
 	{
@@ -2181,7 +2196,9 @@ void HeightMapRenderObjClass::renderExtraBlendTiles()
 	Int indexCount = 0;
 	Int xExtent = m_map->getXExtent();
 	Int border = m_map->getBorderSizeInline();
-	static Int maxBlendTiles = DEFAULT_MAX_FRAME_EXTRABLEND_TILES;
+	// GeneralsX @refactor cemlyn007 01/10/2026 The height map's own, grown as its draws need (PLAN-023 Phase 8, stage
+	// RR3): a member, not a function-local static every render engine's terrain grew.
+	Int& maxBlendTiles = m_maxExtraBlendTiles;
 
 	m_numVisibleExtraBlendTiles = 0;
 

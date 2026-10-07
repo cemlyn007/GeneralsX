@@ -41,6 +41,10 @@
 #include "WW3D2/layer.h"
 #include "WW3D2/w3derr.h"
 #include "WW3D2/robjlist.h"
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 30/09/2026 WW3DState holds two ShaderClass values (PLAN-023 Phase 8, stage RR2a-2).
+#include "WW3D2/shader.h"
+#endif
 
 class		SceneClass;
 class		CameraClass;
@@ -63,16 +67,41 @@ class 	StaticSortListClass;
 #define SNAPSHOT_SAY(x) if (WW3D::Is_Snapshot_Activated()) { WWDEBUG_SAY(x); }
 //#define SNAPSHOT_SAY(x)
 
-/**
-** WW3D
-**
-** This is the collection of static functions and data which initialize and
-** control the behavior of the WW3D library.
-*/
-class WW3D
-{
-public:
+#define DEFAULT_DEBUG_SHADER_BITS	(		SHADE_CNST(\
+												ShaderClass::PASS_LEQUAL,\
+												ShaderClass::DEPTH_WRITE_ENABLE,\
+												ShaderClass::COLOR_WRITE_ENABLE,\
+												ShaderClass::SRCBLEND_ONE,\
+												ShaderClass::DSTBLEND_ZERO,\
+												ShaderClass::FOG_DISABLE,\
+												ShaderClass::GRADIENT_MODULATE,\
+												ShaderClass::SECONDARY_GRADIENT_DISABLE,\
+												ShaderClass::TEXTURING_DISABLE,\
+												ShaderClass::ALPHATEST_DISABLE,\
+												ShaderClass::CULL_MODE_ENABLE, \
+												ShaderClass::DETAILCOLOR_DISABLE,\
+												ShaderClass::DETAILALPHA_DISABLE) )
 
+#define LIGHTMAP_DEBUG_SHADER_BITS	(		SHADE_CNST(\
+												ShaderClass::PASS_LEQUAL,\
+												ShaderClass::DEPTH_WRITE_ENABLE,\
+												ShaderClass::COLOR_WRITE_ENABLE,\
+												ShaderClass::SRCBLEND_ONE,\
+												ShaderClass::DSTBLEND_ZERO,\
+												ShaderClass::FOG_DISABLE,\
+												ShaderClass::GRADIENT_DISABLE,\
+												ShaderClass::SECONDARY_GRADIENT_DISABLE,\
+												ShaderClass::TEXTURING_ENABLE,\
+												ShaderClass::ALPHATEST_DISABLE,\
+												ShaderClass::CULL_MODE_ENABLE, \
+												ShaderClass::DETAILCOLOR_DISABLE,\
+												ShaderClass::DETAILALPHA_DISABLE) )
+
+// GeneralsX @refactor cemlyn007 03/10/2026 WW3D's enums that its per-engine state (WW3DState below) holds, outside the
+// class so the state is complete where WW3D declares its stand-ins; WW3D derives from this, so `WW3D::PrelitModeEnum`
+// and the enumerators are unchanged.
+struct WW3DEnums
+{
 	enum MultiSampleModeEnum {
 		MULTISAMPLE_MODE_NONE = 0,
 		MULTISAMPLE_MODE_2X = 2,
@@ -101,6 +130,104 @@ public:
 		NPATCHES_GAP_FILLING_ENABLED,
 		NPATCHES_GAP_FILLING_FORCE
 	};
+};
+
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 30/09/2026 One render engine's WW3D state (PLAN-023 Phase 8, stage RR2a-2)
+//
+// WW3D's mutable statics (the render settings and render-loop state its Init, Shutdown, render loop, static sort
+// lists and options write) and ww3d.cpp's file statics, as one struct with the statics' names and upstream initial
+// values. Each render engine owns one, rts::EngineContext::ww3dState, allocated beside its W3DRenderState
+// (DX8Wrapper::Create_Render_State) and freed with it at the end of WW3D::Shutdown; an engine that does not render
+// reads WW3DState::Defaults, which nothing may write (W3D_Protect_Render_Defaults makes its pages read-only). Page
+// aligned, so the defaults fill whole pages of their own.
+struct RTS_ENGINE_CONTEXT_API alignas(::rts::renderStateAlignment) WW3DState
+{
+	// Constant-initialised (a ww3d.cpp static_assert checks the texture filter values below), so it is valid before
+	// any dynamic initialiser runs, as the statics it replaces were.
+	static constinit WW3DState Defaults;
+
+	bool IsSortingEnabled = true;
+
+	float PixelCenterX = 0.0f;
+	float PixelCenterY = 0.0f;
+
+	IRenderBackend* RenderBackend = nullptr;
+
+	bool IsInitted = false;
+	bool IsRendering = false;
+	bool IsCapturing = false;
+	bool IsScreenUVBiased = false;
+
+	bool AreDecalsEnabled = true;
+	float DecalRejectionDistance = 1000000.0f;
+
+	bool AreStaticSortListsEnabled = false;
+	bool MungeSortOnLoad = false;
+
+	bool OverbrightModifyOnLoad = false;
+
+	FrameGrabClass* Movie = nullptr;
+	bool PauseRecord = false;
+	bool RecordNextFrame = false;
+
+	long UserStat0 = 0;
+	long UserStat1 = 0;
+	long UserStat2 = 0;
+
+	float DefaultNativeScreenSize = 1.0f;
+
+	StaticSortListClass* DefaultStaticSortLists = nullptr;
+	StaticSortListClass* CurrentStaticSortLists = nullptr;
+
+	VertexMaterialClass* DefaultDebugMaterial = nullptr;
+	ShaderClass DefaultDebugShader{DEFAULT_DEBUG_SHADER_BITS};
+	ShaderClass LightmapDebugShader{LIGHTMAP_DEBUG_SHADER_BITS};
+
+	WW3DEnums::PrelitModeEnum PrelitMode = WW3DEnums::PRELIT_MODE_LIGHTMAP_MULTI_PASS;
+	bool ExposePrelit = false;
+
+	bool SnapshotActivated = false;
+	bool ThumbnailEnabled = true;
+
+	WW3DEnums::MeshDrawModeEnum MeshDrawMode = WW3DEnums::MESH_DRAW_MODE_OLD;
+	WW3DEnums::NPatchesGapFillingModeEnum NPatchesGapFillingMode = WW3DEnums::NPATCHES_GAP_FILLING_ENABLED;
+	unsigned NPatchesLevel = 1;
+	bool IsTexturingEnabled = true;
+	bool IsColoringEnabled = false;
+
+	int LastFrameMemoryAllocations = 0;
+	int LastFrameMemoryFrees = 0;
+
+	int TextureFilter = 2; // TextureFilterClass::TEXTURE_FILTER_BILINEAR
+	int AnisotropyLevel = 2; // TextureFilterClass::TEXTURE_FILTER_ANISOTROPIC_2X
+
+	bool Lite = false;
+
+	// ww3d.cpp's file statics (an HWND), and Make_Screen_Shot's file number.
+	void* _Hwnd = nullptr;
+	int _TextureReduction = 0;
+	int _TextureMinDim = 1;
+	bool _LargeTextureExtraReductionEnabled = false;
+	int ScreenShotFrameNumber = 1;
+};
+
+// The current engine's WW3D state, or WW3DState::Defaults for an engine that has none.
+inline WW3DState& WW3D_State() noexcept
+{
+	return ::rts::indirectContext<WW3DState, &::rts::EngineContext::ww3dState, WW3DState::Defaults>();
+}
+#endif // RTS_ENGINE_CONTEXT
+
+/**
+** WW3D
+**
+** This is the collection of static functions and data which initialize and
+** control the behavior of the WW3D library.
+*/
+class WW3D : public WW3DEnums
+{
+public:
 
 	enum ScreenShotFormatEnum {
 		TGA,
@@ -333,9 +460,16 @@ public:
 
 	// These clock all the time under user control, and are used to update
    // Stats.UserStat* when performance sampling is enabled.
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 30/09/2026 The engine's (WW3DState, above; PLAN-023 Phase 8, stage RR2a-2).
+	static constexpr rts::IndirectContextField<WW3DState, &rts::EngineContext::ww3dState, WW3DState::Defaults, long, &WW3DState::UserStat0> UserStat0{};
+	static constexpr rts::IndirectContextField<WW3DState, &rts::EngineContext::ww3dState, WW3DState::Defaults, long, &WW3DState::UserStat1> UserStat1{};
+	static constexpr rts::IndirectContextField<WW3DState, &rts::EngineContext::ww3dState, WW3DState::Defaults, long, &WW3DState::UserStat2> UserStat2{};
+#else
    static long             UserStat0;
    static long             UserStat1;
    static long             UserStat2;
+#endif
 
 	// Gamma control
 	static void					Set_Gamma(float gamma,float bright,float contrast,bool calibrate=true);
@@ -354,6 +488,15 @@ private:
 	static void					Allocate_Debug_Resources();
 	static void					Release_Debug_Resources();
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 28/09/2026 The timing statics are per engine (EngineContext fields, with
+	// the same initial values): each engine's animation clock advances with its own frames only (PLAN-023
+	// Phase 3). The uses are unchanged.
+	static constexpr rts::ContextField<float, &rts::EngineContext::ww3dLogicFrameTimeMs> LogicFrameTimeMs{};
+	static constexpr rts::ContextField<float, &rts::EngineContext::ww3dFractionalSyncMs> FractionalSyncMs{};
+	static constexpr rts::ContextField<unsigned int, &rts::EngineContext::ww3dSyncTime> SyncTime{};
+	static constexpr rts::ContextField<unsigned int, &rts::EngineContext::ww3dPreviousSyncTime> PreviousSyncTime{};
+#else
 	// Logic frame time, in milliseconds
 	static float LogicFrameTimeMs;
 
@@ -371,7 +514,54 @@ private:
 	// application sets sync time at the start of every frame, this represents
 	// the frame interval.
 	static unsigned int PreviousSyncTime;
+#endif
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 30/09/2026 The current engine's WW3DState fields (above; PLAN-023 Phase 8, stage
+	// RR2a-2): each name is a stand-in for its field, so the uses are unchanged.
+	static constexpr rts::IndirectContextField<WW3DState, &rts::EngineContext::ww3dState, WW3DState::Defaults, float, &WW3DState::PixelCenterX> PixelCenterX{};
+	static constexpr rts::IndirectContextField<WW3DState, &rts::EngineContext::ww3dState, WW3DState::Defaults, float, &WW3DState::PixelCenterY> PixelCenterY{};
+	static constexpr rts::IndirectContextField<WW3DState, &rts::EngineContext::ww3dState, WW3DState::Defaults, IRenderBackend*, &WW3DState::RenderBackend> RenderBackend{};
+	static constexpr rts::IndirectContextField<WW3DState, &rts::EngineContext::ww3dState, WW3DState::Defaults, bool, &WW3DState::IsInitted> IsInitted{};
+	static constexpr rts::IndirectContextField<WW3DState, &rts::EngineContext::ww3dState, WW3DState::Defaults, bool, &WW3DState::IsRendering> IsRendering{};
+	static constexpr rts::IndirectContextField<WW3DState, &rts::EngineContext::ww3dState, WW3DState::Defaults, bool, &WW3DState::IsCapturing> IsCapturing{};
+	static constexpr rts::IndirectContextField<WW3DState, &rts::EngineContext::ww3dState, WW3DState::Defaults, bool, &WW3DState::IsSortingEnabled> IsSortingEnabled{};
+	static constexpr rts::IndirectContextField<WW3DState, &rts::EngineContext::ww3dState, WW3DState::Defaults, bool, &WW3DState::IsScreenUVBiased> IsScreenUVBiased{};
+	static constexpr rts::IndirectContextField<WW3DState, &rts::EngineContext::ww3dState, WW3DState::Defaults, bool, &WW3DState::AreDecalsEnabled> AreDecalsEnabled{};
+	static constexpr rts::IndirectContextField<WW3DState, &rts::EngineContext::ww3dState, WW3DState::Defaults, float, &WW3DState::DecalRejectionDistance> DecalRejectionDistance{};
+	static constexpr rts::IndirectContextField<WW3DState, &rts::EngineContext::ww3dState, WW3DState::Defaults, bool, &WW3DState::AreStaticSortListsEnabled> AreStaticSortListsEnabled{};
+	static constexpr rts::IndirectContextField<WW3DState, &rts::EngineContext::ww3dState, WW3DState::Defaults, bool, &WW3DState::MungeSortOnLoad> MungeSortOnLoad{};
+	static constexpr rts::IndirectContextField<WW3DState, &rts::EngineContext::ww3dState, WW3DState::Defaults, bool, &WW3DState::OverbrightModifyOnLoad> OverbrightModifyOnLoad{};
+	static constexpr rts::IndirectContextField<WW3DState, &rts::EngineContext::ww3dState, WW3DState::Defaults, FrameGrabClass*, &WW3DState::Movie> Movie{};
+	static constexpr rts::IndirectContextField<WW3DState, &rts::EngineContext::ww3dState, WW3DState::Defaults, bool, &WW3DState::PauseRecord> PauseRecord{};
+	static constexpr rts::IndirectContextField<WW3DState, &rts::EngineContext::ww3dState, WW3DState::Defaults, bool, &WW3DState::RecordNextFrame> RecordNextFrame{};
+	static constexpr rts::IndirectContextField<WW3DState, &rts::EngineContext::ww3dState, WW3DState::Defaults, VertexMaterialClass*, &WW3DState::DefaultDebugMaterial> DefaultDebugMaterial{};
+	static constexpr rts::IndirectContextField<WW3DState, &rts::EngineContext::ww3dState, WW3DState::Defaults, ShaderClass, &WW3DState::DefaultDebugShader> DefaultDebugShader{};
+	static constexpr rts::IndirectContextField<WW3DState, &rts::EngineContext::ww3dState, WW3DState::Defaults, ShaderClass, &WW3DState::LightmapDebugShader> LightmapDebugShader{};
+	static constexpr rts::IndirectContextField<WW3DState, &rts::EngineContext::ww3dState, WW3DState::Defaults, PrelitModeEnum, &WW3DState::PrelitMode> PrelitMode{};
+	static constexpr rts::IndirectContextField<WW3DState, &rts::EngineContext::ww3dState, WW3DState::Defaults, bool, &WW3DState::ExposePrelit> ExposePrelit{};
+	static constexpr rts::IndirectContextField<WW3DState, &rts::EngineContext::ww3dState, WW3DState::Defaults, int, &WW3DState::TextureFilter> TextureFilter{};
+	static constexpr rts::IndirectContextField<WW3DState, &rts::EngineContext::ww3dState, WW3DState::Defaults, int, &WW3DState::AnisotropyLevel> AnisotropyLevel{};
+	static constexpr rts::IndirectContextField<WW3DState, &rts::EngineContext::ww3dState, WW3DState::Defaults, bool, &WW3DState::SnapshotActivated> SnapshotActivated{};
+	static constexpr rts::IndirectContextField<WW3DState, &rts::EngineContext::ww3dState, WW3DState::Defaults, bool, &WW3DState::ThumbnailEnabled> ThumbnailEnabled{};
+	static constexpr rts::IndirectContextField<WW3DState, &rts::EngineContext::ww3dState, WW3DState::Defaults, MeshDrawModeEnum, &WW3DState::MeshDrawMode> MeshDrawMode{};
+	static constexpr rts::IndirectContextField<WW3DState, &rts::EngineContext::ww3dState, WW3DState::Defaults, NPatchesGapFillingModeEnum, &WW3DState::NPatchesGapFillingMode> NPatchesGapFillingMode{};
+	static constexpr rts::IndirectContextField<WW3DState, &rts::EngineContext::ww3dState, WW3DState::Defaults, unsigned, &WW3DState::NPatchesLevel> NPatchesLevel{};
+	static constexpr rts::IndirectContextField<WW3DState, &rts::EngineContext::ww3dState, WW3DState::Defaults, bool, &WW3DState::IsTexturingEnabled> IsTexturingEnabled{};
+	static constexpr rts::IndirectContextField<WW3DState, &rts::EngineContext::ww3dState, WW3DState::Defaults, bool, &WW3DState::IsColoringEnabled> IsColoringEnabled{};
+	static constexpr rts::IndirectContextField<WW3DState, &rts::EngineContext::ww3dState, WW3DState::Defaults, bool, &WW3DState::Lite> Lite{};
+	static constexpr rts::IndirectContextField<WW3DState, &rts::EngineContext::ww3dState, WW3DState::Defaults, float, &WW3DState::DefaultNativeScreenSize> DefaultNativeScreenSize{};
+	static constexpr rts::IndirectContextField<WW3DState, &rts::EngineContext::ww3dState, WW3DState::Defaults, StaticSortListClass*, &WW3DState::DefaultStaticSortLists> DefaultStaticSortLists{};
+	static constexpr rts::IndirectContextField<WW3DState, &rts::EngineContext::ww3dState, WW3DState::Defaults, StaticSortListClass*, &WW3DState::CurrentStaticSortLists> CurrentStaticSortLists{};
+	static constexpr rts::IndirectContextField<WW3DState, &rts::EngineContext::ww3dState, WW3DState::Defaults, int, &WW3DState::LastFrameMemoryAllocations> LastFrameMemoryAllocations{};
+	static constexpr rts::IndirectContextField<WW3DState, &rts::EngineContext::ww3dState, WW3DState::Defaults, int, &WW3DState::LastFrameMemoryFrees> LastFrameMemoryFrees{};
+
+	static constexpr rts::ContextField<int, &rts::EngineContext::ww3dFrameCount> FrameCount{};
+
+	// Declared upstream, never defined or used.
+	static bool							IsBackfaceDebugEnabled;
+	static VertexMaterialClass *	BackfaceDebugMaterial;
+#else
 	static float						PixelCenterX;
 	static float						PixelCenterY;
 
@@ -395,7 +585,11 @@ private:
 	static FrameGrabClass *			Movie;
 	static bool							PauseRecord;
 	static bool							RecordNextFrame;
+#if RTS_ENGINE_CONTEXT
+	static constexpr rts::ContextField<int, &rts::EngineContext::ww3dFrameCount> FrameCount{};
+#else
 	static int							FrameCount;
+#endif
 
 	static VertexMaterialClass *	DefaultDebugMaterial;
 	static VertexMaterialClass *	BackfaceDebugMaterial;
@@ -437,7 +631,9 @@ private:
 	// Memory allocation statistics
 	static int							LastFrameMemoryAllocations;
 	static int							LastFrameMemoryFrees;
+#endif
 };
+
 
 
 /*

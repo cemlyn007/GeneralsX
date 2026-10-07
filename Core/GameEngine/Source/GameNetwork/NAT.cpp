@@ -140,7 +140,9 @@
 /* static */ time_t NAT::m_timeToWaitForPort = 15000; // wait for 15 seconds for the other player's port number.
 /* static */ time_t NAT::m_timeForRoundTimeout = 15000; // wait for at most 15 seconds for each connection round to finish.
 
+#if !RTS_ENGINE_CONTEXT
 NAT *TheNAT = nullptr;
+#endif
 
 NAT::NAT()
 {

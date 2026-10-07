@@ -550,5 +550,7 @@ void Eva::processPlayingMessages(UnsignedInt currentFrame)
 }
 
 //-------------------------------------------------------------------------------------------------
+#if !RTS_ENGINE_CONTEXT
 Eva *TheEva = nullptr;
+#endif
 

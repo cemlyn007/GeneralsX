@@ -305,4 +305,6 @@ protected:
 	static Bool useCloud();
 };
 
+#if !RTS_ENGINE_CONTEXT
 extern BaseHeightMapRenderObjClass *TheTerrainRenderObject;
+#endif

@@ -74,4 +74,6 @@ public:
 	virtual AsciiString getPingString( Int timeout ) = 0;
 };
 
+#if !RTS_ENGINE_CONTEXT
 extern PingerInterface *ThePinger;
+#endif

@@ -69,6 +69,8 @@
 #include "Common/GlobalData.h"
 #include "Common/GameCommon.h"
 
+#include <atomic>
+
 
 //---------------------------------------------------------------------
 // Constants
@@ -790,7 +792,8 @@ RenderObjClass * W3DAssetManager::Create_Render_Obj(
 
 	if (proto == nullptr)
 	{
-		static int warning_count = 0;
+		// GeneralsX @feature cemlyn007 28/09/2026 Atomic: any engine's thread may count a missing asset (PLAN-023 Phase 5b).
+		static std::atomic<int> warning_count(0);
 		if (++warning_count <= 20)
 		{
 			WWDEBUG_SAY(("WARNING: Failed to create Render Object: %s",name));
@@ -1398,7 +1401,8 @@ RenderObjClass * W3DAssetManager::Create_Render_Obj(const char * name,float scal
 	}
 
 	if (proto == nullptr) {
-		static int warning_count = 0;
+		// GeneralsX @feature cemlyn007 28/09/2026 Atomic: any engine's thread may count a missing asset (PLAN-023 Phase 5b).
+		static std::atomic<int> warning_count(0);
 		if (++warning_count <= 20) {
 			WWDEBUG_SAY(("WARNING: Failed to create Render Object: %s",name));
 		}

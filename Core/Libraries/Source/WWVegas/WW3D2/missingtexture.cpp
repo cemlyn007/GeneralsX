@@ -29,10 +29,27 @@ static unsigned missing_image_depth=24;
 extern unsigned int missing_image_palette[];
 extern unsigned int missing_image_pixels[];
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 30/09/2026 Per engine: the fallback texture, made on the render engine's own
+// device by Do_Onetime_Device_Dependent_Inits (_Init) and released by its Shutdowns (PLAN-023 Phase 8, stage RR2b).
+static rts::PerEngineStatic<IDirect3DTexture8*> _MissingTexture_perEngine;
+#define _MissingTexture (_MissingTexture_perEngine.get())
+#else
 static IDirect3DTexture8 * _MissingTexture = nullptr;
+#endif
 
 IDirect3DTexture8* MissingTexture::_Get_Missing_Texture()
 {
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @bugfix cemlyn007 30/09/2026 The fallback texture belongs to the render device, so only the
+	// engine that owns the device sees it. A headless engine beside a renderer otherwise got the renderer's
+	// texture and AddRef/Released it on its own thread (a use-after-free once the device is gone), and
+	// Is_Missing_Texture flipped from its solo answer (PLAN-023 Phase 8, stage RR0a).
+	if (!DX8Wrapper::Is_Initted())
+	{
+		return nullptr;
+	}
+#endif
 	// GeneralsX @bugfix fbraz 04/05/2026 Lazily initialize fallback texture to avoid null dereference in headless replay paths.
 	if (_MissingTexture == nullptr)
 	{
@@ -54,6 +71,13 @@ IDirect3DTexture8* MissingTexture::_Get_Missing_Texture()
 
 IDirect3DSurface8* MissingTexture::_Create_Missing_Surface()
 {
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @bugfix cemlyn007 30/09/2026 As in _Get_Missing_Texture: none for an engine without the device.
+	if (!DX8Wrapper::Is_Initted())
+	{
+		return nullptr;
+	}
+#endif
 	if (_MissingTexture == nullptr)
 	{
 		IDirect3DTexture8 *texture = MissingTexture::_Get_Missing_Texture();

@@ -496,4 +496,6 @@ protected:
 
 };
 
+#if !RTS_ENGINE_CONTEXT
 extern ScriptEngine *TheScriptEngine;   ///< singleton definition
+#endif

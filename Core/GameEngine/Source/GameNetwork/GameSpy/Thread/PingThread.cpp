@@ -96,7 +96,9 @@ PingerInterface* PingerInterface::createNewPingerInterface()
 	return NEW Pinger;
 }
 
+#if !RTS_ENGINE_CONTEXT
 PingerInterface *ThePinger;
+#endif
 
 //-------------------------------------------------------------------------
 

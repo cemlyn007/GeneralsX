@@ -28,7 +28,9 @@
 #include "GameNetwork/NetworkInterface.h"
 
 
+#if !RTS_ENGINE_CONTEXT
 FramePacer* TheFramePacer = nullptr;
+#endif
 
 FramePacer::FramePacer()
 {
@@ -69,6 +71,13 @@ void FramePacer::reset()
 {
 	m_frameRateLimit.reset();
 	m_updateTime = 1.0f / (Real)getActualFramesPerSecondLimit();
+}
+
+// GeneralsX @feature cemlyn007 03/10/2026 Set the predicted step explicitly: headless game starts use the nominal logic frame (PLAN-023 Phase 8, stage RR0c).
+void FramePacer::resetToStep(Real seconds)
+{
+	m_frameRateLimit.reset();
+	m_updateTime = seconds;
 }
 
 void FramePacer::setFramesPerSecondLimit( Int fps )

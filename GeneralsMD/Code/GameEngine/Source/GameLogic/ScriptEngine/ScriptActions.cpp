@@ -118,8 +118,16 @@ static void updateTeamAndPlayerStuff( Object *obj, void *userData )
 #define REALLY_FAR	(100000 * MAP_XY_FACTOR)
 
 // GLOBALS ////////////////////////////////////////////////////////////////////////////////////////
+#if !RTS_ENGINE_CONTEXT
 ScriptActionsInterface *TheScriptActions = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 28/09/2026 Per engine (PLAN-023 Phase 4; see ScriptActions.h).
+rts::PerEngineStatic<GameWindow *> ScriptActions::s_messageWindow_perEngine;
+#define m_messageWindow (s_messageWindow_perEngine.get())
+#else
 GameWindow *ScriptActions::m_messageWindow = nullptr;
+#endif
 
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------

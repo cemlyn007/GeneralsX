@@ -168,4 +168,6 @@ inline const void *Image::getRawTextureData() const { return m_rawTextureData; }
 inline UnsignedInt Image::getStatus() const { return m_status; }
 
 // EXTERNALS //////////////////////////////////////////////////////////////////////////////////////
+#if !RTS_ENGINE_CONTEXT
 extern ImageCollection *TheMappedImageCollection;  ///< mapped images
+#endif

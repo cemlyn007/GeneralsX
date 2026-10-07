@@ -420,7 +420,9 @@ GameSpyPSMessageQueueInterface* GameSpyPSMessageQueueInterface::createNewMessage
 	return NEW GameSpyPSMessageQueue;
 }
 
+#if !RTS_ENGINE_CONTEXT
 GameSpyPSMessageQueueInterface *TheGameSpyPSMessageQueue = nullptr;
+#endif
 #define MESSAGE_QUEUE ((GameSpyPSMessageQueue *)TheGameSpyPSMessageQueue)
 
 //-------------------------------------------------------------------------

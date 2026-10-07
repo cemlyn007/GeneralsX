@@ -586,7 +586,13 @@ void pickAndPlayUnitVoiceResponse( const DrawableList *list, GameMessage::Type m
 					}
 					// Special case for GLA worker to use a different set of move voices when he has received the worker shoes upgrade
 					Player *player = obj->getControllingPlayer();
+#if RTS_ENGINE_CONTEXT
+					// GeneralsX @feature cemlyn007 28/09/2026 Per engine: the cached template is this engine's (PLAN-023 Phase 4).
+					static rts::PerEngineStatic<const UpgradeTemplate *> workerShoeTemplate_perEngine;
+					const UpgradeTemplate *workerShoeTemplate = workerShoeTemplate_perEngine.get([&](const UpgradeTemplate *&value) { value = TheUpgradeCenter->findUpgrade( "Upgrade_GLAWorkerShoes" ); });
+#else
 					static const UpgradeTemplate *workerShoeTemplate = TheUpgradeCenter->findUpgrade( "Upgrade_GLAWorkerShoes" );
+#endif
 					if (player && workerShoeTemplate && player->hasUpgradeComplete(workerShoeTemplate))
 					{
 						if (obj->isKindOf(KINDOF_INFANTRY) && obj->isKindOf(KINDOF_DOZER) && obj->isKindOf(KINDOF_HARVESTER)) // Only Workers fit all 3

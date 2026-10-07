@@ -19,6 +19,7 @@
 #include <queue>
 #include <cstring>
 #include <cstdio>
+#include "Common/EngineContext.h" // GeneralsX @feature cemlyn007 28/09/2026 rts::withCurrentEngine
 
 #if defined(SAGE_USE_GAMENETWORKINGSOCKETS)
 
@@ -740,7 +741,7 @@ void NetworkMesh::StartLoadingKeepalive()
 	}
 	m_bLoadingActive.store(true);
 	m_bKeepaliveRunning.store(true);
-	m_keepaliveThread = std::thread([this]()
+	m_keepaliveThread = std::thread(::rts::withCurrentEngine([this]()
 	{
 		fprintf(stderr, "[STEAM NETWORKING] ICE keepalive thread started (loading protection)\n");
 		fflush(stderr);
@@ -752,7 +753,7 @@ void NetworkMesh::StartLoadingKeepalive()
 		m_bKeepaliveRunning.store(false);
 		fprintf(stderr, "[STEAM NETWORKING] ICE keepalive thread stopped\n");
 		fflush(stderr);
-	});
+	}));
 }
 
 void NetworkMesh::StopLoadingKeepalive()

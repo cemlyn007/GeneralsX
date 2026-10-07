@@ -142,10 +142,21 @@ public:
 	virtual void preloadTextureAssets( AsciiString texture ) override;	///< preload texture asset
 
 	/// @todo Need a scene abstraction
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 28/09/2026 The scenes and the asset manager are per engine (EngineContext
+	// fields): a headless engine builds only the asset manager (the scenes need a render mode), and one
+	// engine's teardown reset another's asset manager after it was freed (PLAN-023 Phase 3). The qualified
+	// uses are unchanged.
+	static constexpr rts::ContextField<RTS3DScene*, &rts::EngineContext::w3dDisplay3DScene> m_3DScene{};
+	static constexpr rts::ContextField<RTS2DScene*, &rts::EngineContext::w3dDisplay2DScene> m_2DScene{};
+	static constexpr rts::ContextField<RTS3DInterfaceScene*, &rts::EngineContext::w3dDisplay3DInterfaceScene> m_3DInterfaceScene{};
+	static constexpr rts::ContextField<W3DAssetManager*, &rts::EngineContext::w3dDisplayAssetManager> m_assetManager{};
+#else
 	static RTS3DScene *m_3DScene;							///< our 3d scene representation
 	static RTS2DScene *m_2DScene;							///< our 2d scene representation
 	static RTS3DInterfaceScene *m_3DInterfaceScene;	///< our 3d interface scene that draws last (for 3d mouse cursor, etc)
 	static W3DAssetManager *m_assetManager;		///< W3D asset manager
+#endif
 
 	void drawFPSStats();								///< draw the fps on the screen
 	virtual Real getAverageFPS() override;						///< return the average FPS.
@@ -174,7 +185,22 @@ protected:
 	IRegion2D m_clipRegion;									///< the clipping region for images
 	Bool m_isClippedEnabled;	///<used by 2D drawing operations to define clip re
 	Real m_averageFPS;		///<average fps over the last 30 frames.
+	// GeneralsX @feature cemlyn007 30/09/2026 Whether draw() has logged the device's first TestCooperativeLevel
+	// result: once per engine (PLAN-023 Phase 8, stage RR0c).
+	Bool m_loggedCooperativeLevel;
 	Real m_currentFPS;		///<current fps value.
+
+	// GeneralsX @refactor cemlyn007 30/09/2026 updateAverageFPS's and gatherDebugStats' state, which were
+	// function-local statics: every render engine's draw updates its own (PLAN-023 Phase 8, stage RR2a-2).
+	Int64 m_fpsLastUpdateTime64 = 0;
+	Int m_fpsHistoryOffset = 0;
+	static constexpr Int FPS_HISTORY_SIZE = 30;
+	Real m_fpsHistory[FPS_HISTORY_SIZE] = {};
+	UnsignedInt m_statsFramesRenderedSinceLastUpdate = 0;
+	Int64 m_statsLastUpdateTime64 = 0;
+	double m_statsTimeSinceLastUpdateInSecs = 0.0;
+	Int m_statsDrawCallsSinceLastUpdate = 0;
+	Int m_statsSortedPolysSinceLastUpdate = 0;
 
 	TextureClass *m_batchTexture;
 	DrawImageMode m_batchMode;

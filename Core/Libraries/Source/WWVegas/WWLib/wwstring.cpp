@@ -54,7 +54,7 @@ TCHAR *	StringClass::m_EmptyString				= &m_NullChar;
 // For alignment reasons we need twice as large block...
 char StringClass::m_TempStrings[(StringClass::MAX_TEMP_STRING*2)*StringClass::MAX_TEMP_BYTES];
 
-unsigned StringClass::ReservedMask=0;
+std::atomic<unsigned> StringClass::ReservedMask{0};
 
 ///////////////////////////////////////////////////////////////////
 //
@@ -76,14 +76,18 @@ StringClass::Get_String (int length, bool is_temp)
 	//
 	//	Should we attempt to use a temp buffer for this string?
 	//
-	if (is_temp && length <= MAX_TEMP_LEN && ReservedMask!=ALL_TEMP_STRINGS_USED_MASK) {
+	// GeneralsX @bugfix cemlyn007 29/09/2026, revised 02/10/2026 (PLAN-023 Phase 5b, TSan)
+	// Upstream checked ReservedMask against ALL_TEMP_STRINGS_USED_MASK before taking the lock, an
+	// unsynchronised read of a word other threads write under it: a data race once engines run on
+	// several threads. ReservedMask is now std::atomic<unsigned>, so this relaxed load is a race-free
+	// early-out (the authoritative test-and-set below
+	// still runs under m_Mutex), and we once again skip taking the process-wide lock when every temp buffer
+	// is in use instead of always locking just to find nothing.
+	if (is_temp && length <= MAX_TEMP_LEN && ReservedMask.load(std::memory_order_relaxed) != ALL_TEMP_STRINGS_USED_MASK) {
 
 		//
 		//	Make sure no one else is requesting a temp pointer
-		// at the same time we are. There is a slight possibility that another
-		// thread stole the last available buffer in between the if sentence and
-		// the mutex lock, but that is a feature by design and doesn't cause
-		// anything bad to happen.
+		// at the same time we are.
 		//
 		FastCriticalSectionClass::LockClass m(m_Mutex);
 
@@ -91,11 +95,10 @@ StringClass::Get_String (int length, bool is_temp)
 		//	Try to find an available temporary buffer
 		//
 		// TODO: Don't loop, there are better ways
-		unsigned mask=1;
-		for (int index = 0; index < MAX_TEMP_STRING; index ++, mask<<=1) {
+		for (int index = 0; index < MAX_TEMP_STRING; index ++) {
 			unsigned mask=1<<index;
-			if (!(ReservedMask&mask)) {
-				ReservedMask|=mask;
+			if (!(ReservedMask.load(std::memory_order_relaxed)&mask)) {
+				ReservedMask.fetch_or(mask, std::memory_order_relaxed);
 
 				//
 				//	Grab this unused buffer for our string
@@ -206,7 +209,7 @@ StringClass::Free_String ()
 
 			unsigned index=(buffer_base/MAX_TEMP_BYTES)&(MAX_TEMP_STRING-1);
 			unsigned mask=1<<index;
-			ReservedMask&=~mask;
+			ReservedMask.fetch_and(~mask, std::memory_order_relaxed);
 		}
 		else {
 

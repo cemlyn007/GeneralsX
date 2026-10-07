@@ -32,7 +32,9 @@
 #include "GameClient/ChallengeGenerals.h"
 
 
+#if !RTS_ENGINE_CONTEXT
 ChallengeGenerals *TheChallengeGenerals = nullptr;
+#endif
 
 ChallengeGenerals *createChallengeGenerals()
 {

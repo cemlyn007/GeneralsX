@@ -64,7 +64,14 @@ const unsigned DEFAULT_INACTIVATION_TIME=20000;
 ** Definitions of static members:
 */
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 28/09/2026 Per engine: the texture ID counter, so an engine numbers its textures as
+// it does alone (PLAN-023 Phase 3).
+static rts::PerEngineStatic<unsigned> unused_texture_id_perEngine;
+#define unused_texture_id (unused_texture_id_perEngine.get())
+#else
 static unsigned unused_texture_id;
+#endif
 
 // This throttles submissions to the background texture loading queue.
 static unsigned TexturesAppliedPerFrame;
@@ -139,6 +146,19 @@ TextureBaseClass::~TextureBaseClass()
 
 
 
+
+// Whether this engine's textures skip the thumbnail path. WW3D::ThumbnailEnabled is a process global that a
+// render boot clears, so under an engine context only the engine that owns the render device honours it: a
+// headless engine beside a renderer would otherwise load its textures through the shared texture loader,
+// unlike its solo run, where the flag stays set.
+static inline bool Thumbnails_Disabled()
+{
+#if RTS_ENGINE_CONTEXT
+	return DX8Wrapper::Is_Initted() && !WW3D::Get_Thumbnail_Enabled();
+#else
+	return !WW3D::Get_Thumbnail_Enabled();
+#endif
+}
 
 //**********************************************************************************************
 //! Invalidate old unused textures
@@ -750,7 +770,7 @@ TextureClass::TextureClass
 
 	// If the thumbnails are not enabled, init the texture at this point to avoid stalling when the
 	// mesh is rendered.
-	if (!WW3D::Get_Thumbnail_Enabled())
+	if (Thumbnails_Disabled())
 	{
 		if (TextureLoader::Is_DX8_Thread())
 		{
@@ -863,7 +883,7 @@ void TextureClass::Init()
 
 	if (!Peek_D3D_Base_Texture())
 	{
-		if (!WW3D::Get_Thumbnail_Enabled() || MipLevelCount==MIP_LEVELS_1)
+		if (Thumbnails_Disabled() || MipLevelCount==MIP_LEVELS_1)
 		{
 //		if (MipLevelCount==MIP_LEVELS_1) {
 			TextureLoader::Request_Foreground_Loading(this);
@@ -1495,7 +1515,7 @@ CubeTextureClass::CubeTextureClass
 
 	// If the thumbnails are not enabled, init the texture at this point to avoid stalling when the
 	// mesh is rendered.
-	if (!WW3D::Get_Thumbnail_Enabled())
+	if (Thumbnails_Disabled())
 	{
 		if (TextureLoader::Is_DX8_Thread())
 		{
@@ -1780,7 +1800,7 @@ VolumeTextureClass::VolumeTextureClass
 
 	// If the thumbnails are not enabled, init the texture at this point to avoid stalling when the
 	// mesh is rendered.
-	if (!WW3D::Get_Thumbnail_Enabled())
+	if (Thumbnails_Disabled())
 	{
 		if (TextureLoader::Is_DX8_Thread())
 		{

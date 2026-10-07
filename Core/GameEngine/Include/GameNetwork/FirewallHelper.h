@@ -285,5 +285,7 @@ class FirewallHelperClass {
 
 
 
+#if !RTS_ENGINE_CONTEXT
 extern FirewallHelperClass *TheFirewallHelper;
+#endif
 FirewallHelperClass * createFirewallHelper();
