@@ -562,7 +562,7 @@ Goal: N engines in one process, each stepped on its own thread at the same time,
 
    Large buffers must not become `thread_local`. The library's TLS is initial-exec, and a `dlopen`ed library only gets glibc's small static TLS surplus: the 5 KB `XferLoad` buffers already made it fail to load (Phase 2). A per-engine slot is as good as a per-thread one under the one-thread-at-a-time contract.
 
-   Afterwards the classification has no per-engine entries, and `engine_state_symbols.py check --strict` keeps it so. The `thread_local`s are listed as process-global (per thread by design), as Phase 2's are.
+   Afterwards the classification has no per-engine entries, and `engine_state_symbols.py check` keeps it so (a per-engine symbol is an error in every mode). The `thread_local`s are listed as process-global (per thread by design), as Phase 2's are.
 2. **Process-wide state written after priming.** Shared state must be written once, during the first boot, and only read afterwards. A later boot rewriting it with the same value is still a data race with the engines already stepping. Known cases, all reclassified process-global in Phase 4 because every boot writes them:
    - `DX8Wrapper_IsWindowed` (every headless command line);
    - `GameSpyColor` (every boot's INI parse);
