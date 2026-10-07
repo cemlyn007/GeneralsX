@@ -504,7 +504,9 @@ void OpenALAudioManager::init()
 	// We should now know how many samples we want to load
 	openDevice();
 	m_audioCache->setMaxSize(getAudioSettings()->m_maxCacheSize);
-	alDistanceModel(AL_INVERSE_DISTANCE_CLAMPED);
+	// GeneralsX @bugfix cemlyn007 08/10/2026 No AL call without a context (see hasContext).
+	if (hasContext())
+		alDistanceModel(AL_INVERSE_DISTANCE_CLAMPED);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -534,6 +536,13 @@ void OpenALAudioManager::update()
 {
 	ScopedFPUGuard fpuGuard;
 	AudioManager::update();
+	// GeneralsX @bugfix cemlyn007 08/10/2026 With no device, drop every request as
+	// OpenALAudioManagerDummy::update does: playing one would make AL calls with no current
+	// context, and streaming one hung in OpenALAudioStream::bufferData (see hasContext).
+	if (!hasContext()) {
+		removeAllAudioRequests();
+		return;
+	}
 	setDeviceListenerPosition();
 	processRequestList();
 	processPlayingList();
@@ -1548,12 +1557,18 @@ void OpenALAudioManager::openDevice(void)
 	if (m_alcContext == nullptr) {
 		DEBUG_LOG(("Failed to create ALC context"));
 		setOn(false, AudioAffect_All);
+		// GeneralsX @bugfix cemlyn007 08/10/2026 Close the device too, so getDevice() reports no
+		// device whenever there is no context (see hasContext).
+		closeDevice();
 		return;
 	}
 
 	if (!alcMakeContextCurrent(m_alcContext)) {
 		DEBUG_LOG(("Failed to make ALC context current"));
 		setOn(false, AudioAffect_All);
+		// GeneralsX @bugfix cemlyn007 08/10/2026 Release the context and device, so hasContext()
+		// and getDevice() report no device.
+		closeDevice();
 		return;
 	}
 
@@ -3100,7 +3115,12 @@ void* OpenALAudioManager::getHandleForBink(void)
 {
 	if (!m_binkAudio) {
 		DEBUG_LOG(("Creating Bink audio stream\n"));
-		m_binkAudio = NEW OpenALAudioStream;
+		// GeneralsX @bugfix cemlyn007 08/10/2026 With no device, a stream with no AL behind it, as
+		// OpenALAudioManagerDummy::getHandleForBink makes: the video plays silently (see hasContext).
+		if (hasContext())
+			m_binkAudio = NEW OpenALAudioStream;
+		else
+			m_binkAudio = NEW OpenALAudioStream(OpenALAudioStream::DeviceFree());
 	}
 	return m_binkAudio;
 }
@@ -3132,6 +3152,10 @@ void OpenALAudioManager::friend_forcePlayAudioEventRTS(const AudioEventRTS* even
 {
 	// GeneralsX @bugfix meerzulee 19/07/2026 FP env guard for audio entry point (see #215)
 	ScopedFPUGuard fpuGuard;
+	// GeneralsX @bugfix cemlyn007 08/10/2026 Nothing plays with no device, as in
+	// OpenALAudioManagerDummy::friend_forcePlayAudioEventRTS (see hasContext).
+	if (!hasContext())
+		return;
 	if (!eventToPlay->getAudioEventInfo()) {
 		getInfoForAudioEvent(eventToPlay);
 		if (!eventToPlay->getAudioEventInfo()) {

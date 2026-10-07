@@ -120,6 +120,9 @@ public:
 
 	virtual void friend_forcePlayAudioEventRTS(const AudioEventRTS *eventToPlay);
 
+	// GeneralsX @bugfix cemlyn007 08/10/2026 FALSE when openDevice opened no device (see hasContext).
+	virtual Bool canPlaySounds() const override { return hasContext(); }
+
 	virtual UnsignedInt getNum2DSamples(void) const;
 	virtual UnsignedInt getNum3DSamples(void) const;
 	virtual UnsignedInt getNumStreams(void) const;
@@ -173,6 +176,14 @@ protected:
 	ALuint playSample3D(AudioEventRTS *event, PlayingAudio * audio);
 
 protected:
+	// GeneralsX @bugfix cemlyn007 08/10/2026 Whether openDevice left this manager with a device and
+	// a current context. When it did not (no sound card, as on a CI runner; or the device or context
+	// failed to open), there is no current ALC context, so every AL call fails: OpenAL Soft returns
+	// AL_INVALID_OPERATION from alGetError on every call and logs each one. The manager then behaves
+	// like OpenALAudioManagerDummy: requests are dropped at the next update, so nothing ever plays
+	// and no AL call is made, and a game runs the same as a muted one.
+	Bool hasContext(void) const { return m_alcContext != nullptr; }
+
 	void enumerateDevices(void);
 	void createListener(void);
 	void initDelayFilter(void);
