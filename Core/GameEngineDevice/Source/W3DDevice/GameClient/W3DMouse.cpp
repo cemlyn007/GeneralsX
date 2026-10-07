@@ -481,7 +481,8 @@ void W3DMouse::setCursor( MouseCursor cursor )
 }
 
 #ifdef _WIN32
-extern HWND ApplicationHWnd;
+// GeneralsX @refactor cemlyn007 30/09/2026 The window handles (PLAN-023 Phase 8, stage RR2a-2).
+#include "Common/ApplicationWindow.h"
 #endif
 
 void W3DMouse::draw()

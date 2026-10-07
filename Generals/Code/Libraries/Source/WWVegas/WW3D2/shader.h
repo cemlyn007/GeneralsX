@@ -233,8 +233,11 @@ public:
 	ShaderClass(const ShaderClass & s)
 	{	ShaderBits=s.ShaderBits; }
 
-	ShaderClass(const unsigned int d)
-	{	ShaderBits=d;	}
+	// GeneralsX @refactor cemlyn007 30/09/2026 constexpr: the preset shaders below are constant-initialised, so
+	// read-only data (PLAN-023 Phase 8, stage RR2a-2).
+	constexpr ShaderClass(const unsigned int d)
+		: ShaderBits(d)
+	{	}
 
 	bool operator == (const ShaderClass & s) { return ShaderBits == s.ShaderBits; }
 	bool operator != (const ShaderClass & s) { return ShaderBits != s.ShaderBits; }
@@ -322,7 +325,13 @@ public:
 	int							Guess_Sort_Level() const;
 
 	// DX 8 state management routines
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 30/09/2026 The dirty flag is the engine's (shader.cpp; PLAN-023 Phase 8, stage
+	// RR2a-2).
+	static void	Invalidate();
+#else
 	static void	Invalidate() { ShaderDirty=true; }
+#endif
 
 	// Global backface culling invert.  This interface can be used to globally invert all backface
 	// culling.  This is a global setting and will affect everything being rendered.  Typically it
@@ -335,102 +344,104 @@ public:
 
 	const StringClass& Get_Description(StringClass& str) const;
 
+	// GeneralsX @refactor cemlyn007 30/09/2026 const: built at static initialisation and only copied, so the same for
+	// every engine (PLAN-023 Phase 8, stage RR2a-2).
 	// These are a bunch of predefined shaders for common cases. None of them
 	// have fogging since "no fog" is the surrender default and usage of fog
 	// changes from app to app - if you want a fogging shader just grab one of
 	// these and add fog to it.
 
 	// Texturing, zbuffer, primary gradient, no blending
-	static ShaderClass _PresetOpaqueShader;
+	static const ShaderClass _PresetOpaqueShader;
 
 	// Texturing, zbuffer, primary gradient, additive blending
-	static ShaderClass _PresetAdditiveShader;
+	static const ShaderClass _PresetAdditiveShader;
 
 	// Texturing, zbuffer, primary gradient, additive blending, bumpenvmap
-	static ShaderClass _PresetBumpenvmapShader;
+	static const ShaderClass _PresetBumpenvmapShader;
 
 	// Texturing, zbuffer, primary gradient, alpha blending
-	static ShaderClass _PresetAlphaShader;
+	static const ShaderClass _PresetAlphaShader;
 
 	// Texturing, zbuffer, primary gradient, multiplicative blending
-	static ShaderClass _PresetMultiplicativeShader;
+	static const ShaderClass _PresetMultiplicativeShader;
 
 	// Texturing, no zbuffer reading/writing, no gradients, no blending, no
 	// fogging - mostly for opaque 2D objects.
-	static ShaderClass _PresetOpaque2DShader;
+	static const ShaderClass _PresetOpaque2DShader;
 
 	// Texturing, default zbuffer reading, no zbuffer writing, no gradients, no blending, no
 	// fogging - mostly for opaque sprites
-	static ShaderClass _PresetOpaqueSpriteShader;
+	static const ShaderClass _PresetOpaqueSpriteShader;
 
 	// Texturing, no zbuffer reading/writing, no gradients, additive blending,
 	// no fogging - mostly for additive 2D objects.
-	static ShaderClass _PresetAdditive2DShader;
+	static const ShaderClass _PresetAdditive2DShader;
 
 	// Texturing, no zbuffer reading/writing, no gradients, alpha blending, no
 	// fogging - mostly for alpha-blended 2D objects.
-	static ShaderClass _PresetAlpha2DShader;
+	static const ShaderClass _PresetAlpha2DShader;
 
 	// Texturing, default zbuffer reading, no zbuffer writing, no gradients,
 	// additive blending, no fogging - mostly for use in additive sprite
 	// objects.
-	static ShaderClass _PresetAdditiveSpriteShader;
+	static const ShaderClass _PresetAdditiveSpriteShader;
 
 	// Texturing, default zbuffer reading, no zbuffer writing, no gradients,
 	// alpha blending, no fogging - mostly for use in alpha-blended sprite
 	// objects.
-	static ShaderClass _PresetAlphaSpriteShader;
+	static const ShaderClass _PresetAlphaSpriteShader;
 
 	// No texturing, default zbuffer reading/writing, primary gradient, no
 	// blending, no fogging - mostly for use in solid-colored opaque objects.
-	static ShaderClass _PresetOpaqueSolidShader;
+	static const ShaderClass _PresetOpaqueSolidShader;
 
 	// No texturing, default zbuffer reading, no zbuffer writing, primary
 	// gradient, additive blending, no fogging - mostly for use in
 	// solid-colored additive objects.
-	static ShaderClass _PresetAdditiveSolidShader;
+	static const ShaderClass _PresetAdditiveSolidShader;
 
 	// No texturing, default zbuffer reading, no zbuffer writing, primary
 	// gradient, alpha blending, no fogging - mostly for use in solid-colored
 	// alpha-blended objects.
-	static ShaderClass _PresetAlphaSolidShader;
+	static const ShaderClass _PresetAlphaSolidShader;
 
 	// Texturing, no zbuffer reading/writing, no gradients, no blending, alpha
 	// testing, no fogging - mostly for "pure" alpha-tested 2D objects.
-	static ShaderClass _PresetATest2DShader;
+	static const ShaderClass _PresetATest2DShader;
 
 	// Texturing, default zbuffer reading and writing, no gradients, no
 	// blending, alpha testing, no fogging - mostly for "pure" alpha-tested
 	// sprite objects.
-	static ShaderClass _PresetATestSpriteShader;
+	static const ShaderClass _PresetATestSpriteShader;
 
 	// Texturing, no zbuffer reading/writing, no gradients, alpha blending AND
 	// alpha testing, no fogging - mostly for alpha-tested and blended 2D
 	// objects.
-	static ShaderClass _PresetATestBlend2DShader;
+	static const ShaderClass _PresetATestBlend2DShader;
 
 	// Texturing, default zbuffer reading and writing, no gradients, alpha
 	// blending AND alpha testing, no fogging - mostly for use in alpha-tested
 	// and blended sprite objects.
-	static ShaderClass _PresetATestBlendSpriteShader;
+	static const ShaderClass _PresetATestBlendSpriteShader;
 
 	// Texturing, no zbuffer reading/writing, no gradients, screen blending,
 	// no fogging - mostly for screen-blended 2D objects.
-	static ShaderClass _PresetScreen2DShader;
+	static const ShaderClass _PresetScreen2DShader;
 
 	// Texturing, default zbuffer reading, no zbuffer writing, no gradients,
 	// screen blending, no fogging - mostly for use in screen-blended sprite
 	// objects.
-	static ShaderClass _PresetScreenSpriteShader;
+	static const ShaderClass _PresetScreenSpriteShader;
 
 	// Texturing, no zbuffer reading/writing, no gradients, multiplicative
 	// blending, no fogging - mostly for multiplicatively blended 2D objects.
-	static ShaderClass _PresetMultiplicative2DShader;
+	static const ShaderClass _PresetMultiplicative2DShader;
 
 	// Texturing, default zbuffer reading, no zbuffer writing, no gradients,
 	// multiplicative blending, no fogging - mostly for use in multiplicatively
 	// blended sprite objects.
-	static ShaderClass _PresetMultiplicativeSpriteShader;
+	static const ShaderClass _PresetMultiplicativeSpriteShader;
 
 protected:
 
@@ -439,8 +450,12 @@ protected:
 
 	unsigned int ShaderBits;
 
+#if !RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 30/09/2026 With RTS_ENGINE_CONTEXT these and shader.cpp's _PolygonCullMode are the
+	// current engine's W3DRenderState fields (PLAN-023 Phase 8, stage RR2a-2).
 	static bool ShaderDirty;
 	static unsigned long CurrentShader;
+#endif
 };
 
 inline void ShaderClass::Reset()

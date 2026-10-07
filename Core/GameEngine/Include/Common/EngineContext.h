@@ -96,9 +96,21 @@ class RTS3DInterfaceScene;
 class W3DAssetManager;
 class WW3DAssetManager;
 struct W3DRenderState;
+struct WW3DState;
+struct SDL_Window;
 
 namespace rts
 {
+
+// GeneralsX @feature cemlyn007 30/09/2026 The alignment, and so the size granule, of the render states an engine's
+// w3dRender and ww3dState point to (W3DRenderState, WW3DState): the largest memory page size of the targets (16 KiB
+// on Apple silicon, 4 KiB on x86-64 Linux), so that their defaults fill whole pages of their own, which a host can
+// make read-only (W3D_Protect_Render_Defaults; PLAN-023 Phase 8, stage RR2a-2).
+#ifdef __APPLE__
+inline constexpr std::size_t renderStateAlignment = 16384;
+#else
+inline constexpr std::size_t renderStateAlignment = 4096;
+#endif
 
 // Destroys one per-engine slot object (see EngineContext::setSlot).
 typedef void (*EngineSlotDestroyFn)(void* object);
@@ -354,6 +366,12 @@ struct ContextFieldOps
 	operator T&() const noexcept
 	{
 		return Derived::get();
+	}
+	// An explicit cast to an enum type (`(SomeEnum)name`, for an integer field) casts the field's value.
+	template <typename E, typename = std::enable_if_t<std::is_enum_v<E> && std::is_integral_v<T>>>
+	explicit operator E() const noexcept
+	{
+		return static_cast<E>(Derived::get());
 	}
 	T operator->() const noexcept
 	{

@@ -178,12 +178,11 @@ void SDL3GameEngine::init(void)
 	}
 
 	// Verify window was created by SDL3Main.cpp
-	extern SDL_Window* TheSDL3Window;
-	extern HWND ApplicationHWnd;
-
-	// GeneralsX @feature cemlyn007 30/09/2026 Windowless render-headless, as Zero Hour's. Generals'
-	// W3DDisplay brings no device up and draws nothing while m_headless is set, so only Zero Hour
-	// renders windowless (PLAN-023 Phase 8, stage RR0c).
+	// GeneralsX @feature cemlyn007 30/09/2026 Windowless render-headless: an embed host that draws
+	// image observations brings the render device up with no window at all (a null HWND: DXVK then
+	// gives the device a back buffer and no presenter), so the engine binds none and makes no SDL
+	// call. Generals' W3DDisplay brings no device up and draws nothing while m_headless is set, so
+	// only Zero Hour renders windowless (PLAN-023 Phase 8, stage RR0c).
 	if (TheGlobalData && TheGlobalData->m_headless && TheGlobalData->m_headlessRender && !TheSDL3Window) {
 		fprintf(stderr, "INFO: SDL3GameEngine::init() windowless render mode - no SDL window\n");
 		m_SDLWindow = nullptr;

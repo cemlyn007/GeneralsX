@@ -155,7 +155,6 @@ HAND = [
     (GLOBAL, "", "theReleaseCrashLogFile", "thread_local handle of the release-crash log being written: per thread by design (PLAN-023 Phase 5 moves the log to per-engine output paths)"),
     (GLOBAL, "", "theEngineHasFaulted", "embedding host's sticky fault latch: atomic (PLAN-023 Phase 5 moves the release-crash log to per-engine output paths)"),
     (GLOBAL, "", "theInReleaseCrashNoReturn", "thread_local re-entry guard of ReleaseCrashNoReturn: per thread by design"),
-    (GLOBAL, "", "re:TheSDL3Window|ApplicationHWnd", "the process's window (at most one rendering engine per process)"),
     (GLOBAL, "", "re:__argc|__argv", "the process's argv (the executable's, set by rlgenerals' launcher; PLAN-023 Phase 5 BootConfig replaces it): boot/shutdown only, serialized by the host (only CommandLine's boot-time parse reads it)"),
     (GLOBAL, "", "re:critSec[1-5]|FilterSoftwareVulkanICDs\\(\\)::hw_icds", "the game executable's own (SDL3Main), unused by an embedding host"),
     (GLOBAL, "", "re:rts::WorkingDirectory::\\w+", "the startup working directory (one per process): boot/shutdown only, serialized by the host (CommandLine's boot-time parse writes and reads it)"),
@@ -274,16 +273,18 @@ HAND = [
     (RPROC, "", "DX8Wrapper_FinalReleaseHook", "the embedding host's check before a render device's or Direct3D interface's last release (RR1): set once, before any render device"),
     # RR2a-1 moved DX8Wrapper's device state (its class statics, dx8wrapper.cpp's file statics and globals) and
     # Debug_Statistics' counters (statistics.cpp) into W3DRenderState, one per render engine (EngineContext::w3dRender,
-    # heap-allocated by DX8Wrapper::Init, freed by Shutdown); the host's two render switches are EngineContext fields.
-    (RCONST, "", "W3DRenderState::Defaults", "the render state an engine without one reads (RR2a-1): every field at its upstream initial value, built at static initialisation and never written (an engine that renders reads and writes its own W3DRenderState)"),
-    (RPER, "RR2a-2", "_Hwnd", "the render window handle, ww3d.cpp's (dx8wrapper.cpp's moved into W3DRenderState at RR2a-1): the render engine's window (null for a windowless one)"),
+    # heap-allocated by DX8Wrapper::Init, freed by Destroy_Render_State at the end of WW3D::Shutdown from RR2a-2); the host's two render switches are EngineContext fields.
+    (RCONST, "", "W3DRenderState::Defaults", "the render state an engine without one reads (RR2a-1): every field at its upstream initial value, built at static initialization and never written (an engine that renders reads and writes its own W3DRenderState; a host makes its pages read-only, W3D_Protect_Render_Defaults, RR2a-2)"),
+    # RR2a-2 moved WW3D's statics (its render settings and render-loop state, ww3d.cpp's file statics) into WW3DState,
+    # one per render engine (EngineContext::ww3dState, allocated and freed with w3dRender), and ShaderClass's device
+    # state (CurrentShader, ShaderDirty, _PolygonCullMode) into W3DRenderState; the 22 preset shaders are const
+    # (constant-initialised, so read-only data); TheSDL3Window and ApplicationHWnd are EngineContext fields; and
+    # W3DDisplay's FPS history and debug statistics are its members.
+    (RCONST, "", "WW3DState::Defaults", "the WW3D state an engine without one reads (RR2a-2): every field at its upstream initial value, constant-initialized and never written (a host makes its pages read-only, W3D_Protect_Render_Defaults)"),
+    (RPROC, "", "W3D_Protect_Render_Defaults(bool)::s_exitHandlerOnce", "registers, once per process, the exit handler that makes the render defaults writable again for their static destructors (RR2a-2)"),
     (DEBUG, "", "file:WW3D2/dx8rendererdebugger\\.cpp", "WW3D renderer debugger (DX8RendererDebugger::Enabled is never set)"),
-    (RPER, "RR2a-2", "re:W3DDisplay::(gatherDebugStats|updateAverageFPS)\\(\\)::\\w+", "the FPS history and debug statistics W3DDisplay::draw updates on every frame (updateAverageFPS unconditionally): per render engine, as W3DDisplay members"),
-    (RPER, "RR2a-2", "re:WW3D::(IsSortingEnabled|PixelCenter[XY]|RenderBackend|IsInitted|IsRendering|IsCapturing|IsScreenUVBiased|AreDecalsEnabled|DecalRejectionDistance|AreStaticSortListsEnabled|MungeSortOnLoad|OverbrightModifyOnLoad|Movie|PauseRecord|RecordNextFrame|UserStat[0-2]|DefaultNativeScreenSize|DefaultStaticSortLists|CurrentStaticSortLists|DefaultDebugMaterial|DefaultDebugShader|LightmapDebugShader|PrelitMode|ExposePrelit|SnapshotActivated|ThumbnailEnabled|MeshDrawMode|NPatchesGapFillingMode|NPatchesLevel|IsTexturingEnabled|IsColoringEnabled|LastFrameMemoryAllocations|LastFrameMemoryFrees|TextureFilter|AnisotropyLevel|Lite)|_TextureReduction|_TextureMinDim|_LargeTextureExtraReductionEnabled|WW3D::Make_Screen_Shot\\(.*\\)::frame_number", "WW3D's render settings and render-loop state: WW3D::Init and Shutdown, the render loop, the static sort lists and the options (texture filter, texture reduction) write them, so each render engine needs its own"),
     (RCONST, "", "VertexMaterialClass::Apply_Null()::default_settings", "the null material's settings, constant data"),
     (RCONST, "", "DAZZLE_INI_FILENAME", "the dazzle INI's name, never reassigned"),
-    (RPER, "RR2a-2", "re:ShaderClass::(ShaderDirty|CurrentShader)|_PolygonCullMode", "the shader last applied to the device and its dirty flag, and the cull mode: device state each render engine's draw writes"),
-    (RCONST, "RR2a-2", "re:ShaderClass::_Preset\\w+Shader", "the 22 preset shaders, built at static initialization and only copied: made const"),
     (RCONST, "", "re:(src|dst)BlendLUT", "blend-mode lookup tables, built at static initialization from constants and only read"),
     (RPER, "RR2b", "re:VertexMaterialClass::Presets|BoxRenderObjClass::IsInitted|_BoxMaterial|PointGroupClass::PointMaterial|_MissingTexture|DX8TextureManagerClass::Managed_Textures|Render2DClass::ScreenResolution|_surface|CapsWorkString", "a device-dependent object Do_Onetime_Device_Dependent_Inits (or WW3D::Init) makes and its Shutdowns free, or state they set from the device: per render engine"),
     (RPER, "RR2b", "re:_Dynamic(DX8|Sorting)(Vertex|Index)(Buffer|Array)(Size|Offset)?|_(Vertex|Index)BufferTotal(Vertices|Indices|Size)|_(Vertex|Index)BufferCount", "the dynamic vertex/index buffers, their cursors, and the buffer statistics every buffer's creation and release counts: per render engine"),
@@ -330,7 +331,10 @@ HAND = [
     (RSCR, "RR2b", "re:PredictiveLODOptimizerClass::\\w+", "the predictive LOD optimizer's object arrays and cost, filled and consumed within one frame's optimization"),
     (RPROC, "", "re:AnimatedSoundMgrClass::\\w+", "W3D animated sounds (WWAudio), never initialized by the game (not used by its audio)"),
     (RPER, "RR2b", "Vector3Randomizer::Randomizer", "the RNG of the W3D particle emitters' randomizers: per engine with an identical seed (the render engines have no particles today: ParticleSystemManagerDummy while m_headless)"),
-    (RCONST, "", "re:detailOpaqueShader|detailAlphaShader|zFillAlphaShader|PlayerColorShader", "terrain, tree, bib, bridge, road, status-circle, water and player-color shaders, one per TU, built at static initialization and only read (copied into objects, or applied)"),
+    # The terrain, tree, bib, bridge, road, status-circle, water and player-colour shaders (detailOpaqueShader,
+    # detailAlphaShader, zFillAlphaShader, PlayerColorShader; one per TU) left the writable data at RR2a-2: they
+    # are `static const`, and ShaderClass's constructor from bits is constexpr, so they are constant-initialised
+    # read-only data.
     (RPER, "RR3", "re:FlatHeightMapRenderObjClass::updateCenter\\(.*\\)::prev\\w+|visM(in|ax)[XY]|HeightMapRenderObjClass::renderExtraBlendTiles\\(\\)::maxBlendTiles", "terrain draw state kept between frames: members of the height map"),
     (RPER, "RR3", "re:W3DFilters|W3DShaders|W3DShadersPassCount|W3DShaderManager::\\w+|screen(Default|BW|BWFilterDOT3|CrossFade|MotionBlur)Filter\\w*|Screen(BW|CrossFade|MotionBlur)Filter::\\w+|(shroud|flatShroud|mask|cloud)TextureShader|(terrain|flatTerrain|road)Shader(2Stage|8Stage|PixelShader)", "W3DShaderManager: its shader and filter tables, the chosen chipset, the render-to-texture surfaces, and the shader and filter objects (some holding D3D pixel shaders and textures; the screen filters' fade and motion-blur state is script-driven): one per-engine struct made by init and freed by shutdown"),
     (RCONST, "RR3", "re:\\w+(Shader|Filter)List", "tables of pointers to the shader and filter objects above, never written: they move with them"),

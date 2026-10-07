@@ -70,12 +70,18 @@ char** __argv = nullptr; ///< global argument vector
 // TheSuperHackers @build felipebraz 13/02/2026
 // ApplicationHWnd is declared extern in Generals/Code/Main/WinMain.h
 // On Linux, we cast SDL_Window* to HWND type for compatibility
+// GeneralsX @refactor cemlyn007 30/09/2026 With RTS_ENGINE_CONTEXT the handles are the engine's (Common/ApplicationWindow.h;
+// PLAN-023 Phase 8, stage RR2a-2).
+#if !RTS_ENGINE_CONTEXT
 HWND ApplicationHWnd = nullptr;  ///< our application window handle
+#endif
 
 // GLOBAL SDL3 WINDOW
 // GeneralsX @feature felipebraz 16/02/2026
 // SDL3 window created in main() before GameMain(), stored globally for engine access
+#if !RTS_ENGINE_CONTEXT
 SDL_Window* TheSDL3Window = nullptr;
+#endif
 
 // GAME TEXT FILE PATHS
 // TheSuperHackers @build felipebraz 13/02/2026

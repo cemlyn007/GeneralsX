@@ -66,7 +66,7 @@ PROCESS_GLOBAL = {
     "TheObjectIDToDebug": "debug",
     "TheMiniDumper": "crash dumps, process-wide (Windows)",
     # Process-level host objects: one window and one Win32 message pump per process.
-    "TheSDL3Window": "the process's SDL window (at most one rendering engine per process)",
+    "TheSDL3Window": "the game's SDL window: with RTS_ENGINE_CONTEXT the engine's own (EngineContext::sdl3Window, Common/ApplicationWindow.h; PLAN-023 Phase 8, stage RR2a-2), this extern is the build without it",
     "TheWin32Mouse": "Windows WndProc mouse (WinMain only)",
     # Dead online back ends, stubbed or unused on Linux/macOS.
     "TheWebBrowser": "WOL browser, a stub off Windows (CComObject<WebBrowser> on Windows)",

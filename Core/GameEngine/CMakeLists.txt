@@ -2,6 +2,7 @@ set(GAMEENGINE_SRC
     Include/Common/AcademyStats.h
 #    Include/Common/ActionManager.h
     Include/Common/AddonCompat.h
+    Include/Common/ApplicationWindow.h
     Include/Common/ArchiveFile.h
     Include/Common/ArchiveFileSystem.h
     Include/Common/AsciiString.h

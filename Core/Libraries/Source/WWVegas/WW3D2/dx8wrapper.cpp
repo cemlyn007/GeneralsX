@@ -99,7 +99,13 @@
 #include "shdlib.h"
 
 #include <atomic>
+#include <cstdint>
+#include <cstdlib>
 #include <mutex>
+#ifndef _WIN32
+#include <sys/mman.h>
+#include <unistd.h>
+#endif
 
 // GeneralsX @feature cemlyn007 30/09/2026 DX8Wrapper's state names as the current engine's W3DRenderState fields,
 // in this file too (PLAN-023 Phase 8, stage RR2a-1; see w3drenderstate.h). After every #include.
@@ -125,11 +131,59 @@ void DX8Wrapper::Create_Render_State()
 	::rts::EngineContext* const context = ::rts::ctx();
 	if (context->w3dRender == nullptr)
 		context->w3dRender = new W3DRenderState();
+	// GeneralsX @feature cemlyn007 30/09/2026 WW3D's state comes and goes with DX8Wrapper's (PLAN-023 Phase 8, stage
+	// RR2a-2).
+	if (context->ww3dState == nullptr)
+		context->ww3dState = new WW3DState();
 }
 
-// GeneralsX @bugfix cemlyn007 02/10/2026 Create_Render_State's inverse, for a caller that allocated this
-// engine's state but never reaches a device: Init's failure returns; a lite backend reaches it through
-// Shutdown, which ~DX8Backend now calls unconditionally with RTS_ENGINE_CONTEXT (Backend/DX8Backend.cpp).
+// GeneralsX @feature cemlyn007 30/09/2026 The defaults' guard (PLAN-023 Phase 8, stage RR2a-2; see w3drenderstate.h).
+static bool Protect_Pages(void* object, std::size_t size, bool readOnly)
+{
+#ifdef _WIN32
+	(void)object;
+	(void)size;
+	(void)readOnly;
+	return false;
+#else
+	const long pageSize = sysconf(_SC_PAGESIZE);
+	if (pageSize <= 0 || reinterpret_cast<std::uintptr_t>(object) % static_cast<std::uintptr_t>(pageSize) != 0 ||
+		size % static_cast<std::size_t>(pageSize) != 0)
+		return false;
+	return mprotect(object, size, readOnly ? PROT_READ : PROT_READ | PROT_WRITE) == 0;
+#endif
+}
+
+static void Unprotect_Render_Defaults_At_Exit()
+{
+	W3D_Protect_Render_Defaults(false);
+}
+
+bool W3D_Protect_Render_Defaults(bool readOnly)
+{
+	static_assert(alignof(W3DRenderState) == ::rts::renderStateAlignment, "W3DRenderState fills whole pages");
+	static_assert(alignof(WW3DState) == ::rts::renderStateAlignment, "WW3DState fills whole pages");
+	if (readOnly)
+	{
+		static std::once_flag s_exitHandlerOnce;
+		std::call_once(s_exitHandlerOnce, [] { std::atexit(Unprotect_Render_Defaults_At_Exit); });
+	}
+	const bool render = Protect_Pages(&W3DRenderState::Defaults, sizeof(W3DRenderState), readOnly);
+	const bool ww3d = Protect_Pages(&WW3DState::Defaults, sizeof(WW3DState), readOnly);
+	return render && ww3d;
+}
+
+void DX8Wrapper::Destroy_Render_State()
+{
+	::rts::EngineContext* const context = ::rts::ctx();
+	delete context->w3dRender;
+	context->w3dRender = nullptr;
+	delete context->ww3dState;
+	context->ww3dState = nullptr;
+}
+
+// GeneralsX @bugfix cemlyn007 02/10/2026 Frees this engine's W3DRenderState for Init's failure returns, which
+// never reach a device (WW3D::Shutdown's Destroy_Render_State frees it otherwise).
 void DX8Wrapper::Free_Render_State()
 {
 	::rts::EngineContext* const context = ::rts::ctx();
@@ -650,8 +704,8 @@ void MoveRectIntoOtherRect(const RECT& inner, const RECT& outer, int* x, int* y)
 bool DX8Wrapper::Init(void * hwnd, bool lite)
 {
 #if RTS_ENGINE_CONTEXT
-	// GeneralsX @feature cemlyn007 30/09/2026 This engine's render state, freed by Shutdown (PLAN-023 Phase 8, stage
-	// RR2a-1).
+	// GeneralsX @feature cemlyn007 30/09/2026 This engine's render state, freed by Destroy_Render_State at the end of
+	// WW3D::Shutdown (PLAN-023 Phase 8, stages RR2a-1, RR2a-2).
 	Create_Render_State();
 #endif
 	WWASSERT(!IsInitted);
@@ -830,11 +884,9 @@ void DX8Wrapper::Shutdown()
 
 	DX8Caps::Shutdown();
 	IsInitted = false;		// 010803 srj
-#if RTS_ENGINE_CONTEXT
-	// GeneralsX @feature cemlyn007 30/09/2026 The engine's render state goes with its device (PLAN-023 Phase 8,
-	// stage RR2a-1); a later Init starts a fresh one, as a fresh process did.
-	Free_Render_State();
-#endif
+	// GeneralsX @feature cemlyn007 30/09/2026 With RTS_ENGINE_CONTEXT the engine's render state outlives its device
+	// until the end of WW3D::Shutdown, which writes WW3D's own after this (PLAN-023 Phase 8, stages RR2a-1 and
+	// RR2a-2): Destroy_Render_State.
 }
 
 void DX8Wrapper::Do_Onetime_Device_Dependent_Inits()

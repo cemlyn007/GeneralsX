@@ -116,6 +116,8 @@ static void drawFramerateBar();
 #endif
 
 #include "WinMain.h"
+// GeneralsX @refactor cemlyn007 30/09/2026 The window handles (PLAN-023 Phase 8, stage RR2a-2).
+#include "Common/ApplicationWindow.h"
 
 
 // DEFINE AND ENUMS ///////////////////////////////////////////////////////////
@@ -471,7 +473,6 @@ inline Bool isResolutionSupported(const ResolutionDescClass &res)
 #ifdef SAGE_USE_SDL3
 static bool SDL3_GetNativeDisplaySize(int& outW, int& outH, float& outDensity)
 {
-	extern SDL_Window* TheSDL3Window;
 	if (!TheSDL3Window) return false;
 	SDL_DisplayID displayId = SDL_GetDisplayForWindow(TheSDL3Window);
 	const SDL_DisplayMode* mode = SDL_GetCurrentDisplayMode(displayId);
@@ -484,7 +485,6 @@ static bool SDL3_GetNativeDisplaySize(int& outW, int& outH, float& outDensity)
 
 static bool SDL3_GetWindowSizeInPixels(int& outW, int& outH, float& outDensity)
 {
-	extern SDL_Window* TheSDL3Window;
 	if (!TheSDL3Window) return false;
 	int logW = 0, logH = 0, physW = 0, physH = 0;
 	SDL_GetWindowSize(TheSDL3Window, &logW, &logH);
@@ -550,7 +550,6 @@ static void SDL3_CenterWindowOnCurrentDisplay(SDL_Window* window, Int width, Int
 // GeneralsX @bugfix GitHub Copilot 27/04/2026 Apply SDL3 window sizing/fullscreen only after the final render resolution is known.
 static void SDL3_ApplyWindowModeForRenderConfig(Bool windowed, Int renderWidth, Int renderHeight)
 {
-	extern SDL_Window* TheSDL3Window;
 	if (!TheSDL3Window) return;
 
 	if (!windowed) {
@@ -619,6 +618,9 @@ static bool s_filteredDirty = true;
 static void buildFilteredResolutions()
 {
 	s_filteredResolutions.clear();
+	// GeneralsX @bugfix cemlyn007 03/10/2026 A driver that reports no display modes adds no device, and the table's first
+	// entry is then a null reference: init's last resolution attempt would fault, so that attempt falls back to the default size.
+	if (WW3D::Get_Render_Device_Count() <= 0) return;
 	const RenderDeviceDescClass &devDesc = WW3D::Get_Render_Device_Desc(0);
 	const DynamicVectorClass<ResolutionDescClass> &resolutions = devDesc.Enumerate_Resolutions();
 
@@ -954,7 +956,6 @@ void W3DDisplay::init()
 
 		// GeneralsX @bugfix felipebraz 16/02/2026 Show window after DirectX8/DXVK initialized
 		#ifndef _WIN32
-		extern SDL_Window* TheSDL3Window;
 		if (TheSDL3Window) {
 			fprintf(stderr, "DEBUG: Showing SDL3 window after WW3D init...\n");
 			SDL_ShowWindow(TheSDL3Window);
@@ -1043,7 +1044,9 @@ void W3DDisplay::init()
 
 			++attempt;
 		}
-		while (attempt < 3 && renderDeviceError != WW3D_ERROR_OK);
+		// GeneralsX @bugfix cemlyn007 03/10/2026 A render-headless host owns the image size, so the last attempt's fallback to the
+		// default size is not made: a size the adapter cannot back fails the boot.
+		while (attempt < (TheGlobalData->m_headlessRender ? 2 : 3) && renderDeviceError != WW3D_ERROR_OK);
 
 		if (renderDeviceError != WW3D_ERROR_OK)
 		{
@@ -1158,11 +1161,10 @@ const UnsignedInt START_CUMU_FRAME = LOGICFRAMES_PER_SECOND / 2;	// skip first h
 
 void W3DDisplay::updateAverageFPS()
 {
-	constexpr const Int FPS_HISTORY_SIZE = 30;
-
-	static Int64 lastUpdateTime64 = 0;
-	static Int historyOffset = 0;
-	static Real fpsHistory[FPS_HISTORY_SIZE] = {0};
+	// GeneralsX @refactor cemlyn007 30/09/2026 The display's own, not function-local statics (PLAN-023 Phase 8, stage
+	// RR2a-2): each render engine's draw keeps its own FPS history and statistics.
+	Int64& lastUpdateTime64 = m_fpsLastUpdateTime64;
+	Int& historyOffset = m_fpsHistoryOffset;
 
 	const Int64 freq64 = getPerformanceCounterFrequency();
 	const Int64 time64 = getPerformanceCounter();
@@ -1184,10 +1186,10 @@ void W3DDisplay::updateAverageFPS()
 		historyOffset = 0;
 
 	m_currentFPS = 1.0f/elapsedSeconds;
-	fpsHistory[historyOffset++] = m_currentFPS;
+	m_fpsHistory[historyOffset++] = m_currentFPS;
 
 	// determine average frame rate over our past history.
-	const Real sum = std::accumulate(fpsHistory, fpsHistory + FPS_HISTORY_SIZE, 0.0f);
+	const Real sum = std::accumulate(m_fpsHistory, m_fpsHistory + FPS_HISTORY_SIZE, 0.0f);
 	m_averageFPS = sum / FPS_HISTORY_SIZE;
 
 	lastUpdateTime64 = time64;
@@ -1202,12 +1204,7 @@ ICoord2D TheMousePos;
 //=============================================================================
 void W3DDisplay::gatherDebugStats()
 {
-	static UnsignedInt s_framesRenderedSinceLastUpdate = 0;
-	static Int64 s_lastUpdateTime64 = 0;
-	static double s_timeSinceLastUpdateInSecs = 0.0;
-	static Int s_drawCallsSinceLastUpdate = 0;
-	static Int s_sortedPolysSinceLastUpdate = 0;
-
+	// GeneralsX @refactor cemlyn007 30/09/2026 The display's own members, not function-local statics (PLAN-023 Phase 8, stage RR2a-2).
 	// allocate the display strings if needed
 	if( m_displayStrings[0] == nullptr )
 	{
@@ -1242,14 +1239,14 @@ void W3DDisplay::gatherDebugStats()
 		m_benchmarkDisplayString->setFont( thisFont );
 	}
 
-	++s_framesRenderedSinceLastUpdate;
-  s_drawCallsSinceLastUpdate += Debug_Statistics::Get_Draw_Calls();
-	s_sortedPolysSinceLastUpdate += Debug_Statistics::Get_Sorting_Polygons();
+	++m_statsFramesRenderedSinceLastUpdate;
+  m_statsDrawCallsSinceLastUpdate += Debug_Statistics::Get_Draw_Calls();
+	m_statsSortedPolysSinceLastUpdate += Debug_Statistics::Get_Sorting_Polygons();
 
 	Int64 freq64 = getPerformanceCounterFrequency();
 	Int64 time64 = getPerformanceCounter();
 
-	s_timeSinceLastUpdateInSecs = ((double)(time64 - s_lastUpdateTime64) / (double)(freq64));
+	m_statsTimeSinceLastUpdateInSecs = ((double)(time64 - m_statsLastUpdateTime64) / (double)(freq64));
 
 #ifdef EXTENDED_STATS
 		static FILE *pListFile = nullptr;
@@ -1268,7 +1265,7 @@ void W3DDisplay::gatherDebugStats()
 
 	// we update stats on a delay
 	const Real UPDATE_RATE_SECS = 2.0;
-	if( s_timeSinceLastUpdateInSecs >= UPDATE_RATE_SECS || TheGlobalData->m_constantDebugUpdate )
+	if( m_statsTimeSinceLastUpdateInSecs >= UPDATE_RATE_SECS || TheGlobalData->m_constantDebugUpdate )
 	{
 		UnicodeString unibuffer, unibuffer2;
 		UnicodeString fpsString;
@@ -1277,9 +1274,9 @@ void W3DDisplay::gatherDebugStats()
 		Debug_Statistics::Record_Texture_Mode(Debug_Statistics::RECORD_TEXTURE_SIMPLE/*RECORD_TEXTURE_NONE*/);
 
 		// frames per second
-		double fps = (Real)s_framesRenderedSinceLastUpdate / s_timeSinceLastUpdateInSecs;
-		double drawsPerFrame = Debug_Statistics::Get_Draw_Calls(); //(Real)s_drawCallsSinceLastUpdate / (Real)s_framesRenderedSinceLastUpdate;
-		double sortPolysPerFrame = Debug_Statistics::Get_Sorting_Polygons();  //(Real)s_sortedPolysSinceLastUpdate / (Real)s_framesRenderedSinceLastUpdate;
+		double fps = (Real)m_statsFramesRenderedSinceLastUpdate / m_statsTimeSinceLastUpdateInSecs;
+		double drawsPerFrame = Debug_Statistics::Get_Draw_Calls(); //(Real)m_statsDrawCallsSinceLastUpdate / (Real)m_statsFramesRenderedSinceLastUpdate;
+		double sortPolysPerFrame = Debug_Statistics::Get_Sorting_Polygons();  //(Real)m_statsSortedPolysSinceLastUpdate / (Real)m_statsFramesRenderedSinceLastUpdate;
 		double skinDrawsPerFrame = Debug_Statistics::Get_DX8_Skin_Renders();
 
 		if (fps<0.1) fps = 0.1;
@@ -1488,11 +1485,11 @@ void W3DDisplay::gatherDebugStats()
 		unibuffer.format( L"Video RAM: %d", Debug_Statistics::Get_Record_Texture_Size() - 1376256 );
 		m_displayStrings[VideoRam]->setText( unibuffer );
 
-		s_lastUpdateTime64 = time64;
-		s_timeSinceLastUpdateInSecs = 0.0f;
-		s_framesRenderedSinceLastUpdate = 0;
-		s_drawCallsSinceLastUpdate = 0;
-		s_sortedPolysSinceLastUpdate = 0;
+		m_statsLastUpdateTime64 = time64;
+		m_statsTimeSinceLastUpdateInSecs = 0.0f;
+		m_statsFramesRenderedSinceLastUpdate = 0;
+		m_statsDrawCallsSinceLastUpdate = 0;
+		m_statsSortedPolysSinceLastUpdate = 0;
 
 		// terrain stats
 		unibuffer.format( L"3-Way Blends: %d/%d, Shoreline Blends: %d/%d", TheTerrainRenderObject->getNumExtraBlendTiles(TRUE),
@@ -1930,7 +1927,6 @@ void W3DDisplay::draw()
 	// GeneralsX @feature xxorza 15/04/2026 Process deferred window resize for pillarbox
 	DX8Wrapper::Pillarbox_Process_Resize();
 
-	extern HWND ApplicationHWnd;
 	if (ApplicationHWnd && ::IsIconic(ApplicationHWnd)) {
 		return;
 	}
