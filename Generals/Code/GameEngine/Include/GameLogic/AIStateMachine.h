@@ -1002,7 +1002,11 @@ private:
 	AttackExitConditionsInterface*	m_attackParameters;					///< these are not owned by this, and will not be deleted on destruction
 	Team*														m_victimTeam;								///< recorded onEnter because if it changes during attack , it may no longer be a valid target.
 	Coord3D													m_originalVictimPos;				///< position of first obj/pos attacked... used for ContinueAttackRange.
-	const Weapon*						m_lockedWeaponOnEnter;
+	// GeneralsX @bugfix cemlyn007 05/10/2026 The locked weapon's slot, not its address: WeaponSet::updateWeaponSet
+	// deletes and reallocates every Weapon while a shared weapon lock survives, so the old address
+	// may or may not come back, and which depends on the heap (game memory pools are off), not the sim.
+	Bool								m_hasLockedWeaponOnEnter;
+	WeaponSlotType					m_lockedWeaponSlotOnEnter;
 	const Bool							m_follow;
 	const Bool							m_isAttackingObject;								// if false, attacking position
 	const Bool							m_isForceAttacking;
