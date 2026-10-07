@@ -72,13 +72,20 @@ inline void EnterCriticalSection(CRITICAL_SECTION *cs) {
 }
 
 // Leave a critical section (unlock)
+// GeneralsX @bugfix cemlyn007 28/09/2026 Unlock on every leave, not only the outermost one.
+// The mutex is recursive, so each EnterCriticalSection takes one lock level and the
+// matching leave must release it. Unlocking only when ref_count reached 0 leaked one
+// level per nested enter (AsciiString::set nests), so the first thread to nest owned
+// the lock forever and every other thread deadlocked. ref_count and owner are kept
+// for bookkeeping only, and are updated while the lock is still held.
 inline void LeaveCriticalSection(CRITICAL_SECTION *cs) {
     cs->ref_count--;
-    
+
     if (cs->ref_count == 0) {
         cs->owner = 0;
-        pthread_mutex_unlock(&cs->mutex);
     }
+
+    pthread_mutex_unlock(&cs->mutex);
 }
 
 #ifdef __cplusplus

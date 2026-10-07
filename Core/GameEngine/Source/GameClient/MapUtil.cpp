@@ -67,6 +67,7 @@ static std::set<std::string> s_failedMapLookups;
 #include "GameLogic/FPUControl.h"
 #include "GameNetwork/GameInfo.h"
 #include "GameNetwork/NetworkDefs.h"
+#include "Common/FatalEngineError.h"
 
 
 //-------------------------------------------------------------------------------
@@ -1382,6 +1383,11 @@ Image *getMapPreviewImage( AsciiString mapName )
 		{
 			copyFromBigToDir(tgaName, mapPreviewDir);
 			success = true;
+		}
+		// GeneralsX @bugfix cemlyn007 28/09/2026 Let an embedded-mode fatal error reach the host.
+		catch (const FatalEngineError&)
+		{
+			throw;
 		}
 		catch (...)
 		{

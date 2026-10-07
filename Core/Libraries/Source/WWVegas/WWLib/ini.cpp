@@ -117,6 +117,7 @@
 #include	"wwstring.h"
 #include "widestring.h"
 #include "nstrdup.h"
+#include "strtok_r.h"
 
 #if defined(__WATCOMC__)
 // Disable the "temporary object used to initialize a non-constant reference" warning.
@@ -1841,7 +1842,9 @@ int INIClass::Get_Int_Bitfield(char const * section, char const * entry, int def
 	char *str	= strdup(entryptr->Value);
 
    int lp;
-	for (char *token = strtok(str, "|+"); token; token = strtok(nullptr, "|+")) {
+	// GeneralsX @bugfix cemlyn007 28/09/2026 strtok_r: libc strtok's save pointer is process-wide
+	char *tokSave = nullptr;
+	for (char *token = strtok_r(str, "|+", &tokSave); token; token = strtok_r(nullptr, "|+", &tokSave)) {
 		for (lp = 0; list[lp]; lp++) {
 			// if this list entry matches our string token then we need
 			// to set this bit.
@@ -1875,7 +1878,9 @@ int *	INIClass::Get_Alloc_Int_Array(char const * section, char const * entry, in
 	int count = 0;
 	char *str = strdup(entryptr->Value);
 	char *token;
-	for (token = strtok(str, " "); token; token = strtok(nullptr, " ")) {
+	// GeneralsX @bugfix cemlyn007 28/09/2026 strtok_r: libc strtok's save pointer is process-wide
+	char *tokSave = nullptr;
+	for (token = strtok_r(str, " ", &tokSave); token; token = strtok_r(nullptr, " ", &tokSave)) {
 		count++;
 	}
 	free(str);
@@ -1885,7 +1890,7 @@ int *	INIClass::Get_Alloc_Int_Array(char const * section, char const * entry, in
 	retval	= W3DNEWARRAY int[count+1];
 	count		= 0;
 	str		= strdup(entryptr->Value);
-	for (token = strtok(str, " "); token; token = strtok(nullptr, " ")) {
+	for (token = strtok_r(str, " ", &tokSave); token; token = strtok_r(nullptr, " ", &tokSave)) {
 		retval[count] = atoi(token);
 		count++;
 	}

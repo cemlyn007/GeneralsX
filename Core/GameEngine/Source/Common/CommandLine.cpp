@@ -1230,8 +1230,11 @@ static CommandLineParam paramsForEngineInit[] =
 	// TheSuperHackers @feature xezon 03/08/2025 Force full viewport for 'Control Bar Pro' Addons like GenTool did it.
 	{ "-forcefullviewport", parseFullViewport },
 
-#if defined(RTS_DEBUG)
+	// GeneralsX @feature cemlyn007 28/09/2026 Is now available in Release builds. On SDL3 it also
+	// selects the device-free audio manager, so no audio device is opened (PLAN-023 Phase 0).
 	{ "-noaudio", parseNoAudio },
+
+#if defined(RTS_DEBUG)
 	{ "-map", parseMapName },
 	{ "-nomusic", parseNoMusic },
 	{ "-novideo", parseNoVideo },
