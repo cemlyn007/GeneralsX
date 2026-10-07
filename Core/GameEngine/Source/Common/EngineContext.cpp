@@ -100,14 +100,16 @@ void appendLiveFieldName(const char* name, void* user)
 EngineContext::~EngineContext()
 {
 #ifdef DEBUG_CRASHING
-	if (this != &g_noEngine && (countLiveSingletons() != 0 || originalGlobalData != nullptr || wwMathInitialized))
+	if (this != &g_noEngine && (countLiveSingletons() != 0 || originalGlobalData != nullptr || wwMathInitialized
+			|| ownsRenderDevice || drawableModelLockCount != 0))
 	{
 		LiveFieldNames names;
 		const std::size_t live = forEachLiveSingleton(&appendLiveFieldName, &names);
 		DEBUG_CRASH(("EngineContext destroyed before its engine was shut down, or its shutdown left state: "
-			"%u live singleton/pointer fields (%s), originalGlobalData %s, wwMathInitialized %s",
+			"%u live singleton/pointer fields (%s), originalGlobalData %s, wwMathInitialized %s, "
+			"ownsRenderDevice %s, drawableModelLockCount %d",
 			(unsigned)live, live != 0 ? names.text : "none", originalGlobalData != nullptr ? "set" : "null",
-			wwMathInitialized ? "true" : "false"));
+			wwMathInitialized ? "true" : "false", ownsRenderDevice ? "true" : "false", drawableModelLockCount));
 	}
 #endif
 	DEBUG_ASSERTCRASH(this == &g_noEngine || noEngineIsPristine(), ("g_noEngine was written: engine state leaked outside every Scope"));

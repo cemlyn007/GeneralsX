@@ -303,7 +303,15 @@ static rts::PerEngineStatic<DrawableStaticImages> s_drawableStaticImages_perEngi
 /*static*/ Anim2DTemplate**	Drawable::s_animationTemplates = nullptr;
 #endif
 #ifdef DIRTY_CONDITION_FLAGS
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @bugfix cemlyn007 30/09/2026 Per engine (an EngineContext field): the rendering engine's scene
+// locks its drawables while a headless engine's getDrawModules reads the count on its own thread, so one
+// process-wide count raced (PLAN-023 Phase 8, stage RR0a). The class static stays declared; this macro
+// stands in for it in this file, its only user.
+#define s_modelLockCount (::rts::ctx()->drawableModelLockCount)
+#else
 /*static*/ Int							Drawable::s_modelLockCount = 0;
+#endif
 #endif
 
 // ------------------------------------------------------------------------------------------------
