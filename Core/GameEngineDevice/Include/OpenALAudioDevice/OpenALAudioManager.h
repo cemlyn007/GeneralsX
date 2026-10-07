@@ -299,6 +299,10 @@ public:
 	virtual void friend_forcePlayAudioEventRTS(const AudioEventRTS *eventToPlay) override {}
 	virtual void processRequestList(void) override { removeAllAudioRequests(); }
 
+	// GeneralsX @performance cemlyn007 29/09/2026 No sound is ever audible (pending requests are dropped at the next audio update), so client code may skip
+	// work that only restarts sounds (PLAN-023 Phase 5b, perf2). Same in MiniAudioManagerDummy.
+	virtual Bool canPlaySounds() const override { return FALSE; }
+
 protected:
 	virtual void setDeviceListenerPosition(void) override {}
 };

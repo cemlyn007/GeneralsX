@@ -1281,8 +1281,22 @@ void Drawable::updateDrawable()
   // to see if they are in range. But this messes up non-looping sounds -- they keep looping!
   // End result: a hack of testing the looping bit and only restarting the sound if the looping
   // bit is on and the loop count is 0 (loop forever).
+  //
+  // GeneralsX @performance cemlyn007 29/09/2026 Skip the restart when the audio manager can never
+  // play a sound (PLAN-023 Phase 5b, perf2). The device-free managers (headless engines and -noaudio runs) drop every
+  // request at the next audio update, which runs before the client update, so by the time this check
+  // runs the previous frame's restart is gone and isCurrentlyPlaying is false: every looping ambient
+  // sound was restarted on every frame: a stop, an AudioEventRTS copy and an addAudioEvent per drawable per frame, all
+  // discarded at the next audio update. A real audio manager answers TRUE, so its behaviour is
+  // unchanged. The simulation cannot see the skip: m_ambientSound is client-side (Drawable::xfer only
+  // clears it on load), ambient sounds are not logical audio, and addAudioEvent's side effects are
+  // the audio random stream (theGameAudioSeed, never part of the logic CRC, which reads only the logic
+  // seed) and a new audio handle (which logic only passes back to the manager, whose answers do not
+  // depend on it when nothing plays). With RETAIL_COMPATIBLE_CRC off even logical audio stays out
+  // of the CRC (AudioManager::addAudioEvent).
   if( m_ambientSound && m_ambientSoundEnabled && m_ambientSoundEnabledFromScript &&
-      !m_ambientSound->getEventName().isEmpty() && !m_ambientSound->isCurrentlyPlaying() )
+      !m_ambientSound->getEventName().isEmpty() && TheAudio->canPlaySounds() &&
+      !m_ambientSound->isCurrentlyPlaying() )
   {
     const AudioEventInfo * eventInfo = m_ambientSound->getAudioEventInfo();
 
