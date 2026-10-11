@@ -73,6 +73,8 @@ ALLOWLIST = {
     "D3D8Lib": "the D3D8 library, loaded per process under a mutex and never freed",
     "Direct3DCreate8Ptr": "the D3D8 library's Direct3DCreate8, looked up once per process with it",
     "DX8Wrapper_FinalReleaseHook": "the host's final-release check, set by its first render boot",
+    "ApplicationWindow_TryLockEventPump": "the host's window event pump lock, set once by its first render boot",
+    "ApplicationWindow_UnlockEventPump": "the host's window event pump lock, set once by its first render boot",
     "W3DVolumetricShadow::Update()::originCompareVector": "a constant vector, built at first use under the static-init guard",
     "Drawable::drawBombed(IRegion2D const*)::key_StickyBombUpdate": "a NameKey cache (PLAN-023 Decision 2), set at first use (a draw path) under the static-init guard",
     "FiringTracker::getModuleNameKey() const::nk": "a NameKey cache (PLAN-023 Decision 2), set at first use under the static-init guard",

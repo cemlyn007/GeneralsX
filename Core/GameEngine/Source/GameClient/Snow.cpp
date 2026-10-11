@@ -69,7 +69,8 @@ void SnowManager::updateIniSettings()
 	//initialize a table of random starting positions for each particle.
 	Int boxDimensions = (Int)TheWeatherSetting->m_snowBoxDimensions;
 #if RTS_ENGINE_CONTEXT
-	// The engine's generator, bound once rather than looked up per particle.
+	// The engine's generator, bound once rather than looked up per particle (named so that it does not
+	// shadow POSIX ::random()).
 	Random3Class& snowRandom = SnowRandom_perEngine.get();
 #endif
 	for (Int y=0; y<SNOW_NOISE_Y; y++)
