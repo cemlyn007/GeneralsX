@@ -381,7 +381,7 @@ void GameEngine::init()
 		// never calls SetEngineEmbeddedMode(true), so this is unreachable there regardless of
 		// environment. Checked once per init() call, not cached, since it is an uncached getenv
 		// like any other and init() itself may run more than once per process (rlgenerals'
-		// MULTI_ENGINE_CONSUMER.md stage R1 calls create/destroy/create in one process).
+		// the multi-engine consumers call create/destroy/create in one process).
 		if (IsEngineEmbeddedMode() && std::getenv("GENERALSX_TEST_FAULT_IN_INIT"))
 			RELEASE_CRASH("test fault inside GameEngine::init (GENERALSX_TEST_FAULT_IN_INIT)");
 
