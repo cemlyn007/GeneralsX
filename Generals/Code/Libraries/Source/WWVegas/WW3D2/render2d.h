@@ -149,12 +149,13 @@ public:
 	SimpleDynVecClass<unsigned long> &	Get_Color_Array ()	{ return Colors; }
 
 	// statics to access the Screen Resolution in Pixels
-	static void	Set_Screen_Resolution( const RectClass & screen )	{ ScreenResolution = screen; }
 #if RTS_ENGINE_CONTEXT
+	static void	Set_Screen_Resolution( const RectClass & screen );
 	// GeneralsX @feature cemlyn007 30/09/2026 Out of line: the resolution is per engine (render2d.cpp; PLAN-023
 	// Phase 8, stage RR2b).
 	static const RectClass & Get_Screen_Resolution();
 #else
+	static void	Set_Screen_Resolution( const RectClass & screen )	{ ScreenResolution = screen; }
 	static const RectClass & Get_Screen_Resolution()			{ return ScreenResolution; }
 #endif
 
@@ -173,9 +174,7 @@ protected:
 	float											ZValue;
 
 #if !RTS_ENGINE_CONTEXT
-#if !RTS_ENGINE_CONTEXT
 	static RectClass							ScreenResolution;
-#endif
 #endif
 
 	Vector2 Convert_Vert( const Vector2 & v );

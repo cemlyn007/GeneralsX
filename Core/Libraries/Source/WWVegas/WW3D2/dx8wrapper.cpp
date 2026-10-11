@@ -180,22 +180,41 @@ bool W3D_Protect_Render_Defaults(bool readOnly)
 		static std::once_flag s_exitHandlerOnce;
 		std::call_once(s_exitHandlerOnce, [] { std::atexit(Unprotect_Render_Defaults_At_Exit); });
 	}
-	// GeneralsX @bugfix cemlyn007 01/10/2026 The protection both have now (they change together), so that a rollback
-	// puts back what was there rather than the opposite of what was asked for: making read-only defaults read-only
-	// again must leave them read-only when the second call fails (PLAN-023 Phase 8, stage RR3). Atomic: a host may
-	// call this from more than one thread (it should not do so at once).
-	static std::atomic<bool> s_defaultsReadOnly{false};
-	const bool wasReadOnly = s_defaultsReadOnly.load();
-	// GeneralsX @bugfix cemlyn007 30/09/2026 All or nothing: when the second fails, the first is put back, so a
-	// failed call leaves both as they were (PLAN-023 Phase 8, stage RR2b).
-	if (!Protect_Pages(&W3DRenderState::Defaults, sizeof(W3DRenderState), readOnly))
-		return false;
-	if (!Protect_Pages(&WW3DState::Defaults, sizeof(WW3DState), readOnly))
+	// GeneralsX @bugfix cemlyn007 30/09/2026 A failed protect changes neither: it puts back only the pages this
+	// call made read-only. Making them writable goes on past a failure (leaving a page read-only is what the exit
+	// handler is there to undo), so a failed unprotect may leave one page writable (PLAN-023 Phase 8, stage RR2b).
+	void* const objects[2] = {&W3DRenderState::Defaults, &WW3DState::Defaults};
+	const std::size_t sizes[2] = {sizeof(W3DRenderState), sizeof(WW3DState)};
+	static bool s_readOnly[2] = {false, false};
+	if (!readOnly)
 	{
-		Protect_Pages(&W3DRenderState::Defaults, sizeof(W3DRenderState), wasReadOnly);
-		return false;
+		bool allWritable = true;
+		for (int i = 0; i < 2; ++i)
+		{
+			if (Protect_Pages(objects[i], sizes[i], false))
+				s_readOnly[i] = false;
+			else
+				allWritable = false;
+		}
+		return allWritable;
 	}
-	s_defaultsReadOnly.store(readOnly);
+	bool changed[2] = {false, false};
+	for (int i = 0; i < 2; ++i)
+	{
+		if (s_readOnly[i])
+			continue;
+		if (!Protect_Pages(objects[i], sizes[i], true))
+		{
+			for (int j = 0; j < i; ++j)
+			{
+				if (changed[j] && Protect_Pages(objects[j], sizes[j], false))
+					s_readOnly[j] = false;
+			}
+			return false;
+		}
+		s_readOnly[i] = true;
+		changed[i] = true;
+	}
 	return true;
 }
 
@@ -206,6 +225,15 @@ void DX8Wrapper::Destroy_Render_State()
 	context->w3dRender = nullptr;
 	delete context->ww3dState;
 	context->ww3dState = nullptr;
+}
+
+// GeneralsX @bugfix cemlyn007 02/10/2026 Frees this engine's W3DRenderState for Init's failure returns, which
+// never reach a device (WW3D::Shutdown's Destroy_Render_State frees it otherwise).
+void DX8Wrapper::Free_Render_State()
+{
+	::rts::EngineContext* const context = ::rts::ctx();
+	delete context->w3dRender;
+	context->w3dRender = nullptr;
 }
 #else
 static D3DPRESENT_PARAMETERS _PresentParameters;
@@ -721,8 +749,8 @@ void MoveRectIntoOtherRect(const RECT& inner, const RECT& outer, int* x, int* y)
 bool DX8Wrapper::Init(void * hwnd, bool lite)
 {
 #if RTS_ENGINE_CONTEXT
-	// GeneralsX @feature cemlyn007 30/09/2026 This engine's render state, freed by Shutdown (PLAN-023 Phase 8, stage
-	// RR2a-1).
+	// GeneralsX @feature cemlyn007 30/09/2026 This engine's render state, freed by Destroy_Render_State at the end of
+	// WW3D::Shutdown (PLAN-023 Phase 8, stages RR2a-1, RR2a-2).
 	Create_Render_State();
 #endif
 	WWASSERT(!IsInitted);
@@ -769,12 +797,16 @@ bool DX8Wrapper::Init(void * hwnd, bool lite)
 	Invalidate_Cached_Render_States();
 
 	if (!lite) {
-		// GeneralsX @bugfix cemlyn007 30/09/2026 The D3D8 library is loaded once for the process and never freed
+		// GeneralsX @bugfix cemlyn007 30/09/2026 The D3D8 library is loaded for the process and never freed
 		// (PLAN-023 Phase 8, stage RR1). A process may bring a render device up, shut it down and bring another
 		// up, and render engines may come and go while others run: unloading DXVK in one engine's Shutdown would
 		// pull its code from under the next device (and from the host's own IDirect3D8), so no FreeLibrary.
-		static std::once_flag s_d3d8LibOnce;
-		std::call_once(s_d3d8LibOnce, [] {
+		// A failed load is retried by the next Init, so a transient failure does not stick for the process.
+		static std::mutex s_d3d8LibMutex;
+		bool d3d8Loaded;
+		{
+		std::lock_guard<std::mutex> d3d8LibLock(s_d3d8LibMutex);
+		if (D3D8Lib == nullptr || Direct3DCreate8Ptr == nullptr) [] {
 			// GeneralsX @build BenderAI 10/02/2026 - Platform-specific DLL/SO/DYLIB loading (Phase 5: macOS)
 #ifdef _WIN32
 			D3D8Lib = LoadLibrary("D3D8.DLL");
@@ -807,8 +839,15 @@ bool DX8Wrapper::Init(void * hwnd, bool lite)
 				fprintf(stderr, "ERROR: DX8Wrapper::Init() - Failed to get Direct3DCreate8 function\n");
 			}
 
-		});
-		if (D3D8Lib == nullptr || Direct3DCreate8Ptr == nullptr) {
+		}();
+		d3d8Loaded = D3D8Lib != nullptr && Direct3DCreate8Ptr != nullptr;
+		}
+		if (!d3d8Loaded) {
+#if RTS_ENGINE_CONTEXT
+			// GeneralsX @bugfix cemlyn007 02/10/2026 Create_Render_State() above already allocated this
+			// engine's state; nothing else frees it on this failure return.
+			Free_Render_State();
+#endif
 			return false;	// Return false at this point if init failed
 		}
 
@@ -828,6 +867,11 @@ bool DX8Wrapper::Init(void * hwnd, bool lite)
 		fprintf(stderr, "DEBUG: DX8Wrapper::Init() - Direct3DCreate8 returned: %p\n", (void*)D3DInterface);
 		if (D3DInterface == nullptr) {
 			fprintf(stderr, "ERROR: DX8Wrapper::Init() - Direct3DCreate8 returned NULL (DXVK failed to create D3D8 interface)\n");
+#if RTS_ENGINE_CONTEXT
+			// GeneralsX @bugfix cemlyn007 02/10/2026 Same as the D3D8Lib failure above: free what
+			// Create_Render_State() allocated before this engine gives up on a device.
+			Free_Render_State();
+#endif
 			return(false);
 		}
 		IsInitted = true;
@@ -1597,7 +1641,8 @@ bool DX8Wrapper::Set_Render_Device(int dev, int width, int height, int bits, int
 
 		// GeneralsX @feature cemlyn007 30/09/2026 A windowless device has no desktop to match: if the
 		// adapter reports no display mode, take the 32-bit format the promotion below expects from a
-		// desktop, so it keeps the same back buffer as a windowed one (PLAN-023 Phase 8, stage RR0c).
+		// desktop, so it keeps the same back buffer as a windowed one. No driver tested (NVIDIA, lavapipe)
+		// reports no mode, so this fallback has not been run (PLAN-023 Phase 8, stage RR0c).
 		if (_Hwnd == nullptr && (FAILED(display_mode_result) || desktop_mode.Format == D3DFMT_UNKNOWN))
 			desktop_mode.Format = D3DFMT_X8R8G8B8;
 

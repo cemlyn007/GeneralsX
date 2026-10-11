@@ -75,7 +75,7 @@ PROCESS_GLOBAL = {
     "TheLobbyQueuedUTMs": "GameSpy lobby menu queue (menu state; one UI engine per process)",
     # Not pointers: objects and values that later phases classify (the Phase 1 nm classification).
     "TheDX8MeshRenderer": "W3D mesh renderer object of the build without the context; with it, a PER_ENGINE_STATIC (PLAN-023 Phase 3)",
-    "TheW3DFrameLengthInMsec": "W3D frame timing value: every engine writes the same constant (GameClient::init sets MSEC_PER_LOGICFRAME_REAL); the unsynchronised write matters only with threads",
+    "TheW3DFrameLengthInMsec": "W3D frame timing value: every engine writes the same constant (GameClient::init sets MSEC_PER_LOGICFRAME_REAL); the unsynchronized write matters only with threads",
     "TheWaterTransparency": "OVERRIDE<> INI object of the build without the context; with it, a PER_ENGINE_STATIC (PLAN-023 Phase 3)",
     "TheWeatherSetting": "OVERRIDE<> INI object of the build without the context; with it, a PER_ENGINE_STATIC (PLAN-023 Phase 3)",
     "TheSupplyAndTechImageLocations": "skirmish-menu object (PLAN-023 Phase 4)",
@@ -92,7 +92,7 @@ CONSTANT_TABLE_RE = re.compile(r"(Names|FieldParse|FieldParseTable|LookupList)$"
 
 
 # A PER_ENGINE_STATIC's static (`TheXxx_perEngine`, rts::PerEngineStatic<T>): it holds only the slot index,
-# written once at static initialisation; the object lives in each engine's EngineContext.
+# allocated at static initialisation (file or class scope) or at the first call (function-local); the object lives in each engine's EngineContext.
 PER_ENGINE_STATIC_RE = re.compile(r"_perEngine$")
 
 

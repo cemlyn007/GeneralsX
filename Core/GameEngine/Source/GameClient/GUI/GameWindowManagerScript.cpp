@@ -119,10 +119,27 @@ static GameWinSystemFunc		systemFunc = nullptr;
 static GameWinInputFunc		inputFunc = nullptr;
 static GameWinTooltipFunc	tooltipFunc = nullptr;
 static GameWinDrawFunc			drawFunc = nullptr;
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 03/10/2026 Per engine: every engine's ~GameWindowManager clears these
+// (freeStaticStrings), headless ones too, while the rendering engine may be parsing a .wnd file (PLAN-023 Phase 4).
+struct WindowCallbackStrings
+{
+	AsciiString system;
+	AsciiString input;
+	AsciiString tooltip;
+	AsciiString draw;
+};
+static rts::PerEngineStatic<WindowCallbackStrings> s_windowCallbackStrings_perEngine;
+#define theSystemString (s_windowCallbackStrings_perEngine.get().system)
+#define theInputString (s_windowCallbackStrings_perEngine.get().input)
+#define theTooltipString (s_windowCallbackStrings_perEngine.get().tooltip)
+#define theDrawString (s_windowCallbackStrings_perEngine.get().draw)
+#else
 static AsciiString theSystemString;
 static AsciiString theInputString;
 static AsciiString theTooltipString;
 static AsciiString theDrawString;
+#endif
 
 // default visual properties
 static Color defEnabledColor		= 0;

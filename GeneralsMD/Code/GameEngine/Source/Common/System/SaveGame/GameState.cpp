@@ -30,6 +30,7 @@
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
 #include "PreRTS.h"
 #include <cstdio>
+#include <cstdlib>  // std::getenv (GENERALSX_TEST_FAULT_IN_LOADGAME)
 #ifndef _WIN32
 #include <filesystem>     // std::filesystem for Linux directory operations
 #include "socket_compat.h" // CreateDirectory stub for Linux
@@ -709,6 +710,20 @@ SaveCode GameState::loadGame( AvailableGameInfo gameInfo )
 	try
 	{
 
+		// GeneralsX @bugfix cemlyn007 03/10/2026 Test-only fault hook: raise a fault from inside
+		// this try block, before xferSaveData runs, so a host's test can exercise *this*
+		// function's own `catch (const FatalEngineError&) { throw; }` rethrow site below
+		// specifically, the same way GameEngine::init's GENERALSX_TEST_FAULT_IN_INIT hook covers
+		// that function's rethrow site. Without this, every fault test that reaches a real
+		// RELEASE_CRASH does so either from outside any engine-side try block (a host's own unsafe
+		// test hook) or from inside GameEngine::init's own try block (GENERALSX_TEST_FAULT_IN_INIT),
+		// so none of them pass through this function's rethrow site, and none of them tell it apart
+		// from one a later edit moved `catch (...)` ahead of. Gated on IsEngineEmbeddedMode(), not
+		// just the env var, so a retail or stock build (which never calls
+		// SetEngineEmbeddedMode(true)) can never reach this regardless of environment.
+		if (IsEngineEmbeddedMode() && std::getenv("GENERALSX_TEST_FAULT_IN_LOADGAME"))
+			RELEASE_CRASH("test fault inside GameState::loadGame (GENERALSX_TEST_FAULT_IN_LOADGAME)");
+
 		// load file
 		xferSaveData( &xferLoad, SNAPSHOT_SAVELOAD );
 
@@ -1374,10 +1389,79 @@ void GameState::iterateSaveFiles( IterateSaveFileCallback callback, void *userDa
 		return;
 
 	// GeneralsX @bugfix cemlyn007 27/09/2026 List the save directory by absolute path instead of switching the
-	// process into it, which changed the working directory under every other thread. The local file system lists
-	// the directory on every platform, and a save directory that does not exist yet lists nothing. The listing is
-	// complete before any callback runs, so a callback that throws leaves no directory state behind to restore;
+	// process into it, which changed the working directory under every other thread. On Windows (below) the local
+	// file system lists the directory, and a save directory that does not exist yet lists nothing; the listing is
+	// complete before any callback runs, so a callback that throws leaves no directory state behind to restore.
 	// callbacks handle their own errors, as addGameToAvailableList does.
+#ifndef _WIN32
+	// GeneralsX @bugfix cemlyn007 02/10/2026 List the directory directly instead of through
+	// TheLocalFileSystem->getFileListInDirectory. That goes through FilenameList
+	// (std::set<AsciiString, rts::less_than_nocase<AsciiString>>), which collapses two save files
+	// that differ only in case to one entry, and (StdLocalFileSystem's implementation) lists any
+	// non-directory entry, including a FIFO, socket or dangling symlink: opening one of those in
+	// getSaveGameInfoFromFile's XferLoad::open can block forever (a FIFO) or fail per entry (a
+	// dangling symlink). Iterate case-sensitively here and keep only regular files (and symlinks
+	// that resolve to one), matching the old POSIX iterateSaveFiles this replaced. Unlike the
+	// Windows branch below, this one bypasses TheLocalFileSystem, so it also bypasses its error
+	// reporting: a directory that does not exist yet is an ordinary empty listing, but any other
+	// failure (permissions, a mid-read I/O error) is reported here the same way
+	// StdLocalFileSystem::getFileListInDirectory does, since a silently short or empty listing
+	// (e.g. a save directory whose scratch-pad maps were never cleared) would otherwise be hard to
+	// trace; the listing this produces is not necessarily complete before the first callback runs,
+	// since a mid-read error stops the loop with whatever entries it already saw.
+	{
+		std::error_code ec;
+		std::filesystem::directory_iterator dirIter( getSaveDirectory().str(), ec );
+		if( ec )
+		{
+			if( ec != std::errc::no_such_file_or_directory )
+			{
+				fprintf( stderr, "GameState::iterateSaveFiles - Error opening directory '%s': %s\n",
+				         getSaveDirectory().str(), ec.message().c_str() );
+				fflush( stderr );
+			}
+		}
+		else
+		{
+			// GeneralsX @bugfix cemlyn007 03/10/2026 Advance with increment(ec) and check ec
+			// *before* testing against `end`, not as a for-loop's condition/step pair. Both
+			// libstdc++ and libc++ reset dirIter to the end iterator when increment(ec) fails,
+			// so a `for( ; dirIter != end; dirIter.increment( ec ) )` loop's own condition goes
+			// false on the same call that set ec, and a `if( ec )` in the loop body never runs:
+			// a mid-read failure (permissions dropped, an I/O error) stayed silent despite the
+			// comment above claiming otherwise.
+			const std::filesystem::directory_iterator end;
+			while( dirIter != end )
+			{
+				std::error_code statusError;
+				const Bool isRegular = std::filesystem::is_regular_file( dirIter->path(), statusError );
+				if( !statusError && isRegular )
+				{
+					AsciiString leaf = dirIter->path().filename().string().c_str();
+
+					// Win32 wildcards also match longer extensions through 8.3 short names, so check the extension itself
+					if( leaf.endsWithNoCase( SAVE_GAME_EXTENSION ) )
+					{
+						// the callbacks take the leaf name and resolve it with getSaveGamePathForRead
+						callback( getMapLeafName( leaf ), userData );
+					}
+				}
+
+				dirIter.increment( ec );
+				if( ec )
+				{
+					if( ec != std::errc::no_such_file_or_directory )
+					{
+						fprintf( stderr, "GameState::iterateSaveFiles - Error reading directory '%s': %s\n",
+						         getSaveDirectory().str(), ec.message().c_str() );
+						fflush( stderr );
+					}
+					break;
+				}
+			}
+		}
+	}
+#else
 	FilenameList saveFiles;
 	TheLocalFileSystem->getFileListInDirectory( AsciiString::TheEmptyString, getSaveDirectory(), "*.sav", saveFiles, FALSE );
 
@@ -1392,6 +1476,7 @@ void GameState::iterateSaveFiles( IterateSaveFileCallback callback, void *userDa
 		callback( getMapLeafName( *it ), userData );
 
 	}
+#endif
 
 }
 

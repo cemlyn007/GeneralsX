@@ -771,6 +771,7 @@ private:
 
 	Bool drawsAnyUIText();
 
+#if !RTS_ENGINE_CONTEXT
 	static Bool							s_staticImagesInited;
 	static const Image*			s_veterancyImage[LEVEL_COUNT];
 	static const Image*			s_fullAmmo;
@@ -778,6 +779,7 @@ private:
 	static const Image*			s_fullContainer;
 	static const Image*			s_emptyContainer;
 	static Anim2DTemplate**	s_animationTemplates;
+#endif
 
 #ifdef DIRTY_CONDITION_FLAGS
 	static Int							s_modelLockCount;

@@ -47,7 +47,10 @@ bool OpenALAudioStream::bufferData(uint8_t *data, size_t data_size, ALenum forma
     if (!m_hasSource)
         return false;
     DEBUG_LOG(("Buffering %zu bytes of data (samplerate: %i, format: %i)\n", data_size, samplerate, format));
-    ALint num_queued;
+    // GeneralsX @bugfix cemlyn007 08/10/2026 Initialise the AL query results in this file: a failed
+    // alGetSourcei (no current context, say) leaves them unwritten, and the code then branched on
+    // stack garbage.
+    ALint num_queued = 0;
     alGetSourcei(m_source, AL_BUFFERS_QUEUED, &num_queued);
     if (num_queued >= AL_STREAM_BUFFER_COUNT) {
         DEBUG_LOG(("Having too many buffers already queued: %i", num_queued));
@@ -56,7 +59,11 @@ bool OpenALAudioStream::bufferData(uint8_t *data, size_t data_size, ALenum forma
 
     ALuint &current_buffer = m_buffers[m_current_buffer_idx];
     // GeneralsX @bugfix BenderAI 22/04/2026 Detect and reject invalid OpenAL buffer/queue operations.
-    while (alGetError() != AL_NO_ERROR) {}
+    // GeneralsX @bugfix cemlyn007 08/10/2026 Bound the error-clearing loop. OpenAL keeps a single
+    // error per context, so one call clears it; but with no current context (an audio manager that
+    // opened no device) alGetError never returns AL_NO_ERROR, and the unbounded loop hung the game
+    // on the first streamed sound.
+    for (int i = 0; i < 8 && alGetError() != AL_NO_ERROR; ++i) {}
     alBufferData(current_buffer, format, data, data_size, samplerate);
     ALenum err = alGetError();
     if (err != AL_NO_ERROR) {
@@ -85,10 +92,10 @@ void OpenALAudioStream::update()
 {
     if (!m_hasSource)
         return;
-    ALint sourceState;
+    ALint sourceState = AL_INITIAL;
     alGetSourcei(m_source, AL_SOURCE_STATE, &sourceState);
 
-    ALint num_queued;
+    ALint num_queued = 0;
     alGetSourcei(m_source, AL_BUFFERS_QUEUED, &num_queued);
 
     // GeneralsX @bugfix BenderAI 22/04/2026 Restart before unqueue to avoid dropping freshly queued
@@ -150,7 +157,7 @@ void OpenALAudioStream::reset()
     // alSourcei(AL_BUFFER, 0) would fail with AL_INVALID_OPERATION if any
     // buffers were still pending.
     alSourceStop(m_source);
-    ALint num_queued;
+    ALint num_queued = 0;
     alGetSourcei(m_source, AL_BUFFERS_QUEUED, &num_queued);
     while (num_queued > 0) {
         ALuint buf;
@@ -164,7 +171,7 @@ bool OpenALAudioStream::isPlaying()
 {
     if (!m_hasSource)
         return false;
-    ALint state;
+    ALint state = AL_STOPPED;
     alGetSourcei(m_source, AL_SOURCE_STATE, &state);
     return state == AL_PLAYING;
 }

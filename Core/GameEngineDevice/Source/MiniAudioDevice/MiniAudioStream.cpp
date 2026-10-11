@@ -77,6 +77,12 @@ bool MiniAudioStream::bufferData(uint8_t *data, size_t data_size, ma_format form
     ScopedFPUGuard fpuGuard;
     if (data_size == 0) return false;
 
+    // GeneralsX @bugfix cemlyn007 02/10/2026 Device-free parity (PLAN-023): a stream with no
+    // engine (MiniAudioManagerDummy::getHandleForBink) never calls createSound, so nothing ever
+    // drains m_buffer. Drop the data here instead of accumulating it without bound, mirroring
+    // OpenALAudioStream::DeviceFree, which discards decoded frames outright.
+    if (!m_engine) return false;
+
     std::lock_guard<std::mutex> lock(m_mutex);
 
     if (!m_initialized) {

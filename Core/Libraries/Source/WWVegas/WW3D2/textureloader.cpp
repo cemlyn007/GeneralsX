@@ -225,9 +225,9 @@ static FastCriticalSectionClass					_BackgroundCriticalSection;
 
 // GeneralsX @bugfix cemlyn007 01/10/2026 Whether the per-engine loader below may drop the process-wide locks across a
 // load and stop the loader thread on its own: only where no loader thread exists (_UNIX, where ThreadClass::Execute
-// returns at once), so that only the thread stepping an engine ever touches its queues and tasks. Elsewhere the
-// locks are held as upstream holds them (PLAN-023 Phase 8, stage RR3; TextureLoader::Init asserts the thread is
-// absent).
+// returns at once), so that only the thread stepping an engine ever touches its queues and tasks. Without the
+// engine context the locks are held as upstream holds them; the context build is refused elsewhere (#error below;
+// PLAN-023 Phase 8, stage RR3; TextureLoader::Init asserts the thread is absent).
 #if RTS_ENGINE_CONTEXT && defined(_UNIX)
 #define RTS_TEXTURE_LOADER_NO_THREAD 1
 #else
@@ -253,6 +253,11 @@ static void Delete_Free_Lists(TextureLoadTaskListClass& tex_list, TextureLoadTas
 }
 
 #if RTS_ENGINE_CONTEXT
+#if !defined(_UNIX)
+// The queues below are reached through the current engine's slot table, which the loader thread would read while
+// the owning engine's thread can grow it; and that thread serves only the engine that started it.
+#error "RTS_ENGINE_CONTEXT needs a platform where ThreadClass::Execute starts no loader thread (see TextureLoaderState)."
+#endif
 // GeneralsX @feature cemlyn007 30/09/2026 Per engine (PLAN-023 Phase 8, stage RR2b): the load queues, the free lists
 // of load tasks, and the suspend switch and inactive-texture time, so that each engine loads, recycles and retires
 // only its own textures and one engine's TextureLoader::Deinit (Delete_Free_Pool) cannot free another's tasks. The

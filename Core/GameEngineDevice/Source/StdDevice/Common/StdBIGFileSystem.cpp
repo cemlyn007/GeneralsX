@@ -524,9 +524,15 @@ void StdBIGFileSystem::init() {
 	// GeneralsX @bugfix felipebraz 23/03/2026 Propagate the resolved asset root to the local file system.
 	// On Linux/macOS the binary cwd and the game data directory (asset root) are separate. Loose files like
 	// Data\Scripts\SkirmishScripts.scb must be resolvable from the asset root, not just from cwd.
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @bugfix cemlyn007 03/10/2026 Passed even when empty, so that the first boot settles the process-wide root
+	// and a later boot that resolves one is refused (see StdLocalFileSystem::setAssetRootPath).
+	TheLocalFileSystem->setAssetRootPath(primaryAssetsDirectory);
+#else
 	if (primaryAssetsDirectory.isNotEmpty()) {
 		TheLocalFileSystem->setAssetRootPath(primaryAssetsDirectory);
 	}
+#endif
 
 #if RTS_ZEROHOUR
 	loadBaseGeneralsAssetsForZH(this, primaryAssetsDirectory);

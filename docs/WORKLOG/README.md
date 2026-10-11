@@ -7,6 +7,7 @@ This directory contains chronological monthly development diaries recording tech
 
 ## Monthly Diaries
 
+- [October 2026](2026-10-DIARY.md)
 - [September 2026](2026-09-DIARY.md)
 - [August 2026](2026-08-DIARY.md)
 - [July 2026](2026-07-DIARY.md)

@@ -883,10 +883,14 @@ void MiniAudioManager::closeDevice(void)
 	// Stop all audio first to prevent use-after-free in audio callbacks
 	stopAllAudioImmediately();
 
-	// GeneralsX @bugfix cemlyn007 28/09/2026 Uninitialise only the stages openDevice initialised, in
-	// reverse order: -noaudio, a partly failed open and the device-free MiniAudioManagerDummy each
-	// leave some or all of them uninitialised. Clearing each flag makes a second call (the destructor
-	// calls this too) a no-op.
+	// GeneralsX @bugfix cemlyn007 28/09/2026 Uninitialise only the stages openDevice initialised:
+	// -noaudio, a partly failed open and the device-free MiniAudioManagerDummy each leave some or
+	// all of them uninitialised. Clearing each flag makes a second call (the destructor calls this
+	// too) a no-op.
+	// GeneralsX @bugfix cemlyn007 02/10/2026 Teardown order is engine, resource manager, context,
+	// log: the resource manager's ma_vfs callbacks do not reference m_log or m_context (they only
+	// read TheFileSystem), so releasing it before them is safe even though it is not the exact
+	// reverse of openDevice's resource manager, log, context, engine init order.
 	if (m_engineInitialized) {
 		m_engineInitialized = FALSE;
 		ma_sound_group_uninit(&m_speechGroup);

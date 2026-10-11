@@ -65,8 +65,6 @@
 
 
 
-// GeneralsX @bugfix cemlyn007 30/09/2026 const, so these stay read-only data whatever the optimiser does (PLAN-023
-// Phase 8, stage RR2b).
 static const ShaderClass detailOpaqueShader(SC_ALPHA);
 #if RTS_ENGINE_CONTEXT
 // GeneralsX @feature cemlyn007 28/09/2026 Per engine (PLAN-023 Phase 4; see W3DStatusCircle.h), blue at first.

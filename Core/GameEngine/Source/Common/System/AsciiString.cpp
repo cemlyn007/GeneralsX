@@ -164,10 +164,12 @@ void AsciiString::ensureUniqueBufferOfSize(int numCharsNeeded, Bool preserveData
 	const int usableNumChars = numCharsNeeded - 1;
 
 	// GeneralsX @performance cemlyn007 29/09/2026 Copy-on-write safety without the global lock: a buffer is
-	// written in place only when this string holds the sole reference. Strings shared across engines on other
-	// threads (process-global statics, NameKeyGenerator names) keep the count at 2 or more, so they are never
-	// mutated in place while shared. The acquire load pairs with the acq_rel decrement in releaseBuffer(), so
-	// every read the last other holder made of this buffer happens before our in-place write.
+	// written in place only when this string holds the sole reference. That count protects a buffer shared
+	// between distinct AsciiString copies only. The old global lock also made concurrent assignment to one
+	// AsciiString object refcount-safe, which is gone: any write to an object another thread reads or writes is
+	// unsafe, so a process-global string is never written after priming (PLAN-023 Phase 5b item 2). The acquire
+	// load pairs with the acq_rel decrement in releaseBuffer(), so every read the last other holder made of
+	// this buffer happens before our in-place write.
 	if (m_data &&
 			m_data->m_refCount.load(std::memory_order_acquire) == 1 &&
 			m_data->m_numCharsAllocated >= numCharsNeeded)

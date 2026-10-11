@@ -620,6 +620,11 @@ WaterTracksRenderSystem::WaterTracksRenderSystem()
 //=============================================================================
 WaterTracksRenderSystem::~WaterTracksRenderSystem()
 {
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 03/10/2026 No dangling singleton after teardown (PLAN-023 Phase 1)
+	if (TheWaterTracksRenderSystem == this)
+		TheWaterTracksRenderSystem = nullptr;
+#endif
 
 	// free all data
 	shutdown();

@@ -314,8 +314,8 @@ ProcessOperators findProcessOperators()
 	return fallback;
 }
 
-// Resolved on first use, since the engine can allocate during static initialization. Both are constant
-// initialized, so they are valid before any constructor runs.
+// Resolved on first use, since the engine can allocate during static initialisation. Both are constant
+// initialised, so they are valid before any constructor runs.
 ProcessOperators TheProcessOperators;
 std::atomic<int> TheProcessOperatorsState(0); // 0 unresolved, 1 being published, 2 ready
 

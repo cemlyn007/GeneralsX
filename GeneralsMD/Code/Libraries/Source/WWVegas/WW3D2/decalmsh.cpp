@@ -819,9 +819,12 @@ void SkinDecalMeshClass::Render()
 	** Skin decals have to get the deformed vertices of their parent meshes.  For this
 	** reason, decals on skins is not a very good idea...
 	*/
-	_TempVertexBuffer.Uninitialised_Grow(model->Get_Vertex_Count());
-	_TempNormalBuffer.Uninitialised_Grow(model->Get_Vertex_Count());
-	Parent->Get_Deformed_Vertices(&(_TempVertexBuffer[0]),&(_TempNormalBuffer[0]));
+	// GeneralsX @performance cemlyn007 03/10/2026 Looked up once: with RTS_ENGINE_CONTEXT each use of the name is a slot lookup.
+	SimpleVecClass<Vector3> & temp_vertices = _TempVertexBuffer;
+	SimpleVecClass<Vector3> & temp_normals = _TempNormalBuffer;
+	temp_vertices.Uninitialised_Grow(model->Get_Vertex_Count());
+	temp_normals.Uninitialised_Grow(model->Get_Vertex_Count());
+	Parent->Get_Deformed_Vertices(&(temp_vertices[0]),&(temp_normals[0]));
 
 	/*
 	** Copy the vertices into the dynamic vb
@@ -833,13 +836,13 @@ void SkinDecalMeshClass::Render()
 
 		for (int i=0; i<ParentVertexIndices.Count(); i++) {
 			int src_i = ParentVertexIndices[i];
-			vertex->x = _TempVertexBuffer[src_i].X;
-			vertex->y = _TempVertexBuffer[src_i].Y;
-			vertex->z = _TempVertexBuffer[src_i].Z;
+			vertex->x = temp_vertices[src_i].X;
+			vertex->y = temp_vertices[src_i].Y;
+			vertex->z = temp_vertices[src_i].Z;
 
-			vertex->nx = _TempNormalBuffer[src_i].X;
-			vertex->ny = _TempNormalBuffer[src_i].Y;
-			vertex->nz = _TempNormalBuffer[src_i].Z;
+			vertex->nx = temp_normals[src_i].X;
+			vertex->ny = temp_normals[src_i].Y;
+			vertex->nz = temp_normals[src_i].Z;
 
 			vertex->diffuse = 0xFFFFFFFF;
 

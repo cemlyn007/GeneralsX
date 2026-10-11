@@ -70,43 +70,10 @@ bool DX8TextureCategoryClass::m_gForceMultiply = false; // Forces opaque materia
 // lists alive, as with the file statics below.
 namespace
 {
-struct DX8MeshRendererState;
-
-// The state whose destructor is running: its slot is already cleared then (EngineContext::destroySlots),
-// so the renderer's teardown reaches its lists, and TheDX8MeshRenderer, through this instead.
-thread_local DX8MeshRendererState* DX8MeshRendererState_destroying = nullptr;
-
-// Marks its state as the one being destroyed from the start of ~DX8MeshRendererState's body until its
-// last member is destroyed: as the first member it is destroyed last, after the renderer and the lists,
-// whose destructors may reach the state through DX8_Current_Mesh_Renderer_State.
-class DX8MeshRendererStateDestroyingMark
-{
-public:
-	DX8MeshRendererStateDestroyingMark() = default;
-	DX8MeshRendererStateDestroyingMark(const DX8MeshRendererStateDestroyingMark&) = delete;
-	DX8MeshRendererStateDestroyingMark& operator=(const DX8MeshRendererStateDestroyingMark&) = delete;
-	void enter(DX8MeshRendererState* state)
-	{
-		m_previous = DX8MeshRendererState_destroying;
-		m_entered = true;
-		DX8MeshRendererState_destroying = state;
-	}
-	~DX8MeshRendererStateDestroyingMark()
-	{
-		if (m_entered)
-			DX8MeshRendererState_destroying = m_previous;
-	}
-
-private:
-	DX8MeshRendererState* m_previous = nullptr;
-	bool m_entered = false;
-};
-
 struct DX8MeshRendererState
 {
 	~DX8MeshRendererState();
 
-	DX8MeshRendererStateDestroyingMark destroyingMark; // first: destroyed last
 	// GeneralsX @feature cemlyn007 28/09/2026 The skinned-mesh deform scratch (the file statics _TempVertexBuffer and
 	// _TempNormalBuffer OFF), per engine so that engines on separate threads do not share it (PLAN-023 Phase 5b).
 	// Before the renderer, whose Shutdown frees their memory.
@@ -122,8 +89,6 @@ rts::PerEngineStatic<DX8MeshRendererState> DX8MeshRendererState_perEngine;
 
 DX8MeshRendererState& DX8_Current_Mesh_Renderer_State()
 {
-	if (DX8MeshRendererState_destroying != nullptr)
-		return *DX8MeshRendererState_destroying;
 	return DX8MeshRendererState_perEngine.get();
 }
 }
@@ -2377,7 +2342,6 @@ void DX8MeshRendererClass::Invalidate( bool shutdown)
 // ~DX8MeshRendererClass avoids. After a Shutdown() there is nothing left, so this does nothing.
 DX8MeshRendererState::~DX8MeshRendererState()
 {
-	destroyingMark.enter(this); // until the last member is destroyed
 	renderer.Invalidate(true);
 	renderer.Clear_Pending_Delete_Lists();
 }

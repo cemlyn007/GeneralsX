@@ -81,8 +81,6 @@
 	ShaderClass::ALPHATEST_ENABLE, ShaderClass::CULL_MODE_DISABLE, \
 	ShaderClass::DETAILCOLOR_DISABLE, ShaderClass::DETAILALPHA_DISABLE) )
 
-// GeneralsX @bugfix cemlyn007 30/09/2026 const, so these stay read-only data whatever the optimiser does (PLAN-023
-// Phase 8, stage RR2b).
 static const ShaderClass detailAlphaShader(SC_ALPHA_DETAIL);
 
 
@@ -91,8 +89,6 @@ static const ShaderClass detailAlphaShader(SC_ALPHA_DETAIL);
 	ShaderClass::ALPHATEST_DISABLE, ShaderClass::CULL_MODE_DISABLE, \
 	ShaderClass::DETAILCOLOR_DISABLE, ShaderClass::DETAILALPHA_DISABLE) )
 
-// GeneralsX @bugfix cemlyn007 30/09/2026 const, so these stay read-only data whatever the optimiser does (PLAN-023
-// Phase 8, stage RR2b).
 static const ShaderClass detailShader(SC_ALPHA_MIRROR);
 
 #define NO_USE_BRIDGE_NORMALS

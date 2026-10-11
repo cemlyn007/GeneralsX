@@ -951,7 +951,7 @@ protected:
 	// GeneralsX @feature cemlyn007 28/09/2026 Per engine: every engine's ControlBar constructor (headless too,
 	// InGameUI::init) clears it (resetContainData), so shared, a headless engine's boot would clear the rendering
 	// engine's inventory buttons (PLAN-023 Phase 4). ControlBarCommand.cpp and ControlBarCommandProcessing.cpp
-	// stand m_containData in for its entries.
+	// stand m_containData in for its entries; ControlBarStructureInventory.cpp writes s_containData_perEngine directly.
 	struct ContainData
 	{
 		ContainEntry entries[ MAX_COMMANDS_PER_SET ];

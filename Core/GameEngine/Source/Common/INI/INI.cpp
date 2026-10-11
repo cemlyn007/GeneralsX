@@ -60,7 +60,7 @@
 #include "GameLogic/ScriptEngine.h"
 #include "GameLogic/Weapon.h"
 
-// GeneralsX @bugfix cemlyn007 28/09/2026 strtok_r for the per-INI tokenizer (declared by WWLib where libc lacks it)
+// GeneralsX @bugfix cemlyn007 28/09/2026 strtok_r for the per-INI tokeniser (declared by WWLib where libc lacks it)
 #include "strtok_r.h"
 #include "Common/FatalEngineError.h"
 

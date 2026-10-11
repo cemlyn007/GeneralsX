@@ -249,6 +249,16 @@ protected:
 // (the engine, its groups or the device list) is overridden here or is only reached with a
 // playing sound, which never exists. Keep in step with OpenALAudioManagerDummy
 // (OpenALAudioManager.h); PLAN-023 notes the one known difference (getFileLengthMS).
+//
+// GeneralsX @bugfix cemlyn007 02/10/2026 This class's own closeDevice() override below is a
+// no-op, but ~MiniAudioManager (no destructor is declared here, so the base one runs last) calls
+// closeDevice() during its own destruction, when the object's dynamic type is back to
+// MiniAudioManager and the call resolves to the *base* closeDevice(), not this override. That is
+// the real, staged teardown (MiniAudioManager.cpp), guarded by m_resourceManagerInitialized /
+// m_logInitialized / m_contextInitialized / m_engineInitialized; since openDevice() is never
+// called on this class, every flag is still FALSE, so every guarded step is skipped and the call
+// is a safe no-op. Keep every closeDevice step behind its own flag: an unguarded addition there
+// would run uninitialised against a dummy instance with no MiniAudio state to tear down.
 class MiniAudioManagerDummy : public MiniAudioManager
 {
 public:
@@ -277,7 +287,7 @@ public:
 	virtual void friend_forcePlayAudioEventRTS(const AudioEventRTS *eventToPlay) override {}
 	virtual void processRequestList(void) override { removeAllAudioRequests(); }
 
-	// GeneralsX @performance cemlyn007 29/09/2026 Nothing is ever playing, so client code may skip
+	// GeneralsX @performance cemlyn007 29/09/2026 No sound is ever audible (pending requests are dropped at the next audio update), so client code may skip
 	// work that only restarts sounds (PLAN-023 Phase 5b, perf2). Same in OpenALAudioManagerDummy.
 	virtual Bool canPlaySounds() const override { return FALSE; }
 

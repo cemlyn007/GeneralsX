@@ -1214,15 +1214,19 @@ void NGMP_OnlineServicesManager::requestPlaylistsAsync() {
 }
 
 void NGMP_OnlineServicesManager::startMatchmakingAsync(uint16_t playlistID, const std::vector<int>& selectedMapIndexes) {
-    std::thread(::rts::withCurrentEngine([this, playlistID, selectedMapIndexes]() {
+    // GeneralsX @bugfix cemlyn007 03/10/2026 Read the engine values here: this thread is detached, so it
+    // may outlive the engine's context and must not reach engine state itself.
+    const auto exeCRC = TheGlobalData ? TheGlobalData->m_exeCRC : 0;
+    const auto iniCRC = TheGlobalData ? TheGlobalData->m_iniCRC : 0;
+    std::thread([this, playlistID, selectedMapIndexes, exeCRC, iniCRC]() {
         CURL* curl = curl_easy_init();
         if (!curl) return;
 
         json payload;
         payload["playlist"] = playlistID;
         payload["maps"] = selectedMapIndexes;
-        payload["exe_crc"] = TheGlobalData ? TheGlobalData->m_exeCRC : 0;
-        payload["ini_crc"] = TheGlobalData ? TheGlobalData->m_iniCRC : 0;
+        payload["exe_crc"] = exeCRC;
+        payload["ini_crc"] = iniCRC;
         payload["anticheat_id"] = -1;
 
         std::string payloadStr = payload.dump(-1, ' ', false, json::error_handler_t::replace);
@@ -1256,7 +1260,7 @@ void NGMP_OnlineServicesManager::startMatchmakingAsync(uint16_t playlistID, cons
             fprintf(stderr, "[NGMP] Failed to start matchmaking (curl=%d, http=%ld)\n", res, httpCode);
             fflush(stderr);
         }
-    })).detach();
+    }).detach();
 }
 
 void NGMP_OnlineServicesManager::cancelMatchmakingAsync() {

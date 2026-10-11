@@ -120,6 +120,9 @@ public:
 
 	virtual void friend_forcePlayAudioEventRTS(const AudioEventRTS *eventToPlay);
 
+	// GeneralsX @bugfix cemlyn007 08/10/2026 FALSE when openDevice opened no device (see hasContext).
+	virtual Bool canPlaySounds() const override { return hasContext(); }
+
 	virtual UnsignedInt getNum2DSamples(void) const;
 	virtual UnsignedInt getNum3DSamples(void) const;
 	virtual UnsignedInt getNumStreams(void) const;
@@ -173,6 +176,14 @@ protected:
 	ALuint playSample3D(AudioEventRTS *event, PlayingAudio * audio);
 
 protected:
+	// GeneralsX @bugfix cemlyn007 08/10/2026 Whether openDevice left this manager with a device and
+	// a current context. When it did not (no sound card, as on a CI runner; or the device or context
+	// failed to open), there is no current ALC context, so every AL call fails: OpenAL Soft returns
+	// AL_INVALID_OPERATION from alGetError on every call and logs each one. The manager then behaves
+	// like OpenALAudioManagerDummy: requests are dropped at the next update, so nothing ever plays
+	// and no AL call is made, and a game runs the same as a muted one.
+	Bool hasContext(void) const { return m_alcContext != nullptr; }
+
 	void enumerateDevices(void);
 	void createListener(void);
 	void initDelayFilter(void);
@@ -278,6 +289,14 @@ public:
 #if defined(_DEBUG) || defined(_INTERNAL)
 	virtual void audioDebugDisplay(DebugDisplayInterface *dd, void *, FILE *fp = NULL) override {}
 #endif
+	// GeneralsX @bugfix cemlyn007 02/10/2026 This always-0 answer only matches the real backend
+	// while no build defines SAGE_USE_FFMPEG: OpenALAudioManager::getFileLengthMS then decodes a
+	// real length through m_audioCache. Fail the build instead of silently diverging per-frame
+	// logic between muted and audible engines on the same seed if that build option is ever
+	// turned on without updating this override.
+#ifdef SAGE_USE_FFMPEG
+#error "OpenALAudioManagerDummy::getFileLengthMS must be updated to match the decoded length OpenALAudioManager::getFileLengthMS now reports under SAGE_USE_FFMPEG"
+#endif
 	virtual Real getFileLengthMS(AsciiString strToLoad) const override { return 0.0f; }
 
 	virtual void selectProvider(UnsignedInt providerNdx) override {}
@@ -291,7 +310,7 @@ public:
 	virtual void friend_forcePlayAudioEventRTS(const AudioEventRTS *eventToPlay) override {}
 	virtual void processRequestList(void) override { removeAllAudioRequests(); }
 
-	// GeneralsX @performance cemlyn007 29/09/2026 Nothing is ever playing, so client code may skip
+	// GeneralsX @performance cemlyn007 29/09/2026 No sound is ever audible (pending requests are dropped at the next audio update), so client code may skip
 	// work that only restarts sounds (PLAN-023 Phase 5b, perf2). Same in MiniAudioManagerDummy.
 	virtual Bool canPlaySounds() const override { return FALSE; }
 

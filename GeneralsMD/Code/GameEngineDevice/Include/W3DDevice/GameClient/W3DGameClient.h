@@ -37,6 +37,8 @@
 // SYSTEM INCLUDES ////////////////////////////////////////////////////////////
 
 // USER INCLUDES //////////////////////////////////////////////////////////////
+#include <cstdio>
+
 #include "GameClient/GameClient.h"
 #include "W3DDevice/GameClient/W3DParticleSys.h"
 #include "W3DDevice/GameClient/W3DDisplay.h"
@@ -141,6 +143,9 @@ protected:
 		if (TheW3DFrameLengthInMsec == msecsPerFrame)
 			return;
 #if RTS_ENGINE_CONTEXT
+		fprintf(stderr, "W3DGameClient::setFrameRate - the frame length is process-wide (%g ms): %g ms refused\n",
+			(double)TheW3DFrameLengthInMsec, (double)msecsPerFrame);
+		fflush(stderr);
 		DEBUG_CRASH(("W3DGameClient::setFrameRate - the frame length is process-wide (%g ms): %g ms refused",
 			TheW3DFrameLengthInMsec, msecsPerFrame));
 #else

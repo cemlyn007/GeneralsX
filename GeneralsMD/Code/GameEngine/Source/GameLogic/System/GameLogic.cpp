@@ -1284,6 +1284,12 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 	TheWritableGlobalData->m_loadScreenRender = TRUE;	///< mark it so only a few select things are rendered during load
 	TheWritableGlobalData->m_TiVOFastMode = FALSE;	//always disable the TIVO fast-forward mode at the start of a new game.
 
+	// GeneralsX @bugfix cemlyn007 03/10/2026 View::init leaves the height adjustment off until the game has
+	// started, but nothing clears it at the end of a game. An engine's later games would otherwise ease the
+	// camera's zoom by wall-clock steps in every draw of the load and the start fade.
+	if (TheGlobalData->m_headless)
+		TheTacticalView->setOkToAdjustHeight(FALSE);
+
 	Campaign* currentCampaign = TheCampaignManager->getCurrentCampaign();
 	Bool isChallengeCampaign = m_gameMode == GAME_SINGLE_PLAYER && currentCampaign && currentCampaign->m_isChallengeCampaign;
 
@@ -2356,6 +2362,14 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 
 		}
 	}
+
+	// GeneralsX @bugfix cemlyn007 03/10/2026 An embed host never calls TheFramePacer->update() again, so
+	// whatever step the pacer holds scales the draw path's per-frame adjustments (camera zoom, pivot
+	// easing) for the rest of the game. Set the nominal logic step, so the logic time-scale ratio is exactly 1
+	// (it is clamped) and the base-over-update ratio is 1 to within float rounding, independent of load, the fps
+	// limit or which game the engine played before. Applies to save loads too.
+	if (TheGlobalData->m_headless)
+		TheFramePacer->resetToStep(SECONDS_PER_LOGICFRAME_REAL);
 
 	if(m_loadScreen)
 	{

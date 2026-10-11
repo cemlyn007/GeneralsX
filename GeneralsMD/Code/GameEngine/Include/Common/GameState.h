@@ -209,6 +209,16 @@ public:
 
 	AsciiString getMapLeafName(const AsciiString& in) const;
 
+	// GeneralsX @feature cemlyn007 03/10/2026 Expose the private iterateSaveFiles for test
+	// coverage. Production code only reaches it through populateSaveGameListbox (needs a live
+	// GameWindow) and findNextSaveFilename's dead HIGHEST_NUMBER branch, so nothing outside the
+	// Load/Save menu could exercise the non-Windows directory-filtering logic (case
+	// sensitivity, regular-files-only, mid-read error reporting) at all. Named like
+	// friend_xferSaveDataForCRC above (a public entry onto a private method); unlike that one,
+	// which GameLogic::getCRC uses for deep CRCs, this hook is test-only and not part of the
+	// save/load flow.
+	void friend_iterateSaveFiles( IterateSaveFileCallback callback, void *userData ) { iterateSaveFiles( callback, userData ); }
+
 protected:
 
 	// snapshot methods

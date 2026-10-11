@@ -28,6 +28,8 @@
 
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
+#include <cstdlib>  // std::getenv (the GENERALSX_TEST_* hooks)
+
 #include "Common/ActionManager.h"
 // GeneralsX @refactor cemlyn007 30/09/2026 The window handles (PLAN-023 Phase 8, stage RR2a-2).
 #include "Common/ApplicationWindow.h"
@@ -293,7 +295,7 @@ GameEngine::GameEngine()
 //-------------------------------------------------------------------------------------------------
 GameEngine::~GameEngine()
 {
-	// GeneralsX @bugfix cemlyn007 28/09/2026 From here on a fatal error with no TheGlobalData does not
+	// GeneralsX @bugfix cemlyn007 28/09/2026 From here on an embedded-mode fatal error does not
 	// throw (see FatalEngineError.h)
 	SetEngineTearingDown(true);
 
@@ -450,6 +452,18 @@ void GameEngine::init()
 	try {
 		//create an INI object to use for loading stuff
 		INI ini;
+
+		// GeneralsX @feature cemlyn007 02/10/2026 Test-only fault injection, so an embedded-mode
+		// host's tests can exercise this function's own `catch (const FatalEngineError&) { throw; }`
+		// rethrow site below, not only a throw site a test calls directly (RELEASE_CRASH called
+		// from outside init(), e.g. a host's own unsafe test hook, never passes through this catch
+		// block). Gated on IsEngineEmbeddedMode(), not just the env var: a retail or stock build
+		// never calls SetEngineEmbeddedMode(true), so this is unreachable there regardless of
+		// environment. Checked once per init() call, not cached, since it is an uncached getenv
+		// like any other and init() itself may run more than once per process (rlgenerals'
+		// MULTI_ENGINE_CONSUMER.md stage R1 calls create/destroy/create in one process).
+		if (IsEngineEmbeddedMode() && std::getenv("GENERALSX_TEST_FAULT_IN_INIT"))
+			RELEASE_CRASH("test fault inside GameEngine::init (GENERALSX_TEST_FAULT_IN_INIT)");
 
 #ifdef DEBUG_LOGGING
 		if (TheVersion)
@@ -788,9 +802,18 @@ void GameEngine::init()
 
 		initSubsystem(TheUpgradeCenter,"TheUpgradeCenter", MSGNEW("GameEngineSubsystem") UpgradeCenter, &xferCRC, "Data\\INI\\Default\\Upgrade", "Data\\INI\\Upgrade");
 #if RTS_ENGINE_CONTEXT
+		// GeneralsX @feature cemlyn007 03/10/2026 Test hook (embedded mode only, like
+		// GENERALSX_TEST_FAULT_IN_INIT): a later engine looks the given name up inside its frozen window,
+		// and any engine interns it right after its own frozen window ends, so a host test can reach both
+		// frozen-window refusals, including a name the priming engine interned just after its window.
+		const char* testInternName = IsEngineEmbeddedMode() ? std::getenv("GENERALSX_TEST_INTERN_IN_FROZEN_WINDOW") : nullptr;
+		if (testInternName && rts::ctx()->nameKeysFrozen)
+			TheNameKeyGenerator->nameToKey(testInternName);
 		// GeneralsX @feature cemlyn007 28/09/2026 Every name key a later engine needs to share with
-		// the priming engine (the science and upgrade keys that orders carry) is interned by now
+		// the priming engine (the science and upgrade keys that orders carry) is interned by now.
 		primingLatch.endFrozenNames();
+		if (testInternName)
+			TheNameKeyGenerator->nameToKey(testInternName);
 #endif
 		initSubsystem(TheGameClient,"TheGameClient", createGameClient(), nullptr);
 

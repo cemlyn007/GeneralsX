@@ -247,6 +247,8 @@ AsciiString QuotedPrintableToAsciiString(AsciiString original)
 		}
 		src++;
 		c++;
+		// GeneralsX @bugfix cemlyn007 03/10/2026 Count output bytes so the i<1023 bound holds (upstream never incremented i).
+		i++;
 	}
 
 	*c = 0;

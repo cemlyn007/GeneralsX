@@ -231,7 +231,7 @@ struct RTS_ENGINE_CONTEXT_API alignas(::rts::renderStateAlignment) W3DRenderStat
 // engine without one, faults where it happens instead of passing unseen (PLAN-023 Phase 8, stage RR2a-2). An
 // embedding host calls it once, before any engine boots; the first call also registers an exit handler that makes
 // them writable again for their static destructors. Returns false where it cannot (a page size that does not divide
-// rts::renderStateAlignment, or no mprotect: Windows), and then changes neither (RR2b).
+// rts::renderStateAlignment, or no mprotect: Windows), and then a failed protect changes neither; a failed unprotect makes writable every page it can (RR2b).
 RTS_ENGINE_CONTEXT_API bool W3D_Protect_Render_Defaults(bool readOnly);
 
 // The current engine's render state, or W3DRenderState::Defaults for an engine that has none.

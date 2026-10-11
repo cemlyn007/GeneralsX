@@ -5392,7 +5392,8 @@ AIAttackState::AIAttackState( StateMachine *machine, Bool follow, Bool attacking
 	State( machine , "AIAttackState"),
 	m_attackMachine(nullptr),
 	m_attackParameters(attackParameters),
-	m_lockedWeaponOnEnter(nullptr),
+	m_hasLockedWeaponOnEnter(FALSE),
+	m_lockedWeaponSlotOnEnter(PRIMARY_WEAPON),
 	m_follow(follow),
 	m_isAttackingObject(attackingObject),
 	m_isForceAttacking(forceAttacking),
@@ -5470,7 +5471,9 @@ void AIAttackState::loadPostProcess()
 		m_victimTeam = victim->getTeam();
 	}
 	Object* source = getMachineOwner();
-	m_lockedWeaponOnEnter = source->isCurWeaponLocked() ? source->getCurrentWeapon() : nullptr;
+	// GeneralsX @bugfix cemlyn007 05/10/2026 Record the locked weapon by slot (see m_lockedWeaponSlotOnEnter).
+	m_lockedWeaponSlotOnEnter = PRIMARY_WEAPON;
+	m_hasLockedWeaponOnEnter = source->isCurWeaponLocked() && source->getCurrentWeapon(&m_lockedWeaponSlotOnEnter) != nullptr;
 }
 
 #ifdef STATE_MACHINE_DEBUG
@@ -5583,7 +5586,8 @@ StateReturnType AIAttackState::onEnter()
 	if( !weaponPicked )
 		return STATE_FAILURE;
 
-	Weapon* curWeapon = source->getCurrentWeapon();
+	WeaponSlotType curWeaponSlot = PRIMARY_WEAPON;
+	Weapon* curWeapon = source->getCurrentWeapon(&curWeaponSlot);
 	if (curWeapon)
 	{
 		curWeapon->setMaxShotCount(NO_MAX_SHOTS_LIMIT);
@@ -5592,7 +5596,9 @@ StateReturnType AIAttackState::onEnter()
 			source->setStatus( MAKE_OBJECT_STATUS_MASK( OBJECT_STATUS_IGNORING_STEALTH ) );
 	}
 
-	m_lockedWeaponOnEnter = source->isCurWeaponLocked() ? curWeapon : nullptr;
+	// GeneralsX @bugfix cemlyn007 05/10/2026 Record the locked weapon by slot (see m_lockedWeaponSlotOnEnter).
+	m_hasLockedWeaponOnEnter = source->isCurWeaponLocked() && curWeapon != nullptr;
+	m_lockedWeaponSlotOnEnter = curWeaponSlot;
 
 	StateReturnType retType = m_attackMachine->initDefaultState();
 	if( retType == STATE_CONTINUE )
@@ -5698,12 +5704,15 @@ StateReturnType AIAttackState::update()
 	if( !weaponPicked )
 		return STATE_FAILURE;
 
-	Weapon* curWeapon = source->getCurrentWeapon();
+	WeaponSlotType curWeaponSlot = PRIMARY_WEAPON;
+	Weapon* curWeapon = source->getCurrentWeapon(&curWeaponSlot);
 
 	// if we entered with a locked weapon (ie, a special weapon), then we will
 	// only keep attacking as long as that weapon remains the cur weapon...
 	// if anything ever changes that weapon, we exit attack mode immediately.
-	if (m_lockedWeaponOnEnter != nullptr && m_lockedWeaponOnEnter != curWeapon)
+	// GeneralsX @bugfix cemlyn007 05/10/2026 Compare slots, not addresses: a weapon-set change that keeps a shared lock
+	// reallocates the Weapon in the same slot, and whether it lands at the old address depends on the heap.
+	if (m_hasLockedWeaponOnEnter && (curWeapon == nullptr || curWeaponSlot != m_lockedWeaponSlotOnEnter))
 		return STATE_FAILURE;
 
 	// we've shot as many times as we are allowed to

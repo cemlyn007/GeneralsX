@@ -62,6 +62,11 @@ const RectClass& Render2DClass::Get_Screen_Resolution()
 {
 	return ScreenResolution;
 }
+
+void Render2DClass::Set_Screen_Resolution( const RectClass & screen )
+{
+	ScreenResolution = screen;
+}
 #else
 RectClass							Render2DClass::ScreenResolution( 0,0,0,0 );
 #endif

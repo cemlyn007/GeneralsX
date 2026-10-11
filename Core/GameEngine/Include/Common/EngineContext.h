@@ -104,17 +104,17 @@ namespace rts
 
 // GeneralsX @feature cemlyn007 30/09/2026 The alignment, and so the size granule, of the render states an engine's
 // w3dRender and ww3dState point to (W3DRenderState, WW3DState): the largest memory page size the target can run with
-// (16 KiB on Apple silicon; 64 KiB on 64-bit Arm, POWER and LoongArch Linux, whose kernels may be built with 4, 16 or
-// 64 KiB pages; 4 KiB on x86-64), so that their defaults fill whole pages of their own, which a host can make
+// (16 KiB on Apple silicon; 4 KiB on x86 and x86-64; 64 KiB on every other target, whose kernels may be built with
+// 4, 16 or 64 KiB pages), so that their defaults fill whole pages of their own, which a host can make
 // read-only (W3D_Protect_Render_Defaults; PLAN-023 Phase 8, stage RR2a-2).
-// GeneralsX @bugfix cemlyn007 30/09/2026 64 KiB on those Linux targets, where 4 KiB made every protect fail on a
-// 16 or 64 KiB page kernel (PLAN-023 Phase 8, stage RR2b).
+// GeneralsX @bugfix cemlyn007 30/09/2026 64 KiB wherever a larger page is possible, where 4 KiB made every protect
+// fail on a 16 or 64 KiB page kernel (PLAN-023 Phase 8, stage RR2b).
 #if defined(__APPLE__)
 inline constexpr std::size_t renderStateAlignment = 16384;
-#elif defined(__aarch64__) || defined(__powerpc64__) || defined(__loongarch64)
-inline constexpr std::size_t renderStateAlignment = 65536;
-#else
+#elif defined(__x86_64__) || defined(__i386__) || defined(_M_X64) || defined(_M_IX86)
 inline constexpr std::size_t renderStateAlignment = 4096;
+#else
+inline constexpr std::size_t renderStateAlignment = 65536;
 #endif
 
 // Destroys one per-engine slot object (see EngineContext::setSlot).
@@ -148,14 +148,13 @@ struct RTS_ENGINE_CONTEXT_API EngineContext
 #undef RTS_ENGINE_SINGLETON_STRUCT
 #undef RTS_ENGINE_SINGLETON_ZH
 
-	// Set while this engine is being torn down (GameEngine's destructor onwards), cleared when a
-	// GameEngine is constructed in it. Fatal errors raised in that window do not throw (see
-	// FatalEngineError.h).
-	bool engineTearingDown = false;
-
-	// Set while this engine boots from names another engine primed, until its upgrades are loaded: it
-	// must intern no new NameKey then (NameKeyGenerator::PrimingLatch, PLAN-023 Decision 2).
-	bool nameKeysFrozen = false;
+	// The direct fields that are not seeds (the engine's teardown flags, the pathfinder pool, the map and
+	// partition lists, W3D's scenes, asset managers and clocks, ...), from EngineContextFields.inl.
+#define RTS_ENGINE_CONTEXT_POINTER(T, n) ::T* n = nullptr;
+#define RTS_ENGINE_CONTEXT_VALUE(T, n, init) T n = init;
+#include "EngineContextFields.inl"
+#undef RTS_ENGINE_CONTEXT_POINTER
+#undef RTS_ENGINE_CONTEXT_VALUE
 
 	// GlobalData::m_theOriginal, this engine's GlobalData with no overrides (Zero Hour; see GlobalData.h).
 	// GlobalData nulls it when that instance is deleted.
@@ -169,91 +168,6 @@ struct RTS_ENGINE_CONTEXT_API EngineContext
 	std::uint32_t gameClientSeed[6] = RTS_RANDOM_SEED_INITIAL_VALUES;
 	std::uint32_t gameLogicSeed[6] = RTS_RANDOM_SEED_INITIAL_VALUES;
 	std::uint32_t gameLogicBaseSeed = 0;
-
-	// PathfindCellInfo::s_infoArray/s_firstFree: the pathfinder's cell-info pool and its free list
-	// (AIPathfind.cpp), made and freed by this engine's Pathfinder.
-	::PathfindCellInfo* pathfindCellInfoArray = nullptr;
-	::PathfindCellInfo* pathfindCellInfoFirstFree = nullptr;
-
-	// PolygonTrigger::ThePolygonTriggerListPtr/s_currentID: the map's trigger areas, walked on every
-	// object's cell change, and the next trigger ID.
-	::PolygonTrigger* polygonTriggerList = nullptr;
-	std::int32_t polygonTriggerCurrentID = 1;
-
-	// MapObject::TheMapObjectListPtr: the map objects of the last map this engine read.
-	::MapObject* mapObjectList = nullptr;
-
-	// PartitionManager.cpp's TheContactList (the contact list of the partition update in progress) and
-	// getClosestObjects()'s iteration stamp (nonzero).
-	::PartitionContactList* partitionContactList = nullptr;
-	std::int32_t partitionIterFlag = 1;
-
-	// ScriptList::m_curId: the last script ID handed out.
-	std::int32_t scriptListCurId = 0;
-
-	// REPLAY_CRC_INTERVAL (Recorder.cpp): the logic CRC interval of a solo game or replay.
-	std::int32_t replayCrcInterval = 100;
-
-	// W3DDisplay's scenes and asset manager (W3DDisplay::m_3DScene, ...; PLAN-023 Phase 3). Headless
-	// builds them too, and each engine's GameClient::reset resets its own.
-	::RTS3DScene* w3dDisplay3DScene = nullptr;
-	::RTS2DScene* w3dDisplay2DScene = nullptr;
-	::RTS3DInterfaceScene* w3dDisplay3DInterfaceScene = nullptr;
-	::W3DAssetManager* w3dDisplayAssetManager = nullptr;
-
-	// WW3DAssetManager::TheInstance: the asset manager the W3D loaders use (bones and meshes, headless
-	// too); the same object as w3dDisplayAssetManager once W3DDisplay has made it.
-	::WW3DAssetManager* ww3dAssetManager = nullptr;
-
-	// WW3D's timing statics (WW3D::SyncTime, ...), with their upstream initial values: the animation clock
-	// (bones are posed headless too), advanced by this engine's frames only. 1000.0f / WWSyncPerSecond.
-	float ww3dLogicFrameTimeMs = 1000.0f / 30;
-	float ww3dFractionalSyncMs = 0.0f;
-	unsigned int ww3dSyncTime = 0;
-	unsigned int ww3dPreviousSyncTime = 0;
-	int ww3dFrameCount = 0;
-
-	// Whether this engine holds one of WWMath's Init counts (wwmath.cpp): set by its first WWMath::Init and
-	// cleared by its first WWMath::Shutdown after that, so an engine that calls Shutdown twice (W3DDisplay's
-	// failed init, then its destructor) releases only its own count, never another live engine's.
-	bool wwMathInitialized = false;
-
-	// GeneralsX @bugfix cemlyn007 30/09/2026 Drawable::s_modelLockCount (Drawable.cpp, under
-	// DIRTY_CONDITION_FLAGS): the depth of this engine's scene iterations that lock its drawables' dirty
-	// model state (StDrawableDirtyStuffLocker in W3DScene.cpp). Only a rendering engine locks, but every
-	// engine's Drawable::getDrawModules reads it, so one process-wide count let a headless engine's reads
-	// race the renderer's scene (PLAN-023 Phase 8, stage RR0a).
-	int drawableModelLockCount = 0;
-
-	// GeneralsX @feature cemlyn007 30/09/2026 This engine's DX8Wrapper state (WW3D2/w3drenderstate.h): its Direct3D
-	// interface and device, caps, render targets, cached states and statistics. DX8Wrapper::Init allocates it
-	// (Set_Display_Size_Provider, just before, too), the end of WW3D::Shutdown frees it (RR2a-2: after
-	// DX8Wrapper::Shutdown, since WW3D's own state goes with it), and it is null for an engine that does not
-	// render. DX8Wrapper reads W3DRenderState::Defaults (no device, IsInitted false) while it is
-	// null, so a headless engine beside a renderer never reaches the renderer's device or caps and answers as in
-	// a headless solo run (this replaces RR0a's ownsRenderDevice flag). A direct field, not a slot: DX8Wrapper's
-	// inline state-cache setters are on the draw's hot path (PLAN-023 Phase 8, stage RR2a-1).
-	::W3DRenderState* w3dRender = nullptr;
-
-	// GeneralsX @feature cemlyn007 30/09/2026 DX8Wrapper_HeadlessRender and DX8Wrapper_PreserveFPU (dx8wrapper.h):
-	// the host's (and -preserveFPU's) switches for this engine's render device, set before its boot creates the
-	// device, so before w3dRender exists (PLAN-023 Phase 8, stage RR2a-1).
-	bool dx8HeadlessRender = false;
-	int dx8PreserveFPU = 0;
-
-	// GeneralsX @feature cemlyn007 30/09/2026 This engine's WW3D state (WW3D2/ww3d.h, WW3DState): WW3D's render
-	// settings and render-loop statics (IsInitted, the render backend, the static sort lists, the debug shaders,
-	// the texture filter and reduction, ...). Allocated beside w3dRender and freed with it (at the end of
-	// WW3D::Shutdown), null for an engine that does not render, which reads WW3DState::Defaults (PLAN-023 Phase 8,
-	// stage RR2a-2).
-	::WW3DState* ww3dState = nullptr;
-
-	// GeneralsX @feature cemlyn007 30/09/2026 The engine's window: TheSDL3Window and ApplicationHWnd (an HWND,
-	// the same handle cast; Common/ApplicationWindow.h names both), set by whoever made the window (the game's
-	// main(), or a host for its viewer) before the engine boots, and null for a windowless engine. Not owned:
-	// the window outlives the engine (PLAN-023 Phase 8, stage RR2a-2).
-	::SDL_Window* sdl3Window = nullptr;
-	void* applicationHWnd = nullptr;
 
 	// Per-engine slot objects, by allocateEngineSlotIndex() index; null until set.
 	void* getSlot(std::size_t index) const;
@@ -288,8 +202,8 @@ inline EngineContext* ctx() noexcept
 	return t_engine;
 }
 
-// True when g_noEngine still has every singleton null and no slot object (nothing assigned one, or used a
-// PerEngineStatic, outside a Scope).
+// True when g_noEngine still has every singleton and direct field at its initial value and no slot object
+// (nothing assigned one, or used a PerEngineStatic, outside a Scope).
 RTS_ENGINE_CONTEXT_API bool noEngineIsPristine();
 
 // GeneralsX @feature cemlyn007 28/09/2026 The per-thread state an engine relies on (PLAN-023 Phase 5b): the calling
@@ -297,13 +211,16 @@ RTS_ENGINE_CONTEXT_API bool noEngineIsPristine();
 // an engine. Opaque here, so that this force-included header pulls in neither <cfenv> nor <locale.h>;
 // EngineContext.cpp checks that fenv_t and locale_t fit.
 // GeneralsX @bugfix cemlyn007 28/09/2026 Only what the Scope changes is saved and restored. On x86-64 (not Windows) that
-// is the x87 control word and MXCSR, and nothing at all for a thread already in the engine's mode; elsewhere the
-// whole fenv_t (with the x87 control word on i386). Only LC_NUMERIC is switched (to "C"), so that the engine sees
+// is the x87 control word and MXCSR, reloaded on exit for a thread already in the engine's mode only if the Scope
+// changed them; elsewhere the whole fenv_t (with the x87 control word on i386). Only LC_NUMERIC is switched (to "C"), so that the engine sees
 // the thread's other categories (LC_CTYPE for towlower, iswspace, mbstowcs) as it does without the engine context.
 // GeneralsX @bugfix cemlyn007 29/09/2026 The locale is switched on every entry, to one cached per thread (the
-// thread's own locale, as at its first entry, with LC_NUMERIC "C"), never left as the process's global locale:
+// thread's own locale with LC_NUMERIC "C": made at the first entry for a thread on the global locale, at every
+// outermost entry for one on a locale of its own), never left as the process's global locale:
 // see enterEngineThreadInvariants. The host must still not call setlocale() while any engine steps (glibc's
-// locale functions are not safe against it).
+// locale functions are not safe against it), and must set the process locale before the first entry: a thread on
+// the global locale keeps the LC_CTYPE it had at its first entry, so every thread that steps engines needs the
+// same LC_CTYPE.
 struct ThreadInvariants
 {
 	alignas(8) unsigned char floatingPointEnvironment[32];
@@ -313,7 +230,9 @@ struct ThreadInvariants
 	void* engineLocale;
 	unsigned int mxcsr;
 	unsigned short x87ControlWord;
-	// Whether the fields above hold the thread's floating-point state to restore.
+	// Whether the thread entered outside the engine's mode, so the fields above hold its own state to reload on
+	// exit. When false they hold the engine's mode as at entry, reloaded on exit only if something inside the
+	// Scope changed it.
 	bool floatingPointSaved;
 };
 
@@ -329,11 +248,10 @@ RTS_ENGINE_CONTEXT_API void leaveEngineThreadInvariants(const ThreadInvariants& 
 // GeneralsX @feature cemlyn007 28/09/2026 A Scope that switches the thread to a different engine also sets the
 // engine's per-thread invariants (PLAN-023 Phase 5b): the floating-point mode setFPMode() sets, which the engine's
 // boot, INI and load-screen paths set only on the thread that ran them, and a "C" LC_NUMERIC for its number
-// parsing and formatting. An engine
-// may be stepped on another thread than it booted on, or on one whose mode the host changed, and must still
-// run as it would alone. The thread's own mode and locale come back when the Scope ends. A nested Scope on
-// the engine already current, and a Scope for g_noEngine, do nothing more than before, so the cost is paid
-// once per outermost call into an engine.
+// parsing and formatting. An engine may be stepped on another thread than it booted on, or on one whose mode
+// the host changed, and must still run as it would alone, given the host's locale contract above. The thread's
+// own mode and locale come back when the Scope ends. A nested Scope on the engine already current, and a Scope
+// for g_noEngine, do nothing more than before, so the cost is paid once per outermost call into an engine.
 class [[nodiscard]] Scope
 {
 public:
@@ -365,7 +283,8 @@ private:
 // One object per engine in place of a file, class or function-local static: the object lives in a slot of
 // the current EngineContext, made on first use in that context (value-initialised, then passed to
 // `initialize` if one is given) and destroyed with it, newest first. The static itself only holds the slot
-// index, so it is process-wide and written once, at static initialisation. A TU-local (or header) `#define`
+// index, process-wide: taken at static initialisation for a file or class static, or at the first call (under
+// the static-init guard) for a function-local one. A TU-local (or header) `#define`
 // of the old name to `(name_perEngine.get())` keeps the uses unchanged. An access costs a slot lookup (a
 // call), so hot state belongs in direct EngineContext fields instead. It must not be used outside every
 // Scope (g_noEngine owns no slots).
@@ -381,17 +300,10 @@ public:
 
 	T& get() const
 	{
-		EngineContext* context = ctx();
-		void* object = context->getSlot(m_index);
-		if (object == nullptr)
-		{
-			Holder* holder = new Holder();
+		return get([this](T& value) {
 			if (m_initialize != nullptr)
-				m_initialize(holder->value);
-			context->setSlot(m_index, holder, &destroy);
-			object = holder;
-		}
-		return static_cast<Holder*>(object)->value;
+				m_initialize(value);
+		});
 	}
 
 	// GeneralsX @feature cemlyn007 28/09/2026 As get(), but the object is made with `initialize(object)`, which
@@ -439,46 +351,82 @@ private:
 	void (*m_initialize)(T& object);
 };
 
-// GeneralsX @feature cemlyn007 28/09/2026 A stand-in for a class's static data member whose value is a
-// direct EngineContext field (PLAN-023 Phase 2), for statics that are also used qualified
-// (`MapObject::TheMapObjectListPtr`), where a macro cannot stand in: declare it as
-// `static constexpr rts::ContextField<T, &rts::EngineContext::field> name{};` and the upstream reads,
-// assignments, `->` and comparisons compile unchanged. Taking its address gives the stand-in's, not the
-// field's, so a static whose address is taken needs a macro instead.
-template <typename T, T EngineContext::*Field>
-struct ContextField
+// GeneralsX @refactor cemlyn007 02/10/2026 ContextField and IndirectContextField are the same family (one
+// operator set over a `T&` the stand-in locates differently): factor that set into this CRTP base, which calls
+// `Derived::get()`, so a later operator (PLAN-023 Phase 8, stage RR2a-1) is added once for both instead
+// of being copied and risking the two kinds diverging.
+//
+// GeneralsX @fix cemlyn007 02/10/2026 The deleted copy constructor and unary operator& turn two of the gate's
+// (scripts/cpp/engine_context_standins.py) regex checks into compiler diagnostics instead: copying a stand-in
+// (`auto x = C::name;`, or passing it by value to a variadic logger, which must copy it to place it in `...`)
+// now fails with "use of deleted function", and so does `&name` (operator&). `sizeof(name)` and
+// `std::addressof(name)` still compile, so the gate keeps checking those.
+template <typename Derived, typename T>
+struct ContextFieldOps
 {
+	constexpr ContextFieldOps() noexcept = default;
+	ContextFieldOps(const ContextFieldOps&) = delete;
+	ContextFieldOps& operator=(const ContextFieldOps&) = delete;
+	Derived* operator&() const = delete;
+
 	operator T&() const noexcept
 	{
-		return ctx()->*Field;
+		return Derived::get();
+	}
+	// An explicit cast to an enum type (`(SomeEnum)name`, for an integer field) casts the field's value.
+	template <typename E, typename = std::enable_if_t<std::is_enum_v<E> && std::is_integral_v<T>>>
+	explicit operator E() const noexcept
+	{
+		return static_cast<E>(Derived::get());
 	}
 	T operator->() const noexcept
 	{
-		return ctx()->*Field;
+		return Derived::get();
 	}
-	const ContextField& operator=(T value) const noexcept
+	const Derived& operator=(T value) const noexcept
 	{
-		ctx()->*Field = value;
-		return *this;
+		Derived::get() = value;
+		return static_cast<const Derived&>(*this);
 	}
 	T& operator++() const noexcept
 	{
-		return ++(ctx()->*Field);
+		return ++Derived::get();
 	}
 	T operator++(int) const noexcept
 	{
-		return (ctx()->*Field)++;
+		return Derived::get()++;
 	}
 	// Compound assignment needs members: a built-in `+=` takes no user-defined conversion of its left operand.
 	template <typename U>
 	T& operator+=(const U& value) const noexcept
 	{
-		return ctx()->*Field += value;
+		return Derived::get() += value;
 	}
 	template <typename U>
 	T& operator-=(const U& value) const noexcept
 	{
-		return ctx()->*Field -= value;
+		return Derived::get() -= value;
+	}
+};
+
+// GeneralsX @feature cemlyn007 28/09/2026 A stand-in for a class's static data member whose value is a
+// direct EngineContext field (PLAN-023 Phase 2), for statics that are also used qualified
+// (`MapObject::TheMapObjectListPtr`), where a macro cannot stand in: declare it as
+// `static constexpr rts::ContextField<T, &rts::EngineContext::field> name{};` and the upstream reads,
+// assignments, `->` and comparisons compile unchanged. Its copy constructor and unary `operator&` are deleted
+// (see ContextFieldOps), but `sizeof` and `std::addressof` give the stand-in's, not the field's, so a static
+// used with either needs a macro instead.
+template <typename T, T EngineContext::*Field>
+struct ContextField : ContextFieldOps<ContextField<T, Field>, T>
+{
+	// A derived class's own operator=, even the implicitly-declared copy assignment, hides every base
+	// class operator= by name; without this, `field = value` stops finding the base's and falls back to
+	// (and fails to match) the implicit one, which takes only a `const ContextField&`.
+	using ContextFieldOps<ContextField<T, Field>, T>::operator=;
+
+	static T& get() noexcept
+	{
+		return ctx()->*Field;
 	}
 };
 
@@ -495,52 +443,33 @@ inline S& indirectContext() noexcept
 // A stand-in for a class's static data member that moved into such a struct (member `Field`), declared as
 // `static constexpr rts::IndirectContextField<S, &rts::EngineContext::p, S::Defaults, T, &S::name> name{};`.
 // Like ContextField: the upstream reads, assignments, `->` and comparisons compile unchanged, but `sizeof` and
-// `&` give the stand-in's size and address, not the field's (scripts/cpp/engine_context_standins.py fails on
-// those), so a name used that way, or with `.`, needs a reference-returning macro instead. An array field also
+// `std::addressof` give the stand-in's size and address, not the field's (scripts/cpp/engine_context_standins.py
+// fails on those), so a name used that way, or with `.`, needs a reference-returning macro instead. An array field also
 // takes `[]` and decays to a pointer to its first element.
 template <typename S, S* EngineContext::*Pointer, S& Defaults, typename T, T S::*Field>
 struct IndirectContextField
+	: ContextFieldOps<IndirectContextField<S, Pointer, Defaults, T, Field>, T>
 {
+	// See ContextField's same `using`: without it the implicit copy assignment hides the base's operator=.
+	using ContextFieldOps<IndirectContextField<S, Pointer, Defaults, T, Field>, T>::operator=;
+
 	static T& get() noexcept
 	{
 		return indirectContext<S, Pointer, Defaults>().*Field;
-	}
-	operator T&() const noexcept
-	{
-		return get();
-	}
-	T operator->() const noexcept
-	{
-		return get();
-	}
-	const IndirectContextField& operator=(T value) const noexcept
-	{
-		get() = value;
-		return *this;
-	}
-	T& operator++() const noexcept
-	{
-		return ++get();
-	}
-	T operator++(int) const noexcept
-	{
-		return get()++;
-	}
-	template <typename U>
-	T& operator+=(const U& value) const noexcept
-	{
-		return get() += value;
-	}
-	template <typename U>
-	T& operator-=(const U& value) const noexcept
-	{
-		return get() -= value;
 	}
 };
 
 template <typename S, S* EngineContext::*Pointer, S& Defaults, typename E, std::size_t N, E (S::*Field)[N]>
 struct IndirectContextField<S, Pointer, Defaults, E[N], Field>
 {
+	// Same deleted copy/operator& backstop as ContextFieldOps (this specialisation does not derive from
+	// it: an array field decays to E* rather than converting to E&, so it needs its own operator[]/
+	// operator E*() instead of ContextFieldOps's operator T&()/operator->()).
+	constexpr IndirectContextField() noexcept = default;
+	IndirectContextField(const IndirectContextField&) = delete;
+	IndirectContextField& operator=(const IndirectContextField&) = delete;
+	IndirectContextField* operator&() const = delete;
+
 	static E (&get() noexcept)[N]
 	{
 		return indirectContext<S, Pointer, Defaults>().*Field;
@@ -555,54 +484,20 @@ struct IndirectContextField<S, Pointer, Defaults, E[N], Field>
 	}
 };
 
-// GeneralsX @feature cemlyn007 30/09/2026 A stand-in whose field is whatever `Get` returns (PLAN-023 Phase 8,
-// stage RR2a-2), for a class whose per-engine state struct cannot be complete where the stand-ins are declared
-// (WW3D's, which holds WW3D's own nested enum types): the class declares `static T& name_State() noexcept;`,
-// defines it once the struct is complete, and declares
-// `static constexpr rts::AccessorContextField<T, &C::name_State> name{};`. The same operators as ContextField,
-// and the same limits: `sizeof` and `&` give the stand-in's (scripts/cpp/engine_context_standins.py fails on
-// both).
-template <typename T, T& (*Get)() noexcept>
-struct AccessorContextField
+// True when a stand-in type cannot be copied or have its address taken with unary `&`: the compile-time half
+// of what scripts/cpp/engine_context_standins.py checks. A static_assert on it where a stand-in is declared
+// keeps those two deleted operations from being dropped.
+template <typename Field, typename = void>
+struct HasUnaryAddressOf : std::false_type
 {
-	operator T&() const noexcept
-	{
-		return Get();
-	}
-	T operator->() const noexcept
-	{
-		return Get();
-	}
-	// An explicit cast to an enum type (`(SomeEnum)name`, for an int field) casts the field's value.
-	template <typename E, typename = std::enable_if_t<std::is_enum_v<E>>>
-	explicit operator E() const noexcept
-	{
-		return static_cast<E>(Get());
-	}
-	const AccessorContextField& operator=(T value) const noexcept
-	{
-		Get() = value;
-		return *this;
-	}
-	T& operator++() const noexcept
-	{
-		return ++Get();
-	}
-	T operator++(int) const noexcept
-	{
-		return Get()++;
-	}
-	template <typename U>
-	T& operator+=(const U& value) const noexcept
-	{
-		return Get() += value;
-	}
-	template <typename U>
-	T& operator-=(const U& value) const noexcept
-	{
-		return Get() -= value;
-	}
 };
+template <typename Field>
+struct HasUnaryAddressOf<Field, std::void_t<decltype(&std::declval<const Field&>())>> : std::true_type
+{
+};
+template <typename Field>
+inline constexpr bool isStandInGuarded =
+	!std::is_copy_constructible_v<std::remove_cv_t<Field>> && !HasUnaryAddressOf<std::remove_cv_t<Field>>::value;
 
 // A callable that runs `function` inside a Scope for the context that was current when it was made. For
 // thread functions: see withCurrentEngine.

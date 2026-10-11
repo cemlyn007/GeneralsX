@@ -126,45 +126,15 @@
 
 const char* DAZZLE_INI_FILENAME="DAZZLE.INI";
 
-#define DEFAULT_DEBUG_SHADER_BITS	(		SHADE_CNST(\
-												ShaderClass::PASS_LEQUAL,\
-												ShaderClass::DEPTH_WRITE_ENABLE,\
-												ShaderClass::COLOR_WRITE_ENABLE,\
-												ShaderClass::SRCBLEND_ONE,\
-												ShaderClass::DSTBLEND_ZERO,\
-												ShaderClass::FOG_DISABLE,\
-												ShaderClass::GRADIENT_MODULATE,\
-												ShaderClass::SECONDARY_GRADIENT_DISABLE,\
-												ShaderClass::TEXTURING_DISABLE,\
-												ShaderClass::ALPHATEST_DISABLE,\
-												ShaderClass::CULL_MODE_ENABLE, \
-												ShaderClass::DETAILCOLOR_DISABLE,\
-												ShaderClass::DETAILALPHA_DISABLE) )
-
-#define LIGHTMAP_DEBUG_SHADER_BITS	(		SHADE_CNST(\
-												ShaderClass::PASS_LEQUAL,\
-												ShaderClass::DEPTH_WRITE_ENABLE,\
-												ShaderClass::COLOR_WRITE_ENABLE,\
-												ShaderClass::SRCBLEND_ONE,\
-												ShaderClass::DSTBLEND_ZERO,\
-												ShaderClass::FOG_DISABLE,\
-												ShaderClass::GRADIENT_DISABLE,\
-												ShaderClass::SECONDARY_GRADIENT_DISABLE,\
-												ShaderClass::TEXTURING_ENABLE,\
-												ShaderClass::ALPHATEST_DISABLE,\
-												ShaderClass::CULL_MODE_ENABLE, \
-												ShaderClass::DETAILCOLOR_DISABLE,\
-												ShaderClass::DETAILALPHA_DISABLE) )
-
-
-
 /**********************************************************************************
 **
 **  WW3D Static Globals
 **
 ***********************************************************************************/
 
-#if !RTS_ENGINE_CONTEXT
+#if RTS_ENGINE_CONTEXT
+static_assert(WWSyncPerSecond == 30, "EngineContext::ww3dLogicFrameTimeMs starts at 1000.0f / 30");
+#else
 float														WW3D::LogicFrameTimeMs = 1000.0f / WWSyncPerSecond; // initialized to something to avoid division by zero on first use
 float															WW3D::FractionalSyncMs = 0.0f;
 unsigned int											WW3D::SyncTime = 0;
@@ -172,16 +142,11 @@ unsigned int											WW3D::PreviousSyncTime = 0;
 #endif
 #if RTS_ENGINE_CONTEXT
 // GeneralsX @feature cemlyn007 30/09/2026 WW3D's statics are the current engine's WW3DState fields (ww3d.h; PLAN-023
-// Phase 8, stage RR2a-2), with the upstream initial values below.
-WW3DState WW3DState::Defaults;
+// Phase 8, stage RR2a-2), with the upstream initial values there.
+constinit WW3DState WW3DState::Defaults;
 
-WW3DState::WW3DState()
-	: DefaultDebugShader(DEFAULT_DEBUG_SHADER_BITS),
-	  LightmapDebugShader(LIGHTMAP_DEBUG_SHADER_BITS),
-	  TextureFilter(TextureFilterClass::TextureFilterMode::TEXTURE_FILTER_BILINEAR),
-	  AnisotropyLevel(TextureFilterClass::AnisotropicFilterMode::TEXTURE_FILTER_ANISOTROPIC_2X)
-{
-}
+static_assert(TextureFilterClass::TEXTURE_FILTER_BILINEAR == 2 && TextureFilterClass::TEXTURE_FILTER_ANISOTROPIC_2X == 2,
+	"WW3DState's TextureFilter and AnisotropyLevel defaults (ww3d.h)");
 
 // The file statics, as the engine's fields.
 #define _Hwnd (reinterpret_cast<HWND&>(WW3D_State()._Hwnd))
@@ -865,10 +830,11 @@ WW3DErrorType WW3D::Begin_Render(bool clear,bool clearz,const Vector3 & color, f
 	SNAPSHOT_SAY(("========== WW3D::Begin_Render ============"));
 	SNAPSHOT_SAY(("==========================================\n"));
 
-	// rlgenerals: off-screen render mode has a hidden window with no presentable
-	// surface, so TestCooperativeLevel reports LOST/NOTRESET forever. We never
-	// present (the embed reads the backbuffer back) and the device can still
-	// render into the backbuffer VkImage, so skip the device-lost handling.
+	// rlgenerals: off-screen render mode never presents (the embed reads the
+	// backbuffer back) and renders into the backbuffer VkImage, so it skips the
+	// device-lost handling. TestCooperativeLevel measures D3D_OK there, with a
+	// hidden window and with none; the skip is kept so that mode never takes the
+	// device-lost path.
 	if (!DX8Wrapper_HeadlessRender &&
 	    DX8Wrapper::_Get_D3D_Device8() && (hr=DX8Wrapper::_Get_D3D_Device8()->TestCooperativeLevel()) != D3D_OK)
 	{

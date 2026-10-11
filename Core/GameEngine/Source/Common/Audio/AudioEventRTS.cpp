@@ -59,11 +59,13 @@
 
 
 //-------------------------------------------------------------------------------------------------
+// GeneralsX @bugfix cemlyn007 03/10/2026 Every non-copy constructor sets m_portionToPlayNext, and the default, name and position constructors also set the owner id; upstream left these unset, and a per-engine event must not depend on zero-fill (PLAN-023 Phase 4)
 AudioEventRTS::AudioEventRTS()
 									: m_eventName(AsciiString::TheEmptyString),
 										m_priority(AP_NORMAL),
 										m_volume(-1.0),
 										m_timeOfDay(TIME_OF_DAY_AFTERNOON),
+										m_objectID(INVALID_ID),
 										m_ownerType(OT_INVALID),
 										m_shouldFade(false),
 										m_isLogicalAudio(false),
@@ -78,7 +80,8 @@ AudioEventRTS::AudioEventRTS()
 										m_allCount(0),
 										m_playerIndex(-1),
 										m_delay(0.0f),
-										m_uninterruptible(FALSE)
+										m_uninterruptible(FALSE),
+										m_portionToPlayNext(PP_Attack)
 {
 	m_attackName.clear();
 	m_decayName.clear();
@@ -91,6 +94,7 @@ AudioEventRTS::AudioEventRTS( const AsciiString& eventName )
 										m_priority(AP_NORMAL),
 										m_volume(-1.0),
 										m_timeOfDay(TIME_OF_DAY_AFTERNOON),
+										m_objectID(INVALID_ID),
 										m_ownerType(OT_INVALID),
 										m_shouldFade(false),
 										m_isLogicalAudio(false),
@@ -105,7 +109,8 @@ AudioEventRTS::AudioEventRTS( const AsciiString& eventName )
 										m_allCount(0),
 										m_playerIndex(-1),
 										m_delay(0.0f),
-										m_uninterruptible(FALSE)
+										m_uninterruptible(FALSE),
+										m_portionToPlayNext(PP_Attack)
 {
 	m_attackName.clear();
 	m_decayName.clear();
@@ -133,7 +138,8 @@ AudioEventRTS::AudioEventRTS( const AsciiString& eventName, ObjectID ownerID )
 										m_allCount(0),
 										m_playerIndex(-1),
 										m_delay(0.0f),
-										m_uninterruptible(FALSE)
+										m_uninterruptible(FALSE),
+										m_portionToPlayNext(PP_Attack)
 {
 	m_attackName.clear();
 	m_decayName.clear();
@@ -169,7 +175,8 @@ AudioEventRTS::AudioEventRTS( const AsciiString& eventName, DrawableID drawableI
 										m_allCount(0),
 										m_playerIndex(-1),
 										m_delay(0.0f),
-										m_uninterruptible(FALSE)
+										m_uninterruptible(FALSE),
+										m_portionToPlayNext(PP_Attack)
 {
 	m_attackName.clear();
 	m_decayName.clear();
@@ -190,6 +197,7 @@ AudioEventRTS::AudioEventRTS( const AsciiString& eventName, const Coord3D *posit
 										m_priority(AP_NORMAL),
 										m_volume(-1.0),
 										m_timeOfDay(TIME_OF_DAY_AFTERNOON),
+										m_objectID(INVALID_ID),
 										m_ownerType(OT_Positional),
 										m_shouldFade(false),
 										m_isLogicalAudio(false),
@@ -204,7 +212,8 @@ AudioEventRTS::AudioEventRTS( const AsciiString& eventName, const Coord3D *posit
 										m_allCount(0),
 										m_playerIndex(-1),
 										m_delay(0.0f),
-										m_uninterruptible(FALSE)
+										m_uninterruptible(FALSE),
+										m_portionToPlayNext(PP_Attack)
 {
 	m_positionOfAudio.set( *positionOfAudio );
 	m_attackName.clear();

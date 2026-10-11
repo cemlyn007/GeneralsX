@@ -144,8 +144,9 @@ public:
 	/// @todo Need a scene abstraction
 #if RTS_ENGINE_CONTEXT
 	// GeneralsX @feature cemlyn007 28/09/2026 The scenes and the asset manager are per engine (EngineContext
-	// fields): a headless engine builds them too, and one engine's teardown reset another's scenes after
-	// they were freed (PLAN-023 Phase 3). The qualified uses are unchanged.
+	// fields): a headless engine builds only the asset manager (the scenes need a render mode), and one
+	// engine's teardown reset another's asset manager after it was freed (PLAN-023 Phase 3). The qualified
+	// uses are unchanged.
 	static constexpr rts::ContextField<RTS3DScene*, &rts::EngineContext::w3dDisplay3DScene> m_3DScene{};
 	static constexpr rts::ContextField<RTS2DScene*, &rts::EngineContext::w3dDisplay2DScene> m_2DScene{};
 	static constexpr rts::ContextField<RTS3DInterfaceScene*, &rts::EngineContext::w3dDisplay3DInterfaceScene> m_3DInterfaceScene{};
@@ -193,7 +194,8 @@ protected:
 	// function-local statics: every render engine's draw updates its own (PLAN-023 Phase 8, stage RR2a-2).
 	Int64 m_fpsLastUpdateTime64 = 0;
 	Int m_fpsHistoryOffset = 0;
-	Real m_fpsHistory[30] = {};
+	static constexpr Int FPS_HISTORY_SIZE = 30;
+	Real m_fpsHistory[FPS_HISTORY_SIZE] = {};
 	UnsignedInt m_statsFramesRenderedSinceLastUpdate = 0;
 	Int64 m_statsLastUpdateTime64 = 0;
 	double m_statsTimeSinceLastUpdateInSecs = 0.0;

@@ -111,7 +111,8 @@ typedef void (*AIDecisionObserverFn)(const AIDecision &decision, void *userData)
 
 // Install (or, with null, remove) the observer. One at a time.
 // GeneralsX @feature cemlyn007 28/09/2026 With RTS_ENGINE_CONTEXT, one per engine: this installs it on the
-// current engine only, and only that engine's decisions reach it (PLAN-023 Phase 2).
+// current engine only, and only that engine's decisions reach it (PLAN-023 Phase 2). With no engine
+// current the call does nothing.
 void setAIDecisionObserver(AIDecisionObserverFn fn, void *userData);
 
 // RAII: attributes every decision made while alive to origin. Scopes nest; the
