@@ -480,12 +480,15 @@ WindowMsgHandledType WOLMapSelectMenuSystem( GameWindow *window, UnsignedInt msg
 					std::map<AsciiString, MapMetaData>::iterator it = TheMapCache ? TheMapCache->find(asciiMap) : std::map<AsciiString, MapMetaData>::iterator();
 					if (TheMapCache && it != TheMapCache->end())
 					{
+						// GeneralsX @bugfix cemlyn007 13/10/2026 Build without NGMP: GeneralsOnline is only compiled with SAGE_USE_NGMP
+#if defined(SAGE_USE_NGMP)
 						if (TheNGMPGame)
 						{
 							TheNGMPGame->getGameSpySlot(0)->setMapAvailability(TRUE);
 							TheNGMPGame->setMapCRC( it->second.m_CRC );
 							TheNGMPGame->setMapSize( it->second.m_filesize );
 						}
+#endif
 						if (TheGameSpyInfo && TheGameSpyInfo->getCurrentStagingRoom())
 						{
 							TheGameSpyInfo->getCurrentStagingRoom()->getGameSpySlot(0)->setMapAvailability(TRUE);
@@ -515,12 +518,15 @@ WindowMsgHandledType WOLMapSelectMenuSystem( GameWindow *window, UnsignedInt msg
 					WOLDisplayGameOptions();
 
 					// NGMP: Update lobby
+					// GeneralsX @bugfix cemlyn007 13/10/2026 Build without NGMP: GeneralsOnline is only compiled with SAGE_USE_NGMP
+#if defined(SAGE_USE_NGMP)
 					NGMP_OnlineServices_LobbyInterface* pLobbyInterface = NGMP_OnlineServicesManager::GetInterface<NGMP_OnlineServices_LobbyInterface>();
 					if (pLobbyInterface != nullptr)
 					{
 						AsciiString mapPathToSend = (TheGameSpyInfo && TheGameSpyInfo->getCurrentStagingRoom()) ? TheGameSpyInfo->getCurrentStagingRoom()->getMap() : (TheNGMPGame ? TheNGMPGame->getMap() : asciiMap);
 						pLobbyInterface->UpdateCurrentLobby_Map(strMapName, mapPathToSend, bOfficialMap, newMaxPlayers);
 					}
+#endif
 
 					if (WOLMapSelectLayout)
 					{
