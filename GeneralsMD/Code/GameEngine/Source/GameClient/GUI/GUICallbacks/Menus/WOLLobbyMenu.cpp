@@ -209,12 +209,15 @@ Bool handleLobbySlashCommands(UnicodeString uText)
 	else if (token == "me" && uText.getLength()>4)
 	{
 		UnicodeString msg = UnicodeString(uText.str() + 4); // skip the /me
+		// GeneralsX @bugfix cemlyn007 13/10/2026 Build without NGMP: GeneralsOnline is only compiled with SAGE_USE_NGMP
+#if defined(SAGE_USE_NGMP)
 		NGMP_OnlineServices_RoomsInterface* pRoomsInterface = NGMP_OnlineServicesManager::GetInterface<NGMP_OnlineServices_RoomsInterface>();
 		if (pRoomsInterface != nullptr)
 		{
 			pRoomsInterface->SendChatMessageToCurrentRoom(msg, true);
 		}
 		else
+#endif
 		{
 			TheGameSpyInfo->sendChat(UnicodeString(uText.str()+4), TRUE, listboxLobbyPlayers);
 		}
@@ -238,11 +241,14 @@ Bool handleLobbySlashCommands(UnicodeString uText)
 		}
 		else
 		{
+			// GeneralsX @bugfix cemlyn007 13/10/2026 Build without NGMP: GeneralsOnline is only compiled with SAGE_USE_NGMP
+#if defined(SAGE_USE_NGMP)
 			std::shared_ptr<WebSocket> pWS = NGMP_OnlineServicesManager::GetWebSocket();
 			if (pWS != nullptr)
 			{
 				pWS->SendData_ChangeName(newName);
 			}
+#endif
 		}
 		
 		return TRUE; // was a slash command
@@ -957,11 +963,14 @@ void NGMP_WOLLobbyMenu_JoinLobbyCallback(EJoinLobbyResult result)
 //-------------------------------------------------------------------------------------------------
 void WOLLobbyMenuInit( WindowLayout *layout, void *userData )
 {
+	// GeneralsX @bugfix cemlyn007 13/10/2026 Build without NGMP: GeneralsOnline is only compiled with SAGE_USE_NGMP
+#if defined(SAGE_USE_NGMP)
 	NGMP_OnlineServices_LobbyInterface* pLobbyInterface = NGMP_OnlineServicesManager::GetInterface<NGMP_OnlineServices_LobbyInterface>();
 	if (pLobbyInterface != nullptr)
 	{
 		pLobbyInterface->LeaveCurrentLobby();
 	}
+#endif
 
 	nextScreen = nullptr;
 	buttonPushed = false;
@@ -1015,6 +1024,8 @@ void WOLLobbyMenuInit( WindowLayout *layout, void *userData )
 	// Show Menu
 	layout->hide( FALSE );
 
+	// GeneralsX @bugfix cemlyn007 13/10/2026 Build without NGMP: GeneralsOnline is only compiled with SAGE_USE_NGMP
+#if defined(SAGE_USE_NGMP)
 	NGMP_OnlineServices_RoomsInterface* pRoomsInterface = NGMP_OnlineServicesManager::GetInterface<NGMP_OnlineServices_RoomsInterface>();
 	if (pLobbyInterface != nullptr && pRoomsInterface != nullptr)
 	{
@@ -1030,6 +1041,7 @@ void WOLLobbyMenuInit( WindowLayout *layout, void *userData )
 				refreshPlayerList(false);
 			});
 	}
+#endif
 
 	GrabWindowInfo();
 
@@ -1107,6 +1119,8 @@ static void shutdownComplete( WindowLayout *layout )
 //-------------------------------------------------------------------------------------------------
 void WOLLobbyMenuShutdown( WindowLayout *layout, void *userData )
 {
+	// GeneralsX @bugfix cemlyn007 13/10/2026 Build without NGMP: GeneralsOnline is only compiled with SAGE_USE_NGMP
+#if defined(SAGE_USE_NGMP)
 	NGMP_OnlineServices_LobbyInterface* pLobbyInterface = NGMP_OnlineServicesManager::GetInterface<NGMP_OnlineServices_LobbyInterface>();
 	if (pLobbyInterface != nullptr)
 	{
@@ -1123,6 +1137,7 @@ void WOLLobbyMenuShutdown( WindowLayout *layout, void *userData )
 		pRoomsInterface->DeregisterForChatCallback();
 		pRoomsInterface->DeregisterForRosterNeedsRefreshCallback();
 	}
+#endif
 
 	CustomMatchPreferences pref;
 //	GameWindow *slider = TheWindowManager->winGetWindowFromId(parent, sliderChatAdjustID);
