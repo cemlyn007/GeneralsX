@@ -86,6 +86,11 @@ Data no engine writes is constant, so it is read-only and shared: tables are
 are constant-initialised. The empty `StringClass` and `WideStringClass`
 buffers are constants that no constructor writes.
 
+C++20's `std::bitset` sets a bit at compile time only below the 64th, so a
+constant mask is constant-initialised only while all its bits lie there. A
+constant mask with a higher bit (`KINDOFMASK_FS`, the weapon-slot model
+conditions) is a per-engine static instead, built on its first use.
+
 ## The interfaces
 
 `Core/GameEngine/Include/Common/EmbeddingContract.h` declares what the host

@@ -85,11 +85,10 @@ HAND = [
     # are EngineContext fields or PER_ENGINE_STATICs now (so gone from the library; their slot indexes are
     # rule:per-engine-static), as are Phase 3's TheWaterTransparency, TheWeatherSetting, WaterSettings[], rand4
     # and CameraShakerSystem.
-    # thread_local (per thread by design, so process-global here): inCRCGen and
-    # PathNode::computeDirectionVector()'s dir. The two XferLoad buffers are locals now, and both
-    # checkfortransitionsnum per-engine statics (so gone).
+    # thread_local (per thread by design, so process-global here): PathNode::computeDirectionVector()'s dir.
+    # The two XferLoad buffers are locals now, and both checkfortransitionsnum and inCRCGen per-engine
+    # statics (so gone).
     (GLOBAL, "", "TerrainLogic::m_gridWaterHandle", "an address-only sentinel (the grid water's WaterHandle is compared by address and never written), the same for every engine"),
-    (GLOBAL, "", "inCRCGen", "thread_local, set only while this thread runs GameLogic::getCRC (PLAN-023 Phase 2): per thread by design"),
     (GLOBAL, "", "re:PathNode::computeDirectionVector\\(\\)::dir", "thread_local returned-by-pointer scratch, consumed at once (PLAN-023 Phase 2): per thread by design"),
     # ---------------------------------------------------------------------------------------------------
     # PLAN-023 Phase 3: device-layer state a headless engine uses.
@@ -143,7 +142,6 @@ HAND = [
     (GLOBAL, "", "StdLocalFileSystem::setAssetRootPath(AsciiString const&)::s_assetRootSettled", "std::atomic flag: set by the first boot's setAssetRootPath (even with no root), after which a different root is refused (PLAN-023 Phase 5b)"),
     (GLOBAL, "", "re:s_thread|s_done|s_hasUpdate|s_latestTag", "update checker (menus), one per process"),
     (GLOBAL, "", "re:thread_id_map(_mutex)?|next_thread_id", "pthread-to-Win32 thread id map (CompatLib), process-wide by nature"),
-    (CONST, "", "re:scoringBuilding(Create|Destroy)?Mask", "KindOf masks built once at static initialization by ScoreKeeper.cpp's makeScoringMask from constants; never written (PLAN-023 Phase 5b)"),
     (CONST, "", "GameSpyColorDefaults", "the online chat colors' defaults (Chat.cpp), which each engine's GameSpyColor (a PER_ENGINE_STATIC, PLAN-023 Phase 5b) starts from; never written"),
     (GLOBAL, "", "NGMP_OnlineServicesManager::getInstance()::instance", "the process's GeneralsOnline session, logged into from the online menus of the one UI engine: with RTS_ENGINE_CONTEXT only a non-headless engine calls getInstance() (GameEngine::init, every update, its menus and ~GameEngine; headless engines skip it), and there is at most one such engine per process, so no other engine touches the instance (PLAN-023 Phase 5b)"),
     (GLOBAL, "", "re:theLobbyFilter|isThreadHosting|NET_CRC_INTERVAL|MIN_LOGIC_FRAMES|MAX_FRAMES_AHEAD|MIN_RUNAHEAD|FRAME_DATA_LENGTH|FRAMES_TO_KEEP|commandsReadyDebugSpewage", NET),
@@ -162,28 +160,11 @@ HAND = [
     # Constant.
     (CONST, "", "re:LZHL(De|En)coderStat::\\w+Table0", "LZHL static coding tables"),
     (CONST, "", "re:gli::.*::Table|stbiw__encode_png_line\\(.*\\)::(firstmap|mapping)|pi_lo|tiny", "table/constant in header-only third-party code"),
-    (CONST, "", "re:OBJECT_STATUS_MASK_NONE|DAMAGE_TYPE_FLAGS_(NONE|ALL)|DISABLEDMASK_(NONE|ALL)|KINDOFMASK_(NONE|FS)", "constant bit mask, set at static initialization"),
     (CONST, "", "re:replayExtention|lastReplayFileName|PORTABLE_(SAVE|MAPS|USER_MAPS)|g_csfFile|g_strFile|statsDir|ignoredChars", "constant string, never reassigned"),
     (CONST, "", "re:Surfaces|ShakeIntensities|EMITTER_TYPE_NAMES|ReportCategoryNames", "name table, never written"),
     (CONST, "", "re:s_noSoundMarker|ThingTemplate::s_audioEventNoSound", "default-constructed 'no sound' marker, returned by const pointer"),
-    (CONST, "", "SimpleObjectIterator::theClumpCompareProcs", "function-pointer table"),
     (CONST, "", "re:gameWindowFieldList|layoutScriptTable", ".wnd parse table (names and parsers)"),
     (CONST, "", "re:_\\w+(Loader|Factory)|_NullPrototype|_TwiddlerPersistFactory", LOADER),
-    (
-        CONST,
-        "",
-        "SpecialPowerTemplate::m_specialPowerFieldParse",
-        "INI FieldParse table, built once, never written; rule:fieldparse's declared-type check expects an "
-        "unqualified array name and this is an out-of-line, class-qualified definition",
-    ),
-    (
-        CONST,
-        "",
-        "s_allWeaponFireFlags",
-        "built once from MAKE_MODELCONDITION_MASK5 (Common/ModelState.h), which macro-expands to "
-        "ModelConditionFlags's own constructor applied to literal flags only; a textual rule cannot see "
-        "through the macro to confirm that",
-    ),
     # ---------------------------------------------------------------------------------------------------
     # Debug only.
     (DEBUG, "", "re:TheDebugIgnoreSyncErrors|TheCurrentIgnoreCrashPtr|g_LastErrorDump", "debug"),

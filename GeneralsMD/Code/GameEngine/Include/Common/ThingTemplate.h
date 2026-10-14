@@ -335,6 +335,10 @@ public:
 //-------------------------------------------------------------------------------------------------
 /** Definition of a thing template to read from our game data framework */
 //-------------------------------------------------------------------------------------------------
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+#define s_audioEventNoSound RTS_ENGINE_GLOBAL_REF(s_audioEventNoSound)
+#endif
 class ThingTemplate : public Overridable
 {
 
@@ -654,7 +658,11 @@ protected:
 private:
 	static const FieldParse s_objectFieldParseTable[];		///< the parse table
 	static const FieldParse s_objectReskinFieldParseTable[];		///< the parse table
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_CLASS_STATIC(AudioEventRTS, s_audioEventNoSound);
+#else
 	static AudioEventRTS s_audioEventNoSound;
+#endif
 
 private:
 
@@ -776,3 +784,6 @@ private:
 //-----------------------------------------------------------------------------
 //           Externals
 //-----------------------------------------------------------------------------
+#if RTS_ENGINE_CONTEXT
+#undef s_audioEventNoSound
+#endif

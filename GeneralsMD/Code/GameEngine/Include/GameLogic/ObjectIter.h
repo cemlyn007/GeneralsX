@@ -104,7 +104,8 @@ private:
 	};
 
 	typedef Real (*ClumpCompareProc)(Clump *a, Clump *b);
-	static ClumpCompareProc theClumpCompareProcs[];
+	// GeneralsX @refactor cemlyn007 14/10/2026 Constant, so read-only (docs/EMBEDDING.md)
+	static const ClumpCompareProc theClumpCompareProcs[];
 
 	static Real sortNearToFar(Clump *a, Clump *b);
 	static Real sortFarToNear(Clump *a, Clump *b);
