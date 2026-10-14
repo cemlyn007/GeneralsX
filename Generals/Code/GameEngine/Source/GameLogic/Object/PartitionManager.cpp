@@ -2190,7 +2190,7 @@ void PartitionData::invalidateShroudedStatusForAllPlayers()
 #if RTS_ENGINE_CONTEXT
 // GeneralsX @fix cemlyn007 03/10/2026 Per engine: calcMaxCoiForObject() assigns this from every engine's thread, and
 // two threads must not write one AsciiString object (the atomic refcount only covers buffers shared between copies).
-static rts::PerEngineStatic<AsciiString> theObjName_perEngine;
+static constexpr rts::PerEngineStatic<AsciiString> theObjName_perEngine{};
 #define theObjName (theObjName_perEngine.get())
 #else
 static AsciiString theObjName;

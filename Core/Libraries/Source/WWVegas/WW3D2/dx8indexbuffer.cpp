@@ -69,7 +69,7 @@ struct DynamicIndexBufferState
 	int _IndexBufferTotalIndices = 0;
 	int _IndexBufferTotalSize = 0;
 };
-rts::PerEngineStatic<DynamicIndexBufferState> DynamicIndexBufferState_perEngine;
+constexpr rts::PerEngineStatic<DynamicIndexBufferState> DynamicIndexBufferState_perEngine{};
 } // namespace
 #define _DynamicSortingIndexArrayInUse (DynamicIndexBufferState_perEngine.get()._DynamicSortingIndexArrayInUse)
 #define _DynamicSortingIndexArray (DynamicIndexBufferState_perEngine.get()._DynamicSortingIndexArray)

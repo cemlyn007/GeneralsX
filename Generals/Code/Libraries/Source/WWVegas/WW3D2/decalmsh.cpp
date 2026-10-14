@@ -184,7 +184,7 @@ struct DecalClipState
 	DecalPolyClass _DecalPoly0;
 	DecalPolyClass _DecalPoly1;
 };
-rts::PerEngineStatic<DecalClipState> DecalClipState_perEngine;
+constexpr rts::PerEngineStatic<DecalClipState> DecalClipState_perEngine{};
 } // namespace
 #define _DecalPoly0 (DecalClipState_perEngine.get()._DecalPoly0)
 #define _DecalPoly1 (DecalClipState_perEngine.get()._DecalPoly1)

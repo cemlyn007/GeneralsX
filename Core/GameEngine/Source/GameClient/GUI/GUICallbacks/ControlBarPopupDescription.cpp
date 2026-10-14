@@ -106,7 +106,7 @@ struct BuildTooltipState
 	AnimateWindowManager *theAnimateWindowManager;
 	GameWindow *prevWindow;
 };
-static rts::PerEngineStatic<BuildTooltipState> s_buildTooltipState_perEngine;
+static constexpr rts::PerEngineStatic<BuildTooltipState> s_buildTooltipState_perEngine{};
 #define theAnimateWindowManager (s_buildTooltipState_perEngine.get().theAnimateWindowManager)
 #define prevWindow (s_buildTooltipState_perEngine.get().prevWindow)
 #else

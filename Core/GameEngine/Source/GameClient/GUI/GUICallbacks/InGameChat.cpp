@@ -59,7 +59,7 @@ struct InGameChatState
 	UnicodeString savedChat;
 	InGameChatType chatType;
 };
-static rts::PerEngineStatic<InGameChatState> s_inGameChatState_perEngine;
+static constexpr rts::PerEngineStatic<InGameChatState> s_inGameChatState_perEngine{};
 #define chatWindow (s_inGameChatState_perEngine.get().chatWindow)
 #define chatTextEntry (s_inGameChatState_perEngine.get().chatTextEntry)
 #define chatTypeStaticText (s_inGameChatState_perEngine.get().chatTypeStaticText)

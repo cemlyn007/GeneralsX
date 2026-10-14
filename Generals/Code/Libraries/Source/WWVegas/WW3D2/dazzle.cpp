@@ -247,7 +247,7 @@ struct DazzleState
 	const DazzleVisibilityClass* _VisibilityHandler = &_DefaultVisibilityHandler;
 	bool _dazzle_rendering_enabled = true;
 };
-rts::PerEngineStatic<DazzleState> DazzleState_perEngine;
+constexpr rts::PerEngineStatic<DazzleState> DazzleState_perEngine{};
 } // namespace
 #define types (DazzleState_perEngine.get().types)
 #define type_count (DazzleState_perEngine.get().type_count)

@@ -127,7 +127,7 @@ Color GameSpyColor[GSCOLOR_MAX] =
 };
 
 #if RTS_ENGINE_CONTEXT
-rts::PerEngineStatic<Color[GSCOLOR_MAX]> GameSpyColor_perEngine([](Color (&colors)[GSCOLOR_MAX])
+extern constexpr rts::PerEngineStatic<Color[GSCOLOR_MAX]> GameSpyColor_perEngine([](Color (&colors)[GSCOLOR_MAX])
 {
 	for (Int i = 0; i < GSCOLOR_MAX; ++i)
 		colors[i] = GameSpyColorDefaults[i];

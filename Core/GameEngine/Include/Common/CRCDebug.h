@@ -100,7 +100,7 @@
 #if RTS_ENGINE_CONTEXT
 	// GeneralsX @fix cemlyn007 03/10/2026 Per engine: every boot given -saveDebugCRCPerFrame assigns it, and two threads
 	// must not write one AsciiString object (the atomic refcount only covers buffers shared between copies).
-	extern rts::PerEngineStatic<AsciiString> g_saveDebugCRCPerFrameDir_perEngine;
+	extern const rts::PerEngineStatic<AsciiString> g_saveDebugCRCPerFrameDir_perEngine;
 	#define g_saveDebugCRCPerFrameDir (g_saveDebugCRCPerFrameDir_perEngine.get())
 #else
 	extern AsciiString g_saveDebugCRCPerFrameDir;

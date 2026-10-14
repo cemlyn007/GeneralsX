@@ -50,7 +50,7 @@
 #if RTS_ENGINE_CONTEXT
 // GeneralsX @feature cemlyn007 30/09/2026 Per engine: the caps log's work string, written while each render engine
 // reads its device's caps (PLAN-023 Phase 8, stage RR2b).
-static rts::PerEngineStatic<StringClass> CapsWorkString_perEngine;
+static constexpr rts::PerEngineStatic<StringClass> CapsWorkString_perEngine{};
 #define CapsWorkString (CapsWorkString_perEngine.get())
 #else
 static StringClass CapsWorkString;

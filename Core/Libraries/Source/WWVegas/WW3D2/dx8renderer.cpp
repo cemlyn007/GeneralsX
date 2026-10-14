@@ -85,7 +85,7 @@ struct DX8MeshRendererState
 	DX8MeshRendererClass					renderer;
 };
 
-rts::PerEngineStatic<DX8MeshRendererState> DX8MeshRendererState_perEngine;
+constexpr rts::PerEngineStatic<DX8MeshRendererState> DX8MeshRendererState_perEngine{};
 
 DX8MeshRendererState& DX8_Current_Mesh_Renderer_State()
 {

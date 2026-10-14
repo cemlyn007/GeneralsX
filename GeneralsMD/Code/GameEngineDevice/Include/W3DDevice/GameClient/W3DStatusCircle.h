@@ -88,7 +88,7 @@ public:
 		Int diffuse;
 		Bool needUpdate;
 	};
-	static rts::PerEngineStatic<StatusColor> s_statusColor_perEngine;
+	static const rts::PerEngineStatic<StatusColor> s_statusColor_perEngine;
 	void static setColor(Int r, Int g, Int b) {StatusColor &color = s_statusColor_perEngine.get(); color.needUpdate = true; color.diffuse = (b) + (g<<8) + (r<<16);};
 protected:
 	Int	m_numTriangles;	//dimensions of list

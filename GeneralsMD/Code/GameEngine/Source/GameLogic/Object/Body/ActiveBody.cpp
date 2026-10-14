@@ -1117,19 +1117,19 @@ void ActiveBody::updateBodyParticleSystems()
 {
 #if RTS_ENGINE_CONTEXT
 	// GeneralsX @feature cemlyn007 28/09/2026 Per engine: each cached template is this engine's (PLAN-023 Phase 4).
-	static rts::PerEngineStatic<const ParticleSystemTemplate *> fireSmallTemplate_perEngine;
+	static constexpr rts::PerEngineStatic<const ParticleSystemTemplate *> fireSmallTemplate_perEngine{};
 	const ParticleSystemTemplate *fireSmallTemplate = fireSmallTemplate_perEngine.get([&](const ParticleSystemTemplate *&value) { value = TheParticleSystemManager->findTemplate( TheGlobalData->m_autoFireParticleSmallSystem ); });
-	static rts::PerEngineStatic<const ParticleSystemTemplate *> fireMediumTemplate_perEngine;
+	static constexpr rts::PerEngineStatic<const ParticleSystemTemplate *> fireMediumTemplate_perEngine{};
 	const ParticleSystemTemplate *fireMediumTemplate = fireMediumTemplate_perEngine.get([&](const ParticleSystemTemplate *&value) { value = TheParticleSystemManager->findTemplate( TheGlobalData->m_autoFireParticleMediumSystem ); });
-	static rts::PerEngineStatic<const ParticleSystemTemplate *> fireLargeTemplate_perEngine;
+	static constexpr rts::PerEngineStatic<const ParticleSystemTemplate *> fireLargeTemplate_perEngine{};
 	const ParticleSystemTemplate *fireLargeTemplate = fireLargeTemplate_perEngine.get([&](const ParticleSystemTemplate *&value) { value = TheParticleSystemManager->findTemplate( TheGlobalData->m_autoFireParticleLargeSystem ); });
-	static rts::PerEngineStatic<const ParticleSystemTemplate *> smokeSmallTemplate_perEngine;
+	static constexpr rts::PerEngineStatic<const ParticleSystemTemplate *> smokeSmallTemplate_perEngine{};
 	const ParticleSystemTemplate *smokeSmallTemplate = smokeSmallTemplate_perEngine.get([&](const ParticleSystemTemplate *&value) { value = TheParticleSystemManager->findTemplate( TheGlobalData->m_autoSmokeParticleSmallSystem ); });
-	static rts::PerEngineStatic<const ParticleSystemTemplate *> smokeMediumTemplate_perEngine;
+	static constexpr rts::PerEngineStatic<const ParticleSystemTemplate *> smokeMediumTemplate_perEngine{};
 	const ParticleSystemTemplate *smokeMediumTemplate = smokeMediumTemplate_perEngine.get([&](const ParticleSystemTemplate *&value) { value = TheParticleSystemManager->findTemplate( TheGlobalData->m_autoSmokeParticleMediumSystem ); });
-	static rts::PerEngineStatic<const ParticleSystemTemplate *> smokeLargeTemplate_perEngine;
+	static constexpr rts::PerEngineStatic<const ParticleSystemTemplate *> smokeLargeTemplate_perEngine{};
 	const ParticleSystemTemplate *smokeLargeTemplate = smokeLargeTemplate_perEngine.get([&](const ParticleSystemTemplate *&value) { value = TheParticleSystemManager->findTemplate( TheGlobalData->m_autoSmokeParticleLargeSystem ); });
-	static rts::PerEngineStatic<const ParticleSystemTemplate *> aflameTemplate_perEngine;
+	static constexpr rts::PerEngineStatic<const ParticleSystemTemplate *> aflameTemplate_perEngine{};
 	const ParticleSystemTemplate *aflameTemplate = aflameTemplate_perEngine.get([&](const ParticleSystemTemplate *&value) { value = TheParticleSystemManager->findTemplate( TheGlobalData->m_autoAflameParticleSystem ); });
 #else
 	static const ParticleSystemTemplate *fireSmallTemplate   = TheParticleSystemManager->findTemplate( TheGlobalData->m_autoFireParticleSmallSystem );

@@ -75,7 +75,7 @@ typedef uint16_t replay_wide_char_t;
 #if RTS_ENGINE_CONTEXT
 // GeneralsX @feature cemlyn007 28/09/2026 Per engine: the start time of this engine's recording
 // (PLAN-023 Phase 2). The macro ends before readReplayHeader, whose ReplayHeader has a field of this name.
-static rts::PerEngineStatic<time_t> startTime_perEngine;
+static constexpr rts::PerEngineStatic<time_t> startTime_perEngine{};
 #define startTime (startTime_perEngine.get())
 #else
 static time_t startTime;

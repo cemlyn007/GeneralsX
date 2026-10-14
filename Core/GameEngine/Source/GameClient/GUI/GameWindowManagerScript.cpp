@@ -129,7 +129,7 @@ struct WindowCallbackStrings
 	AsciiString tooltip;
 	AsciiString draw;
 };
-static rts::PerEngineStatic<WindowCallbackStrings> s_windowCallbackStrings_perEngine;
+static constexpr rts::PerEngineStatic<WindowCallbackStrings> s_windowCallbackStrings_perEngine{};
 #define theSystemString (s_windowCallbackStrings_perEngine.get().system)
 #define theInputString (s_windowCallbackStrings_perEngine.get().input)
 #define theTooltipString (s_windowCallbackStrings_perEngine.get().tooltip)

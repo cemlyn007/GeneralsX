@@ -110,7 +110,7 @@ void		WWMath::Shutdown()
 // GeneralsX @bugfix cemlyn007 01/10/2026 From the engine's own generator, seeded the same for every engine, not the C
 // library's process-wide rand(): the camera shake (CameraShakeSystem) draws its frequencies and jitter from it, so an
 // engine's shake, and its image, followed whatever other engines had drawn (PLAN-023 Phase 8, stage RR3).
-static rts::PerEngineStatic<Random3Class> RandomFloat_perEngine;
+static constexpr rts::PerEngineStatic<Random3Class> RandomFloat_perEngine{};
 
 float		WWMath::Random_Float()
 {

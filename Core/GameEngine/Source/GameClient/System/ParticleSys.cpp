@@ -1809,7 +1809,7 @@ const ParticleInfo *ParticleSystem::generateParticleInfo( Int particleNum, Int p
 	// GeneralsX @feature cemlyn007 28/09/2026 Per engine (PLAN-023 Phase 5b): returned by pointer and consumed at once,
 	// but a ParticleInfo (280 bytes, with a constructor) is too big for the library's static TLS, so a slot rather
 	// than thread_local; one engine is on one thread at a time.
-	static rts::PerEngineStatic<ParticleInfo> info_perEngine;
+	static constexpr rts::PerEngineStatic<ParticleInfo> info_perEngine{};
 	ParticleInfo& info = info_perEngine.get();
 #else
 	static ParticleInfo info;

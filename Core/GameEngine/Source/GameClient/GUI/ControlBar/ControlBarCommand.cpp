@@ -74,7 +74,7 @@ static Color BuildClockColor = GameMakeColor(0,0,0,100);
 // STATIC DATA STORAGE ////////////////////////////////////////////////////////////////////////////
 #if RTS_ENGINE_CONTEXT
 // GeneralsX @feature cemlyn007 28/09/2026 Per engine (PLAN-023 Phase 4; see ControlBar.h).
-rts::PerEngineStatic<ControlBar::ContainData> ControlBar::s_containData_perEngine;
+constexpr rts::PerEngineStatic<ControlBar::ContainData> ControlBar::s_containData_perEngine{};
 #define m_containData (s_containData_perEngine.get().entries)
 #else
 ControlBar::ContainEntry ControlBar::m_containData[ MAX_COMMANDS_PER_SET ];

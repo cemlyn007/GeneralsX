@@ -4714,7 +4714,7 @@ Bool AIUpdateInterface::hasNationalism() const
 		///@todo Find a better way to represent nationalism without hard coding here (CBD)
 #if RTS_ENGINE_CONTEXT
 		// GeneralsX @feature cemlyn007 28/09/2026 Per engine: the cached template is this engine's (PLAN-023 Phase 4).
-		static rts::PerEngineStatic<const UpgradeTemplate *> nationalismTemplate_perEngine;
+		static constexpr rts::PerEngineStatic<const UpgradeTemplate *> nationalismTemplate_perEngine{};
 		const UpgradeTemplate *nationalismTemplate = nationalismTemplate_perEngine.get([&](const UpgradeTemplate *&value) { value = TheUpgradeCenter->findUpgrade( "Upgrade_Nationalism" ); });
 #else
 		static const UpgradeTemplate *nationalismTemplate = TheUpgradeCenter->findUpgrade( "Upgrade_Nationalism" );
@@ -4736,7 +4736,7 @@ Bool AIUpdateInterface::hasFanaticism() const
 		///@todo Find a better way to represent fanaticism without hard coding here (MAL)
 #if RTS_ENGINE_CONTEXT
 		// GeneralsX @feature cemlyn007 28/09/2026 Per engine: the cached template is this engine's (PLAN-023 Phase 4).
-		static rts::PerEngineStatic<const UpgradeTemplate *> fanaticismTemplate_perEngine;
+		static constexpr rts::PerEngineStatic<const UpgradeTemplate *> fanaticismTemplate_perEngine{};
 		const UpgradeTemplate *fanaticismTemplate = fanaticismTemplate_perEngine.get([&](const UpgradeTemplate *&value) { value = TheUpgradeCenter->findUpgrade( "Upgrade_Fanaticism" ); });
 #else
 		static const UpgradeTemplate *fanaticismTemplate = TheUpgradeCenter->findUpgrade( "Upgrade_Fanaticism" );

@@ -46,7 +46,7 @@ namespace
 		Int muted;
 		UnsignedInt seq;
 	};
-	rts::PerEngineStatic<ObserverPerEngine> s_observerPerEngine;
+	constexpr rts::PerEngineStatic<ObserverPerEngine> s_observerPerEngine{};
 	inline ObserverPerEngine &observerState() { return s_observerPerEngine.get(); }
 	// Each s_xxx macro is its own out-of-line slot lookup, so functions touching several fields
 	// fetch `ope` once instead.

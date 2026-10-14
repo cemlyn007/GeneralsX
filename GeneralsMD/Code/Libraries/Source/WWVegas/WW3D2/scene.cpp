@@ -521,7 +521,7 @@ float SimpleSceneClass::Compute_Point_Visibility
 // GeneralsX @feature cemlyn007 30/09/2026 Per engine: Customized_Render's light environment. Each draw rebuilds it,
 // but rinfo keeps a pointer to it for the draw, so it is this engine's, not a local. A file static, so that its slot
 // is taken at static initialisation, not at the first draw (PLAN-023 Phase 8, stage RR2b).
-static rts::PerEngineStatic<LightEnvironmentClass> Customized_Render_lenv_perEngine;
+static constexpr rts::PerEngineStatic<LightEnvironmentClass> Customized_Render_lenv_perEngine{};
 #endif
 
 /***********************************************************************************************

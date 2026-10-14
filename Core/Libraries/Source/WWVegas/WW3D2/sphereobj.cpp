@@ -103,7 +103,7 @@ struct SphereMeshState
 	SphereMeshClass SphereMeshArray[SPHERE_NUM_LOD];
 	float SphereLODCosts[SPHERE_NUM_LOD + 1] = {}; // SPHERE_NUM_LOD doesn't include the null LOD
 };
-rts::PerEngineStatic<SphereMeshState> SphereMeshState_perEngine;
+constexpr rts::PerEngineStatic<SphereMeshState> SphereMeshState_perEngine{};
 } // namespace
 #define Sphere_Array_Valid (SphereMeshState_perEngine.get().Sphere_Array_Valid)
 #define SphereMeshArray (SphereMeshState_perEngine.get().SphereMeshArray)

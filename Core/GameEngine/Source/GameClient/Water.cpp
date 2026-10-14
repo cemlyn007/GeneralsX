@@ -35,8 +35,8 @@
 
 // GLOBALS ////////////////////////////////////////////////////////////////////////////////////////
 #if RTS_ENGINE_CONTEXT
-rts::PerEngineStatic<WaterSetting[ TIME_OF_DAY_COUNT ]> WaterSettings_perEngine;
-rts::PerEngineStatic<OVERRIDE<WaterTransparencySetting> > TheWaterTransparency_perEngine;
+extern constexpr rts::PerEngineStatic<WaterSetting[ TIME_OF_DAY_COUNT ]> WaterSettings_perEngine{};
+extern constexpr rts::PerEngineStatic<OVERRIDE<WaterTransparencySetting> > TheWaterTransparency_perEngine{};
 #else
 WaterSetting WaterSettings[ TIME_OF_DAY_COUNT ];
 OVERRIDE<WaterTransparencySetting> TheWaterTransparency = nullptr;

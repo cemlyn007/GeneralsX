@@ -24,12 +24,19 @@
 
 #include "Common/EngineContext.h"
 
+#include "Common/EmbeddingContract.h"
+
 #include <algorithm>
 #include <atomic>
 #include <cfenv>
+#include <condition_variable>
 #include <cstdio>
 #include <cstring>
+#include <memory>
 #include <mutex>
+#include <stdexcept>
+#include <string>
+#include <thread>
 #include <vector>
 
 #ifndef _WIN32
@@ -51,27 +58,138 @@ EngineContext g_noEngine;
 
 constinit thread_local EngineContext* t_engine RTS_TLS_IE = &g_noEngine;
 
-namespace
+// GeneralsX @feature cemlyn007 14/10/2026 One context's per-engine statics (Common/EngineStatic.h): an open-addressed
+// table from each static's key to its storage, which threads of the engine read without a lock, and the order the
+// statics were made in, which they are destroyed in reverse.
+struct EngineStatics
 {
-std::atomic<std::size_t> theNextSlotIndex(0);
-}
-
-std::size_t allocateEngineSlotIndex()
-{
-	return theNextSlotIndex.fetch_add(1);
-}
-
-struct EngineSlotTable
-{
-	struct Owned
+	struct Entry
 	{
-		std::size_t index;
-		void* object;
-		EngineSlotDestroyFn destroy;
+		std::atomic<const EngineStaticKey*> key{nullptr};
+		std::atomic<void*> storage{nullptr};
 	};
 
-	std::vector<void*> byIndex;
-	std::vector<Owned> inCreationOrder;
+	struct Table
+	{
+		explicit Table(unsigned int bits) : shift(64 - bits), mask((std::size_t(1) << bits) - 1), entries(new Entry[mask + 1]) {}
+
+		std::size_t first(const EngineStaticKey& key) const noexcept
+		{
+			const std::uint64_t address = static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(&key));
+			return static_cast<std::size_t>((address * 0x9E3779B97F4A7C15ull) >> shift);
+		}
+
+		Entry* find(const EngineStaticKey& key) const noexcept
+		{
+			for (std::size_t index = first(key);; index = (index + 1) & mask)
+			{
+				const EngineStaticKey* const found = entries[index].key.load(std::memory_order_acquire);
+				if (found == &key)
+					return &entries[index];
+				if (found == nullptr)
+					return nullptr;
+			}
+		}
+
+		unsigned int shift;
+		std::size_t mask;
+		std::unique_ptr<Entry[]> entries;
+		std::size_t used = 0;
+	};
+
+	struct Made
+	{
+		const EngineStaticKey* key;
+		void* storage;
+		const EngineStaticType* type;
+	};
+
+	static constexpr unsigned int initialBits = 10;
+
+	void* findLocked(const EngineStaticKey& key) const noexcept
+	{
+		const Table* const current = table.load(std::memory_order_relaxed);
+		if (current == nullptr)
+			return nullptr;
+		const Entry* const entry = current->find(key);
+		return entry != nullptr ? entry->storage.load(std::memory_order_relaxed) : nullptr;
+	}
+
+	void insertLocked(const EngineStaticKey& key, void* storage)
+	{
+		Table* current = table.load(std::memory_order_relaxed);
+		if (current != nullptr)
+		{
+			Entry* const existing = current->find(key);
+			if (existing != nullptr)
+			{
+				existing->storage.store(storage, std::memory_order_release);
+				return;
+			}
+		}
+		if (current == nullptr || (current->used + 1) * 2 > current->mask + 1)
+			current = grownLocked(current);
+		std::size_t index = current->first(key);
+		while (current->entries[index].key.load(std::memory_order_relaxed) != nullptr)
+			index = (index + 1) & current->mask;
+		current->entries[index].storage.store(storage, std::memory_order_relaxed);
+		current->entries[index].key.store(&key, std::memory_order_release);
+		++current->used;
+	}
+
+	// A table twice the size of `current` (or the first table), holding its entries, published for readers. The old
+	// table is kept, since a reader may still be probing it; one that misses a static there finds it under the lock.
+	Table* grownLocked(const Table* current)
+	{
+		const unsigned int bits = current == nullptr ? initialBits : 64 - current->shift + 1;
+		std::unique_ptr<Table> grown = std::make_unique<Table>(bits);
+		if (current != nullptr)
+		{
+			for (std::size_t index = 0; index <= current->mask; ++index)
+			{
+				const EngineStaticKey* const key = current->entries[index].key.load(std::memory_order_relaxed);
+				if (key == nullptr)
+					continue;
+				std::size_t target = grown->first(*key);
+				while (grown->entries[target].key.load(std::memory_order_relaxed) != nullptr)
+					target = (target + 1) & grown->mask;
+				grown->entries[target].storage.store(current->entries[index].storage.load(std::memory_order_relaxed), std::memory_order_relaxed);
+				grown->entries[target].key.store(key, std::memory_order_relaxed);
+				++grown->used;
+			}
+		}
+		Table* const published = grown.get();
+		tables.push_back(std::move(grown));
+		table.store(published, std::memory_order_release);
+		return published;
+	}
+
+	bool inConstructionLocked(const EngineStaticKey& key, std::thread::id* builder) const
+	{
+		for (const auto& building : inConstruction)
+		{
+			if (building.first == &key)
+			{
+				*builder = building.second;
+				return true;
+			}
+		}
+		return false;
+	}
+
+	void endConstructionLocked(const EngineStaticKey& key)
+	{
+		inConstruction.erase(std::find_if(inConstruction.begin(), inConstruction.end(),
+			[&key](const auto& building) { return building.first == &key; }));
+		madeOrFailed.notify_all();
+	}
+
+	mutable std::mutex mutex;
+	std::condition_variable madeOrFailed;
+	std::atomic<Table*> table{nullptr};
+	std::vector<std::unique_ptr<Table>> tables;
+	std::vector<Made> inCreationOrder;
+	std::vector<std::pair<const EngineStaticKey*, std::thread::id>> inConstruction;
 };
 
 #ifdef DEBUG_CRASHING
@@ -114,54 +232,142 @@ EngineContext::~EngineContext()
 #endif
 	DEBUG_ASSERTCRASH(this == &g_noEngine || noEngineIsPristine(), ("g_noEngine was written: engine state leaked outside every Scope"));
 
-	destroySlots();
+	destroyStatics();
+	delete m_statics.load(std::memory_order_acquire);
+	delete m_embedding;
 }
 
-void EngineContext::destroySlots()
+EngineContext::EngineContext(EmbeddingConfig embedding) : m_embedding(new EmbeddingConfig(std::move(embedding)))
 {
-	if (m_slots == nullptr)
+}
+
+EngineStatics& EngineContext::statics()
+{
+	EngineStatics* existing = m_statics.load(std::memory_order_acquire);
+	if (existing != nullptr)
+		return *existing;
+	EngineStatics* const made = new EngineStatics;
+	if (m_statics.compare_exchange_strong(existing, made, std::memory_order_acq_rel, std::memory_order_acquire))
+		return *made;
+	delete made;
+	return *existing;
+}
+
+void* EngineContext::findStatic(const EngineStaticKey& key) const noexcept
+{
+	const EngineStatics* const statics = m_statics.load(std::memory_order_acquire);
+	if (statics == nullptr)
+		return nullptr;
+	const EngineStatics::Table* const table = statics->table.load(std::memory_order_acquire);
+	if (table == nullptr)
+		return nullptr;
+	const EngineStatics::Entry* const entry = table->find(key);
+	return entry != nullptr ? entry->storage.load(std::memory_order_acquire) : nullptr;
+}
+
+void* EngineContext::makeStatic(const EngineStaticKey& key, const EngineStaticType& type, void* closure)
+{
+	if (this == &g_noEngine)
+	{
+		DEBUG_CRASH(("the per-engine static %s is used with no engine current", key.name));
+		throw std::logic_error(std::string("the per-engine static ") + key.name + " is used with no engine current");
+	}
+	EngineStatics& statics = this->statics();
+	std::unique_lock<std::mutex> lock(statics.mutex);
+	for (;;)
+	{
+		if (void* const made = statics.findLocked(key))
+			return made;
+		std::thread::id builder;
+		if (!statics.inConstructionLocked(key, &builder))
+			break;
+		if (builder == std::this_thread::get_id())
+		{
+			DEBUG_CRASH(("the per-engine static %s is used by its own initialiser", key.name));
+			throw std::logic_error(std::string("the per-engine static ") + key.name + " is used by its own initialiser");
+		}
+		statics.madeOrFailed.wait(lock);
+	}
+	statics.inConstruction.emplace_back(&key, std::this_thread::get_id());
+	lock.unlock();
+
+	void* storage = nullptr;
+	try
+	{
+		storage = ::operator new(type.size, std::align_val_t(type.alignment));
+		std::memset(storage, 0, type.size);
+		type.construct(storage, closure);
+	}
+	catch (...)
+	{
+		if (storage != nullptr)
+			::operator delete(storage, std::align_val_t(type.alignment));
+		lock.lock();
+		statics.endConstructionLocked(key);
+		throw;
+	}
+
+	lock.lock();
+	statics.insertLocked(key, storage);
+	statics.inCreationOrder.push_back(EngineStatics::Made{&key, storage, &type});
+	statics.endConstructionLocked(key);
+	return storage;
+}
+
+void EngineContext::destroyStatics()
+{
+	EngineStatics* const statics = m_statics.load(std::memory_order_acquire);
+	if (statics == nullptr)
 		return;
 
-	// A slot object's destructor may read engine state, which must be this engine's.
+	// A static's destructor may read engine state, which must be this engine's.
 	Scope scope(this);
 
-	// A slot object's destructor may read another slot (or create one), so destroy them newest first. A
-	// slot stays set while its own destructor runs, so a destructor that reaches its own static finds the
-	// object being destroyed, not a fresh one; it is cleared once the destructor returns.
-	while (!m_slots->inCreationOrder.empty())
+	// A static's destructor may use another static (or make one), so they are destroyed newest first. A static stays
+	// set while its own destructor runs, so a destructor that reaches its own static finds the object being destroyed,
+	// not a fresh one; it is cleared once the destructor returns.
+	for (;;)
 	{
-		EngineSlotTable::Owned owned = m_slots->inCreationOrder.back();
-		m_slots->inCreationOrder.pop_back();
-		if (owned.destroy != nullptr)
-			owned.destroy(owned.object);
-		m_slots->byIndex[owned.index] = nullptr;
+		EngineStatics::Made made;
+		{
+			std::lock_guard<std::mutex> lock(statics->mutex);
+			if (statics->inCreationOrder.empty())
+				break;
+			made = statics->inCreationOrder.back();
+			statics->inCreationOrder.pop_back();
+		}
+		made.type->destroy(made.storage);
+		{
+			std::lock_guard<std::mutex> lock(statics->mutex);
+			statics->insertLocked(*made.key, nullptr);
+		}
+		::operator delete(made.storage, std::align_val_t(made.type->alignment));
 	}
-	delete m_slots;
-	m_slots = nullptr;
 }
 
-void* EngineContext::getSlot(std::size_t index) const
+std::size_t EngineContext::countStatics() const
 {
-	if (m_slots == nullptr || index >= m_slots->byIndex.size())
-		return nullptr;
-	return m_slots->byIndex[index];
+	const EngineStatics* const statics = m_statics.load(std::memory_order_acquire);
+	if (statics == nullptr)
+		return 0;
+	std::lock_guard<std::mutex> lock(statics->mutex);
+	return statics->inCreationOrder.size();
 }
 
-void EngineContext::setSlot(std::size_t index, void* object, EngineSlotDestroyFn destroy)
+void EngineContext::forEachStatic(void (*visit)(const char* name, void* user), void* user) const
 {
-	DEBUG_ASSERTCRASH(this != &g_noEngine, ("EngineContext::setSlot on g_noEngine: no engine is current"));
-	DEBUG_ASSERTCRASH(getSlot(index) == nullptr, ("EngineContext::setSlot: slot %u is already set", (unsigned)index));
-	if (m_slots == nullptr)
-		m_slots = new EngineSlotTable;
-	if (index >= m_slots->byIndex.size())
-		m_slots->byIndex.resize(index + 1, nullptr);
-	m_slots->byIndex[index] = object;
-	m_slots->inCreationOrder.push_back(EngineSlotTable::Owned{index, object, destroy});
-}
-
-bool EngineContext::hasSlotObjects() const
-{
-	return m_slots != nullptr && !m_slots->inCreationOrder.empty();
+	const EngineStatics* const statics = m_statics.load(std::memory_order_acquire);
+	if (statics == nullptr)
+		return;
+	std::vector<const char*> names;
+	{
+		std::lock_guard<std::mutex> lock(statics->mutex);
+		names.reserve(statics->inCreationOrder.size());
+		for (const EngineStatics::Made& made : statics->inCreationOrder)
+			names.push_back(made.key->name);
+	}
+	for (const char* name : names)
+		visit(name, user);
 }
 
 std::size_t EngineContext::countLiveSingletons() const
@@ -393,7 +599,7 @@ static_assert(isStandInGuarded<ContextField<::W3DRenderState*, &EngineContext::w
 
 bool noEngineIsPristine()
 {
-	if (g_noEngine.countLiveSingletons() != 0 || g_noEngine.originalGlobalData != nullptr || g_noEngine.hasSlotObjects())
+	if (g_noEngine.countLiveSingletons() != 0 || g_noEngine.originalGlobalData != nullptr || g_noEngine.countStatics() != 0)
 		return false;
 	// Every value field still has its initial value, the seeds included: a write outside every Scope (a
 	// host callback, a parked engine's leftover call) is engine state leaking into the no-engine context.

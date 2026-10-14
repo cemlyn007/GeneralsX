@@ -87,7 +87,7 @@ struct ScriptsPerEngine
 		if (mtGroup) deleteInstance(mtGroup);
 	}
 };
-rts::PerEngineStatic<ScriptsPerEngine> s_scriptsPerEngine;
+constexpr rts::PerEngineStatic<ScriptsPerEngine> s_scriptsPerEngine{};
 }
 #define s_readLists (s_scriptsPerEngine.get().readLists)
 #define s_numInReadList (s_scriptsPerEngine.get().numInReadList)

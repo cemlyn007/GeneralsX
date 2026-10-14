@@ -716,7 +716,7 @@ static const char* const DebrisDispositionNames[] =
 // GeneralsX @feature cemlyn007 28/09/2026 Per engine: this engine's ObjectCreationList parse fills it and its
 // GameClient's preload empties it, so another engine's boot must not feed this one's preload (PLAN-023
 // Phase 4). GameClient.cpp reads it by this name too.
-rts::PerEngineStatic<std::vector<AsciiString> > debrisModelNamesGlobalHack_perEngine;
+extern constexpr rts::PerEngineStatic<std::vector<AsciiString> > debrisModelNamesGlobalHack_perEngine{};
 #define debrisModelNamesGlobalHack (debrisModelNamesGlobalHack_perEngine.get())
 #else
 std::vector<AsciiString>	debrisModelNamesGlobalHack;
@@ -1317,7 +1317,7 @@ protected:
 	{
 #if RTS_ENGINE_CONTEXT
 		// GeneralsX @feature cemlyn007 28/09/2026 Per engine: the cached template is this engine's (PLAN-023 Phase 4).
-		static rts::PerEngineStatic<const ThingTemplate *> debrisTemplate_perEngine;
+		static constexpr rts::PerEngineStatic<const ThingTemplate *> debrisTemplate_perEngine{};
 		const ThingTemplate *debrisTemplate = debrisTemplate_perEngine.get([&](const ThingTemplate *&value) { value = TheThingFactory->findTemplate("GenericDebris"); });
 #else
 		static const ThingTemplate* debrisTemplate = TheThingFactory->findTemplate("GenericDebris");

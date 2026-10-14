@@ -145,7 +145,7 @@ InGameUI *TheInGameUI = nullptr;
 // clearGameData, ScriptActions, GameEngine::init, InGameUI::init's createControlBar) hide it; shared, one engine
 // would hide another's window, or one its own window manager has freed (PLAN-023 Phase 4). The macro keeps the
 // uses unchanged.
-static rts::PerEngineStatic<GameWindow *> s_replayWindow_perEngine;
+static constexpr rts::PerEngineStatic<GameWindow *> s_replayWindow_perEngine{};
 #define m_replayWindow (s_replayWindow_perEngine.get())
 #else
 GameWindow *m_replayWindow = nullptr;
@@ -2031,7 +2031,7 @@ void InGameUI::update()
 					// lets make a sound
 #if RTS_ENGINE_CONTEXT
 					// GeneralsX @feature cemlyn007 28/09/2026 Per engine: the event keeps this engine's event info and sound rotation (PLAN-023 Phase 4).
-					static rts::PerEngineStatic<AudioEventRTS> click_perEngine([](AudioEventRTS& event) { event.setEventName("MilitarySubtitlesTyping"); });
+					static constexpr rts::PerEngineStatic<AudioEventRTS> click_perEngine([](AudioEventRTS& event) { event.setEventName("MilitarySubtitlesTyping"); });
 					AudioEventRTS& click = click_perEngine.get();
 #else
 					static AudioEventRTS click("MilitarySubtitlesTyping");
@@ -2073,9 +2073,9 @@ void InGameUI::update()
 #if RTS_ENGINE_CONTEXT
 	// GeneralsX @feature cemlyn007 28/09/2026 Per engine: this engine's last shown money and income (InGameUI::update
 	// runs headless too; PLAN-023 Phase 4).
-	static rts::PerEngineStatic<UnsignedInt> lastMoney_perEngine([](UnsignedInt& value) { value = ~0u; });
+	static constexpr rts::PerEngineStatic<UnsignedInt> lastMoney_perEngine([](UnsignedInt& value) { value = ~0u; });
 	UnsignedInt& lastMoney = lastMoney_perEngine.get();
-	static rts::PerEngineStatic<UnsignedInt> lastIncome_perEngine([](UnsignedInt& value) { value = ~0u; });
+	static constexpr rts::PerEngineStatic<UnsignedInt> lastIncome_perEngine([](UnsignedInt& value) { value = ~0u; });
 	UnsignedInt& lastIncome = lastIncome_perEngine.get();
 #else
 	static UnsignedInt lastMoney = ~0u;
@@ -5431,7 +5431,7 @@ void InGameUI::updateFloatingText()
 	Int amount;								// The amount we'll change the alpha
 #if RTS_ENGINE_CONTEXT
 	// GeneralsX @feature cemlyn007 28/09/2026 Per engine: this engine's last floating-text frame (PLAN-023 Phase 4).
-	static rts::PerEngineStatic<UnsignedInt> lastLogicFrameUpdate_perEngine;
+	static constexpr rts::PerEngineStatic<UnsignedInt> lastLogicFrameUpdate_perEngine{};
 	UnsignedInt& lastLogicFrameUpdate = lastLogicFrameUpdate_perEngine.get([&](UnsignedInt& value) { value = currLogicFrame; });
 #else
 	static UnsignedInt lastLogicFrameUpdate = currLogicFrame;		// We need to make sure our current frame is different then our last frame we updated.

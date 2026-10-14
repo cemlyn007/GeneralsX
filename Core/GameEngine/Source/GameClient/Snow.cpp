@@ -38,7 +38,7 @@
 // headless engines included: every engine builds the table). Each engine draws them from its own generator, seeded
 // the same for every engine, so its table equals its solo run's (PLAN-023 Phase 8, stage RR3). It continues across
 // updateIniSettings calls, as rand()'s sequence did.
-static rts::PerEngineStatic<Random3Class> SnowRandom_perEngine;
+static constexpr rts::PerEngineStatic<Random3Class> SnowRandom_perEngine{};
 #endif
 
 
@@ -122,7 +122,7 @@ SnowManager::~SnowManager()
 }
 
 #if RTS_ENGINE_CONTEXT
-rts::PerEngineStatic<OVERRIDE<WeatherSetting> > TheWeatherSetting_perEngine;
+extern constexpr rts::PerEngineStatic<OVERRIDE<WeatherSetting> > TheWeatherSetting_perEngine{};
 #else
 OVERRIDE<WeatherSetting> TheWeatherSetting = nullptr;
 #endif

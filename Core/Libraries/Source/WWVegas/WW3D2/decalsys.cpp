@@ -56,7 +56,7 @@
 
 
 #if RTS_ENGINE_CONTEXT
-rts::PerEngineStatic<uint32> DecalSystemClass::DecalIDGenerator_perEngine;
+constexpr rts::PerEngineStatic<uint32> DecalSystemClass::DecalIDGenerator_perEngine{};
 #define DecalIDGenerator (DecalIDGenerator_perEngine.get())
 #else
 uint32 DecalSystemClass::DecalIDGenerator = 0;

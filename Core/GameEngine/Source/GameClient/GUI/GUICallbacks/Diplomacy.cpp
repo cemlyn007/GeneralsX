@@ -96,7 +96,7 @@ struct DiplomacyState
 	AnimateWindowManager *theAnimateWindowManager;
 	BriefingList theBriefingList;
 };
-static rts::PerEngineStatic<DiplomacyState> s_diplomacyState_perEngine;
+static constexpr rts::PerEngineStatic<DiplomacyState> s_diplomacyState_perEngine{};
 #define staticTextPlayer (s_diplomacyState_perEngine.get().staticTextPlayer)
 #define staticTextSide (s_diplomacyState_perEngine.get().staticTextSide)
 #define staticTextTeam (s_diplomacyState_perEngine.get().staticTextTeam)
