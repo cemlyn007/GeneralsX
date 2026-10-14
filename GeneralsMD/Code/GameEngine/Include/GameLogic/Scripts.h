@@ -91,10 +91,11 @@ class DataChunkOutput;
 // 1 means ground
 // 2 means air
 // 3 means air or ground
-extern const char *Surfaces[];
+// GeneralsX @refactor cemlyn007 14/10/2026 Constant (Scripts.cpp)
+extern const char * const Surfaces[];
 
 // Shake intensities. Must be kept in sync with View::CameraShakeType
-extern const char *ShakeIntensities[];
+extern const char * const ShakeIntensities[];
 
 //-------------------------------------------------------------------------------------------------
 // ******************************** class ScriptGroup ***********************************************

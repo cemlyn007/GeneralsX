@@ -126,7 +126,9 @@ struct StateConditionInfo
 	StateID						toStateID;
 	void*							userData;
 
-	StateConditionInfo(StateTransFuncPtr t, StateID id, void* ud) : test(t), toStateID(id), userData(ud) { }
+	// GeneralsX @refactor cemlyn007 14/10/2026 constexpr, so a constant table of conditions is constant-initialised and
+	// read-only (docs/EMBEDDING.md)
+	constexpr StateConditionInfo(StateTransFuncPtr t, StateID id, void* ud) : test(t), toStateID(id), userData(ud) { }
 };
 
 //-----------------------------------------------------------------------------

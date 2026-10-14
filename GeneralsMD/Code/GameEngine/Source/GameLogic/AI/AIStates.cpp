@@ -266,6 +266,16 @@ AttackStateMachine::AttackStateMachine( Object *obj, AIAttackState* att, AsciiSt
 	: StateMachine( obj, name )
 {
 	// we want to use the CONTINUE mode (not NEW) since we already have acquired the target.
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+	RTS_ENGINE_STATIC(const StateConditionInfo[4], objectConditionsNormal,
+	{
+		StateConditionInfo(outOfWeaponRangeObject, AttackStateMachine::CHASE_TARGET, nullptr),
+		StateConditionInfo(wantToSquishTarget, AttackStateMachine::CHASE_TARGET, nullptr),
+		StateConditionInfo(cannotPossiblyAttackObject, EXIT_MACHINE_WITH_FAILURE, (void*)ATTACK_CONTINUED_TARGET),
+		StateConditionInfo(nullptr, INVALID_STATE_ID, nullptr)
+	});
+#else
 	static const StateConditionInfo objectConditionsNormal[] =
 	{
 		StateConditionInfo(outOfWeaponRangeObject, AttackStateMachine::CHASE_TARGET, nullptr),
@@ -273,8 +283,18 @@ AttackStateMachine::AttackStateMachine( Object *obj, AIAttackState* att, AsciiSt
 		StateConditionInfo(cannotPossiblyAttackObject, EXIT_MACHINE_WITH_FAILURE, (void*)ATTACK_CONTINUED_TARGET),
 		StateConditionInfo(nullptr, INVALID_STATE_ID, nullptr)
 	};
+#endif
 
 	// we want to use the CONTINUE mode (not NEW) since we already have acquired the target.
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(const StateConditionInfo[4], objectConditionsForced,
+	{
+		StateConditionInfo(outOfWeaponRangeObject, AttackStateMachine::CHASE_TARGET, nullptr),
+		StateConditionInfo(cannotPossiblyAttackObject, EXIT_MACHINE_WITH_FAILURE, (void*)ATTACK_CONTINUED_TARGET_FORCED),
+		StateConditionInfo(wantToSquishTarget, AttackStateMachine::CHASE_TARGET, nullptr),
+		StateConditionInfo(nullptr, INVALID_STATE_ID, nullptr)
+	});
+#else
 	static const StateConditionInfo objectConditionsForced[] =
 	{
 		StateConditionInfo(outOfWeaponRangeObject, AttackStateMachine::CHASE_TARGET, nullptr),
@@ -282,6 +302,7 @@ AttackStateMachine::AttackStateMachine( Object *obj, AIAttackState* att, AsciiSt
 		StateConditionInfo(wantToSquishTarget, AttackStateMachine::CHASE_TARGET, nullptr),
 		StateConditionInfo(nullptr, INVALID_STATE_ID, nullptr)
 	};
+#endif
 
 	const StateConditionInfo* objectConditions = forceAttacking ? objectConditionsForced : objectConditionsNormal;
 
