@@ -69,7 +69,8 @@
 StatsCollector *TheStatsCollector = nullptr;
 #endif
 
-static char statsDir[255] = "Stats\\";
+// GeneralsX @refactor cemlyn007 14/10/2026 Constant, so read-only: engines share no writable state (docs/EMBEDDING.md).
+static const char statsDir[255] = "Stats\\";
 //-----------------------------------------------------------------------------
 // PUBLIC FUNCTIONS ///////////////////////////////////////////////////////////
 //-----------------------------------------------------------------------------

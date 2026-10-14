@@ -50,7 +50,14 @@
 //////////////////////////////////////////////////////////////////////////////////
 //	Global instance
 //////////////////////////////////////////////////////////////////////////////////
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+// GeneralsX @refactor cemlyn007 14/10/2026 Per engine (Common/EngineStatic.h), made and so registered by WWSaveLoad::Init (docs/EMBEDDING.md).
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(DefinitionMgrClass, _TheDefinitionMgr);
+#define _TheDefinitionMgr RTS_ENGINE_GLOBAL_REF(_TheDefinitionMgr)
+#else
 DefinitionMgrClass	_TheDefinitionMgr;
+#endif
 
 //////////////////////////////////////////////////////////////////////////////////
 //	Constants
@@ -73,10 +80,31 @@ enum
 //////////////////////////////////////////////////////////////////////////////////
 //	Static member initialization
 //////////////////////////////////////////////////////////////////////////////////
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_CLASS_STATIC_DEFINE(DefinitionClass**, DefinitionMgrClass, _SortedDefinitionArray, nullptr);
+#define _SortedDefinitionArray RTS_ENGINE_GLOBAL_REF(_SortedDefinitionArray)
+#else
 DefinitionClass **	DefinitionMgrClass::_SortedDefinitionArray	= nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_CLASS_STATIC_DEFINE(int, DefinitionMgrClass, _DefinitionCount, 0);
+#define _DefinitionCount RTS_ENGINE_GLOBAL_REF(_DefinitionCount)
+#else
 int						DefinitionMgrClass::_DefinitionCount			= 0;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_CLASS_STATIC_DEFINE(int, DefinitionMgrClass, _MaxDefinitionCount, 0);
+#define _MaxDefinitionCount RTS_ENGINE_GLOBAL_REF(_MaxDefinitionCount)
+#else
 int						DefinitionMgrClass::_MaxDefinitionCount		= 0;
+#endif
+#if RTS_ENGINE_CONTEXT
+using DefinitionHash_rtsEngineType = HashTemplateClass<StringClass, DynamicVectorClass<DefinitionClass*>*>*;
+RTS_ENGINE_CLASS_STATIC_DEFINE(DefinitionHash_rtsEngineType, DefinitionMgrClass, DefinitionHash);
+#define DefinitionHash RTS_ENGINE_GLOBAL_REF(DefinitionHash)
+#else
 HashTemplateClass<StringClass, DynamicVectorClass<DefinitionClass*>*>* DefinitionMgrClass::DefinitionHash;
+#endif
 
 //////////////////////////////////////////////////////////////////////////////////
 //
@@ -756,9 +784,24 @@ DefinitionMgrClass::Save_Variables (ChunkSaveClass &csave)
 	return retval;
 }
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(float, _alloc_time);
+#define _alloc_time RTS_ENGINE_GLOBAL_REF(_alloc_time)
+#else
 float _alloc_time;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(float, _load_time);
+#define _load_time RTS_ENGINE_GLOBAL_REF(_load_time)
+#else
 float _load_time;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(float, _reg_time);
+#define _reg_time RTS_ENGINE_GLOBAL_REF(_reg_time)
+#else
 float _reg_time;
+#endif
 
 
 //////////////////////////////////////////////////////////////////////////////////

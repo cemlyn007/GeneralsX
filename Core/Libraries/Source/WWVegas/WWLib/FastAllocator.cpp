@@ -19,7 +19,13 @@
 #include "FastAllocator.h"
 #include <new>
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(FastAllocatorGeneral*, generalAllocator); //This general allocator will do all allocations for us.
+#define generalAllocator RTS_ENGINE_GLOBAL_REF(generalAllocator)
+#else
 static FastAllocatorGeneral* generalAllocator; //This general allocator will do all allocations for us.
+#endif
 
 FastAllocatorGeneral* FastAllocatorGeneral::Get_Allocator()
 {

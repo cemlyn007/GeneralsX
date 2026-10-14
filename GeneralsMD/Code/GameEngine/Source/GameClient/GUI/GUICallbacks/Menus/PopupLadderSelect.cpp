@@ -74,11 +74,27 @@
 //-----------------------------------------------------------------------------
 
 static NameKeyType parentID = NAMEKEY_INVALID;
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(NameKeyType, listboxLadderSelectID, NAMEKEY_INVALID);
+#define listboxLadderSelectID RTS_ENGINE_GLOBAL_REF(listboxLadderSelectID)
+#else
 static NameKeyType listboxLadderSelectID = NAMEKEY_INVALID;
+#endif
 static NameKeyType listboxLadderDetailsID = NAMEKEY_INVALID;
 static NameKeyType staticTextLadderNameID = NAMEKEY_INVALID;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonOkID, NAMEKEY_INVALID);
+#define buttonOkID RTS_ENGINE_GLOBAL_REF(buttonOkID)
+#else
 static NameKeyType buttonOkID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonCancelID, NAMEKEY_INVALID);
+#define buttonCancelID RTS_ENGINE_GLOBAL_REF(buttonCancelID)
+#else
 static NameKeyType buttonCancelID = NAMEKEY_INVALID;
+#endif
 
 static GameWindow *parent = nullptr;
 static GameWindow *listboxLadderSelect = nullptr;
@@ -89,15 +105,35 @@ static GameWindow *buttonCancel = nullptr;
 
 // password entry popup
 static NameKeyType passwordParentID = NAMEKEY_INVALID;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonPasswordOkID, NAMEKEY_INVALID);
+#define buttonPasswordOkID RTS_ENGINE_GLOBAL_REF(buttonPasswordOkID)
+#else
 static NameKeyType buttonPasswordOkID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonPasswordCancelID, NAMEKEY_INVALID);
+#define buttonPasswordCancelID RTS_ENGINE_GLOBAL_REF(buttonPasswordCancelID)
+#else
 static NameKeyType buttonPasswordCancelID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, textEntryPasswordID, NAMEKEY_INVALID);
+#define textEntryPasswordID RTS_ENGINE_GLOBAL_REF(textEntryPasswordID)
+#else
 static NameKeyType textEntryPasswordID = NAMEKEY_INVALID;
+#endif
 static GameWindow *passwordParent = nullptr;
 static GameWindow *textEntryPassword = nullptr;
 
 // incorrect password popup
 static NameKeyType badPasswordParentID = NAMEKEY_INVALID;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonBadPasswordOkID, NAMEKEY_INVALID);
+#define buttonBadPasswordOkID RTS_ENGINE_GLOBAL_REF(buttonBadPasswordOkID)
+#else
 static NameKeyType buttonBadPasswordOkID = NAMEKEY_INVALID;
+#endif
 static GameWindow *badPasswordParent = nullptr;
 
 static void updateLadderDetails( Int ladderID, GameWindow *staticTextLadderName, GameWindow *listboxLadderDetails );
@@ -598,11 +634,20 @@ void RCGameDetailsMenuInit( WindowLayout *layout, void *userData )
 {
 }
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 The function's own buttonOkID hides the file's from here on.
+#undef buttonOkID
+#endif
 WindowMsgHandledType RCGameDetailsMenuSystem( GameWindow *window, UnsignedInt msg, WindowMsgData mData1, WindowMsgData mData2 )
 {
 
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(NameKeyType, ladderInfoID, NAMEKEY_INVALID);
+	RTS_ENGINE_STATIC(NameKeyType, buttonOkID, NAMEKEY_INVALID);
+#else
 	static NameKeyType ladderInfoID = NAMEKEY_INVALID;
 	static NameKeyType buttonOkID = NAMEKEY_INVALID;
+#endif
 	switch( msg )
 	{
 

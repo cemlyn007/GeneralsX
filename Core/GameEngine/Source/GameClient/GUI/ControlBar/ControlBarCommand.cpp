@@ -562,8 +562,14 @@ void ControlBar::populateBuildQueue( Object *producer )
 	static const CommandButton *cancelUnitCommand = findCommandButton( "Command_CancelUnitCreate" );
 /// @todo srj -- remove hard-coding here, please
 	static const CommandButton *cancelUpgradeCommand = findCommandButton( "Command_CancelUpgradeCreate" );
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+	RTS_ENGINE_STATIC(NameKeyType[ MAX_BUILD_QUEUE_BUTTONS ], buildQueueIDs);
+	RTS_ENGINE_STATIC(Bool, idsInitialized, FALSE);
+#else
 	static NameKeyType buildQueueIDs[ MAX_BUILD_QUEUE_BUTTONS ];
 	static Bool idsInitialized = FALSE;
+#endif
 	Int i;
 
 	// reset the build queue data
@@ -796,7 +802,11 @@ void ControlBar::updateContextCommand()
 			const ProductionEntry *produce = pu->firstProduction();
 			if( produce )
 			{
+#if RTS_ENGINE_CONTEXT
+				RTS_ENGINE_STATIC(NameKeyType, winID, TheNameKeyGenerator->nameToKey( "ControlBar.wnd:ButtonQueue01" ));
+#else
 				static NameKeyType winID = TheNameKeyGenerator->nameToKey( "ControlBar.wnd:ButtonQueue01" );
+#endif
 				GameWindow *win = TheWindowManager->winGetWindowFromId( m_contextParent[ CP_BUILD_QUEUE ], winID );
 
 				DEBUG_ASSERTCRASH( win, ("updateContextCommand: Unable to find first build queue button") );
@@ -1442,7 +1452,11 @@ CommandAvailability ControlBar::getCommandAvailability( const CommandButton *com
 			}
 			else if( mod->getSpecialPowerTemplate()->getSpecialPowerType() == SPECIAL_CHANGE_BATTLE_PLANS )
 			{
+#if RTS_ENGINE_CONTEXT
+				RTS_ENGINE_STATIC(NameKeyType, key_BattlePlanUpdate, NAMEKEY( "BattlePlanUpdate" ));
+#else
 				static NameKeyType key_BattlePlanUpdate = NAMEKEY( "BattlePlanUpdate" );
+#endif
 				BattlePlanUpdate *update = (BattlePlanUpdate*)obj->findUpdateModule( key_BattlePlanUpdate );
 				if( update && update->getCommandOption() & command->getOptions() )
 				{
@@ -1520,7 +1534,11 @@ CommandAvailability ControlBar::getCommandAvailability( const CommandButton *com
 
 			//We're dealing with a strategy center stop button. Only show the button
 			//if we're in bombardment mode (to stop the artillery cannon).
+#if RTS_ENGINE_CONTEXT
+			RTS_ENGINE_STATIC(NameKeyType, key_BattlePlanUpdate, NAMEKEY( "BattlePlanUpdate" ));
+#else
 			static NameKeyType key_BattlePlanUpdate = NAMEKEY( "BattlePlanUpdate" );
+#endif
 			BattlePlanUpdate *bpUpdate = (BattlePlanUpdate*)obj->findUpdateModule( key_BattlePlanUpdate );
 			if( bpUpdate && bpUpdate->getActiveBattlePlan() != PLANSTATUS_BOMBARDMENT )
 			{

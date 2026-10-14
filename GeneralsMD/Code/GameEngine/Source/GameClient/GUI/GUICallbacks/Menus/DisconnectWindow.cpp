@@ -43,22 +43,73 @@
 // Private Data -----------------------------
 static WindowLayout *disconnectMenuLayout;
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(NameKeyType, textEntryID, NAMEKEY_INVALID);
+#define textEntryID RTS_ENGINE_GLOBAL_REF(textEntryID)
+#else
 static NameKeyType textEntryID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, textDisplayID, NAMEKEY_INVALID);
+#define textDisplayID RTS_ENGINE_GLOBAL_REF(textDisplayID)
+#else
 static NameKeyType textDisplayID = NAMEKEY_INVALID;
+#endif
 
 static GameWindow *textEntryWindow = nullptr;
 static GameWindow *textDisplayWindow = nullptr;
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonQuitID, NAMEKEY_INVALID);
+#define buttonQuitID RTS_ENGINE_GLOBAL_REF(buttonQuitID)
+#else
 static NameKeyType buttonQuitID = NAMEKEY_INVALID;
+#endif
 static GameWindow *buttonQuitWindow = nullptr;
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonVotePlayer1ID, NAMEKEY_INVALID);
+#define buttonVotePlayer1ID RTS_ENGINE_GLOBAL_REF(buttonVotePlayer1ID)
+#else
 static NameKeyType buttonVotePlayer1ID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonVotePlayer2ID, NAMEKEY_INVALID);
+#define buttonVotePlayer2ID RTS_ENGINE_GLOBAL_REF(buttonVotePlayer2ID)
+#else
 static NameKeyType buttonVotePlayer2ID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonVotePlayer3ID, NAMEKEY_INVALID);
+#define buttonVotePlayer3ID RTS_ENGINE_GLOBAL_REF(buttonVotePlayer3ID)
+#else
 static NameKeyType buttonVotePlayer3ID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonVotePlayer4ID, NAMEKEY_INVALID);
+#define buttonVotePlayer4ID RTS_ENGINE_GLOBAL_REF(buttonVotePlayer4ID)
+#else
 static NameKeyType buttonVotePlayer4ID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonVotePlayer5ID, NAMEKEY_INVALID);
+#define buttonVotePlayer5ID RTS_ENGINE_GLOBAL_REF(buttonVotePlayer5ID)
+#else
 static NameKeyType buttonVotePlayer5ID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonVotePlayer6ID, NAMEKEY_INVALID);
+#define buttonVotePlayer6ID RTS_ENGINE_GLOBAL_REF(buttonVotePlayer6ID)
+#else
 static NameKeyType buttonVotePlayer6ID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonVotePlayer7ID, NAMEKEY_INVALID);
+#define buttonVotePlayer7ID RTS_ENGINE_GLOBAL_REF(buttonVotePlayer7ID)
+#else
 static NameKeyType buttonVotePlayer7ID = NAMEKEY_INVALID;
+#endif
 
 static GameWindow *buttonVotePlayer1Window = nullptr;
 static GameWindow *buttonVotePlayer2Window = nullptr;

@@ -67,7 +67,8 @@ public:
 	// Constructors
 	WWINLINE Vector4() {};
 	WWINLINE Vector4(const Vector4 & v) { X = v.X; Y = v.Y; Z = v.Z; W = v.W; }
-	WWINLINE Vector4(float x, float y, float z, float w) { X = x; Y = y; Z = z; W = w; }
+	// GeneralsX @refactor cemlyn007 14/10/2026 constexpr, so constant vectors and matrices are constant-initialised and read-only.
+	WWINLINE constexpr Vector4(float x, float y, float z, float w) : X(x), Y(y), Z(z), W(w) {}
 	WWINLINE Vector4(const float vector[4]) { X = vector[0]; Y = vector[1]; Z = vector[2]; W = vector[3]; }
 
 	// Assignment

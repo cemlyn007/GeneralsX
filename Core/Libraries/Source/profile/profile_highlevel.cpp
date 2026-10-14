@@ -35,7 +35,13 @@
 #include <WWLib/WWCommon.h>
 
 // our own fast critical section
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(ProfileFastCS, cs);
+#define cs RTS_ENGINE_GLOBAL_REF(cs)
+#else
 static ProfileFastCS cs;
+#endif
 
 //////////////////////////////////////////////////////////////////////////////
 // ProfileHighLevel::Id
@@ -115,11 +121,36 @@ ProfileHighLevel::Block::~Block()
 // ProfileId
 
 // profile ID stuff
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_CLASS_STATIC_DEFINE(ProfileId*, ProfileId, first);
+#define first RTS_ENGINE_GLOBAL_REF(first)
+#else
 ProfileId *ProfileId::first;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_CLASS_STATIC_DEFINE(int, ProfileId, curFrame);
+#define curFrame RTS_ENGINE_GLOBAL_REF(curFrame)
+#else
 int ProfileId::curFrame;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_CLASS_STATIC_DEFINE(unsigned, ProfileId, frameRecordMask);
+#define frameRecordMask RTS_ENGINE_GLOBAL_REF(frameRecordMask)
+#else
 unsigned ProfileId::frameRecordMask;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_CLASS_STATIC_DEFINE(char[ProfileId::STRING_BUFFER_SIZE], ProfileId, stringBuf);
+#define stringBuf RTS_ENGINE_GLOBAL_REF(stringBuf)
+#else
 char ProfileId::stringBuf[ProfileId::STRING_BUFFER_SIZE];
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_CLASS_STATIC_DEFINE(unsigned, ProfileId, stringBufUnused);
+#define stringBufUnused RTS_ENGINE_GLOBAL_REF(stringBufUnused)
+#else
 unsigned ProfileId::stringBufUnused;
+#endif
 
 ProfileId::ProfileId(const char *name, const char *descr, const char *unit, int precision, int exp10)
 {
@@ -346,4 +377,9 @@ ProfileHighLevel::ProfileHighLevel()
 {
 }
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_CLASS_STATIC_DEFINE(ProfileHighLevel, ProfileHighLevel, Instance);
+#define Instance RTS_ENGINE_GLOBAL_REF(Instance)
+#else
 ProfileHighLevel ProfileHighLevel::Instance;
+#endif

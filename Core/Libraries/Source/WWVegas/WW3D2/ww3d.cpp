@@ -257,12 +257,23 @@ void WW3D::Set_NPatches_Level(unsigned level)
  * HISTORY:                                                                                    *
  *   3/24/98    GTH : Created.                                                                 *
  *=============================================================================================*/
+#if RTS_ENGINE_CONTEXT
+void WW3D_Register_Render_Object_Factory();
+void WW3D_Register_Dazzle_Factory();
+void WW3D_Register_Light_Factory();
+#endif
+
 WW3DErrorType WW3D::Init(void *hwnd, char *defaultpal, bool lite)
 {
 #if RTS_ENGINE_CONTEXT
 	// GeneralsX @feature cemlyn007 30/09/2026 This engine's render state (WW3D's and DX8Wrapper's), before the first
 	// write below; freed at the end of Shutdown (PLAN-023 Phase 8, stage RR2a-2).
 	DX8Wrapper::Create_Render_State(true);
+	// GeneralsX @refactor cemlyn007 14/10/2026 This engine's persist factories, which upstream made, and so registered, at
+	// static initialisation (docs/EMBEDDING.md)
+	WW3D_Register_Render_Object_Factory();
+	WW3D_Register_Dazzle_Factory();
+	WW3D_Register_Light_Factory();
 #endif
 	assert(IsInitted == false);
 	WWDEBUG_SAY(("WW3D::Init hwnd = %p",hwnd));

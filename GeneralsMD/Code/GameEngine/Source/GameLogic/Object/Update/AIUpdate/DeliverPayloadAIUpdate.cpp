@@ -752,7 +752,12 @@ StateReturnType DeliveringState::update() // Kick a dude out every so often
 			}
 
 			/// @todo srj -- urg. icky.
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+			RTS_ENGINE_STATIC(NameKeyType, key_GenerateMinefieldBehavior, NAMEKEY("GenerateMinefieldBehavior"));
+#else
 			static NameKeyType key_GenerateMinefieldBehavior = NAMEKEY("GenerateMinefieldBehavior");
+#endif
 			GenerateMinefieldBehavior* mfb = (GenerateMinefieldBehavior *)item->findUpdateModule(key_GenerateMinefieldBehavior);
 			if (mfb)
 			{
@@ -760,7 +765,11 @@ StateReturnType DeliveringState::update() // Kick a dude out every so often
 			}
 
 
+#if RTS_ENGINE_CONTEXT
+			RTS_ENGINE_STATIC(NameKeyType, key_SmartBombTargetHomingUpdate, NAMEKEY("SmartBombTargetHomingUpdate"));
+#else
 			static NameKeyType key_SmartBombTargetHomingUpdate = NAMEKEY("SmartBombTargetHomingUpdate");
+#endif
 			SmartBombTargetHomingUpdate* smthu = (SmartBombTargetHomingUpdate *)item->findUpdateModule(key_SmartBombTargetHomingUpdate);
 			if (smthu)
 			{

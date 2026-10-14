@@ -169,6 +169,17 @@ private:
 	////////////////////////////////////////////////////////////
 	//	Static member data
 	////////////////////////////////////////////////////////////
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @refactor cemlyn007 14/10/2026 The temporary buffers are per engine (Temp_Pool, widestring.cpp). The empty
+	// string is a constant every engine shares read-only: nothing writes it (the constructors leave it alone).
+	struct TempPool;
+	static TempPool& Temp_Pool();
+	// This engine's temporary buffers, or null outside every engine, where a string uses none.
+	static TempPool* Find_Temp_Pool();
+
+	static const WCHAR	m_NullChar;
+	static WCHAR * const	m_EmptyString;
+#else
 	static char		m_TempString1[MAX_TEMP_BYTES];
 	static char		m_TempString2[MAX_TEMP_BYTES];
 	static char		m_TempString3[MAX_TEMP_BYTES];
@@ -181,6 +192,7 @@ private:
 
 	static WCHAR	m_NullChar;
 	static WCHAR *	m_EmptyString;
+#endif
 };
 
 ///////////////////////////////////////////////////////////////////
@@ -191,7 +203,11 @@ WideStringClass::WideStringClass (int initial_len, bool hint_temporary)
 	:	m_Buffer (m_EmptyString)
 {
 	Get_String (initial_len, hint_temporary);
-	m_Buffer[0]	= m_NullChar;
+	// GeneralsX @bugfix cemlyn007 14/10/2026 A zero-length, non-temporary string is m_EmptyString, which is never
+	// written, as StringClass's constructor already does.
+	if (m_Buffer != m_EmptyString) {
+		m_Buffer[0]	= m_NullChar;
+	}
 }
 
 ///////////////////////////////////////////////////////////////////

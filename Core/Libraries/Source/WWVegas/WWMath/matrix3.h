@@ -84,7 +84,8 @@ public:
 	WWINLINE explicit Matrix3x3(const Vector3 & v0, const Vector3 & v1, const Vector3 & v2);
 	explicit Matrix3x3(const Matrix3D & m);
 	explicit Matrix3x3(const Matrix4x4 & m);
-	WWINLINE explicit Matrix3x3(
+	// GeneralsX @refactor cemlyn007 14/10/2026 constexpr, so constant vectors and matrices are constant-initialised and read-only.
+	WWINLINE constexpr explicit Matrix3x3(
 		float m11,float m12,float m13,
 		float m21,float m22,float m23,
 		float m31,float m32,float m33
@@ -325,16 +326,14 @@ WWINLINE void Matrix3x3::Make_Identity()
 }
 
 
-WWINLINE Matrix3x3::Matrix3x3
+WWINLINE constexpr Matrix3x3::Matrix3x3
 (
 	float m11,float m12,float m13,
 	float m21,float m22,float m23,
 	float m31,float m32,float m33
 )
+	: Row{Vector3(m11,m12,m13), Vector3(m21,m22,m23), Vector3(m31,m32,m33)}
 {
-	Row[0].Set(m11,m12,m13);
-	Row[1].Set(m21,m22,m23);
-	Row[2].Set(m31,m32,m33);
 }
 
 WWINLINE void Matrix3x3::Set

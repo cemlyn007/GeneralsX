@@ -122,6 +122,10 @@ inline float LookupTableClass::Get_Value_Quick(float input)
 ** NOTE: I add a table called "DefaultTable" so that you can revert to that if
 ** your table isn't found.
 */
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+#define Tables RTS_ENGINE_GLOBAL_REF(Tables)
+#endif
 class LookupTableMgrClass
 {
 public:
@@ -150,6 +154,13 @@ public:
 
 protected:
 
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_CLASS_STATIC(RefMultiListClass<LookupTableClass>, Tables);
+#else
 	static RefMultiListClass<LookupTableClass>	Tables;
+#endif
 
 };
+#if RTS_ENGINE_CONTEXT
+#undef Tables
+#endif

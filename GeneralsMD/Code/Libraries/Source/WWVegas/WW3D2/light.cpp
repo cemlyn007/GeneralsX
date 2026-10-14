@@ -73,7 +73,18 @@
 /*
 ** PersistFactory for LightClasses - lights have custom save-load support
 */
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 Per engine (Common/EngineStatic.h), made and so registered by WW3D::Init (docs/EMBEDDING.md).
+using _LightFactory_rtsEngineType = SimplePersistFactoryClass<LightClass,WW3D_PERSIST_CHUNKID_LIGHT>;
+RTS_ENGINE_GLOBAL(_LightFactory_rtsEngineType, _LightFactory);
+#define _LightFactory RTS_ENGINE_GLOBAL_REF(_LightFactory)
+void WW3D_Register_Light_Factory()
+{
+	_LightFactory;
+}
+#else
 SimplePersistFactoryClass<LightClass,WW3D_PERSIST_CHUNKID_LIGHT>	_LightFactory;
+#endif
 
 /*
 ** Chunk ID's used by LightClass's save-load support (different from the W3D file format...)

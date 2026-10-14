@@ -92,7 +92,12 @@ void CleanupAreaPower::doSpecialPowerAtLocation( const Coord3D *loc, Real angle,
 	Object *obj = getObject();
 	const CleanupAreaPowerModuleData *data = getCleanupAreaPowerModuleData();
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+	RTS_ENGINE_STATIC(NameKeyType, key_CleanupHazardUpdate, NAMEKEY( "CleanupHazardUpdate" ));
+#else
 	static NameKeyType key_CleanupHazardUpdate = NAMEKEY( "CleanupHazardUpdate" );
+#endif
 	CleanupHazardUpdate *update = (CleanupHazardUpdate*)obj->findUpdateModule( key_CleanupHazardUpdate );
 	if( update )
 	{

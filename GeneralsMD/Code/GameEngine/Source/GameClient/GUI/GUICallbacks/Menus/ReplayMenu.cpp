@@ -56,19 +56,55 @@ typedef std::map<ReplayName, TooltipString> ReplayTooltipMap;
 static ReplayTooltipMap replayTooltipCache;
 
 // window ids -------------------------------------------------------------------------------------
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(NameKeyType, parentReplayMenuID, NAMEKEY_INVALID);
+#define parentReplayMenuID RTS_ENGINE_GLOBAL_REF(parentReplayMenuID)
+#else
 static NameKeyType parentReplayMenuID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonLoadID, NAMEKEY_INVALID);
+#define buttonLoadID RTS_ENGINE_GLOBAL_REF(buttonLoadID)
+#else
 static NameKeyType buttonLoadID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonBackID, NAMEKEY_INVALID);
+#define buttonBackID RTS_ENGINE_GLOBAL_REF(buttonBackID)
+#else
 static NameKeyType buttonBackID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, listboxReplayFilesID, NAMEKEY_INVALID);
+#define listboxReplayFilesID RTS_ENGINE_GLOBAL_REF(listboxReplayFilesID)
+#else
 static NameKeyType listboxReplayFilesID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonDeleteID, NAMEKEY_INVALID);
+#define buttonDeleteID RTS_ENGINE_GLOBAL_REF(buttonDeleteID)
+#else
 static NameKeyType buttonDeleteID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonCopyID, NAMEKEY_INVALID);
+#define buttonCopyID RTS_ENGINE_GLOBAL_REF(buttonCopyID)
+#else
 static NameKeyType buttonCopyID = NAMEKEY_INVALID;
+#endif
 
 static Bool isShuttingDown = false;
 
 // window pointers --------------------------------------------------------------------------------
 static GameWindow *parentReplayMenu = nullptr;
 static GameWindow *buttonLoad = nullptr;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, buttonBack, nullptr);
+#define buttonBack RTS_ENGINE_GLOBAL_REF(buttonBack)
+#else
 static GameWindow *buttonBack = nullptr;
+#endif
 static GameWindow *listboxReplayFiles = nullptr;
 static GameWindow *buttonDelete = nullptr;
 static GameWindow *buttonCopy = nullptr;

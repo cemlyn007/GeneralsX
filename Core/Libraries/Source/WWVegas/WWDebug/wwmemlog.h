@@ -91,6 +91,10 @@ enum
 ** 	WWMemoryLogClass::Release_Memory(ptr);
 ** }
 */
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+#define IsMemoryLogEnabled RTS_ENGINE_GLOBAL_REF(IsMemoryLogEnabled)
+#endif
 class WWMemoryLogClass
 {
 public:
@@ -135,7 +139,11 @@ protected:
 	static MemLogClass * Get_Log();
 	static void  Release_Log();
 
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_CLASS_STATIC(bool, IsMemoryLogEnabled);
+#else
 	static bool IsMemoryLogEnabled;
+#endif
 
 	friend class WWMemorySampleClass;
 };
@@ -177,4 +185,7 @@ public:
 #define	WWMEMLOG( category )					WWMemorySampleClass _memsample( category )
 #else
 #define	WWMEMLOG( category )
+#if RTS_ENGINE_CONTEXT
+#undef IsMemoryLogEnabled
+#endif
 #endif

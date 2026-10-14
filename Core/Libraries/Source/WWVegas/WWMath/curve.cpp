@@ -51,8 +51,24 @@ DECLARE_FORCE_LINK(curve);
 /*
 ** Persist factories and chunk-id's used to save and load.
 */
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+// GeneralsX @refactor cemlyn007 14/10/2026 Per engine (Common/EngineStatic.h), made and so registered by WWMath::Init (docs/EMBEDDING.md).
+using _LinearCurve3DFactory_rtsEngineType = SimplePersistFactoryClass<LinearCurve3DClass,WWMATH_CHUNKID_LINEARCURVE3D>;
+RTS_ENGINE_GLOBAL(_LinearCurve3DFactory_rtsEngineType, _LinearCurve3DFactory);
+#define _LinearCurve3DFactory RTS_ENGINE_GLOBAL_REF(_LinearCurve3DFactory)
+using _LinearCurve1DFactory_rtsEngineType = SimplePersistFactoryClass<LinearCurve1DClass,WWMATH_CHUNKID_LINEARCURVE1D>;
+RTS_ENGINE_GLOBAL(_LinearCurve1DFactory_rtsEngineType, _LinearCurve1DFactory);
+#define _LinearCurve1DFactory RTS_ENGINE_GLOBAL_REF(_LinearCurve1DFactory)
+void WWMath_Register_Curve_Factories()
+{
+	_LinearCurve3DFactory;
+	_LinearCurve1DFactory;
+}
+#else
 SimplePersistFactoryClass<LinearCurve3DClass,WWMATH_CHUNKID_LINEARCURVE3D>	_LinearCurve3DFactory;
 SimplePersistFactoryClass<LinearCurve1DClass,WWMATH_CHUNKID_LINEARCURVE1D>	_LinearCurve1DFactory;
+#endif
 
 enum
 {

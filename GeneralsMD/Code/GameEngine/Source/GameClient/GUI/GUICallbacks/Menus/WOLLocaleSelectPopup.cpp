@@ -51,9 +51,25 @@
 
 // PRIVATE DATA ///////////////////////////////////////////////////////////////////////////////////
 // window ids ------------------------------------------------------------------------------
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(NameKeyType, parentLocaleSelectID, NAMEKEY_INVALID);
+#define parentLocaleSelectID RTS_ENGINE_GLOBAL_REF(parentLocaleSelectID)
+#else
 static NameKeyType parentLocaleSelectID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonOkID, NAMEKEY_INVALID);
+#define buttonOkID RTS_ENGINE_GLOBAL_REF(buttonOkID)
+#else
 static NameKeyType buttonOkID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, listboxLocaleID, NAMEKEY_INVALID);
+#define listboxLocaleID RTS_ENGINE_GLOBAL_REF(listboxLocaleID)
+#else
 static NameKeyType listboxLocaleID = NAMEKEY_INVALID;
+#endif
 
 // Window Pointers ------------------------------------------------------------------------
 static GameWindow *parentLocaleSelect = nullptr;

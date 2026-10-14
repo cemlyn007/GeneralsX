@@ -86,7 +86,8 @@ enum BoxSideType {
 ** <AXIS> is 0,1,2 meaning x,y,z
 ** <SIDE> is BOX_SIDE_NEGATIVE or BOX_SIDE_POSITIVE
 */
-static Vector3 _box_normal[3][2] =
+// GeneralsX @refactor cemlyn007 14/10/2026 Constant, so read-only: engines share no writable state (docs/EMBEDDING.md).
+static const Vector3 _box_normal[3][2] =
 {
 	// plane = 0 (x axis)
 	{

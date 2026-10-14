@@ -184,9 +184,8 @@ endif()
 # ON: every singleton in Core/GameEngine/Include/Common/EngineSingletons.inl is a field of rts::EngineContext
 # and `TheXxx` is a macro over the current context, so a host can run several engines in one process. The
 # context header is force-included into every C++ translation unit that links core_config, ahead of the
-# precompiled header. OFF (the default) builds the upstream-shaped code: the header declares only what lets
-# the same sources build without a context, and the `#if !RTS_ENGINE_CONTEXT` guards around the upstream
-# singleton declarations keep them.
+# precompiled header. OFF (the default) builds exactly the upstream-shaped code: the header is not included,
+# and the `#if !RTS_ENGINE_CONTEXT` guards around the upstream singleton declarations keep them.
 #
 # Zero Hour only for now: the Generals base game's own singleton declarations are not guarded yet (PLAN-023's
 # Generals backport), and the tools (WorldBuilder, GUIEdit, MapCacheBuilder, W3DView, ...) assign singletons
@@ -195,21 +194,19 @@ if(RTS_ENGINE_CONTEXT)
     if(IS_VS6_BUILD)
         message(FATAL_ERROR "RTS_ENGINE_CONTEXT requires C++20 and cannot be used with VC6")
     endif()
-    target_compile_definitions(core_config INTERFACE RTS_ENGINE_CONTEXT=1)
-    message(STATUS "RTS_ENGINE_CONTEXT: engine singletons resolve through rts::EngineContext")
-endif()
-# GeneralsX @refactor cemlyn007 14/10/2026 The context header is force-included OFF too, where it only declares
-# rts::withCurrentEngine and the per-engine static declarations (Common/EngineStatic.h), which then declare the
-# original statics.
-if(NOT IS_VS6_BUILD)
     set(RTS_ENGINE_CONTEXT_HEADER "${CMAKE_CURRENT_LIST_DIR}/../Core/GameEngine/Include/Common/EngineContext.h")
     cmake_path(NORMAL_PATH RTS_ENGINE_CONTEXT_HEADER)
+    target_compile_definitions(core_config INTERFACE RTS_ENGINE_CONTEXT=1)
+    # GeneralsX @refactor cemlyn007 14/10/2026 This build's hosts (the game executable, rlgenerals' old launcher) rely on
+    # the Scope to install the engine's floating-point mode and locale (Common/EngineContext.h)
+    target_compile_definitions(core_config INTERFACE RTS_ENGINE_SCOPE_ENVIRONMENT=1)
     if(MSVC)
         target_compile_options(core_config INTERFACE "$<$<COMPILE_LANGUAGE:CXX>:/FI${RTS_ENGINE_CONTEXT_HEADER}>")
     else()
         # Joined `-include<file>` (GCC and Clang accept it), so the option is one argument.
         target_compile_options(core_config INTERFACE "$<$<COMPILE_LANGUAGE:CXX,OBJCXX>:-include${RTS_ENGINE_CONTEXT_HEADER}>")
     endif()
+    message(STATUS "RTS_ENGINE_CONTEXT: engine singletons resolve through rts::EngineContext")
 endif()
 add_feature_info(EngineContext RTS_ENGINE_CONTEXT "Per-engine singletons through rts::EngineContext (several engines per process)")
 

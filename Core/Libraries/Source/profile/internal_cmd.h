@@ -29,6 +29,13 @@
 
 #pragma once
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+#define numResIf RTS_ENGINE_GLOBAL_REF(numResIf)
+#endif
+#if RTS_ENGINE_CONTEXT
+#define resIf RTS_ENGINE_GLOBAL_REF(resIf)
+#endif
 class ProfileCmdInterface: public DebugCmdInterface
 {
   struct Factory
@@ -37,8 +44,16 @@ class ProfileCmdInterface: public DebugCmdInterface
     const char *name,*arg;
   };
 
+#if RTS_ENGINE_CONTEXT
+  RTS_ENGINE_CLASS_STATIC(unsigned, numResIf);
+#else
   static unsigned numResIf;
+#endif
+#if RTS_ENGINE_CONTEXT
+  RTS_ENGINE_CLASS_STATIC(Factory*, resIf);
+#else
   static Factory *resIf;
+#endif
 
   unsigned numResFunc; // optimizer bug: must be declared volatile!
   ProfileResultInterface **resFunc;
@@ -54,3 +69,7 @@ public:
                        unsigned argn, const char * const * argv) override;
   virtual void Delete() override {}
 };
+#if RTS_ENGINE_CONTEXT
+#undef resIf
+#undef numResIf
+#endif

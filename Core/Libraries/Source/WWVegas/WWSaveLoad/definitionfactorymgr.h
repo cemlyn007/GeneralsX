@@ -47,6 +47,10 @@ class DefinitionFactoryClass;
 //	DefinitionFactoryMgrClass
 //
 //////////////////////////////////////////////////////////////////////////////////
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+#define _FactoryListHead RTS_ENGINE_GLOBAL_REF(_FactoryListHead)
+#endif
 class DefinitionFactoryMgrClass
 {
 public:
@@ -78,5 +82,12 @@ private:
 	/////////////////////////////////////////////////////////////////////
 	//	Static member data
 	/////////////////////////////////////////////////////////////////////
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_CLASS_STATIC(DefinitionFactoryClass*, _FactoryListHead);
+#else
 	static DefinitionFactoryClass *	_FactoryListHead;
+#endif
 };
+#if RTS_ENGINE_CONTEXT
+#undef _FactoryListHead
+#endif

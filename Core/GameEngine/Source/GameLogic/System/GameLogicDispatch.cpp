@@ -2220,7 +2220,12 @@ bool GameLogic::onPlaceBeacon(MAYBE_UNUSED GameMessage *msg)
 		{
 
 			Int updateCount = 0;
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+			RTS_ENGINE_STATIC(NameKeyType, nameKeyClientUpdate, NAMEKEY("BeaconClientUpdate"));
+#else
 			static NameKeyType nameKeyClientUpdate = NAMEKEY("BeaconClientUpdate");
+#endif
 			ClientUpdateModule ** clientModules = object->getDrawable()->getClientUpdateModules();
 			if (clientModules)
 			{
@@ -2297,7 +2302,11 @@ bool GameLogic::onRemoveBeacon(MAYBE_UNUSED GameMessage *msg)
 						if (beaconDrawable)
 						{
 
+#if RTS_ENGINE_CONTEXT
+							RTS_ENGINE_STATIC(NameKeyType, nameKeyClientUpdate, NAMEKEY("BeaconClientUpdate"));
+#else
 							static NameKeyType nameKeyClientUpdate = NAMEKEY("BeaconClientUpdate");
+#endif
 							ClientUpdateModule ** clientModules = beaconDrawable->getClientUpdateModules();
 							if (clientModules)
 							{

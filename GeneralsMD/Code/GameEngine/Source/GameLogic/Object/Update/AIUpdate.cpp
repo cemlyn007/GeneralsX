@@ -3074,7 +3074,12 @@ void AIUpdateInterface::privateMoveToAndEvacuateAndExit( const Coord3D *pos, Com
 	m_isBlockedAndStuck = FALSE;
 	setLastCommandSource( cmdSource );
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+	RTS_ENGINE_STATIC(NameKeyType, key_DeliverPayloadAIUpdate, NAMEKEY("DeliverPayloadAIUpdate"));
+#else
 	static NameKeyType key_DeliverPayloadAIUpdate = NAMEKEY("DeliverPayloadAIUpdate");
+#endif
 	DeliverPayloadAIUpdate *dp = (DeliverPayloadAIUpdate*)getObject()->findUpdateModule( key_DeliverPayloadAIUpdate );
 	if( dp )
 	{
@@ -3973,7 +3978,11 @@ void AIUpdateInterface::privateExecuteRailedTransport( CommandSourceType cmdSour
 ///< life altering state change, if this AI can do it
 void AIUpdateInterface::privateGoProne( const DamageInfo *damageInfo, CommandSourceType )
 {
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(NameKeyType, proneModuleKey, TheNameKeyGenerator->nameToKey( "ProneUpdate" ));
+#else
 	static NameKeyType proneModuleKey = TheNameKeyGenerator->nameToKey( "ProneUpdate" );
+#endif
 	ProneUpdate *proneModule = (ProneUpdate *)getObject()->findUpdateModule( proneModuleKey );
 
 	if( proneModule )
@@ -4183,7 +4192,11 @@ void AIUpdateInterface::privateHackInternet( CommandSourceType cmdSource )
 	getStateMachine()->clear();
 	setLastCommandSource( cmdSource );
 
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(NameKeyType, key_HackInternetAIUpdate, NAMEKEY("HackInternetAIUpdate"));
+#else
 	static NameKeyType key_HackInternetAIUpdate = NAMEKEY("HackInternetAIUpdate");
+#endif
 	HackInternetAIUpdate *ai = (HackInternetAIUpdate*)getObject()->findUpdateModule( key_HackInternetAIUpdate );
 	if( ai )
 	{

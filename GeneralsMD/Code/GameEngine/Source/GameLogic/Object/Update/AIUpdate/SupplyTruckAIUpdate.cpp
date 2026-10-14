@@ -219,12 +219,21 @@ void SupplyTruckAIUpdate::privateDock( Object *dock, CommandSourceType cmdSource
 UnsignedInt SupplyTruckAIUpdate::getActionDelayForDock( Object *dock )
 {
 	// Decide whether to use my Center or Warehouse delay time
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+	RTS_ENGINE_STATIC(const NameKeyType, key_warehouseUpdate, NAMEKEY("SupplyWarehouseDockUpdate"));
+#else
 	static const NameKeyType key_warehouseUpdate = NAMEKEY("SupplyWarehouseDockUpdate");
+#endif
 	SupplyWarehouseDockUpdate *warehouseModule = (SupplyWarehouseDockUpdate*) dock->findUpdateModule( key_warehouseUpdate );
 	if (warehouseModule) {
 		return getSupplyTruckAIUpdateModuleData()->m_warehouseDelay;
 	}
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(const NameKeyType, key_centerUpdate, NAMEKEY("SupplyCenterDockUpdate"));
+#else
 	static const NameKeyType key_centerUpdate = NAMEKEY("SupplyCenterDockUpdate");
+#endif
 	SupplyCenterDockUpdate *centerModule = (SupplyCenterDockUpdate*) dock->findUpdateModule( key_centerUpdate );
 	if (centerModule) {
 		return getSupplyTruckAIUpdateModuleData()->m_centerDelay;

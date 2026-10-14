@@ -495,12 +495,12 @@ Bool GetUnsignedIntFromRegistry(AsciiString path, AsciiString key, UnsignedInt& 
 AsciiString GetRegistryLanguage()
 {
 #if RTS_ENGINE_CONTEXT
-	// GeneralsX @feature cemlyn007 28/09/2026 A process-global string, so it is written exactly once, under
-	// std::call_once, and never mutated afterwards (PLAN-023 Phase 4): every engine reads the same install,
-	// so the first caller's answer is every engine's.
-	static std::once_flag once;
-	static AsciiString val = "english";
-	std::call_once(once, []() {
+	// GeneralsX @feature cemlyn007 28/09/2026 Written exactly once, under std::call_once, and never mutated
+	// afterwards (PLAN-023 Phase 4).
+	// GeneralsX @refactor cemlyn007 14/10/2026 Once per engine, in per-engine statics: engines share no state.
+	RTS_ENGINE_STATIC(std::once_flag, once);
+	RTS_ENGINE_STATIC(AsciiString, val, "english");
+	std::call_once(once, [&val]() {
 		if (!GetStringFromRegistry("", "Language", val))
 			tryAutoDetectLanguage(val);
 	});

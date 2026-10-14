@@ -237,7 +237,12 @@ Bool ActionManager::canTransferSuppliesAt( const Object *obj, const Object *tran
 		return FALSE;
 
 	// If it is a warehouse, it must have boxes left and not be an enemy
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+	RTS_ENGINE_STATIC(const NameKeyType, key_warehouseUpdate, NAMEKEY("SupplyWarehouseDockUpdate"));
+#else
 	static const NameKeyType key_warehouseUpdate = NAMEKEY("SupplyWarehouseDockUpdate");
+#endif
 	SupplyWarehouseDockUpdate *warehouseModule = (SupplyWarehouseDockUpdate*)transferDest->findUpdateModule( key_warehouseUpdate );
 	if( warehouseModule )
 		if( warehouseModule->getBoxesStored() == 0 || transferDest->getRelationship( obj ) == ENEMIES )
@@ -245,7 +250,11 @@ Bool ActionManager::canTransferSuppliesAt( const Object *obj, const Object *tran
 
 	// if it is a supply center, I must have boxes, and must be controlled by the same player
 	// (not merely an ally... otherwise you may find yourself funding your allies. ick.)
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(const NameKeyType, key_centerUpdate, NAMEKEY("SupplyCenterDockUpdate"));
+#else
 	static const NameKeyType key_centerUpdate = NAMEKEY("SupplyCenterDockUpdate");
+#endif
 	SupplyCenterDockUpdate *centerModule = (SupplyCenterDockUpdate*)transferDest->findUpdateModule( key_centerUpdate );
 	if( centerModule  )
 		if( supplyTruck->getNumberBoxes() == 0  || transferDest->getControllingPlayer() != obj->getControllingPlayer() )
@@ -309,7 +318,11 @@ Bool ActionManager::canDockAt( const Object *obj, const Object *dockDest, Comman
 		return TRUE;
 
 	// units and infantry can dock with a railed transport
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(const NameKeyType, key, NAMEKEY( "RailedTransportDockUpdate" ));
+#else
 	static const NameKeyType key = NAMEKEY( "RailedTransportDockUpdate" );
+#endif
 	RailedTransportDockUpdate *fdu = (RailedTransportDockUpdate *)dockDest->findUpdateModule( key );
 	if( fdu )
 	{
@@ -1750,7 +1763,11 @@ Bool ActionManager::canDoSpecialPowerAtObject( const Object *obj, const Object *
 					{
 						//Don't allow it to disguise as a train -- they don't have KINDOF_TRAIN yet, but
 						//if added, please change this code so it'll be faster!
+#if RTS_ENGINE_CONTEXT
+						RTS_ENGINE_STATIC(const NameKeyType, key, NAMEKEY( "RailroadBehavior" ));
+#else
 						static const NameKeyType key = NAMEKEY( "RailroadBehavior" );
+#endif
 						RailroadBehavior *rBehavior = (RailroadBehavior*)target->findUpdateModule( key );
 						if( !rBehavior )
 						{

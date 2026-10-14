@@ -63,14 +63,50 @@ extern Bool LANisShuttingDown;
 static Bool isShuttingDown = false;
 static Bool buttonPushed = false;
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(NameKeyType, buttonBackID, NAMEKEY_INVALID);
+#define buttonBackID RTS_ENGINE_GLOBAL_REF(buttonBackID)
+#else
 static NameKeyType buttonBackID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonHostID, NAMEKEY_INVALID);
+#define buttonHostID RTS_ENGINE_GLOBAL_REF(buttonHostID)
+#else
 static NameKeyType buttonHostID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonJoinID, NAMEKEY_INVALID);
+#define buttonJoinID RTS_ENGINE_GLOBAL_REF(buttonJoinID)
+#else
 static NameKeyType buttonJoinID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, editPlayerNameID, NAMEKEY_INVALID);
+#define editPlayerNameID RTS_ENGINE_GLOBAL_REF(editPlayerNameID)
+#else
 static NameKeyType editPlayerNameID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, comboboxRemoteIPID, NAMEKEY_INVALID);
+#define comboboxRemoteIPID RTS_ENGINE_GLOBAL_REF(comboboxRemoteIPID)
+#else
 static NameKeyType comboboxRemoteIPID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, staticLocalIPID, NAMEKEY_INVALID);
+#define staticLocalIPID RTS_ENGINE_GLOBAL_REF(staticLocalIPID)
+#else
 static NameKeyType staticLocalIPID = NAMEKEY_INVALID;
+#endif
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, buttonBack, nullptr);
+#define buttonBack RTS_ENGINE_GLOBAL_REF(buttonBack)
+#else
 static GameWindow *buttonBack = nullptr;
+#endif
 static GameWindow *buttonHost = nullptr;
 static GameWindow *buttonJoin = nullptr;
 static GameWindow *editPlayerName = nullptr;

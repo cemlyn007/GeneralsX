@@ -126,7 +126,12 @@ void AssistedTargetingUpdate::makeFeedbackLaser( const ThingTemplate *laserTempl
 		return;
 
 	Drawable *draw = laser->getDrawable();
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+	RTS_ENGINE_STATIC(const NameKeyType, key_LaserUpdate, NAMEKEY( "LaserUpdate" ));
+#else
 	static const NameKeyType key_LaserUpdate = NAMEKEY( "LaserUpdate" );
+#endif
 	LaserUpdate *update = (LaserUpdate*)draw->findClientUpdateModule( key_LaserUpdate );
 	if( !update )
 	{

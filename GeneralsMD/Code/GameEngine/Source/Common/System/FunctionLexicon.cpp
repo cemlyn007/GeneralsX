@@ -63,14 +63,112 @@ extern WindowMsgHandledType PopupReplayInput( GameWindow *window, UnsignedInt ms
 extern WindowMsgHandledType ExtendedMessageBoxSystem( GameWindow *window, UnsignedInt msg, WindowMsgData mData1, WindowMsgData mData2 );
 
 // game window draw table -----------------------------------------------------------------------
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(FunctionLexicon::TableEntry[3], gameWinDrawTable, 
+{
+	{ NAMEKEY_INVALID, "IMECandidateMainDraw",      (void*)IMECandidateMainDraw },
+	{ NAMEKEY_INVALID, "IMECandidateTextAreaDraw",  (void*)IMECandidateTextAreaDraw },
+	{ NAMEKEY_INVALID, nullptr,                     nullptr }
+});
+#define gameWinDrawTable RTS_ENGINE_GLOBAL_REF(gameWinDrawTable)
+#else
 static FunctionLexicon::TableEntry gameWinDrawTable[] =
 {
 	{ NAMEKEY_INVALID, "IMECandidateMainDraw",      (void*)IMECandidateMainDraw },
 	{ NAMEKEY_INVALID, "IMECandidateTextAreaDraw",  (void*)IMECandidateTextAreaDraw },
 	{ NAMEKEY_INVALID, nullptr,                     nullptr }
 };
+#endif
 
 // game window system table -----------------------------------------------------------------------
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(FunctionLexicon::TableEntry[73], gameWinSystemTable, 
+{
+
+
+	{ NAMEKEY_INVALID, "PassSelectedButtonsToParentSystem",  (void*)PassSelectedButtonsToParentSystem },
+	{ NAMEKEY_INVALID, "PassMessagesToParentSystem",         (void*)PassMessagesToParentSystem },
+
+	{ NAMEKEY_INVALID, "GameWinDefaultSystem",               (void*)GameWinDefaultSystem },
+	{ NAMEKEY_INVALID, "GadgetPushButtonSystem",             (void*)GadgetPushButtonSystem },
+	{ NAMEKEY_INVALID, "GadgetCheckBoxSystem",               (void*)GadgetCheckBoxSystem },
+	{ NAMEKEY_INVALID, "GadgetRadioButtonSystem",            (void*)GadgetRadioButtonSystem },
+	{ NAMEKEY_INVALID, "GadgetTabControlSystem",             (void*)GadgetTabControlSystem },
+	{ NAMEKEY_INVALID, "GadgetListBoxSystem",                (void*)GadgetListBoxSystem },
+	{ NAMEKEY_INVALID, "GadgetComboBoxSystem",               (void*)GadgetComboBoxSystem },
+	{ NAMEKEY_INVALID, "GadgetHorizontalSliderSystem",       (void*)GadgetHorizontalSliderSystem },
+	{ NAMEKEY_INVALID, "GadgetVerticalSliderSystem",         (void*)GadgetVerticalSliderSystem },
+	{ NAMEKEY_INVALID, "GadgetProgressBarSystem",            (void*)GadgetProgressBarSystem },
+	{ NAMEKEY_INVALID, "GadgetStaticTextSystem",             (void*)GadgetStaticTextSystem },
+	{ NAMEKEY_INVALID, "GadgetTextEntrySystem",              (void*)GadgetTextEntrySystem },
+	{ NAMEKEY_INVALID, "MessageBoxSystem",                   (void*)MessageBoxSystem },
+	{ NAMEKEY_INVALID, "QuitMessageBoxSystem",               (void*)QuitMessageBoxSystem },
+
+	{ NAMEKEY_INVALID, "ExtendedMessageBoxSystem",           (void*)ExtendedMessageBoxSystem },
+
+	{ NAMEKEY_INVALID, "MOTDSystem",                         (void*)MOTDSystem },
+	{ NAMEKEY_INVALID, "MainMenuSystem",                     (void*)MainMenuSystem },
+	{ NAMEKEY_INVALID, "OptionsMenuSystem",                  (void*)OptionsMenuSystem },
+	{ NAMEKEY_INVALID, "SinglePlayerMenuSystem",             (void*)SinglePlayerMenuSystem },
+	{ NAMEKEY_INVALID, "QuitMenuSystem",                     (void*)QuitMenuSystem },
+	{ NAMEKEY_INVALID, "MapSelectMenuSystem",                (void*)MapSelectMenuSystem },
+	{ NAMEKEY_INVALID, "ReplayMenuSystem",                   (void*)ReplayMenuSystem },
+	{ NAMEKEY_INVALID, "CreditsMenuSystem",                  (void*)CreditsMenuSystem },
+	{ NAMEKEY_INVALID, "LanLobbyMenuSystem",                 (void*)LanLobbyMenuSystem },
+	{ NAMEKEY_INVALID, "LanGameOptionsMenuSystem",           (void*)LanGameOptionsMenuSystem },
+	{ NAMEKEY_INVALID, "LanMapSelectMenuSystem",             (void*)LanMapSelectMenuSystem },
+	{ NAMEKEY_INVALID, "SkirmishGameOptionsMenuSystem",      (void*)SkirmishGameOptionsMenuSystem },
+	{ NAMEKEY_INVALID, "SkirmishMapSelectMenuSystem",        (void*)SkirmishMapSelectMenuSystem },
+	{ NAMEKEY_INVALID, "ChallengeMenuSystem",                (void*)ChallengeMenuSystem },
+	{ NAMEKEY_INVALID, "SaveLoadMenuSystem",                 (void*)SaveLoadMenuSystem },
+	{ NAMEKEY_INVALID, "PopupCommunicatorSystem",            (void*)PopupCommunicatorSystem },
+	{ NAMEKEY_INVALID, "PopupBuddyNotificationSystem",       (void*)PopupBuddyNotificationSystem },
+	{ NAMEKEY_INVALID, "PopupReplaySystem",                  (void*)PopupReplaySystem },
+	{ NAMEKEY_INVALID, "KeyboardOptionsMenuSystem",          (void*)KeyboardOptionsMenuSystem },
+	{ NAMEKEY_INVALID, "WOLLadderScreenSystem",              (void*)WOLLadderScreenSystem },
+	{ NAMEKEY_INVALID, "WOLLoginMenuSystem",                 (void*)WOLLoginMenuSystem },
+	{ NAMEKEY_INVALID, "WOLLocaleSelectSystem",              (void*)WOLLocaleSelectSystem },
+	{ NAMEKEY_INVALID, "WOLLobbyMenuSystem",                 (void*)WOLLobbyMenuSystem },
+	{ NAMEKEY_INVALID, "WOLGameSetupMenuSystem",             (void*)WOLGameSetupMenuSystem },
+	{ NAMEKEY_INVALID, "WOLMapSelectMenuSystem",             (void*)WOLMapSelectMenuSystem },
+	{ NAMEKEY_INVALID, "WOLBuddyOverlaySystem",              (void*)WOLBuddyOverlaySystem },
+	{ NAMEKEY_INVALID, "WOLBuddyOverlayRCMenuSystem",        (void*)WOLBuddyOverlayRCMenuSystem },
+	{ NAMEKEY_INVALID, "RCGameDetailsMenuSystem",            (void*)RCGameDetailsMenuSystem },
+	{ NAMEKEY_INVALID, "GameSpyPlayerInfoOverlaySystem",     (void*)GameSpyPlayerInfoOverlaySystem },
+	{ NAMEKEY_INVALID, "WOLMessageWindowSystem",             (void*)WOLMessageWindowSystem },
+	{ NAMEKEY_INVALID, "WOLQuickMatchMenuSystem",            (void*)WOLQuickMatchMenuSystem },
+	{ NAMEKEY_INVALID, "WOLWelcomeMenuSystem",               (void*)WOLWelcomeMenuSystem },
+	{ NAMEKEY_INVALID, "WOLStatusMenuSystem",                (void*)WOLStatusMenuSystem },
+	{ NAMEKEY_INVALID, "WOLQMScoreScreenSystem",             (void*)WOLQMScoreScreenSystem },
+	{ NAMEKEY_INVALID, "WOLCustomScoreScreenSystem",         (void*)WOLCustomScoreScreenSystem },
+	{ NAMEKEY_INVALID, "NetworkDirectConnectSystem",         (void*)NetworkDirectConnectSystem },
+	{ NAMEKEY_INVALID, "PopupHostGameSystem",                (void*)PopupHostGameSystem },
+	{ NAMEKEY_INVALID, "PopupJoinGameSystem",                (void*)PopupJoinGameSystem },
+	{ NAMEKEY_INVALID, "PopupLadderSelectSystem",            (void*)PopupLadderSelectSystem },
+	{ NAMEKEY_INVALID, "InGamePopupMessageSystem",           (void*)InGamePopupMessageSystem },
+	{ NAMEKEY_INVALID, "ControlBarSystem",                   (void*)ControlBarSystem },
+	{ NAMEKEY_INVALID, "ControlBarObserverSystem",           (void*)ControlBarObserverSystem },
+	{ NAMEKEY_INVALID, "IMECandidateWindowSystem",           (void*)IMECandidateWindowSystem },
+	{ NAMEKEY_INVALID, "ReplayControlSystem",                (void*)ReplayControlSystem },
+	{ NAMEKEY_INVALID, "InGameChatSystem",                   (void*)InGameChatSystem },
+	{ NAMEKEY_INVALID, "DisconnectControlSystem",            (void*)DisconnectControlSystem },
+	{ NAMEKEY_INVALID, "DiplomacySystem",                    (void*)DiplomacySystem },
+	{ NAMEKEY_INVALID, "GeneralsExpPointsSystem",            (void*)GeneralsExpPointsSystem },
+	{ NAMEKEY_INVALID, "DifficultySelectSystem",             (void*)DifficultySelectSystem },
+
+	{ NAMEKEY_INVALID, "IdleWorkerSystem",                   (void*)IdleWorkerSystem },
+	{ NAMEKEY_INVALID, "EstablishConnectionsControlSystem",  (void*)EstablishConnectionsControlSystem },
+	{ NAMEKEY_INVALID, "GameInfoWindowSystem",               (void*)GameInfoWindowSystem },
+	{ NAMEKEY_INVALID, "ScoreScreenSystem",                  (void*)ScoreScreenSystem },
+	{ NAMEKEY_INVALID, "DownloadMenuSystem",                 (void*)DownloadMenuSystem },
+	{ NAMEKEY_INVALID, "ExtrasMenuSystem",                   (void*)ExtrasMenuSystem },
+
+	{ NAMEKEY_INVALID, nullptr,                              nullptr }
+
+});
+#define gameWinSystemTable RTS_ENGINE_GLOBAL_REF(gameWinSystemTable)
+#else
 static FunctionLexicon::TableEntry gameWinSystemTable[] =
 {
 
@@ -155,8 +253,83 @@ static FunctionLexicon::TableEntry gameWinSystemTable[] =
 	{ NAMEKEY_INVALID, nullptr,                              nullptr }
 
 };
+#endif
 
 // game window input table ------------------------------------------------------------------------
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(FunctionLexicon::TableEntry[63], gameWinInputTable, 
+{
+
+	{ NAMEKEY_INVALID, "GameWinDefaultInput",               (void*)GameWinDefaultInput },
+	{ NAMEKEY_INVALID, "GameWinBlockInput",                 (void*)GameWinBlockInput },
+	{ NAMEKEY_INVALID, "GadgetPushButtonInput",             (void*)GadgetPushButtonInput },
+	{ NAMEKEY_INVALID, "GadgetCheckBoxInput",               (void*)GadgetCheckBoxInput },
+	{ NAMEKEY_INVALID, "GadgetRadioButtonInput",            (void*)GadgetRadioButtonInput },
+	{ NAMEKEY_INVALID, "GadgetTabControlInput",             (void*)GadgetTabControlInput },
+	{ NAMEKEY_INVALID, "GadgetListBoxInput",                (void*)GadgetListBoxInput },
+	{ NAMEKEY_INVALID, "GadgetListBoxMultiInput",           (void*)GadgetListBoxMultiInput },
+	{ NAMEKEY_INVALID, "GadgetComboBoxInput",               (void*)GadgetComboBoxInput },
+	{ NAMEKEY_INVALID, "GadgetHorizontalSliderInput",       (void*)GadgetHorizontalSliderInput },
+	{ NAMEKEY_INVALID, "GadgetVerticalSliderInput",         (void*)GadgetVerticalSliderInput },
+	{ NAMEKEY_INVALID, "GadgetStaticTextInput",             (void*)GadgetStaticTextInput },
+	{ NAMEKEY_INVALID, "GadgetTextEntryInput",              (void*)GadgetTextEntryInput },
+
+	{ NAMEKEY_INVALID, "MainMenuInput",                     (void*)MainMenuInput },
+	{ NAMEKEY_INVALID, "MapSelectMenuInput",                (void*)MapSelectMenuInput },
+	{ NAMEKEY_INVALID, "OptionsMenuInput",                  (void*)OptionsMenuInput },
+	{ NAMEKEY_INVALID, "SinglePlayerMenuInput",             (void*)SinglePlayerMenuInput },
+	{ NAMEKEY_INVALID, "LanLobbyMenuInput",                 (void*)LanLobbyMenuInput },
+	{ NAMEKEY_INVALID, "ReplayMenuInput",                   (void*)ReplayMenuInput },
+	{ NAMEKEY_INVALID, "CreditsMenuInput",                  (void*)CreditsMenuInput },
+	{ NAMEKEY_INVALID, "KeyboardOptionsMenuInput",          (void*)KeyboardOptionsMenuInput },
+	{ NAMEKEY_INVALID, "PopupCommunicatorInput",            (void*)PopupCommunicatorInput },
+	{ NAMEKEY_INVALID, "LanGameOptionsMenuInput",           (void*)LanGameOptionsMenuInput },
+	{ NAMEKEY_INVALID, "LanMapSelectMenuInput",             (void*)LanMapSelectMenuInput },
+	{ NAMEKEY_INVALID, "SkirmishGameOptionsMenuInput",      (void*)SkirmishGameOptionsMenuInput },
+	{ NAMEKEY_INVALID, "SkirmishMapSelectMenuInput",        (void*)SkirmishMapSelectMenuInput },
+	{ NAMEKEY_INVALID, "ChallengeMenuInput",                (void*)ChallengeMenuInput },
+	{ NAMEKEY_INVALID, "WOLLadderScreenInput",              (void*)WOLLadderScreenInput },
+	{ NAMEKEY_INVALID, "WOLLoginMenuInput",                 (void*)WOLLoginMenuInput },
+	{ NAMEKEY_INVALID, "WOLLocaleSelectInput",              (void*)WOLLocaleSelectInput },
+	{ NAMEKEY_INVALID, "WOLLobbyMenuInput",                 (void*)WOLLobbyMenuInput },
+	{ NAMEKEY_INVALID, "WOLGameSetupMenuInput",             (void*)WOLGameSetupMenuInput },
+	{ NAMEKEY_INVALID, "WOLMapSelectMenuInput",             (void*)WOLMapSelectMenuInput },
+	{ NAMEKEY_INVALID, "WOLBuddyOverlayInput",              (void*)WOLBuddyOverlayInput },
+	{ NAMEKEY_INVALID, "GameSpyPlayerInfoOverlayInput",     (void*)GameSpyPlayerInfoOverlayInput },
+	{ NAMEKEY_INVALID, "WOLMessageWindowInput",             (void*)WOLMessageWindowInput },
+	{ NAMEKEY_INVALID, "WOLQuickMatchMenuInput",            (void*)WOLQuickMatchMenuInput },
+	{ NAMEKEY_INVALID, "WOLWelcomeMenuInput",               (void*)WOLWelcomeMenuInput },
+	{ NAMEKEY_INVALID, "WOLStatusMenuInput",                (void*)WOLStatusMenuInput },
+	{ NAMEKEY_INVALID, "WOLQMScoreScreenInput",             (void*)WOLQMScoreScreenInput },
+	{ NAMEKEY_INVALID, "WOLCustomScoreScreenInput",         (void*)WOLCustomScoreScreenInput },
+	{ NAMEKEY_INVALID, "NetworkDirectConnectInput",         (void*)NetworkDirectConnectInput },
+	{ NAMEKEY_INVALID, "PopupHostGameInput",                (void*)PopupHostGameInput },
+	{ NAMEKEY_INVALID, "PopupJoinGameInput",                (void*)PopupJoinGameInput },
+	{ NAMEKEY_INVALID, "PopupLadderSelectInput",            (void*)PopupLadderSelectInput },
+	{ NAMEKEY_INVALID, "InGamePopupMessageInput",           (void*)InGamePopupMessageInput },
+	{ NAMEKEY_INVALID, "ControlBarInput",                   (void*)ControlBarInput },
+	{ NAMEKEY_INVALID, "ReplayControlInput",                (void*)ReplayControlInput },
+	{ NAMEKEY_INVALID, "InGameChatInput",                   (void*)InGameChatInput },
+	{ NAMEKEY_INVALID, "DisconnectControlInput",            (void*)DisconnectControlInput },
+	{ NAMEKEY_INVALID, "DiplomacyInput",                    (void*)DiplomacyInput },
+	{ NAMEKEY_INVALID, "EstablishConnectionsControlInput",  (void*)EstablishConnectionsControlInput },
+	{ NAMEKEY_INVALID, "LeftHUDInput",                      (void*)LeftHUDInput },
+	{ NAMEKEY_INVALID, "ScoreScreenInput",                  (void*)ScoreScreenInput },
+	{ NAMEKEY_INVALID, "SaveLoadMenuInput",                 (void*)SaveLoadMenuInput },
+	{ NAMEKEY_INVALID, "BeaconWindowInput",                 (void*)BeaconWindowInput },
+	{ NAMEKEY_INVALID, "DifficultySelectInput",             (void*)DifficultySelectInput },
+	{ NAMEKEY_INVALID, "PopupReplayInput",                  (void*)PopupReplayInput },
+	{ NAMEKEY_INVALID, "GeneralsExpPointsInput",            (void*)GeneralsExpPointsInput },
+
+	{ NAMEKEY_INVALID, "DownloadMenuInput",                 (void*)DownloadMenuInput },
+	{ NAMEKEY_INVALID, "ExtrasMenuInput",                   (void*)ExtrasMenuInput },
+
+	{ NAMEKEY_INVALID, "IMECandidateWindowInput",           (void*)IMECandidateWindowInput },
+	{ NAMEKEY_INVALID, nullptr,                             nullptr }
+
+});
+#define gameWinInputTable RTS_ENGINE_GLOBAL_REF(gameWinInputTable)
+#else
 static FunctionLexicon::TableEntry gameWinInputTable[] =
 {
 
@@ -228,8 +401,21 @@ static FunctionLexicon::TableEntry gameWinInputTable[] =
 	{ NAMEKEY_INVALID, nullptr,                             nullptr }
 
 };
+#endif
 
 // game window tooltip table ----------------------------------------------------------------------
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(FunctionLexicon::TableEntry[2], gameWinTooltipTable, 
+{
+
+
+	{ NAMEKEY_INVALID, "GameWinDefaultTooltip",  (void*)GameWinDefaultTooltip },
+
+	{ NAMEKEY_INVALID, nullptr,                  nullptr }
+
+});
+#define gameWinTooltipTable RTS_ENGINE_GLOBAL_REF(gameWinTooltipTable)
+#else
 static FunctionLexicon::TableEntry gameWinTooltipTable[] =
 {
 
@@ -239,8 +425,63 @@ static FunctionLexicon::TableEntry gameWinTooltipTable[] =
 	{ NAMEKEY_INVALID, nullptr,                  nullptr }
 
 };
+#endif
 
 // window layout init table -----------------------------------------------------------------------
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(FunctionLexicon::TableEntry[44], winLayoutInitTable, 
+{
+
+	{ NAMEKEY_INVALID, "MainMenuInit",                  (void*)MainMenuInit },
+	{ NAMEKEY_INVALID, "OptionsMenuInit",               (void*)OptionsMenuInit },
+	{ NAMEKEY_INVALID, "SaveLoadMenuInit",              (void*)SaveLoadMenuInit },
+	{ NAMEKEY_INVALID, "SaveLoadMenuFullScreenInit",    (void*)SaveLoadMenuFullScreenInit },
+
+	{ NAMEKEY_INVALID, "PopupCommunicatorInit",         (void*)PopupCommunicatorInit },
+	{ NAMEKEY_INVALID, "KeyboardOptionsMenuInit",       (void*)KeyboardOptionsMenuInit },
+	{ NAMEKEY_INVALID, "SinglePlayerMenuInit",          (void*)SinglePlayerMenuInit },
+	{ NAMEKEY_INVALID, "MapSelectMenuInit",             (void*)MapSelectMenuInit },
+	{ NAMEKEY_INVALID, "LanLobbyMenuInit",              (void*)LanLobbyMenuInit },
+	{ NAMEKEY_INVALID, "ReplayMenuInit",                (void*)ReplayMenuInit },
+	{ NAMEKEY_INVALID, "CreditsMenuInit",               (void*)CreditsMenuInit },
+	{ NAMEKEY_INVALID, "LanGameOptionsMenuInit",        (void*)LanGameOptionsMenuInit },
+	{ NAMEKEY_INVALID, "LanMapSelectMenuInit",          (void*)LanMapSelectMenuInit },
+	{ NAMEKEY_INVALID, "SkirmishGameOptionsMenuInit",   (void*)SkirmishGameOptionsMenuInit },
+	{ NAMEKEY_INVALID, "SkirmishMapSelectMenuInit",     (void*)SkirmishMapSelectMenuInit },
+	{ NAMEKEY_INVALID, "ChallengeMenuInit",             (void*)ChallengeMenuInit },
+	{ NAMEKEY_INVALID, "WOLLadderScreenInit",           (void*)WOLLadderScreenInit },
+	{ NAMEKEY_INVALID, "WOLLoginMenuInit",              (void*)WOLLoginMenuInit },
+	{ NAMEKEY_INVALID, "WOLLocaleSelectInit",           (void*)WOLLocaleSelectInit },
+	{ NAMEKEY_INVALID, "WOLLobbyMenuInit",              (void*)WOLLobbyMenuInit },
+	{ NAMEKEY_INVALID, "WOLGameSetupMenuInit",          (void*)WOLGameSetupMenuInit },
+	{ NAMEKEY_INVALID, "WOLMapSelectMenuInit",          (void*)WOLMapSelectMenuInit },
+	{ NAMEKEY_INVALID, "WOLBuddyOverlayInit",           (void*)WOLBuddyOverlayInit },
+	{ NAMEKEY_INVALID, "WOLBuddyOverlayRCMenuInit",     (void*)WOLBuddyOverlayRCMenuInit },
+	{ NAMEKEY_INVALID, "RCGameDetailsMenuInit",         (void*)RCGameDetailsMenuInit },
+	{ NAMEKEY_INVALID, "GameSpyPlayerInfoOverlayInit",  (void*)GameSpyPlayerInfoOverlayInit },
+	{ NAMEKEY_INVALID, "WOLMessageWindowInit",          (void*)WOLMessageWindowInit },
+	{ NAMEKEY_INVALID, "WOLQuickMatchMenuInit",         (void*)WOLQuickMatchMenuInit },
+	{ NAMEKEY_INVALID, "WOLWelcomeMenuInit",            (void*)WOLWelcomeMenuInit },
+	{ NAMEKEY_INVALID, "WOLStatusMenuInit",             (void*)WOLStatusMenuInit },
+	{ NAMEKEY_INVALID, "WOLQMScoreScreenInit",          (void*)WOLQMScoreScreenInit },
+	{ NAMEKEY_INVALID, "WOLCustomScoreScreenInit",      (void*)WOLCustomScoreScreenInit },
+	{ NAMEKEY_INVALID, "NetworkDirectConnectInit",      (void*)NetworkDirectConnectInit },
+	{ NAMEKEY_INVALID, "PopupHostGameInit",             (void*)PopupHostGameInit },
+	{ NAMEKEY_INVALID, "PopupJoinGameInit",             (void*)PopupJoinGameInit },
+	{ NAMEKEY_INVALID, "PopupLadderSelectInit",         (void*)PopupLadderSelectInit },
+	{ NAMEKEY_INVALID, "InGamePopupMessageInit",        (void*)InGamePopupMessageInit },
+	{ NAMEKEY_INVALID, "GameInfoWindowInit",            (void*)GameInfoWindowInit },
+	{ NAMEKEY_INVALID, "ScoreScreenInit",               (void*)ScoreScreenInit },
+	{ NAMEKEY_INVALID, "DownloadMenuInit",              (void*)DownloadMenuInit },
+	{ NAMEKEY_INVALID, "ExtrasMenuInit",                (void*)ExtrasMenuInit },
+	{ NAMEKEY_INVALID, "DifficultySelectInit",          (void*)DifficultySelectInit },
+	{ NAMEKEY_INVALID, "PopupReplayInit",               (void*)PopupReplayInit },
+
+	{ NAMEKEY_INVALID, nullptr,                         nullptr }
+
+});
+#define winLayoutInitTable RTS_ENGINE_GLOBAL_REF(winLayoutInitTable)
+#else
 static FunctionLexicon::TableEntry winLayoutInitTable[] =
 {
 
@@ -292,8 +533,52 @@ static FunctionLexicon::TableEntry winLayoutInitTable[] =
 	{ NAMEKEY_INVALID, nullptr,                         nullptr }
 
 };
+#endif
 
 // window layout update table ---------------------------------------------------------------------
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(FunctionLexicon::TableEntry[34], winLayoutUpdateTable, 
+{
+
+	{ NAMEKEY_INVALID, "MainMenuUpdate",                  (void*)MainMenuUpdate },
+	{ NAMEKEY_INVALID, "OptionsMenuUpdate",               (void*)OptionsMenuUpdate },
+	{ NAMEKEY_INVALID, "SinglePlayerMenuUpdate",          (void*)SinglePlayerMenuUpdate },
+	{ NAMEKEY_INVALID, "MapSelectMenuUpdate",             (void*)MapSelectMenuUpdate },
+	{ NAMEKEY_INVALID, "LanLobbyMenuUpdate",              (void*)LanLobbyMenuUpdate },
+	{ NAMEKEY_INVALID, "ReplayMenuUpdate",                (void*)ReplayMenuUpdate },
+	{ NAMEKEY_INVALID, "SaveLoadMenuUpdate",              (void*)SaveLoadMenuUpdate },
+
+	{ NAMEKEY_INVALID, "CreditsMenuUpdate",               (void*)CreditsMenuUpdate },
+	{ NAMEKEY_INVALID, "LanGameOptionsMenuUpdate",        (void*)LanGameOptionsMenuUpdate },
+	{ NAMEKEY_INVALID, "LanMapSelectMenuUpdate",          (void*)LanMapSelectMenuUpdate },
+	{ NAMEKEY_INVALID, "SkirmishGameOptionsMenuUpdate",   (void*)SkirmishGameOptionsMenuUpdate },
+	{ NAMEKEY_INVALID, "SkirmishMapSelectMenuUpdate",     (void*)SkirmishMapSelectMenuUpdate },
+	{ NAMEKEY_INVALID, "ChallengeMenuUpdate",             (void*)ChallengeMenuUpdate },
+	{ NAMEKEY_INVALID, "WOLLadderScreenUpdate",           (void*)WOLLadderScreenUpdate },
+	{ NAMEKEY_INVALID, "WOLLoginMenuUpdate",              (void*)WOLLoginMenuUpdate },
+	{ NAMEKEY_INVALID, "WOLLocaleSelectUpdate",           (void*)WOLLocaleSelectUpdate },
+	{ NAMEKEY_INVALID, "WOLLobbyMenuUpdate",              (void*)WOLLobbyMenuUpdate },
+	{ NAMEKEY_INVALID, "WOLGameSetupMenuUpdate",          (void*)WOLGameSetupMenuUpdate },
+	{ NAMEKEY_INVALID, "PopupHostGameUpdate",             (void*)PopupHostGameUpdate },
+	{ NAMEKEY_INVALID, "WOLMapSelectMenuUpdate",          (void*)WOLMapSelectMenuUpdate },
+	{ NAMEKEY_INVALID, "WOLBuddyOverlayUpdate",           (void*)WOLBuddyOverlayUpdate },
+	{ NAMEKEY_INVALID, "GameSpyPlayerInfoOverlayUpdate",  (void*)GameSpyPlayerInfoOverlayUpdate },
+	{ NAMEKEY_INVALID, "WOLMessageWindowUpdate",          (void*)WOLMessageWindowUpdate },
+	{ NAMEKEY_INVALID, "WOLQuickMatchMenuUpdate",         (void*)WOLQuickMatchMenuUpdate },
+	{ NAMEKEY_INVALID, "WOLWelcomeMenuUpdate",            (void*)WOLWelcomeMenuUpdate },
+	{ NAMEKEY_INVALID, "WOLStatusMenuUpdate",             (void*)WOLStatusMenuUpdate },
+	{ NAMEKEY_INVALID, "WOLQMScoreScreenUpdate",          (void*)WOLQMScoreScreenUpdate },
+	{ NAMEKEY_INVALID, "WOLCustomScoreScreenUpdate",      (void*)WOLCustomScoreScreenUpdate },
+	{ NAMEKEY_INVALID, "NetworkDirectConnectUpdate",      (void*)NetworkDirectConnectUpdate },
+	{ NAMEKEY_INVALID, "ScoreScreenUpdate",               (void*)ScoreScreenUpdate },
+	{ NAMEKEY_INVALID, "DownloadMenuUpdate",              (void*)DownloadMenuUpdate },
+	{ NAMEKEY_INVALID, "ExtrasMenuUpdate",                (void*)ExtrasMenuUpdate },
+	{ NAMEKEY_INVALID, "PopupReplayUpdate",               (void*)PopupReplayUpdate },
+	{ NAMEKEY_INVALID, nullptr,                           nullptr }
+
+});
+#define winLayoutUpdateTable RTS_ENGINE_GLOBAL_REF(winLayoutUpdateTable)
+#else
 static FunctionLexicon::TableEntry winLayoutUpdateTable[] =
 {
 
@@ -334,8 +619,52 @@ static FunctionLexicon::TableEntry winLayoutUpdateTable[] =
 	{ NAMEKEY_INVALID, nullptr,                           nullptr }
 
 };
+#endif
 
 // window layout shutdown table -------------------------------------------------------------------
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(FunctionLexicon::TableEntry[35], winLayoutShutdownTable, 
+{
+
+	{ NAMEKEY_INVALID, "MainMenuShutdown",                  (void*)MainMenuShutdown },
+	{ NAMEKEY_INVALID, "OptionsMenuShutdown",               (void*)OptionsMenuShutdown },
+	{ NAMEKEY_INVALID, "SaveLoadMenuShutdown",              (void*)SaveLoadMenuShutdown },
+	{ NAMEKEY_INVALID, "PopupCommunicatorShutdown",         (void*)PopupCommunicatorShutdown },
+	{ NAMEKEY_INVALID, "KeyboardOptionsMenuShutdown",       (void*)KeyboardOptionsMenuShutdown },
+	{ NAMEKEY_INVALID, "SinglePlayerMenuShutdown",          (void*)SinglePlayerMenuShutdown },
+	{ NAMEKEY_INVALID, "MapSelectMenuShutdown",             (void*)MapSelectMenuShutdown },
+	{ NAMEKEY_INVALID, "LanLobbyMenuShutdown",              (void*)LanLobbyMenuShutdown },
+	{ NAMEKEY_INVALID, "ReplayMenuShutdown",                (void*)ReplayMenuShutdown },
+	{ NAMEKEY_INVALID, "CreditsMenuShutdown",               (void*)CreditsMenuShutdown },
+	{ NAMEKEY_INVALID, "LanGameOptionsMenuShutdown",        (void*)LanGameOptionsMenuShutdown },
+	{ NAMEKEY_INVALID, "LanMapSelectMenuShutdown",          (void*)LanMapSelectMenuShutdown },
+	{ NAMEKEY_INVALID, "SkirmishGameOptionsMenuShutdown",   (void*)SkirmishGameOptionsMenuShutdown },
+	{ NAMEKEY_INVALID, "SkirmishMapSelectMenuShutdown",     (void*)SkirmishMapSelectMenuShutdown },
+	{ NAMEKEY_INVALID, "ChallengeMenuShutdown",             (void*)ChallengeMenuShutdown },
+	{ NAMEKEY_INVALID, "WOLLadderScreenShutdown",           (void*)WOLLadderScreenShutdown },
+	{ NAMEKEY_INVALID, "WOLLoginMenuShutdown",              (void*)WOLLoginMenuShutdown },
+	{ NAMEKEY_INVALID, "WOLLocaleSelectShutdown",           (void*)WOLLocaleSelectShutdown },
+	{ NAMEKEY_INVALID, "WOLLobbyMenuShutdown",              (void*)WOLLobbyMenuShutdown },
+	{ NAMEKEY_INVALID, "WOLGameSetupMenuShutdown",          (void*)WOLGameSetupMenuShutdown },
+	{ NAMEKEY_INVALID, "WOLMapSelectMenuShutdown",          (void*)WOLMapSelectMenuShutdown },
+	{ NAMEKEY_INVALID, "WOLBuddyOverlayShutdown",           (void*)WOLBuddyOverlayShutdown },
+	{ NAMEKEY_INVALID, "GameSpyPlayerInfoOverlayShutdown",  (void*)GameSpyPlayerInfoOverlayShutdown },
+	{ NAMEKEY_INVALID, "WOLMessageWindowShutdown",          (void*)WOLMessageWindowShutdown },
+	{ NAMEKEY_INVALID, "WOLQuickMatchMenuShutdown",         (void*)WOLQuickMatchMenuShutdown },
+	{ NAMEKEY_INVALID, "WOLWelcomeMenuShutdown",            (void*)WOLWelcomeMenuShutdown },
+	{ NAMEKEY_INVALID, "WOLStatusMenuShutdown",             (void*)WOLStatusMenuShutdown },
+	{ NAMEKEY_INVALID, "WOLQMScoreScreenShutdown",          (void*)WOLQMScoreScreenShutdown },
+	{ NAMEKEY_INVALID, "WOLCustomScoreScreenShutdown",      (void*)WOLCustomScoreScreenShutdown },
+	{ NAMEKEY_INVALID, "NetworkDirectConnectShutdown",      (void*)NetworkDirectConnectShutdown },
+	{ NAMEKEY_INVALID, "ScoreScreenShutdown",               (void*)ScoreScreenShutdown },
+	{ NAMEKEY_INVALID, "DownloadMenuShutdown",              (void*)DownloadMenuShutdown },
+	{ NAMEKEY_INVALID, "ExtrasMenuShutdown",                (void*)ExtrasMenuShutdown },
+	{ NAMEKEY_INVALID, "PopupReplayShutdown",               (void*)PopupReplayShutdown },
+	{ NAMEKEY_INVALID, nullptr,                             nullptr }
+
+});
+#define winLayoutShutdownTable RTS_ENGINE_GLOBAL_REF(winLayoutShutdownTable)
+#else
 static FunctionLexicon::TableEntry winLayoutShutdownTable[] =
 {
 
@@ -376,6 +705,7 @@ static FunctionLexicon::TableEntry winLayoutShutdownTable[] =
 	{ NAMEKEY_INVALID, nullptr,                             nullptr }
 
 };
+#endif
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // PUBLIC DATA
@@ -404,27 +734,11 @@ void FunctionLexicon::loadTable( TableEntry *table,
 	{
 
 		// assign key from name key based on name provided in table
-		// GeneralsX @feature cemlyn007 28/09/2026 Written only when it changes: the tables are process-wide and every
-		// engine's init interns the same names (PLAN-023 Decision 2), so only the first boot writes a key and later
-		// boots do not write while other engines look functions up on their threads (PLAN-023 Phase 5b).
-		// GeneralsX @bugfix cemlyn007 28/09/2026 With the engine context a key is written once: a later boot that
-		// finds a different one set (its names interned in another order) is refused rather than racing the engines
-		// already looking functions up (PLAN-023 Phase 5b).
+		// GeneralsX @refactor cemlyn007 14/10/2026 Each engine has its own tables (Common/EngineStatic.h) and its own name
+		// keys, so the key is assigned as upstream does, with no check across engines.
 		const NameKeyType key = TheNameKeyGenerator->nameToKey( entry->name );
-#if RTS_ENGINE_CONTEXT
-		if( entry->key != NAMEKEY_INVALID && entry->key != key )
-		{
-			fprintf( stderr, "FunctionLexicon::loadTable - '%s' already has key %d, not %d\n", entry->name, (int)entry->key, (int)key );
-			fflush( stderr );
-		}
-		DEBUG_ASSERTCRASH( entry->key == NAMEKEY_INVALID || entry->key == key,
-			( "FunctionLexicon::loadTable - '%s' already has key %d, not %d", entry->name, entry->key, key ) );
-		if( entry->key == NAMEKEY_INVALID )
-			entry->key = key;
-#else
 		if( entry->key != key )
 			entry->key = key;
-#endif
 
 		// next table entry please
 		entry++;

@@ -94,11 +94,37 @@ static GameWindow *buttonSaveLoadWin = nullptr;
 static GameWindow *buttonOptionsWin = nullptr;
 static GameWindow *buttonExitWin = nullptr;
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(NameKeyType, buttonExit, NAMEKEY_INVALID);
+#define buttonExit RTS_ENGINE_GLOBAL_REF(buttonExit)
+#else
 static NameKeyType buttonExit = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonRestart, NAMEKEY_INVALID);
+#define buttonRestart RTS_ENGINE_GLOBAL_REF(buttonRestart)
+#else
 static NameKeyType buttonRestart = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonReturn, NAMEKEY_INVALID);
+#define buttonReturn RTS_ENGINE_GLOBAL_REF(buttonReturn)
+#else
 static NameKeyType buttonReturn = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonOptions, NAMEKEY_INVALID);
+#define buttonOptions RTS_ENGINE_GLOBAL_REF(buttonOptions)
+#else
 static NameKeyType buttonOptions = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonSaveLoad, NAMEKEY_INVALID);
+#define buttonSaveLoad RTS_ENGINE_GLOBAL_REF(buttonSaveLoad)
+#else
 static NameKeyType buttonSaveLoad = NAMEKEY_INVALID;
+#endif
 
 static void initGadgetsFullQuit()
 {

@@ -34,7 +34,13 @@
 
 static WindowLayout *establishConnectionsLayout;
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(NameKeyType, buttonQuitID, NAMEKEY_INVALID);
+#define buttonQuitID RTS_ENGINE_GLOBAL_REF(buttonQuitID)
+#else
 static NameKeyType buttonQuitID = NAMEKEY_INVALID;
+#endif
 static NameKeyType staticPlayer1NameID = NAMEKEY_INVALID;
 static NameKeyType staticPlayer2NameID = NAMEKEY_INVALID;
 static NameKeyType staticPlayer3NameID = NAMEKEY_INVALID;

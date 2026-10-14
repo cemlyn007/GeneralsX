@@ -22,10 +22,6 @@ RTS_ENGINE_CONTEXT_VALUE(bool, engineTearingDown, false)
 RTS_ENGINE_CONTEXT_VALUE(bool, fatalErrorThrown, false)
 RTS_ENGINE_CONTEXT_VALUE(bool, fatalErrorReturned, false)
 
-// Set while this engine boots from names another engine primed, until its upgrades are loaded: it must
-// intern no new NameKey then (NameKeyGenerator::PrimingLatch, PLAN-023 Decision 2).
-RTS_ENGINE_CONTEXT_VALUE(bool, nameKeysFrozen, false)
-
 // PathfindCellInfo::s_infoArray/s_firstFree: the pathfinder's cell-info pool and its free list
 // (AIPathfind.cpp), made and freed by this engine's Pathfinder.
 RTS_ENGINE_CONTEXT_POINTER(PathfindCellInfo, pathfindCellInfoArray)

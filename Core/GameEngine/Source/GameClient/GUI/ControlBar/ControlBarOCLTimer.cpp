@@ -47,10 +47,19 @@
 void ControlBar::updateOCLTimerTextDisplay( UnsignedInt totalSeconds, Real percent )
 {
 	UnicodeString text;
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+	RTS_ENGINE_STATIC(UnsignedInt, descID, TheNameKeyGenerator->nameToKey( "ControlBar.wnd:OCLTimerStaticText" ));
+#else
 	static UnsignedInt descID = TheNameKeyGenerator->nameToKey( "ControlBar.wnd:OCLTimerStaticText" );
+#endif
 	GameWindow *descWindow = TheWindowManager->winGetWindowFromId( nullptr, descID );
 
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(UnsignedInt, barID, TheNameKeyGenerator->nameToKey( "ControlBar.wnd:OCLTimerProgressBar" ));
+#else
 	static UnsignedInt barID = TheNameKeyGenerator->nameToKey( "ControlBar.wnd:OCLTimerProgressBar" );
+#endif
 	GameWindow *barWindow = TheWindowManager->winGetWindowFromId( nullptr, barID );
 
 	// sanity
@@ -141,7 +150,11 @@ void ControlBar::updateContextOCLTimer()
 {
 	Object *obj = m_currentSelectedDrawable->getObject();
 
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(const NameKeyType, key_OCLUpdate, NAMEKEY( "OCLUpdate" ));
+#else
 	static const NameKeyType key_OCLUpdate = NAMEKEY( "OCLUpdate" );
+#endif
 	OCLUpdate *update = (OCLUpdate*)obj->findUpdateModule( key_OCLUpdate );
 
 	UnsignedInt frames = update->getRemainingFrames();

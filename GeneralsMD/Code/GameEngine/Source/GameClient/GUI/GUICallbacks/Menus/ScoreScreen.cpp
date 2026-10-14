@@ -119,16 +119,62 @@ extern NGMPGame* TheNGMPGame;
 //-----------------------------------------------------------------------------
 // DEFINES ////////////////////////////////////////////////////////////////////
 //-----------------------------------------------------------------------------
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(NameKeyType, parentID, NAMEKEY_INVALID);
+#define parentID RTS_ENGINE_GLOBAL_REF(parentID)
+#else
 static NameKeyType parentID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonOkID, NAMEKEY_INVALID);
+#define buttonOkID RTS_ENGINE_GLOBAL_REF(buttonOkID)
+#else
 static NameKeyType buttonOkID = NAMEKEY_INVALID;
+#endif
 ///static NameKeyType buttonRehostID = NAMEKEY_INVALID;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, textEntryChatID, NAMEKEY_INVALID);
+#define textEntryChatID RTS_ENGINE_GLOBAL_REF(textEntryChatID)
+#else
 static NameKeyType textEntryChatID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonChatID, NAMEKEY_INVALID);
+#define buttonChatID RTS_ENGINE_GLOBAL_REF(buttonChatID)
+#else
 static NameKeyType buttonChatID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, chatBoxBorderID, NAMEKEY_INVALID);
+#define chatBoxBorderID RTS_ENGINE_GLOBAL_REF(chatBoxBorderID)
+#else
 static NameKeyType chatBoxBorderID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonContinueID, NAMEKEY_INVALID);
+#define buttonContinueID RTS_ENGINE_GLOBAL_REF(buttonContinueID)
+#else
 static NameKeyType buttonContinueID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonBuddiesID, NAMEKEY_INVALID);
+#define buttonBuddiesID RTS_ENGINE_GLOBAL_REF(buttonBuddiesID)
+#else
 static NameKeyType buttonBuddiesID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonSaveReplayID, NAMEKEY_INVALID);
+#define buttonSaveReplayID RTS_ENGINE_GLOBAL_REF(buttonSaveReplayID)
+#else
 static NameKeyType buttonSaveReplayID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, backdropID, NAMEKEY_INVALID);
+#define backdropID RTS_ENGINE_GLOBAL_REF(backdropID)
+#else
 static NameKeyType backdropID = NAMEKEY_INVALID;
+#endif
 
 static GameWindow *parent = nullptr;
 static GameWindow *buttonOk = nullptr;
@@ -148,12 +194,27 @@ static GameWindow *gadgetParent = nullptr;
 static Bool overidePlayerDisplayName = FALSE;
 
 //External declarations
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(NameKeyType, listboxChatWindowScoreScreenID, NAMEKEY_INVALID);
+#define listboxChatWindowScoreScreenID RTS_ENGINE_GLOBAL_REF(listboxChatWindowScoreScreenID)
+#else
 NameKeyType listboxChatWindowScoreScreenID = NAMEKEY_INVALID;
+#endif
 GameWindow *listboxChatWindowScoreScreen = nullptr;
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(NameKeyType, listboxAcademyWindowScoreScreenID, NAMEKEY_INVALID);
+#define listboxAcademyWindowScoreScreenID RTS_ENGINE_GLOBAL_REF(listboxAcademyWindowScoreScreenID)
+#else
 NameKeyType listboxAcademyWindowScoreScreenID = NAMEKEY_INVALID;
+#endif
 GameWindow *listboxAcademyWindowScoreScreen = nullptr;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(NameKeyType, staticTextAcademyTitleID, NAMEKEY_INVALID);
+#define staticTextAcademyTitleID RTS_ENGINE_GLOBAL_REF(staticTextAcademyTitleID)
+#else
 NameKeyType staticTextAcademyTitleID = NAMEKEY_INVALID;
+#endif
 GameWindow *staticTextAcademyTitle = nullptr;
 
 

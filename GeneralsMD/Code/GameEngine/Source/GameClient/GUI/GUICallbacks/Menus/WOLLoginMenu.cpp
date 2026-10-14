@@ -377,28 +377,124 @@ static void shutdownComplete( WindowLayout *layout )
 
 // PRIVATE DATA ///////////////////////////////////////////////////////////////////////////////////
 // window ids ------------------------------------------------------------------------------
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(NameKeyType, parentWOLLoginID, NAMEKEY_INVALID);
+#define parentWOLLoginID RTS_ENGINE_GLOBAL_REF(parentWOLLoginID)
+#else
 static NameKeyType parentWOLLoginID =						NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonBackID, NAMEKEY_INVALID);	// profile, quick
+#define buttonBackID RTS_ENGINE_GLOBAL_REF(buttonBackID)
+#else
 static NameKeyType buttonBackID =								NAMEKEY_INVALID;	// profile, quick
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonLoginID, NAMEKEY_INVALID);	// profile, quick
+#define buttonLoginID RTS_ENGINE_GLOBAL_REF(buttonLoginID)
+#else
 static NameKeyType buttonLoginID =							NAMEKEY_INVALID;	// profile, quick
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonCreateAccountID, NAMEKEY_INVALID);	// profile, quick
+#define buttonCreateAccountID RTS_ENGINE_GLOBAL_REF(buttonCreateAccountID)
+#else
 static NameKeyType buttonCreateAccountID =			NAMEKEY_INVALID;	// profile, quick
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonUseAccountID, NAMEKEY_INVALID);	// quick
+#define buttonUseAccountID RTS_ENGINE_GLOBAL_REF(buttonUseAccountID)
+#else
 static NameKeyType buttonUseAccountID =					NAMEKEY_INVALID;	// quick
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonDontUseAccountID, NAMEKEY_INVALID);	// profile
+#define buttonDontUseAccountID RTS_ENGINE_GLOBAL_REF(buttonDontUseAccountID)
+#else
 static NameKeyType buttonDontUseAccountID =			NAMEKEY_INVALID;	// profile
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonTOSID, NAMEKEY_INVALID);	// TOS
+#define buttonTOSID RTS_ENGINE_GLOBAL_REF(buttonTOSID)
+#else
 static NameKeyType buttonTOSID =								NAMEKEY_INVALID;	// TOS
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, parentTOSID, NAMEKEY_INVALID);	// TOS Parent
+#define parentTOSID RTS_ENGINE_GLOBAL_REF(parentTOSID)
+#else
 static NameKeyType parentTOSID =								NAMEKEY_INVALID;	// TOS Parent
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonTOSOKID, NAMEKEY_INVALID);	// TOS
+#define buttonTOSOKID RTS_ENGINE_GLOBAL_REF(buttonTOSOKID)
+#else
 static NameKeyType buttonTOSOKID =							NAMEKEY_INVALID;	// TOS
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, listboxTOSID, NAMEKEY_INVALID);	// TOS
+#define listboxTOSID RTS_ENGINE_GLOBAL_REF(listboxTOSID)
+#else
 static NameKeyType listboxTOSID =								NAMEKEY_INVALID;	// TOS
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, comboBoxEmailID, NAMEKEY_INVALID);	// profile
+#define comboBoxEmailID RTS_ENGINE_GLOBAL_REF(comboBoxEmailID)
+#else
 static NameKeyType comboBoxEmailID =						NAMEKEY_INVALID;	// profile
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, comboBoxLoginNameID, NAMEKEY_INVALID);	// profile
+#define comboBoxLoginNameID RTS_ENGINE_GLOBAL_REF(comboBoxLoginNameID)
+#else
 static NameKeyType comboBoxLoginNameID =				NAMEKEY_INVALID;	// profile
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, textEntryLoginNameID, NAMEKEY_INVALID);	// quick
+#define textEntryLoginNameID RTS_ENGINE_GLOBAL_REF(textEntryLoginNameID)
+#else
 static NameKeyType textEntryLoginNameID =				NAMEKEY_INVALID;	// quick
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, textEntryPasswordID, NAMEKEY_INVALID);	// profile
+#define textEntryPasswordID RTS_ENGINE_GLOBAL_REF(textEntryPasswordID)
+#else
 static NameKeyType textEntryPasswordID =				NAMEKEY_INVALID;	// profile
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, checkBoxRememberPasswordID, NAMEKEY_INVALID);	// checkbox to remember information or not
+#define checkBoxRememberPasswordID RTS_ENGINE_GLOBAL_REF(checkBoxRememberPasswordID)
+#else
 static NameKeyType checkBoxRememberPasswordID =	NAMEKEY_INVALID;	// checkbox to remember information or not
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, textEntryMonthID, NAMEKEY_INVALID);	// profile
+#define textEntryMonthID RTS_ENGINE_GLOBAL_REF(textEntryMonthID)
+#else
 static NameKeyType textEntryMonthID =				NAMEKEY_INVALID;	// profile
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, textEntryDayID, NAMEKEY_INVALID);	// profile
+#define textEntryDayID RTS_ENGINE_GLOBAL_REF(textEntryDayID)
+#else
 static NameKeyType textEntryDayID =				NAMEKEY_INVALID;	// profile
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, textEntryYearID, NAMEKEY_INVALID);	// profile
+#define textEntryYearID RTS_ENGINE_GLOBAL_REF(textEntryYearID)
+#else
 static NameKeyType textEntryYearID =				NAMEKEY_INVALID;	// profile
+#endif
 
 // Window Pointers ------------------------------------------------------------------------
 static GameWindow *parentWOLLogin =						nullptr;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, buttonBack, nullptr);
+#define buttonBack RTS_ENGINE_GLOBAL_REF(buttonBack)
+#else
 static GameWindow *buttonBack =								nullptr;
+#endif
 static GameWindow *buttonLogin =							nullptr;
 static GameWindow *buttonCreateAccount =			nullptr;
 static GameWindow *buttonUseAccount =					nullptr;

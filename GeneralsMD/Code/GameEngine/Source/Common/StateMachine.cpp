@@ -111,7 +111,13 @@ StateReturnType State::friend_checkForTransitions( StateReturnType status )
 {
 	// GeneralsX @feature cemlyn007 28/09/2026 thread_local: the counter measures this thread's call-stack depth, so
 	// engines stepped on other threads must not add to it (PLAN-023 Phase 2).
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @refactor cemlyn007 14/10/2026 Per engine (Common/EngineStatic.h): an engine's logic runs on one thread at
+	// a time.
+	RTS_ENGINE_STATIC(Int, checkfortransitionsnum, 0);
+#else
 	static THREAD_LOCAL Int checkfortransitionsnum = 0;
+#endif
 
 	StIncrementer inc(checkfortransitionsnum);
 	if (checkfortransitionsnum >= 20)
@@ -206,7 +212,13 @@ StateReturnType State::friend_checkForSleepTransitions( StateReturnType status )
 {
 	// GeneralsX @feature cemlyn007 28/09/2026 thread_local: the counter measures this thread's call-stack depth, so
 	// engines stepped on other threads must not add to it (PLAN-023 Phase 2).
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @refactor cemlyn007 14/10/2026 Per engine (Common/EngineStatic.h): an engine's logic runs on one thread at
+	// a time.
+	RTS_ENGINE_STATIC(Int, checkfortransitionsnum, 0);
+#else
 	static THREAD_LOCAL Int checkfortransitionsnum = 0;
+#endif
 
 	StIncrementer inc(checkfortransitionsnum);
 	if (checkfortransitionsnum >= 20)

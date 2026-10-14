@@ -52,10 +52,31 @@
 #include "WWLib/systimer.h"
 
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_CLASS_STATIC_DEFINE(SaveLoadSubSystemClass*, SaveLoadSystemClass, SubSystemListHead, nullptr);
+#define SubSystemListHead RTS_ENGINE_GLOBAL_REF(SubSystemListHead)
+#else
 SaveLoadSubSystemClass *		SaveLoadSystemClass::SubSystemListHead = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_CLASS_STATIC_DEFINE(PersistFactoryClass*, SaveLoadSystemClass, FactoryListHead, nullptr);
+#define FactoryListHead RTS_ENGINE_GLOBAL_REF(FactoryListHead)
+#else
 PersistFactoryClass *			SaveLoadSystemClass::FactoryListHead = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_CLASS_STATIC_DEFINE(SList<PostLoadableClass>, SaveLoadSystemClass, PostLoadList);
+#define PostLoadList RTS_ENGINE_GLOBAL_REF(PostLoadList)
+#else
 SList<PostLoadableClass>		SaveLoadSystemClass::PostLoadList;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_CLASS_STATIC_DEFINE(PointerRemapClass, SaveLoadSystemClass, PointerRemapper);
+#define PointerRemapper RTS_ENGINE_GLOBAL_REF(PointerRemapper)
+#else
 PointerRemapClass					SaveLoadSystemClass::PointerRemapper;
+#endif
 
 
 

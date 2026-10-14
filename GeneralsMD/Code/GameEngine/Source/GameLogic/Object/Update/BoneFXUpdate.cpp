@@ -94,7 +94,12 @@ BoneFXUpdate::BoneFXUpdate( Thing *thing, const ModuleData* moduleData ) : Updat
 //-------------------------------------------------------------------------------------------------
 void BoneFXUpdate::onObjectCreated()
 {
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+	RTS_ENGINE_STATIC(NameKeyType, key_BoneFXDamage, NAMEKEY("BoneFXDamage"));
+#else
 	static NameKeyType key_BoneFXDamage = NAMEKEY("BoneFXDamage");
+#endif
 	BoneFXDamage* bfxd = (BoneFXDamage*)getObject()->findDamageModule(key_BoneFXDamage);
 	if (bfxd == nullptr)
 	{

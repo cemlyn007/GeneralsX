@@ -43,6 +43,37 @@
 //	Static member initialzation
 ///////////////////////////////////////////////////////////////////
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 The empty string is a read-only constant, and the temporary buffers are this
+// engine's (docs/EMBEDDING.md).
+const TCHAR		StringClass::m_NullChar					= 0;
+TCHAR * const	StringClass::m_EmptyString				= const_cast<TCHAR *>(&StringClass::m_NullChar);
+
+struct StringClass::TempPool
+{
+	// A trick to optimize strings that are allocated from the stack and used only temporarily
+	// For alignment reasons we need twice as large block...
+	char strings[(StringClass::MAX_TEMP_STRING*2)*StringClass::MAX_TEMP_BYTES];
+	std::atomic<unsigned> reserved{0};
+	FastCriticalSectionClass mutex;
+};
+
+StringClass::TempPool& StringClass::Temp_Pool()
+{
+	RTS_ENGINE_STATIC(TempPool, pool);
+	return pool;
+}
+
+StringClass::TempPool* StringClass::Find_Temp_Pool()
+{
+	return rts::hasCurrentEngine() ? &Temp_Pool() : nullptr;
+}
+
+// Get_String and Free_String find this engine's pool first.
+#define m_TempStrings (pool->strings)
+#define ReservedMask (pool->reserved)
+#define m_Mutex (pool->mutex)
+#else
 FastCriticalSectionClass StringClass::m_Mutex;
 
 TCHAR		StringClass::m_NullChar					= 0;
@@ -55,6 +86,7 @@ TCHAR *	StringClass::m_EmptyString				= &m_NullChar;
 char StringClass::m_TempStrings[(StringClass::MAX_TEMP_STRING*2)*StringClass::MAX_TEMP_BYTES];
 
 std::atomic<unsigned> StringClass::ReservedMask{0};
+#endif
 
 ///////////////////////////////////////////////////////////////////
 //
@@ -83,7 +115,12 @@ StringClass::Get_String (int length, bool is_temp)
 	// early-out (the authoritative test-and-set below
 	// still runs under m_Mutex), and we once again skip taking the process-wide lock when every temp buffer
 	// is in use instead of always locking just to find nothing.
+#if RTS_ENGINE_CONTEXT
+	TempPool* const pool = Find_Temp_Pool();
+	if (pool != nullptr && is_temp && length <= MAX_TEMP_LEN && ReservedMask.load(std::memory_order_relaxed) != ALL_TEMP_STRINGS_USED_MASK) {
+#else
 	if (is_temp && length <= MAX_TEMP_LEN && ReservedMask.load(std::memory_order_relaxed) != ALL_TEMP_STRINGS_USED_MASK) {
+#endif
 
 		//
 		//	Make sure no one else is requesting a temp pointer
@@ -196,9 +233,16 @@ StringClass::Free_String ()
 	if (m_Buffer != m_EmptyString) {
 
 		uintptr_t buffer_base=reinterpret_cast<uintptr_t>(m_Buffer-sizeof (StringClass::_HEADER));
+#if RTS_ENGINE_CONTEXT
+		TempPool* const pool = Find_Temp_Pool();
+		const uintptr_t temp_base = pool != nullptr ? reinterpret_cast<uintptr_t>(m_TempStrings+MAX_TEMP_BYTES*MAX_TEMP_STRING) : 0;
+
+		if (pool != nullptr && (buffer_base>>11)==(temp_base>>11)) {
+#else
 		uintptr_t temp_base=reinterpret_cast<uintptr_t>(m_TempStrings+MAX_TEMP_BYTES*MAX_TEMP_STRING);
 
 		if ((buffer_base>>11)==(temp_base>>11)) {
+#endif
 			m_Buffer[0] = 0;
 
 			//

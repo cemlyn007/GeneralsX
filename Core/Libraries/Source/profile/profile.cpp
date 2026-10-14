@@ -43,8 +43,15 @@
 
 // yuk, I'm doing this so weird because the destructor
 // of cmd must never be called...
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(ProfileCmdInterface&, cmd, *(ProfileCmdInterface *)new
+                  (ProfileAllocMemory(sizeof(ProfileCmdInterface))) ProfileCmdInterface());
+#define cmd RTS_ENGINE_GLOBAL_REF(cmd)
+#else
 static ProfileCmdInterface &cmd=*(ProfileCmdInterface *)new
                   (ProfileAllocMemory(sizeof(ProfileCmdInterface))) ProfileCmdInterface();
+#endif
 
 // we have this here so that our command interface will always
 // be linked in as well...
@@ -212,13 +219,48 @@ static _int64 GetClockCyclesFast()
   return ((avg/2+500000)/1000000)*1000000;
 }
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_CLASS_STATIC_DEFINE(unsigned, Profile, m_rec);
+#define m_rec RTS_ENGINE_GLOBAL_REF(m_rec)
+#else
 unsigned Profile::m_rec;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_CLASS_STATIC_DEFINE(char**, Profile, m_recNames);
+#define m_recNames RTS_ENGINE_GLOBAL_REF(m_recNames)
+#else
 char **Profile::m_recNames;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_CLASS_STATIC_DEFINE(unsigned, Profile, m_names);
+#define m_names RTS_ENGINE_GLOBAL_REF(m_names)
+#else
 unsigned Profile::m_names;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_CLASS_STATIC_DEFINE(Profile::FrameName*, Profile, m_frameNames);
+#define m_frameNames RTS_ENGINE_GLOBAL_REF(m_frameNames)
+#else
 Profile::FrameName *Profile::m_frameNames;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_CLASS_STATIC_DEFINE(_int64, Profile, m_clockCycles, GetClockCyclesFast());
+#define m_clockCycles RTS_ENGINE_GLOBAL_REF(m_clockCycles)
+#else
 _int64 Profile::m_clockCycles=GetClockCyclesFast();
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_CLASS_STATIC_DEFINE(Profile::PatternListEntry*, Profile, firstPatternEntry);
+#define firstPatternEntry RTS_ENGINE_GLOBAL_REF(firstPatternEntry)
+#else
 Profile::PatternListEntry *Profile::firstPatternEntry;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_CLASS_STATIC_DEFINE(Profile::PatternListEntry*, Profile, lastPatternEntry);
+#define lastPatternEntry RTS_ENGINE_GLOBAL_REF(lastPatternEntry)
+#else
 Profile::PatternListEntry *Profile::lastPatternEntry;
+#endif
 
 void Profile::StartRange(const char *range)
 {
@@ -449,4 +491,9 @@ static void ProfileShutdown()
   cmd.RunResultFunctions();
 }
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(int, profileTracerInit, atexit(ProfileShutdown));
+#define profileTracerInit RTS_ENGINE_GLOBAL_REF(profileTracerInit)
+#else
 int profileTracerInit=atexit(ProfileShutdown);
+#endif

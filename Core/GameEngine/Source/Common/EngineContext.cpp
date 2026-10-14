@@ -323,9 +323,10 @@ void EngineContext::destroyStatics()
 	// A static's destructor may read engine state, which must be this engine's.
 	Scope scope(this);
 
-	// A static's destructor may use another static (or make one), so they are destroyed newest first. A static stays
-	// set while its own destructor runs, so a destructor that reaches its own static finds the object being destroyed,
-	// not a fresh one; it is cleared once the destructor returns.
+	// A static's destructor may use another static (or make one), so they are destroyed newest first, and those
+	// destroyed last (allocators whose objects other statics hold) after every other. A static stays set while its own
+	// destructor runs, so a destructor that reaches its own static finds the object being destroyed, not a fresh one;
+	// it is cleared once the destructor returns.
 	for (;;)
 	{
 		EngineStatics::Made made;
@@ -333,8 +334,12 @@ void EngineContext::destroyStatics()
 			std::lock_guard<std::mutex> lock(statics->mutex);
 			if (statics->inCreationOrder.empty())
 				break;
-			made = statics->inCreationOrder.back();
-			statics->inCreationOrder.pop_back();
+			auto next = std::find_if(statics->inCreationOrder.rbegin(), statics->inCreationOrder.rend(),
+				[](const EngineStatics::Made& candidate) { return !candidate.type->destroyLast; });
+			if (next == statics->inCreationOrder.rend())
+				next = statics->inCreationOrder.rbegin();
+			made = *next;
+			statics->inCreationOrder.erase(std::next(next).base());
 		}
 		made.type->destroy(made.storage);
 		{
@@ -395,6 +400,7 @@ std::size_t EngineContext::forEachLiveSingleton(void (*visit)(const char* name, 
 	return live;
 }
 
+#if RTS_ENGINE_SCOPE_ENVIRONMENT
 // GeneralsX @feature cemlyn007 28/09/2026 The per-thread invariants a Scope sets when it enters an engine (PLAN-023
 // Phase 5b; see Scope).
 static_assert(sizeof(std::fenv_t) <= sizeof(ThreadInvariants::floatingPointEnvironment), "fenv_t does not fit ThreadInvariants");
@@ -593,6 +599,7 @@ void leaveEngineThreadInvariants(const ThreadInvariants& saved) noexcept
 #endif
 #endif
 }
+#endif
 
 static_assert(isStandInGuarded<ContextField<::W3DRenderState*, &EngineContext::w3dRender>>,
 	"a ContextField must not be copyable or have unary operator& (ContextFieldOps)");

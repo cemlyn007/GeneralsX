@@ -263,7 +263,12 @@ void RailroadBehavior::onCollide( Object *other, const Coord3D *loc, const Coord
 			return;
 		}
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+		RTS_ENGINE_STATIC(NameKeyType, key_DemoTrapUpdate, NAMEKEY("DemoTrapUpdate"));
+#else
 		static NameKeyType key_DemoTrapUpdate = NAMEKEY("DemoTrapUpdate");
+#endif
 		DemoTrapUpdate *dtu = (DemoTrapUpdate*)other->findUpdateModule(key_DemoTrapUpdate);
 		if( dtu )
 		{
@@ -649,7 +654,11 @@ void RailroadBehavior::makeAWallOutOfThisTrain( Bool on )
 		Object *trailer = TheGameLogic->findObjectByID( m_trailerID );
     if ( trailer )
     {
+#if RTS_ENGINE_CONTEXT
+			RTS_ENGINE_STATIC(NameKeyType, key_RGUpdate, NAMEKEY("RailroadBehavior"));
+#else
 			static NameKeyType key_RGUpdate = NAMEKEY("RailroadBehavior");
+#endif
 			RailroadBehavior *RGUpdate = (RailroadBehavior*)trailer->findUpdateModule(key_RGUpdate);
 			if( RGUpdate )
 			{
@@ -804,7 +813,11 @@ UpdateSleepTime RailroadBehavior::update()
 		if ( trailer )
 		{
 			//call his pull trailer with my info;
+#if RTS_ENGINE_CONTEXT
+			RTS_ENGINE_STATIC(NameKeyType, key_RGUpdate, NAMEKEY("RailroadBehavior"));
+#else
 			static NameKeyType key_RGUpdate = NAMEKEY("RailroadBehavior");
+#endif
 			RailroadBehavior *RGUpdate = (RailroadBehavior*)trailer->findUpdateModule(key_RGUpdate);
 			if( RGUpdate )
 			{
@@ -867,7 +880,11 @@ void RailroadBehavior::disembark()
 	Object *trailer = TheGameLogic->findObjectByID( m_trailerID );
 	if ( trailer )
 	{
+#if RTS_ENGINE_CONTEXT
+		RTS_ENGINE_STATIC(NameKeyType, key_RGUpdate, NAMEKEY("RailroadBehavior"));
+#else
 		static NameKeyType key_RGUpdate = NAMEKEY("RailroadBehavior");
+#endif
 		RailroadBehavior *RGUpdate = (RailroadBehavior*)trailer->findUpdateModule(key_RGUpdate);
 		if( RGUpdate )
 		{
@@ -917,7 +934,11 @@ public:
 		if (m_obj == objOther)
 			return FALSE;
 		// must have railroady goodness
+#if RTS_ENGINE_CONTEXT
+		RTS_ENGINE_STATIC(NameKeyType, key_rb, NAMEKEY("RailroadBehavior"));
+#else
 		static NameKeyType key_rb = NAMEKEY("RailroadBehavior");
+#endif
 		RailroadBehavior *rb = (RailroadBehavior*)objOther->findUpdateModule(key_rb);
 		if( ! rb )
 			return FALSE;
@@ -1000,7 +1021,11 @@ void RailroadBehavior::createCarriages()
 					firstCarriage->setProducer(self);
 					m_trailerID = firstCarriage->getID();
 
+#if RTS_ENGINE_CONTEXT
+					RTS_ENGINE_STATIC(NameKeyType, key_rb, NAMEKEY("RailroadBehavior"));
+#else
 					static NameKeyType key_rb = NAMEKEY("RailroadBehavior");
+#endif
 					RailroadBehavior *rb = (RailroadBehavior*)firstCarriage->findUpdateModule(key_rb);
 					if( rb )
 					{
@@ -1062,7 +1087,11 @@ void RailroadBehavior::hitchNewCarriagebyTemplate( ObjectID locoID, const Templa
 			newCarriage->setProducer(locomotive);
 			m_trailerID = newCarriage->getID();
 
+#if RTS_ENGINE_CONTEXT
+			RTS_ENGINE_STATIC(NameKeyType, key_rb, NAMEKEY("RailroadBehavior"));
+#else
 			static NameKeyType key_rb = NAMEKEY("RailroadBehavior");
+#endif
 			RailroadBehavior *rb = (RailroadBehavior*)newCarriage->findUpdateModule(key_rb);
 			if( rb )
 			{
@@ -1139,7 +1168,11 @@ void RailroadBehavior::hitchNewCarriagebyProximity( ObjectID locoID, TrainTrack 
 		closeCarriage->setProducer(self);
 		m_trailerID = closeCarriage->getID();
 
+#if RTS_ENGINE_CONTEXT
+		RTS_ENGINE_STATIC(NameKeyType, key_rb, NAMEKEY("RailroadBehavior"));
+#else
 		static NameKeyType key_rb = NAMEKEY("RailroadBehavior");
+#endif
 		RailroadBehavior *rb = (RailroadBehavior*)closeCarriage->findUpdateModule(key_rb);
 		if( rb )
 			rb->hitchNewCarriagebyProximity( self->getID(), m_track );
@@ -1193,7 +1226,11 @@ void RailroadBehavior::getPulled( PullInfo *info )
 	if ( trailer )
 	{
 		//call his pull trailer with MY info;
+#if RTS_ENGINE_CONTEXT
+		RTS_ENGINE_STATIC(NameKeyType, key_RGUpdate, NAMEKEY("RailroadBehavior"));
+#else
 		static NameKeyType key_RGUpdate = NAMEKEY("RailroadBehavior");
+#endif
 		RailroadBehavior *RGUpdate = (RailroadBehavior*)trailer->findUpdateModule(key_RGUpdate);
 		if( RGUpdate )
 		{
@@ -1345,7 +1382,11 @@ void RailroadBehavior::destroyTheWholeTrainNow()
 	Object *trailer = TheGameLogic->findObjectByID( m_trailerID );
 	if ( trailer )
 	{
+#if RTS_ENGINE_CONTEXT
+		RTS_ENGINE_STATIC(NameKeyType, key_RGUpdate, NAMEKEY("RailroadBehavior"));
+#else
 		static NameKeyType key_RGUpdate = NAMEKEY("RailroadBehavior");
+#endif
 		RailroadBehavior *RGUpdate = (RailroadBehavior*)trailer->findUpdateModule(key_RGUpdate);
 		if( RGUpdate )
 		{

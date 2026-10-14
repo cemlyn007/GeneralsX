@@ -59,7 +59,12 @@
 //---------------------------------------------------------------------------------
 TensileFormationUpdate* getTFU( Object *obj )
 {
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+	RTS_ENGINE_STATIC(NameKeyType, theTFUKey, TheNameKeyGenerator->nameToKey( "TensileFormationUpdate" ));
+#else
 	static NameKeyType theTFUKey = TheNameKeyGenerator->nameToKey( "TensileFormationUpdate" );
+#endif
 	TensileFormationUpdate* tfu = (TensileFormationUpdate *)obj->findUpdateModule( theTFUKey );
 	return tfu;
 }

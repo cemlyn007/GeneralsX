@@ -61,14 +61,19 @@ public:
 	enum BogusInitType { kInit };
 	enum InitSetAllType { kInitSetAll };
 
-	BitFlags()
+	// GeneralsX @refactor cemlyn007 14/10/2026 constexpr, so constant masks are constant-initialised and read-only
+	constexpr BitFlags()
 	{
 	}
 
 	// This constructor sets all bits to 1
-	BitFlags(InitSetAllType)
+	// GeneralsX @refactor cemlyn007 14/10/2026 constexpr for masks of up to 64 bits, which std::bitset's constructor from an
+	// integer can fill, so such a constant mask is read-only
+	constexpr BitFlags(InitSetAllType)
+		: m_bits(NUMBITS <= 64 ? ~0ULL : 0ULL)
 	{
-		m_bits.set();
+		if constexpr (NUMBITS > 64)
+			m_bits.set();
 	}
 
 	BitFlags(UnsignedInt value)

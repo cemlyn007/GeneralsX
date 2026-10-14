@@ -61,10 +61,31 @@
 
 
 // PRIVATE DATA ///////////////////////////////////////////////////////////////////////////////////
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(NameKeyType, buttonBackKey, NAMEKEY_INVALID);
+#define buttonBackKey RTS_ENGINE_GLOBAL_REF(buttonBackKey)
+#else
 static NameKeyType buttonBackKey					= NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonSaveKey, NAMEKEY_INVALID);
+#define buttonSaveKey RTS_ENGINE_GLOBAL_REF(buttonSaveKey)
+#else
 static NameKeyType buttonSaveKey					= NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, listboxGamesKey, NAMEKEY_INVALID);
+#define listboxGamesKey RTS_ENGINE_GLOBAL_REF(listboxGamesKey)
+#else
 static NameKeyType listboxGamesKey				= NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, textEntryReplayNameKey, NAMEKEY_INVALID);
+#define textEntryReplayNameKey RTS_ENGINE_GLOBAL_REF(textEntryReplayNameKey)
+#else
 static NameKeyType textEntryReplayNameKey = NAMEKEY_INVALID;
+#endif
 
 static GameWindow *parent = nullptr;
 static GameWindow *replaySavedParent = nullptr;

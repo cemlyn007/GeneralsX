@@ -189,7 +189,12 @@ void AIPlayer::checkForSupplyCenter( BuildListInfo *info, Object *bldg )
 {
 	class SupplyCenterDockUpdate;
 	// if it is a supply center, I must have boxes
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+	RTS_ENGINE_STATIC(const NameKeyType, key_centerUpdate, NAMEKEY("SupplyCenterDockUpdate"));
+#else
 	static const NameKeyType key_centerUpdate = NAMEKEY("SupplyCenterDockUpdate");
+#endif
 	SupplyCenterDockUpdate *centerModule = (SupplyCenterDockUpdate*)bldg->findUpdateModule( key_centerUpdate );
 	if( centerModule  )
 	{
@@ -294,7 +299,11 @@ void AIPlayer::queueSupplyTruck()
 					// No supplies.
 					continue;
 				}
+#if RTS_ENGINE_CONTEXT
+				RTS_ENGINE_STATIC(const NameKeyType, key_warehouseUpdate, NAMEKEY("SupplyWarehouseDockUpdate"));
+#else
 				static const NameKeyType key_warehouseUpdate = NAMEKEY("SupplyWarehouseDockUpdate");
+#endif
 				SupplyWarehouseDockUpdate *warehouseModule = (SupplyWarehouseDockUpdate*)supplySource->findUpdateModule( key_warehouseUpdate );
 				if( warehouseModule )	{
 					Int availableCash = warehouseModule->getBoxesStored()*TheGlobalData->m_baseValuePerSupplyBox;
@@ -2218,7 +2227,11 @@ Object *AIPlayer::findSupplyCenter(Int minimumCash)
 		{
 			if (!obj->isKindOf(KINDOF_STRUCTURE)) continue;
 			if (!obj->isKindOf(KINDOF_SUPPLY_SOURCE)) continue;
+#if RTS_ENGINE_CONTEXT
+			RTS_ENGINE_STATIC(const NameKeyType, key_warehouseUpdate, NAMEKEY("SupplyWarehouseDockUpdate"));
+#else
 			static const NameKeyType key_warehouseUpdate = NAMEKEY("SupplyWarehouseDockUpdate");
+#endif
 			SupplyWarehouseDockUpdate *warehouseModule = (SupplyWarehouseDockUpdate*)obj->findUpdateModule( key_warehouseUpdate );
 			if( warehouseModule )	{
 				Int availableCash = warehouseModule->getBoxesStored()*TheGlobalData->m_baseValuePerSupplyBox;

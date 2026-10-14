@@ -347,7 +347,12 @@ void ToggleQuitMenu();
 WindowMsgHandledType ControlBarSystem( GameWindow *window, UnsignedInt msg,
 																			 WindowMsgData mData1, WindowMsgData mData2 )
 {
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+	RTS_ENGINE_STATIC(NameKeyType, buttonCommunicator, NAMEKEY_INVALID);
+#else
 	static NameKeyType buttonCommunicator = NAMEKEY_INVALID;
+#endif
 	if(TheScriptEngine && TheScriptEngine->isGameEnding())
 		return MSG_IGNORED;
 	switch( msg )
@@ -378,15 +383,43 @@ WindowMsgHandledType ControlBarSystem( GameWindow *window, UnsignedInt msg,
 		case GBM_SELECTED_RIGHT:
 		{
 			GameWindow *control = (GameWindow *)mData1;
+#if RTS_ENGINE_CONTEXT
+			RTS_ENGINE_STATIC(NameKeyType, beaconPlacementButtonID, NAMEKEY("ControlBar.wnd:ButtonPlaceBeacon"));
+#else
 			static NameKeyType beaconPlacementButtonID = NAMEKEY("ControlBar.wnd:ButtonPlaceBeacon");
+#endif
+#if RTS_ENGINE_CONTEXT
+			RTS_ENGINE_STATIC(NameKeyType, beaconDeleteButtonID, NAMEKEY("ControlBar.wnd:ButtonDeleteBeacon"));
+#else
 			static NameKeyType beaconDeleteButtonID = NAMEKEY("ControlBar.wnd:ButtonDeleteBeacon");
+#endif
+#if RTS_ENGINE_CONTEXT
+			RTS_ENGINE_STATIC(NameKeyType, beaconClearTextButtonID, NAMEKEY("ControlBar.wnd:ButtonClearBeaconText"));
+#else
 			static NameKeyType beaconClearTextButtonID = NAMEKEY("ControlBar.wnd:ButtonClearBeaconText");
+#endif
+#if RTS_ENGINE_CONTEXT
+			RTS_ENGINE_STATIC(NameKeyType, beaconGeneralButtonID, NAMEKEY("ControlBar.wnd:ButtonGeneral"));
+#else
 			static NameKeyType beaconGeneralButtonID = NAMEKEY("ControlBar.wnd:ButtonGeneral");
+#endif
 //			static NameKeyType buttonSmallID = NAMEKEY("ControlBar.wnd:ButtonSmall");
 //			static NameKeyType buttonMediumID = NAMEKEY("ControlBar.wnd:ButtonMedium");
+#if RTS_ENGINE_CONTEXT
+			RTS_ENGINE_STATIC(NameKeyType, buttonLargeID, NAMEKEY("ControlBar.wnd:ButtonLarge"));
+#else
 			static NameKeyType buttonLargeID = NAMEKEY("ControlBar.wnd:ButtonLarge");
+#endif
+#if RTS_ENGINE_CONTEXT
+			RTS_ENGINE_STATIC(NameKeyType, buttonOptions, NAMEKEY("ControlBar.wnd:ButtonOptions"));
+#else
 			static NameKeyType buttonOptions = NAMEKEY("ControlBar.wnd:ButtonOptions");
+#endif
+#if RTS_ENGINE_CONTEXT
+			RTS_ENGINE_STATIC(NameKeyType, buttonIdleWorker, NAMEKEY("ControlBar.wnd:ButtonIdleWorker"));
+#else
 			static NameKeyType buttonIdleWorker = NAMEKEY("ControlBar.wnd:ButtonIdleWorker");
+#endif
 
 			Int controlID = control->winGetWindowId();
 			if( controlID == buttonCommunicator )
@@ -405,7 +438,11 @@ WindowMsgHandledType ControlBarSystem( GameWindow *window, UnsignedInt msg,
 			}
 			else if( controlID == beaconClearTextButtonID && TheGameLogic->isInMultiplayerGame() )
 			{
+#if RTS_ENGINE_CONTEXT
+				RTS_ENGINE_STATIC(NameKeyType, textID, NAMEKEY("ControlBar.wnd:EditBeaconText"));
+#else
 				static NameKeyType textID = NAMEKEY("ControlBar.wnd:EditBeaconText");
+#endif
 				GameWindow *win = TheWindowManager->winGetWindowFromId(nullptr, textID);
 				if (win)
 				{
@@ -456,7 +493,11 @@ WindowMsgHandledType ControlBarSystem( GameWindow *window, UnsignedInt msg,
 		{
 			GameWindow *control = (GameWindow *)mData1;
 			Int controlID = control->winGetWindowId();
+#if RTS_ENGINE_CONTEXT
+			RTS_ENGINE_STATIC(NameKeyType, textID, NAMEKEY("ControlBar.wnd:EditBeaconText"));
+#else
 			static NameKeyType textID = NAMEKEY("ControlBar.wnd:EditBeaconText");
+#endif
 			if (controlID == textID)
 			{
 				// set beacon text

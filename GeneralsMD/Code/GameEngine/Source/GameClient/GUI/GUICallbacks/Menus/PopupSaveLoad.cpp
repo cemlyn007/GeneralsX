@@ -62,19 +62,85 @@
 #include "GameClient/GameWindowTransitions.h"
 
 // PRIVATE DATA ///////////////////////////////////////////////////////////////////////////////////
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(NameKeyType, buttonBackKey, NAMEKEY_INVALID);
+#define buttonBackKey RTS_ENGINE_GLOBAL_REF(buttonBackKey)
+#else
 static NameKeyType buttonBackKey					= NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonSaveKey, NAMEKEY_INVALID);
+#define buttonSaveKey RTS_ENGINE_GLOBAL_REF(buttonSaveKey)
+#else
 static NameKeyType buttonSaveKey					= NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonLoadKey, NAMEKEY_INVALID);
+#define buttonLoadKey RTS_ENGINE_GLOBAL_REF(buttonLoadKey)
+#else
 static NameKeyType buttonLoadKey					= NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonDeleteKey, NAMEKEY_INVALID);
+#define buttonDeleteKey RTS_ENGINE_GLOBAL_REF(buttonDeleteKey)
+#else
 static NameKeyType buttonDeleteKey				= NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, listboxGamesKey, NAMEKEY_INVALID);
+#define listboxGamesKey RTS_ENGINE_GLOBAL_REF(listboxGamesKey)
+#else
 static NameKeyType listboxGamesKey				= NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonOverwriteCancel, NAMEKEY_INVALID);
+#define buttonOverwriteCancel RTS_ENGINE_GLOBAL_REF(buttonOverwriteCancel)
+#else
 static NameKeyType buttonOverwriteCancel	= NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonOverwriteConfirm, NAMEKEY_INVALID);
+#define buttonOverwriteConfirm RTS_ENGINE_GLOBAL_REF(buttonOverwriteConfirm)
+#else
 static NameKeyType buttonOverwriteConfirm = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonLoadCancel, NAMEKEY_INVALID);
+#define buttonLoadCancel RTS_ENGINE_GLOBAL_REF(buttonLoadCancel)
+#else
 static NameKeyType buttonLoadCancel				= NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonLoadConfirm, NAMEKEY_INVALID);
+#define buttonLoadConfirm RTS_ENGINE_GLOBAL_REF(buttonLoadConfirm)
+#else
 static NameKeyType buttonLoadConfirm			= NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonSaveDescCancel, NAMEKEY_INVALID);
+#define buttonSaveDescCancel RTS_ENGINE_GLOBAL_REF(buttonSaveDescCancel)
+#else
 static NameKeyType buttonSaveDescCancel		= NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonSaveDescConfirm, NAMEKEY_INVALID);
+#define buttonSaveDescConfirm RTS_ENGINE_GLOBAL_REF(buttonSaveDescConfirm)
+#else
 static NameKeyType buttonSaveDescConfirm	= NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonDeleteConfirm, NAMEKEY_INVALID);
+#define buttonDeleteConfirm RTS_ENGINE_GLOBAL_REF(buttonDeleteConfirm)
+#else
 static NameKeyType buttonDeleteConfirm		= NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonDeleteCancel, NAMEKEY_INVALID);
+#define buttonDeleteCancel RTS_ENGINE_GLOBAL_REF(buttonDeleteCancel)
+#else
 static NameKeyType buttonDeleteCancel			= NAMEKEY_INVALID;
+#endif
 
 static GameWindow *buttonFrame = nullptr;
 static GameWindow *overwriteConfirm = nullptr;

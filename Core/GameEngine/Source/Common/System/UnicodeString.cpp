@@ -589,7 +589,18 @@ void UnicodeString::format_va(const WideChar* format, va_list args)
 	// (returns -1 for any format string containing e.g. Cyrillic). Use a UTF-8 locale for
 	// the duration of the call so Cyrillic format strings pass through correctly.
 #ifndef _WIN32
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @refactor cemlyn007 14/10/2026 One per engine, freed with it (docs/EMBEDDING.md)
+	struct Utf8Locale
+	{
+		locale_t locale = newlocale(LC_CTYPE_MASK, "UTF-8", (locale_t)0);
+		~Utf8Locale() { if (locale != (locale_t)0) freelocale(locale); }
+	};
+	RTS_ENGINE_STATIC(Utf8Locale, s_utf8_locale_owner);
+	locale_t s_utf8_locale = s_utf8_locale_owner.locale;
+#else
 	static locale_t s_utf8_locale = newlocale(LC_CTYPE_MASK, "UTF-8", (locale_t)0);
+#endif
 	locale_t old_locale = uselocale(s_utf8_locale);
 #endif
 	const int result = vswprintf(buf, sizeof(buf)/sizeof(WideChar), effectiveFormat, args);

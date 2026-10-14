@@ -66,21 +66,42 @@ static const Int TELETYPE_SKIP = 2;
 
 // window ids ------------------------------------------------------------------------------
 static NameKeyType parentID = NAMEKEY_INVALID;
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(NameKeyType, buttonPlayID, NAMEKEY_INVALID);
+#define buttonPlayID RTS_ENGINE_GLOBAL_REF(buttonPlayID)
+#else
 static NameKeyType buttonPlayID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonBackID, NAMEKEY_INVALID);
+#define buttonBackID RTS_ENGINE_GLOBAL_REF(buttonBackID)
+#else
 static NameKeyType buttonBackID = NAMEKEY_INVALID;
+#endif
 static NameKeyType bioPortraitID = NAMEKEY_INVALID;
 static NameKeyType bioNameEntryID = NAMEKEY_INVALID;
 static NameKeyType bioDOBEntryID = NAMEKEY_INVALID;
 static NameKeyType bioBirthplaceEntryID = NAMEKEY_INVALID;
 static NameKeyType bioStrategyEntryID = NAMEKEY_INVALID;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType[NUM_GENERALS], buttonGeneralPositionID, {NAMEKEY_INVALID});
+#define buttonGeneralPositionID RTS_ENGINE_GLOBAL_REF(buttonGeneralPositionID)
+#else
 static NameKeyType buttonGeneralPositionID[NUM_GENERALS] = {NAMEKEY_INVALID};
+#endif
 static NameKeyType backdropID = NAMEKEY_INVALID;
 static NameKeyType bioParentID = NAMEKEY_INVALID;
 
 // window pointers --------------------------------------------------------------------------------
 static GameWindow *parentMenu = nullptr;
 static GameWindow *buttonPlay = nullptr;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, buttonBack, nullptr);
+#define buttonBack RTS_ENGINE_GLOBAL_REF(buttonBack)
+#else
 static GameWindow *buttonBack = nullptr;
+#endif
 static GameWindow *bioPortrait = nullptr;
 static GameWindow *bioLine1Entry = nullptr;
 static GameWindow *bioLine2Entry = nullptr;

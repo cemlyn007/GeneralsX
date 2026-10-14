@@ -39,14 +39,35 @@
 #include "GameNetwork/WOLBrowser/WebBrowser.h"
 
 // window ids -------------------------------------------------------------------------------------
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(NameKeyType, parentWindowID, NAMEKEY_INVALID);
+#define parentWindowID RTS_ENGINE_GLOBAL_REF(parentWindowID)
+#else
 static NameKeyType parentWindowID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonBackID, NAMEKEY_INVALID);
+#define buttonBackID RTS_ENGINE_GLOBAL_REF(buttonBackID)
+#else
 static NameKeyType buttonBackID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, windowLadderID, NAMEKEY_INVALID);
+#define windowLadderID RTS_ENGINE_GLOBAL_REF(windowLadderID)
+#else
 static NameKeyType windowLadderID = NAMEKEY_INVALID;
+#endif
 
 
 // window pointers --------------------------------------------------------------------------------
 static GameWindow *parentWindow = nullptr;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, buttonBack, nullptr);
+#define buttonBack RTS_ENGINE_GLOBAL_REF(buttonBack)
+#else
 static GameWindow *buttonBack = nullptr;
+#endif
 static GameWindow *windowLadder = nullptr;
 
 

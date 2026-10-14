@@ -86,32 +86,128 @@ static Bool s_inQM = FALSE;
 
 // PRIVATE DATA ///////////////////////////////////////////////////////////////////////////////////
 // window ids ------------------------------------------------------------------------------
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(NameKeyType, parentWOLQuickMatchID, NAMEKEY_INVALID);
+#define parentWOLQuickMatchID RTS_ENGINE_GLOBAL_REF(parentWOLQuickMatchID)
+#else
 static NameKeyType parentWOLQuickMatchID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonBackID, NAMEKEY_INVALID);
+#define buttonBackID RTS_ENGINE_GLOBAL_REF(buttonBackID)
+#else
 static NameKeyType buttonBackID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonStartID, NAMEKEY_INVALID);
+#define buttonStartID RTS_ENGINE_GLOBAL_REF(buttonStartID)
+#else
 static NameKeyType buttonStartID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonStopID, NAMEKEY_INVALID);
+#define buttonStopID RTS_ENGINE_GLOBAL_REF(buttonStopID)
+#else
 static NameKeyType buttonStopID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonWidenID, NAMEKEY_INVALID);
+#define buttonWidenID RTS_ENGINE_GLOBAL_REF(buttonWidenID)
+#else
 static NameKeyType buttonWidenID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonBuddiesID, NAMEKEY_INVALID);
+#define buttonBuddiesID RTS_ENGINE_GLOBAL_REF(buttonBuddiesID)
+#else
 static NameKeyType buttonBuddiesID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, listboxQuickMatchID, NAMEKEY_INVALID);
+#define listboxQuickMatchID RTS_ENGINE_GLOBAL_REF(listboxQuickMatchID)
+#else
 static NameKeyType listboxQuickMatchID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, listboxMapSelectID, NAMEKEY_INVALID);
+#define listboxMapSelectID RTS_ENGINE_GLOBAL_REF(listboxMapSelectID)
+#else
 static NameKeyType listboxMapSelectID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonSelectAllMapsID, NAMEKEY_INVALID);
+#define buttonSelectAllMapsID RTS_ENGINE_GLOBAL_REF(buttonSelectAllMapsID)
+#else
 static NameKeyType buttonSelectAllMapsID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonSelectNoMapsID, NAMEKEY_INVALID);
+#define buttonSelectNoMapsID RTS_ENGINE_GLOBAL_REF(buttonSelectNoMapsID)
+#else
 static NameKeyType buttonSelectNoMapsID = NAMEKEY_INVALID;
+#endif
 //static NameKeyType textEntryMaxDisconnectsID = NAMEKEY_INVALID;
 //static NameKeyType textEntryMaxPointsID = NAMEKEY_INVALID;
 //static NameKeyType textEntryMinPointsID = NAMEKEY_INVALID;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, textEntryWaitTimeID, NAMEKEY_INVALID);
+#define textEntryWaitTimeID RTS_ENGINE_GLOBAL_REF(textEntryWaitTimeID)
+#else
 static NameKeyType textEntryWaitTimeID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, comboBoxNumPlayersID, NAMEKEY_INVALID);
+#define comboBoxNumPlayersID RTS_ENGINE_GLOBAL_REF(comboBoxNumPlayersID)
+#else
 static NameKeyType comboBoxNumPlayersID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, comboBoxMaxPingID, NAMEKEY_INVALID);
+#define comboBoxMaxPingID RTS_ENGINE_GLOBAL_REF(comboBoxMaxPingID)
+#else
 static NameKeyType comboBoxMaxPingID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, comboBoxLadderID, NAMEKEY_INVALID);
+#define comboBoxLadderID RTS_ENGINE_GLOBAL_REF(comboBoxLadderID)
+#else
 static NameKeyType comboBoxLadderID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, comboBoxMaxDisconnectsID, NAMEKEY_INVALID);
+#define comboBoxMaxDisconnectsID RTS_ENGINE_GLOBAL_REF(comboBoxMaxDisconnectsID)
+#else
 static NameKeyType comboBoxMaxDisconnectsID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, staticTextNumPlayersID, NAMEKEY_INVALID);
+#define staticTextNumPlayersID RTS_ENGINE_GLOBAL_REF(staticTextNumPlayersID)
+#else
 static NameKeyType staticTextNumPlayersID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, comboBoxSideID, NAMEKEY_INVALID);
+#define comboBoxSideID RTS_ENGINE_GLOBAL_REF(comboBoxSideID)
+#else
 static NameKeyType comboBoxSideID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, comboBoxColorID, NAMEKEY_INVALID);
+#define comboBoxColorID RTS_ENGINE_GLOBAL_REF(comboBoxColorID)
+#else
 static NameKeyType comboBoxColorID = NAMEKEY_INVALID;
+#endif
 
 
 // Window Pointers ------------------------------------------------------------------------
 static GameWindow *parentWOLQuickMatch = nullptr;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, buttonBack, nullptr);
+#define buttonBack RTS_ENGINE_GLOBAL_REF(buttonBack)
+#else
 static GameWindow *buttonBack = nullptr;
+#endif
 static GameWindow *buttonStart = nullptr;
 static GameWindow *buttonStop = nullptr;
 static GameWindow *buttonWiden = nullptr;
@@ -150,7 +246,11 @@ static const LadderInfo * getLadderInfo();
 
 static Bool isInfoShown()
 {
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(NameKeyType, parentStatsID, NAMEKEY("WOLQuickMatchMenu.wnd:ParentStats"));
+#else
 	static NameKeyType parentStatsID = NAMEKEY("WOLQuickMatchMenu.wnd:ParentStats");
+#endif
 	GameWindow *parentStats = TheWindowManager->winGetWindowFromId( parentWOLQuickMatch, parentStatsID );
 	if (parentStats)
 		return !parentStats->winIsHidden();
@@ -159,7 +259,11 @@ static Bool isInfoShown()
 
 static void hideInfoGadgets(Bool doIt)
 {
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(NameKeyType, parentStatsID, NAMEKEY("WOLQuickMatchMenu.wnd:ParentStats"));
+#else
 	static NameKeyType parentStatsID = NAMEKEY("WOLQuickMatchMenu.wnd:ParentStats");
+#endif
 	GameWindow *parentStats = TheWindowManager->winGetWindowFromId( parentWOLQuickMatch, parentStatsID );
 	if (parentStats)
 	{
@@ -169,7 +273,11 @@ static void hideInfoGadgets(Bool doIt)
 
 static void hideOptionsGadgets(Bool doIt)
 {
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(NameKeyType, parentOptionsID, NAMEKEY("WOLQuickMatchMenu.wnd:ParentOptions"));
+#else
 	static NameKeyType parentOptionsID = NAMEKEY("WOLQuickMatchMenu.wnd:ParentOptions");
+#endif
 	GameWindow *parentOptions = TheWindowManager->winGetWindowFromId( parentWOLQuickMatch, parentOptionsID );
 	if (parentOptions)
 	{
@@ -196,7 +304,11 @@ static void enableOptionsGadgets(Bool doIt)
 #ifdef PERF_TEST
 	s_inQM = !doIt;
 #endif // PERF_TEST
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(NameKeyType, parentOptionsID, NAMEKEY("WOLQuickMatchMenu.wnd:ParentOptions"));
+#else
 	static NameKeyType parentOptionsID = NAMEKEY("WOLQuickMatchMenu.wnd:ParentOptions");
+#endif
 	GameWindow *parentOptions = TheWindowManager->winGetWindowFromId( parentWOLQuickMatch, parentOptionsID );
 	const LadderInfo *li = getLadderInfo();
 	if (parentOptions)
@@ -1785,7 +1897,11 @@ WindowMsgHandledType WOLQuickMatchMenuSystem( GameWindow *window, UnsignedInt ms
 					break;
 				GameWindow *control = (GameWindow *)mData1;
 				Int controlID = control->winGetWindowId();
+#if RTS_ENGINE_CONTEXT
+				RTS_ENGINE_STATIC(NameKeyType, buttonOptionsID, NAMEKEY("WOLQuickMatchMenu.wnd:ButtonOptions"));
+#else
 				static NameKeyType buttonOptionsID = NAMEKEY("WOLQuickMatchMenu.wnd:ButtonOptions");
+#endif
 
 				if ( controlID == buttonStopID )
 				{

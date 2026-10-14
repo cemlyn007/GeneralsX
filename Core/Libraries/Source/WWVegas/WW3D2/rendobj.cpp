@@ -1205,7 +1205,17 @@ class RenderObjPersistFactoryClass : public PersistFactoryClass
 	};
 };
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 Per engine (Common/EngineStatic.h), made and so registered by WW3D::Init (docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(RenderObjPersistFactoryClass, _RenderObjPersistFactory);
+#define _RenderObjPersistFactory RTS_ENGINE_GLOBAL_REF(_RenderObjPersistFactory)
+void WW3D_Register_Render_Object_Factory()
+{
+	_RenderObjPersistFactory;
+}
+#else
 static RenderObjPersistFactoryClass _RenderObjPersistFactory;
+#endif
 
 uint32 RenderObjPersistFactoryClass::Chunk_ID() const
 {

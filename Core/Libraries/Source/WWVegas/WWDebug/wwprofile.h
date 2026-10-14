@@ -192,6 +192,25 @@ protected:
 /*
 ** The Manager for the WWProfile system
 */
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+#define CurrentNode RTS_ENGINE_GLOBAL_REF(CurrentNode)
+#endif
+#if RTS_ENGINE_CONTEXT
+#define CurrentRootNode RTS_ENGINE_GLOBAL_REF(CurrentRootNode)
+#endif
+#if RTS_ENGINE_CONTEXT
+#define FrameCounter RTS_ENGINE_GLOBAL_REF(FrameCounter)
+#endif
+#if RTS_ENGINE_CONTEXT
+#define IsProfileEnabled RTS_ENGINE_GLOBAL_REF(IsProfileEnabled)
+#endif
+#if RTS_ENGINE_CONTEXT
+#define ResetTime RTS_ENGINE_GLOBAL_REF(ResetTime)
+#endif
+#if RTS_ENGINE_CONTEXT
+#define Root RTS_ENGINE_GLOBAL_REF(Root)
+#endif
 class	WWProfileManager {
 public:
 	WWINLINE static	void					Enable_Profile(bool enable) { IsProfileEnabled=enable; }
@@ -221,12 +240,36 @@ public:
 	static	void								Load_Profile_Log(const char* filename, WWProfileHierarchyInfoClass**& array, unsigned& count);
 
 private:
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_CLASS_STATIC(WWProfileHierarchyNodeClass, Root);
+#else
 	static	WWProfileHierarchyNodeClass		Root;
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_CLASS_STATIC(WWProfileHierarchyNodeClass*, CurrentNode);
+#else
 	static	WWProfileHierarchyNodeClass *	CurrentNode;
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_CLASS_STATIC(WWProfileHierarchyNodeClass*, CurrentRootNode);
+#else
 	static	WWProfileHierarchyNodeClass *	CurrentRootNode;
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_CLASS_STATIC(int, FrameCounter);
+#else
 	static	int									FrameCounter;
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_CLASS_STATIC(__int64, ResetTime);
+#else
 	static	__int64								ResetTime;
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_CLASS_STATIC(bool, IsProfileEnabled);
+#else
 	static	bool									IsProfileEnabled;
+#endif
 
 	friend	class		WWProfileInOrderIterator;
 };
@@ -317,6 +360,9 @@ private:
 #define WWLOG_INTERMEDIATE(t)
 #endif
 
+#if RTS_ENGINE_CONTEXT
+#define TabCount RTS_ENGINE_GLOBAL_REF(TabCount)
+#endif
 struct WWMemoryAndTimeLog
 {
 	unsigned TimeStart;
@@ -326,9 +372,22 @@ struct WWMemoryAndTimeLog
 	int AllocSizeStart;
 	int IntermediateAllocSizeStart;
 	StringClass Name;
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_CLASS_STATIC(unsigned, TabCount);
+#else
 	static unsigned TabCount;
+#endif
 
 	WWMemoryAndTimeLog(const char* name);
 	~WWMemoryAndTimeLog();
 	void Log_Intermediate(const char* text);
 };
+#if RTS_ENGINE_CONTEXT
+#undef Root
+#undef ResetTime
+#undef IsProfileEnabled
+#undef FrameCounter
+#undef CurrentRootNode
+#undef CurrentNode
+#undef TabCount
+#endif
