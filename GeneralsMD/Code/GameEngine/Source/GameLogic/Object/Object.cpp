@@ -119,6 +119,33 @@ ObjectID TheObjectIDToDebug = INVALID_ID;
 #endif
 
 // ------------------------------------------------------------------------------------------------
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(const ModelConditionFlags[WEAPONSLOT_COUNT], s_allWeaponFireFlags,
+{
+	MAKE_MODELCONDITION_MASK5(
+		MODELCONDITION_FIRING_A,
+		MODELCONDITION_BETWEEN_FIRING_SHOTS_A,
+		MODELCONDITION_RELOADING_A,
+		MODELCONDITION_PREATTACK_A,
+		MODELCONDITION_USING_WEAPON_A
+	),
+	MAKE_MODELCONDITION_MASK5(
+		MODELCONDITION_FIRING_B,
+		MODELCONDITION_BETWEEN_FIRING_SHOTS_B,
+		MODELCONDITION_RELOADING_B,
+		MODELCONDITION_PREATTACK_B,
+		MODELCONDITION_USING_WEAPON_B
+	),
+	MAKE_MODELCONDITION_MASK5(
+		MODELCONDITION_FIRING_C,
+		MODELCONDITION_BETWEEN_FIRING_SHOTS_C,
+		MODELCONDITION_RELOADING_C,
+		MODELCONDITION_PREATTACK_C,
+		MODELCONDITION_USING_WEAPON_C
+	)
+});
+#define s_allWeaponFireFlags RTS_ENGINE_GLOBAL_REF(s_allWeaponFireFlags)
+#else
 static const ModelConditionFlags s_allWeaponFireFlags[WEAPONSLOT_COUNT] =
 {
 	MAKE_MODELCONDITION_MASK5(
@@ -143,6 +170,7 @@ static const ModelConditionFlags s_allWeaponFireFlags[WEAPONSLOT_COUNT] =
 		MODELCONDITION_USING_WEAPON_C
 	)
 };
+#endif
 
 //-------------------------------------------------------------------------------------------------
 extern void addIcon(const Coord3D *pos, Real width, Int numFramesDuration, RGBColor color);

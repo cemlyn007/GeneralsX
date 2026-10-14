@@ -35,7 +35,8 @@
 
 /// @todo Doxygenize this file
 
-SimpleObjectIterator::ClumpCompareProc SimpleObjectIterator::theClumpCompareProcs[] =
+// GeneralsX @refactor cemlyn007 14/10/2026 Constant, so read-only: engines share no writable state (docs/EMBEDDING.md).
+const SimpleObjectIterator::ClumpCompareProc SimpleObjectIterator::theClumpCompareProcs[] =
 {
 	nullptr,						// "fastest" gets no proc
 	SimpleObjectIterator::sortNearToFar,
