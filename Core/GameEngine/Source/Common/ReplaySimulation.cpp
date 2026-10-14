@@ -38,9 +38,19 @@
 #endif
 
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_CLASS_STATIC_DEFINE(Bool, ReplaySimulation, s_isRunning, false);
+RTS_ENGINE_CLASS_STATIC_DEFINE(UnsignedInt, ReplaySimulation, s_replayIndex, 0);
+RTS_ENGINE_CLASS_STATIC_DEFINE(UnsignedInt, ReplaySimulation, s_replayCount, 0);
+#define s_isRunning RTS_ENGINE_GLOBAL_REF(s_isRunning)
+#define s_replayIndex RTS_ENGINE_GLOBAL_REF(s_replayIndex)
+#define s_replayCount RTS_ENGINE_GLOBAL_REF(s_replayCount)
+#else
 Bool ReplaySimulation::s_isRunning = false;
 UnsignedInt ReplaySimulation::s_replayIndex = 0;
 UnsignedInt ReplaySimulation::s_replayCount = 0;
+#endif
 
 namespace
 {

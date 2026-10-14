@@ -86,7 +86,10 @@ Data no engine writes is constant, so it is read-only and shared: tables are
 are constant-initialised. The empty `StringClass` and `WideStringClass`
 buffers are constants that no constructor writes. A string constant is a
 `constexpr` literal, not a `std::string`, which static initialisation builds
-in writable storage.
+in writable storage, and a pointer to a string literal is itself `const`. An
+object that only marks something by its address, such as the grid water's
+`WaterHandle`, is a constant too, so every engine compares against the same
+address.
 
 C++20's `std::bitset` sets a bit at compile time only below the 64th, so a
 constant mask is constant-initialised only while all its bits lie there. A

@@ -4222,11 +4222,32 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 			if (TheGlobalData)
 			{
 				static Bool isLowDetails = FALSE;
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+				RTS_ENGINE_STATIC(Bool, oldShadowVolumsValue, TRUE);
+#else
 				static Bool oldShadowVolumsValue = TRUE;
+#endif
+#if RTS_ENGINE_CONTEXT
+				RTS_ENGINE_STATIC(Bool, oldLightMapValue, TRUE);
+#else
 				static Bool oldLightMapValue = TRUE;
+#endif
+#if RTS_ENGINE_CONTEXT
+				RTS_ENGINE_STATIC(Bool, oldCloudMap, TRUE);
+#else
 				static Bool oldCloudMap = TRUE;
+#endif
+#if RTS_ENGINE_CONTEXT
+				RTS_ENGINE_STATIC(Bool, oldBehindBuildingMarkers, TRUE);
+#else
 				static Bool oldBehindBuildingMarkers = TRUE;
+#endif
+#if RTS_ENGINE_CONTEXT
+				RTS_ENGINE_STATIC(Int, oldMaxParticleCount, 0);
+#else
 				static Int oldMaxParticleCount = 0;
+#endif
 				if(isLowDetails)
 				{
 					TheWritableGlobalData->m_useShadowVolumes = oldShadowVolumsValue;

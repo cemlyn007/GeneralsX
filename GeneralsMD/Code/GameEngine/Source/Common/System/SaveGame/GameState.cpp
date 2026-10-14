@@ -979,9 +979,16 @@ static AsciiString getMapLeafAndDirName(const AsciiString& in)
 }
 
 // ------------------------------------------------------------------------------------------------
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 Strings no engine writes are constant (docs/EMBEDDING.md).
+const char * const PORTABLE_SAVE				= "Save\\";
+const char * const PORTABLE_MAPS				= "Maps\\";
+const char * const PORTABLE_USER_MAPS	= "UserData\\Maps\\";
+#else
 const char* PORTABLE_SAVE				= "Save\\";
 const char* PORTABLE_MAPS				= "Maps\\";
 const char* PORTABLE_USER_MAPS	= "UserData\\Maps\\";
+#endif
 
 // ------------------------------------------------------------------------------------------------
 AsciiString GameState::realMapPathToPortableMapPath(const AsciiString& in) const

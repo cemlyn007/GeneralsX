@@ -52,7 +52,12 @@ class WaterHandle
 
 public:
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @refactor cemlyn007 14/10/2026 The grid water handle is a constant whose address marks grid water (docs/EMBEDDING.md).
+	constexpr WaterHandle() : m_polygon(nullptr) { }
+#else
 	WaterHandle() { m_polygon = nullptr; }
+#endif
 
 	///@todo we need to formalize the water systems
 	PolygonTrigger *m_polygon;	///< valid when water is a polygon area, nullptr if water is a grid
