@@ -89,7 +89,6 @@ HAND = [
     # The two XferLoad buffers are locals now, and both checkfortransitionsnum and inCRCGen per-engine
     # statics (so gone).
     (GLOBAL, "", "TerrainLogic::m_gridWaterHandle", "an address-only sentinel (the grid water's WaterHandle is compared by address and never written), the same for every engine"),
-    (GLOBAL, "", "re:PathNode::computeDirectionVector\\(\\)::dir", "thread_local returned-by-pointer scratch, consumed at once (PLAN-023 Phase 2): per thread by design"),
     # ---------------------------------------------------------------------------------------------------
     # PLAN-023 Phase 3: device-layer state a headless engine uses.
     # Done (PLAN-023 Phase 3 PR): W3DDisplay's scenes and asset manager, WW3DAssetManager::TheInstance and
@@ -172,7 +171,6 @@ HAND = [
     # ...) were listed here as debug-only, but every ScriptEngine's constructor, init() and update() write
     # them: they are a PER_ENGINE_STATIC now (PLAN-023 Phase 5b, found by the TSan build), so gone from the
     # library; the slot index is rule:per-engine-static.
-    (DEBUG, "", "re:_writeSingleParticleSystem\\(.*\\)::buff[1-4]|_reloadParticleSystemFromINI\\(.*\\)::linebuff|_getParticleSystemName\\(\\)::buff", "particle-editor writer/reader buffers (debug DLL)"),
     # ScriptEngine::getTeamNamed(AsciiString const&)::warnCount, Object::setTriggerAreaFlagsForChangeInPosition()::
     # didWarn and PathfindCell::~PathfindCell()::warn were listed here as debug-only "warn-once" flags, but each
     # is written on a release sim path by every engine's own thread (getTeamNamed's own script-evaluation thread,

@@ -196,7 +196,13 @@ const Coord3D *PathNode::computeDirectionVector()
 {
 	// GeneralsX @feature cemlyn007 28/09/2026 thread_local: returned-by-pointer scratch the caller consumes at once, on its own
 	// thread (PLAN-023 Phase 2).
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @refactor cemlyn007 14/10/2026 Per engine (Common/EngineStatic.h): an engine's logic runs on one thread at
+	// a time.
+	RTS_ENGINE_STATIC(Coord3D, dir);
+#else
 	static THREAD_LOCAL Coord3D dir;
+#endif
 
 	if (m_next == nullptr)
 	{
