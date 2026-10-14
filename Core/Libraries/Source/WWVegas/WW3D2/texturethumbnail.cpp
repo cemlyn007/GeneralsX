@@ -41,7 +41,7 @@ struct ThumbnailManagerState
 	DLListClass<ThumbnailManagerClass> ThumbnailManagerList;
 	ThumbnailManagerClass* GlobalThumbnailManager = nullptr;
 };
-rts::PerEngineStatic<ThumbnailManagerState> ThumbnailManagerState_perEngine;
+constexpr rts::PerEngineStatic<ThumbnailManagerState> ThumbnailManagerState_perEngine{};
 } // namespace
 #define ThumbnailManagerList (ThumbnailManagerState_perEngine.get().ThumbnailManagerList)
 #define GlobalThumbnailManager (ThumbnailManagerState_perEngine.get().GlobalThumbnailManager)

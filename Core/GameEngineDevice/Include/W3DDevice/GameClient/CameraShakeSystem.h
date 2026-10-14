@@ -106,7 +106,7 @@ protected:
 
 #if RTS_ENGINE_CONTEXT
 // GeneralsX @feature cemlyn007 28/09/2026 Per engine, with its view (PLAN-023 Phase 3, pulled forward).
-extern rts::PerEngineStatic<CameraShakeSystemClass> CameraShakerSystem_perEngine;
+extern const rts::PerEngineStatic<CameraShakeSystemClass> CameraShakerSystem_perEngine;
 #define CameraShakerSystem (CameraShakerSystem_perEngine.get())
 #else
 extern CameraShakeSystemClass CameraShakerSystem; //WST 11/12/2002 This is the new Camera Shaker system upgrade

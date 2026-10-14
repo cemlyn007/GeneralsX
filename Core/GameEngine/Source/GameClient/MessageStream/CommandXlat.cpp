@@ -588,7 +588,7 @@ void pickAndPlayUnitVoiceResponse( const DrawableList *list, GameMessage::Type m
 					Player *player = obj->getControllingPlayer();
 #if RTS_ENGINE_CONTEXT
 					// GeneralsX @feature cemlyn007 28/09/2026 Per engine: the cached template is this engine's (PLAN-023 Phase 4).
-					static rts::PerEngineStatic<const UpgradeTemplate *> workerShoeTemplate_perEngine;
+					static constexpr rts::PerEngineStatic<const UpgradeTemplate *> workerShoeTemplate_perEngine{};
 					const UpgradeTemplate *workerShoeTemplate = workerShoeTemplate_perEngine.get([&](const UpgradeTemplate *&value) { value = TheUpgradeCenter->findUpgrade( "Upgrade_GLAWorkerShoes" ); });
 #else
 					static const UpgradeTemplate *workerShoeTemplate = TheUpgradeCenter->findUpgrade( "Upgrade_GLAWorkerShoes" );

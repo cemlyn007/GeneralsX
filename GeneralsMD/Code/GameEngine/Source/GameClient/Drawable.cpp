@@ -285,7 +285,7 @@ struct DrawableStaticImages
 	const Image* emptyContainer;
 	Anim2DTemplate** animationTemplates;
 };
-static rts::PerEngineStatic<DrawableStaticImages> s_drawableStaticImages_perEngine;
+static constexpr rts::PerEngineStatic<DrawableStaticImages> s_drawableStaticImages_perEngine{};
 #define s_staticImagesInited (s_drawableStaticImages_perEngine.get().inited)
 #define s_veterancyImage (s_drawableStaticImages_perEngine.get().veterancyImage)
 #define s_fullAmmo (s_drawableStaticImages_perEngine.get().fullAmmo)

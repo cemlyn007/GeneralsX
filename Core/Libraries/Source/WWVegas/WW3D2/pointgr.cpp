@@ -125,7 +125,7 @@ struct PointGroupState
 
 	SimpleVecClass<unsigned long> remap;
 };
-rts::PerEngineStatic<PointGroupState> PointGroupState_perEngine;
+constexpr rts::PerEngineStatic<PointGroupState> PointGroupState_perEngine{};
 } // namespace
 #define _TriVertexLocationOrientationTable (PointGroupState_perEngine.get()._TriVertexLocationOrientationTable)
 #define _QuadVertexLocationOrientationTable (PointGroupState_perEngine.get()._QuadVertexLocationOrientationTable)

@@ -80,7 +80,7 @@ float ParticleBufferClass::LODMaxScreenSizes[17] = {
 #if RTS_ENGINE_CONTEXT
 // GeneralsX @feature cemlyn007 28/09/2026 Per engine: the particle buffers' generator, so one engine's particles do
 // not advance another's sequence (PLAN-023 Phase 3).
-static rts::PerEngineStatic<Random4Class> rand_gen_perEngine;
+static constexpr rts::PerEngineStatic<Random4Class> rand_gen_perEngine{};
 #define rand_gen (rand_gen_perEngine.get())
 #else
 static Random4Class rand_gen;
@@ -840,7 +840,7 @@ void ParticleBufferClass::Render_Particles(RenderInfoClass & rinfo)
 // GeneralsX @feature cemlyn007 30/09/2026 Per engine: Render_Line's scratch, filled and consumed within one draw. A
 // file static, so that its slot is taken at static initialisation, not at the first draw (PLAN-023 Phase 8, stage
 // RR2b).
-static rts::PerEngineStatic<SimpleDynVecClass<Vector3> > Render_Line_tmp_points_perEngine;
+static constexpr rts::PerEngineStatic<SimpleDynVecClass<Vector3> > Render_Line_tmp_points_perEngine;
 #endif
 
 void ParticleBufferClass::Render_Line(RenderInfoClass & rinfo)

@@ -60,7 +60,7 @@ UnsignedInt TheCRCLastFrameToLog = 0xffffffff;
 Bool g_keepCRCSaves = FALSE;
 Bool g_saveDebugCRCPerFrame = FALSE;
 #if RTS_ENGINE_CONTEXT
-rts::PerEngineStatic<AsciiString> g_saveDebugCRCPerFrameDir_perEngine;
+extern constexpr rts::PerEngineStatic<AsciiString> g_saveDebugCRCPerFrameDir_perEngine{};
 #else
 AsciiString g_saveDebugCRCPerFrameDir;
 #endif

@@ -2722,7 +2722,7 @@ void Object::setTriggerAreaFlagsForChangeInPosition()
 				// writes this on the release sim path, the same misclassification RT3 fixed for ScriptEngine's
 				// st_* hooks and getTeamNamed's warnCount.
 #if RTS_ENGINE_CONTEXT
-				static rts::PerEngineStatic<Bool> didWarn_perEngine;
+				static constexpr rts::PerEngineStatic<Bool> didWarn_perEngine{};
 				Bool &didWarn = didWarn_perEngine.get();
 #else
 				static Bool didWarn = false;

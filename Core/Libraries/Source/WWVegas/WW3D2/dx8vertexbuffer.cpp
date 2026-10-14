@@ -73,7 +73,7 @@ struct DynamicVertexBufferState
 	int _VertexBufferTotalVertices = 0;
 	int _VertexBufferTotalSize = 0;
 };
-rts::PerEngineStatic<DynamicVertexBufferState> DynamicVertexBufferState_perEngine;
+constexpr rts::PerEngineStatic<DynamicVertexBufferState> DynamicVertexBufferState_perEngine{};
 } // namespace
 #define _DynamicSortingVertexArrayInUse (DynamicVertexBufferState_perEngine.get()._DynamicSortingVertexArrayInUse)
 #define _DynamicSortingVertexArray (DynamicVertexBufferState_perEngine.get()._DynamicSortingVertexArray)

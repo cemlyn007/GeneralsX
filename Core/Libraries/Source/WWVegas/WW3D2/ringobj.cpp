@@ -157,7 +157,7 @@ struct RingMeshState
 	RingMeshClass RingMeshArray[RING_NUM_LOD];
 	float RingLODCosts[RING_NUM_LOD + 1] = {}; // RING_NUM_LOD doesn't include the null LOD
 };
-rts::PerEngineStatic<RingMeshState> RingMeshState_perEngine;
+constexpr rts::PerEngineStatic<RingMeshState> RingMeshState_perEngine{};
 } // namespace
 #define Ring_Array_Valid (RingMeshState_perEngine.get().Ring_Array_Valid)
 #define RingMeshArray (RingMeshState_perEngine.get().RingMeshArray)

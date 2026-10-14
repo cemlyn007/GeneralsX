@@ -94,7 +94,7 @@ ControlBar *TheControlBar = nullptr;
 
 #if RTS_ENGINE_CONTEXT
 // GeneralsX @feature cemlyn007 28/09/2026 Per engine (PLAN-023 Phase 4; see ControlBar.h).
-rts::PerEngineStatic<ControlBar::RankIcons> ControlBar::s_rankIcons_perEngine;
+constexpr rts::PerEngineStatic<ControlBar::RankIcons> ControlBar::s_rankIcons_perEngine{};
 #define m_rankVeteranIcon (s_rankIcons_perEngine.get().veteran)
 #define m_rankEliteIcon (s_rankIcons_perEngine.get().elite)
 #define m_rankHeroicIcon (s_rankIcons_perEngine.get().heroic)

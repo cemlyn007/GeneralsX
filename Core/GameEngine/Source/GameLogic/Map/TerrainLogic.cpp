@@ -235,7 +235,7 @@ m_bridgeInfo(theInfo)
 
 #if RTS_ENGINE_CONTEXT
 	// GeneralsX @feature cemlyn007 28/09/2026 Per engine: the cached template is this engine's (PLAN-023 Phase 4).
-	static rts::PerEngineStatic<const ThingTemplate *> genericBridgeTemplate_perEngine;
+	static constexpr rts::PerEngineStatic<const ThingTemplate *> genericBridgeTemplate_perEngine{};
 	const ThingTemplate *genericBridgeTemplate = genericBridgeTemplate_perEngine.get([&](const ThingTemplate *&value) { value = TheThingFactory->findTemplate("GenericBridge"); });
 #else
 	static const ThingTemplate* genericBridgeTemplate = TheThingFactory->findTemplate("GenericBridge");

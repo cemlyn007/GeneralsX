@@ -382,7 +382,8 @@ GameEngine::~GameEngine()
 	// world dict, the water settings, ...) are engine state: free them with the engine, while the memory
 	// manager their strings and pools use is certainly still up, rather than with the context, which a
 	// host may destroy after its last memory-manager reference is gone (PLAN-023 Phase 2).
-	rts::ctx()->destroySlots();
+	// GeneralsX @refactor cemlyn007 14/10/2026 Every per-engine static (Common/EngineStatic.h), not only PerEngineStatic.
+	rts::ctx()->destroyStatics();
 #endif
 
 // TheSuperHackers @build fighter19 11/02/2026 COM termination (Windows-only)

@@ -137,7 +137,7 @@ struct ScriptEngineDebugHooks
 	VTProc vTResume;
 #endif
 };
-static rts::PerEngineStatic<ScriptEngineDebugHooks> s_scriptEngineDebugHooks_perEngine;
+static constexpr rts::PerEngineStatic<ScriptEngineDebugHooks> s_scriptEngineDebugHooks_perEngine{};
 #define st_LastCurrentFrame (s_scriptEngineDebugHooks_perEngine.get().lastCurrentFrame)
 #define st_CurrentFrame (s_scriptEngineDebugHooks_perEngine.get().currentFrame)
 #define st_CanAppCont (s_scriptEngineDebugHooks_perEngine.get().canAppCont)

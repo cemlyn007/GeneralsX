@@ -80,7 +80,7 @@ float ParticleBufferClass::LODMaxScreenSizes[17] = {
 #if RTS_ENGINE_CONTEXT
 // GeneralsX @feature cemlyn007 28/09/2026 Per engine: the particle buffers' generator, so one engine's particles do
 // not advance another's sequence (PLAN-023 Phase 3).
-static rts::PerEngineStatic<Random4Class> rand_gen_perEngine;
+static constexpr rts::PerEngineStatic<Random4Class> rand_gen_perEngine{};
 #define rand_gen (rand_gen_perEngine.get())
 #else
 static Random4Class rand_gen;
@@ -996,7 +996,7 @@ struct RenderLineScratch
 	SimpleDynVecClass<Vector4> tmp_diffuse;
 	SimpleDynVecClass<unsigned char> tmp_id;
 };
-rts::PerEngineStatic<RenderLineScratch> RenderLineScratch_perEngine;
+constexpr rts::PerEngineStatic<RenderLineScratch> RenderLineScratch_perEngine{};
 } // namespace
 #endif
 

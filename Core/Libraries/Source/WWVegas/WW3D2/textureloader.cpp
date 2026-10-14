@@ -341,7 +341,7 @@ struct TextureLoaderState
 		}
 	}
 };
-rts::PerEngineStatic<TextureLoaderState> TextureLoaderState_perEngine;
+constexpr rts::PerEngineStatic<TextureLoaderState> TextureLoaderState_perEngine{};
 } // namespace
 #define _ForegroundQueue (TextureLoaderState_perEngine.get()._ForegroundQueue)
 #define _BackgroundQueue (TextureLoaderState_perEngine.get()._BackgroundQueue)

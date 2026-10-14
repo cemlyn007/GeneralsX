@@ -96,7 +96,7 @@ struct ObserverControls
 	GameWindow *staticTextNumberOfUnitsLost;
 	GameWindow *staticTextPlayerName;
 };
-static rts::PerEngineStatic<ObserverControls> s_observerControls_perEngine;
+static constexpr rts::PerEngineStatic<ObserverControls> s_observerControls_perEngine{};
 #define ObserverPlayerInfoWindow (s_observerControls_perEngine.get().observerPlayerInfoWindow)
 #define ObserverPlayerListWindow (s_observerControls_perEngine.get().observerPlayerListWindow)
 #define buttonPlayer (s_observerControls_perEngine.get().buttonPlayer)

@@ -88,7 +88,7 @@ protected:
 	// too) store this engine's message window here, a real window with GameWindowManagerDummy, and closeWindows
 	// destroys it through the current engine's window manager; shared, one engine would destroy another's window
 	// (PLAN-023 Phase 4). ScriptActions.cpp stands m_messageWindow in for its value.
-	static rts::PerEngineStatic<GameWindow *> s_messageWindow_perEngine;
+	static const rts::PerEngineStatic<GameWindow *> s_messageWindow_perEngine;
 	static void clearWindow() {s_messageWindow_perEngine.get()=nullptr;};
 #else
 	static GameWindow *m_messageWindow;

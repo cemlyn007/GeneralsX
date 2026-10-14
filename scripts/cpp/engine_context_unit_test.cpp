@@ -1,7 +1,7 @@
 // GeneralsX @feature cemlyn007 03/10/2026 Unit test of rts::PerEngineStatic's get() and get(initialize) (PLAN-023)
 //
 // Built and run by engine_context_unit_test.py against Common/EngineContext.cpp alone, with a stub PreRTS.h
-// whose DEBUG_ASSERTCRASH is assert(), under AddressSanitizer so that a leaked slot object fails the run.
+// whose DEBUG_ASSERTCRASH is assert(), under AddressSanitizer so that a leaked per-engine static fails the run.
 
 #include "Common/EngineContext.h"
 
@@ -27,7 +27,7 @@ void setFPMode() {}
 
 namespace
 {
-// Counts the objects alive, so a slot object that is dropped without being destroyed shows up.
+// Counts the objects alive, so a per-engine static that is dropped without being destroyed shows up.
 int theLiveCounters = 0;
 std::vector<int> theDestroyed;
 
@@ -44,16 +44,16 @@ struct Counter
 	Counter& operator=(const Counter&) = delete;
 };
 
-rts::PerEngineStatic<Counter> theCounter;
-rts::PerEngineStatic<Counter> theOther;
-rts::PerEngineStatic<Counter> theThird;
-rts::PerEngineStatic<Counter> theThrowing;
+constexpr rts::PerEngineStatic<Counter> theCounter{};
+constexpr rts::PerEngineStatic<Counter> theOther{};
+constexpr rts::PerEngineStatic<Counter> theThird{};
+constexpr rts::PerEngineStatic<Counter> theThrowing{};
 int theConstructorRuns = 0;
-rts::PerEngineStatic<Counter> theWithConstructorInitializer([](Counter& counter) {
+constexpr rts::PerEngineStatic<Counter> theWithConstructorInitializer([](Counter& counter) {
 	++theConstructorRuns;
 	counter.value = 40 + theConstructorRuns;
 });
-rts::PerEngineStatic<Counter> theThrowingConstructorInitializer([](Counter&) { throw std::runtime_error("init"); });
+constexpr rts::PerEngineStatic<Counter> theThrowingConstructorInitializer([](Counter&) { throw std::runtime_error("init"); });
 }
 
 static void testGetInitializeRunsOncePerContext()
@@ -103,11 +103,11 @@ static void testGetInitializeCleansUpWhenItThrows()
 	}
 	CHECK(threw);
 	CHECK(theLiveCounters == before);
-	CHECK(!context.hasSlotObjects());
+	CHECK(context.countStatics() == 0);
 
-	// The slot is still unset, so the next call initialises it.
+	// The static is still unset, so the next call initialises it.
 	CHECK(theThrowing.get([](Counter& counter) { counter.value = 7; }).value == 7);
-	CHECK(context.hasSlotObjects());
+	CHECK(context.countStatics() == 1);
 }
 
 static void testConstructorInitializerRunsOncePerContext()
@@ -144,18 +144,18 @@ static void testConstructorInitializerCleansUpWhenItThrows()
 	}
 	CHECK(threw);
 	CHECK(theLiveCounters == before);
-	CHECK(!context.hasSlotObjects());
+	CHECK(context.countStatics() == 0);
 }
 
-static void testSlotsAreDestroyedNewestFirstWithTheContext()
+static void testStaticsAreDestroyedNewestFirstWithTheContext()
 {
 	const int before = theLiveCounters;
 	theDestroyed.clear();
 	{
 		rts::EngineContext context;
 		rts::Scope scope(&context);
-		// theCounter, theOther and theThird have ascending slot indices. Creating theOther, theThird, then
-		// theCounter matches neither ascending nor descending index order, so only newest-first passes.
+		// theCounter, theOther and theThird are declared in that order. Creating theOther, theThird, then
+		// theCounter matches neither declaration order nor its reverse, so only newest-first passes.
 		theOther.get().value = 1;
 		theThird.get().value = 2;
 		theCounter.get().value = 3;
@@ -173,7 +173,7 @@ int main()
 	testGetInitializeCleansUpWhenItThrows();
 	testConstructorInitializerRunsOncePerContext();
 	testConstructorInitializerCleansUpWhenItThrows();
-	testSlotsAreDestroyedNewestFirstWithTheContext();
+	testStaticsAreDestroyedNewestFirstWithTheContext();
 	if (theFailures == 0)
 		std::printf("engine_context_unit_test: ok\n");
 	return theFailures == 0 ? 0 : 1;

@@ -70,7 +70,7 @@ struct QuitMenuState
 	Bool isVisible;
 	GameWindow *quitConfirmationWindow;
 };
-static rts::PerEngineStatic<QuitMenuState> s_quitMenuState_perEngine;
+static constexpr rts::PerEngineStatic<QuitMenuState> s_quitMenuState_perEngine{};
 #define quitMenuLayout (s_quitMenuState_perEngine.get().quitMenuLayout)
 #define fullQuitMenuLayout (s_quitMenuState_perEngine.get().fullQuitMenuLayout)
 #define noSaveLoadQuitMenuLayout (s_quitMenuState_perEngine.get().noSaveLoadQuitMenuLayout)
