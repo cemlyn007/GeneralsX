@@ -124,20 +124,65 @@ static NameKeyType checkBoxNonAsianFontID = NAMEKEY_INVALID;
 #endif
 
 // Window Pointers ------------------------------------------------------------------------
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, parent, nullptr);
+#define parent RTS_ENGINE_GLOBAL_REF(parent)
+#else
 static GameWindow *parent = nullptr;
+#endif
 static GameWindow *listboxInfo = nullptr;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, buttonClose, nullptr);
+#define buttonClose RTS_ENGINE_GLOBAL_REF(buttonClose)
+#else
 static GameWindow *buttonClose = nullptr;
+#endif
 static GameWindow *buttonBuddies = nullptr;
 //static GameWindow *buttonbuttonOptions = nullptr;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, buttonSetLocale, nullptr);
+#define buttonSetLocale RTS_ENGINE_GLOBAL_REF(buttonSetLocale)
+#else
 static GameWindow *buttonSetLocale = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, buttonDeleteAccount, nullptr);
+#define buttonDeleteAccount RTS_ENGINE_GLOBAL_REF(buttonDeleteAccount)
+#else
 static GameWindow *buttonDeleteAccount = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, checkBoxAsianFont, nullptr);
+#define checkBoxAsianFont RTS_ENGINE_GLOBAL_REF(checkBoxAsianFont)
+#else
 static GameWindow *checkBoxAsianFont = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, checkBoxNonAsianFont, nullptr);
+#define checkBoxNonAsianFont RTS_ENGINE_GLOBAL_REF(checkBoxNonAsianFont)
+#else
 static GameWindow *checkBoxNonAsianFont = nullptr;
+#endif
 
 static Bool isOverlayActive = false;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Bool, raiseMessageBox, false);
+#define raiseMessageBox RTS_ENGINE_GLOBAL_REF(raiseMessageBox)
+#else
 static Bool raiseMessageBox = false;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Int, lookAtPlayerID, 0);
+#define lookAtPlayerID RTS_ENGINE_GLOBAL_REF(lookAtPlayerID)
+#else
 static Int lookAtPlayerID = 0;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(std::string, lookAtPlayerName);
+#define lookAtPlayerName RTS_ENGINE_GLOBAL_REF(lookAtPlayerName)
+#else
 static std::string lookAtPlayerName;
+#endif
 
 
 static const char *const rankNames[] = {
@@ -515,7 +560,12 @@ void BattleHonorTooltip(GameWindow *window,
 
 }
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Int, rowsToSkip, 0);
+#define rowsToSkip RTS_ENGINE_GLOBAL_REF(rowsToSkip)
+#else
 static Int rowsToSkip = 0;
+#endif
 void ResetBattleHonorInsertion()
 {
 	rowsToSkip = 0;
@@ -526,7 +576,11 @@ void InsertBattleHonor(GameWindow *list, const Image *image, Bool enabled, Int i
 	Int height = MAX_BATTLE_HONOR_IMAGE_HEIGHT * (TheDisplay->getHeight() / static_cast<float>(DEFAULT_DISPLAY_HEIGHT));
 
 	static Int enabledColor = 0xFFFFFFFF;
+#if RTS_ENGINE_CONTEXT
+	static const Int disabledColor = GameMakeColor(80, 80, 80, 255);
+#else
 	static Int disabledColor = GameMakeColor(80, 80, 80, 255);
+#endif
 	Int color;
 	if (enabled)
 		color = enabledColor;

@@ -56,7 +56,13 @@
 #if defined(DEBUG_CRC) && !RETAIL_COMPATIBLE_NETWORKING
 Int NET_CRC_INTERVAL = 1;
 #else
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(Int, NET_CRC_INTERVAL, 100);
+#define NET_CRC_INTERVAL RTS_ENGINE_GLOBAL_REF(NET_CRC_INTERVAL)
+#else
 Int NET_CRC_INTERVAL = 100;
+#endif
 #endif
 
 // DEFINES ////////////////////////////////////////////////////////////////////

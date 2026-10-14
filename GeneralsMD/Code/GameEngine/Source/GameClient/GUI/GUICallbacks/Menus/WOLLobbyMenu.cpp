@@ -83,20 +83,55 @@ static LogClass s_perfLog("Perf.txt");
 #endif // DEBUG_LOGGING
 
 // PRIVATE DATA ///////////////////////////////////////////////////////////////////////////////////
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Bool, isShuttingDown, false);
+#define isShuttingDown RTS_ENGINE_GLOBAL_REF(isShuttingDown)
+#else
 static Bool isShuttingDown = false;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Bool, buttonPushed, false);
+#define buttonPushed RTS_ENGINE_GLOBAL_REF(buttonPushed)
+#else
 static Bool buttonPushed = false;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(const char*, nextScreen, nullptr);
+#define nextScreen RTS_ENGINE_GLOBAL_REF(nextScreen)
+#else
 static const char *nextScreen = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Bool, raiseMessageBoxes, false);
+#define raiseMessageBoxes RTS_ENGINE_GLOBAL_REF(raiseMessageBoxes)
+#else
 static Bool raiseMessageBoxes = false;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(time_t, gameListRefreshTime, 0);
+#define gameListRefreshTime RTS_ENGINE_GLOBAL_REF(gameListRefreshTime)
+#else
 static time_t gameListRefreshTime = 0;
+#endif
 static const time_t gameListRefreshInterval = 10000;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(time_t, playerListRefreshTime, 0);
+#define playerListRefreshTime RTS_ENGINE_GLOBAL_REF(playerListRefreshTime)
+#else
 static time_t playerListRefreshTime = 0;
+#endif
 static const time_t playerListRefreshInterval = 5000;
 #if defined(SAGE_USE_NGMP)
 #endif
 
 void setUnignoreText( WindowLayout *layout, AsciiString nick, GPProfile id);
 static void doSliderTrack(GameWindow *control, Int val);
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(Bool, DontShowMainMenu, FALSE);
+#define DontShowMainMenu RTS_ENGINE_GLOBAL_REF(DontShowMainMenu)
+#else
 Bool DontShowMainMenu = FALSE;
+#endif
 enum { COLUMN_PLAYERNAME = 1 };
 
 // window ids ------------------------------------------------------------------------------
@@ -164,26 +199,81 @@ static GameWindow *buttonBack = nullptr;
 #endif
 static GameWindow *buttonHost = nullptr;
 static GameWindow *buttonRefresh = nullptr;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, buttonJoin, nullptr);
+#define buttonJoin RTS_ENGINE_GLOBAL_REF(buttonJoin)
+#else
 static GameWindow *buttonJoin = nullptr;
+#endif
 static GameWindow *buttonBuddy = nullptr;
 static GameWindow *buttonChat = nullptr;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, textEntryChat, nullptr);
+#define textEntryChat RTS_ENGINE_GLOBAL_REF(textEntryChat)
+#else
 static GameWindow *textEntryChat = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, listboxLobbyPlayers, nullptr);
+#define listboxLobbyPlayers RTS_ENGINE_GLOBAL_REF(listboxLobbyPlayers)
+#else
 static GameWindow *listboxLobbyPlayers = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, listboxLobbyChat, nullptr);
+#define listboxLobbyChat RTS_ENGINE_GLOBAL_REF(listboxLobbyChat)
+#else
 static GameWindow *listboxLobbyChat = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, comboLobbyGroupRooms, nullptr);
+#define comboLobbyGroupRooms RTS_ENGINE_GLOBAL_REF(comboLobbyGroupRooms)
+#else
 static GameWindow *comboLobbyGroupRooms = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, parent, nullptr);
+#define parent RTS_ENGINE_GLOBAL_REF(parent)
+#else
 static GameWindow *parent = nullptr;
+#endif
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Int, groupRoomToJoin, 0);
+#define groupRoomToJoin RTS_ENGINE_GLOBAL_REF(groupRoomToJoin)
+#else
 static Int groupRoomToJoin = 0;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Int, initialGadgetDelay, 2);
+#define initialGadgetDelay RTS_ENGINE_GLOBAL_REF(initialGadgetDelay)
+#else
 static Int	initialGadgetDelay = 2;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Bool, justEntered, FALSE);
+#define justEntered RTS_ENGINE_GLOBAL_REF(justEntered)
+#else
 static Bool justEntered = FALSE;
+#endif
 
 // GeneralsX @feature fbraz3 16/08/2026 Chat rate-limiter: prevent spam (3s cooldown between messages)
 static int64_t s_lobbyLastChatTimeMs = 0;
 static const int64_t S_LOBBY_CHAT_INTERVAL_MS = 3000;
 
 // GeneralsX @feature fbraz3 16/08/2026 Relay toggle globals for troubleshooting
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(bool, g_bForceRelay, false);
+#define g_bForceRelay RTS_ENGINE_GLOBAL_REF(g_bForceRelay)
+#else
 bool g_bForceRelay = false;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(UnsignedInt, m_exeCRCOriginal, 0);
+#define m_exeCRCOriginal RTS_ENGINE_GLOBAL_REF(m_exeCRCOriginal)
+#else
 UnsignedInt m_exeCRCOriginal = 0;
+#endif
 
 static bool LobbyChatSlowmodeAllowsSend()
 {
@@ -222,13 +312,23 @@ Bool g_fakeCRC = FALSE;
 Bool g_debugSlots = FALSE;
 #endif
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(std::list<PeerResponse>, TheLobbyQueuedUTMs);
+#define TheLobbyQueuedUTMs RTS_ENGINE_GLOBAL_REF(TheLobbyQueuedUTMs)
+#else
 std::list<PeerResponse> TheLobbyQueuedUTMs;
+#endif
 
 // Slash commands -------------------------------------------------------------------------
 extern "C" {
 int getQR2HostingStatus();
 }
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL(int, isThreadHosting);
+#define isThreadHosting RTS_ENGINE_GLOBAL_REF(isThreadHosting)
+#else
 extern int isThreadHosting;
+#endif
 
 Bool handleLobbySlashCommands(UnicodeString uText)
 {
@@ -363,7 +463,12 @@ Bool handleLobbySlashCommands(UnicodeString uText)
 	return FALSE; // not a slash command
 }
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Bool, s_tryingToHostOrJoin, FALSE);
+#define s_tryingToHostOrJoin RTS_ENGINE_GLOBAL_REF(s_tryingToHostOrJoin)
+#else
 static Bool s_tryingToHostOrJoin = FALSE;
+#endif
 void SetLobbyAttemptHostJoin(Bool start)
 {
 	s_tryingToHostOrJoin = start;

@@ -130,7 +130,12 @@
 
 #endif
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL(Int, NET_CRC_INTERVAL);
+#define NET_CRC_INTERVAL RTS_ENGINE_GLOBAL_REF(NET_CRC_INTERVAL)
+#else
 extern Int NET_CRC_INTERVAL;
+#endif
 #if RTS_ENGINE_CONTEXT
 // GeneralsX @feature cemlyn007 28/09/2026 Per engine (an EngineContext field, 100 to start with): replay
 // playback and -ReplayCRCInterval set it for their engine only (PLAN-023 Phase 2).

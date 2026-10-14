@@ -56,7 +56,12 @@
 #include "GameLogic/ScriptEngine.h"
 
 //external declarations of the Gadgets the callbacks can use
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(WindowLayout*, popupCommunicatorLayout, nullptr);
+#define popupCommunicatorLayout RTS_ENGINE_GLOBAL_REF(popupCommunicatorLayout)
+#else
 WindowLayout *popupCommunicatorLayout = nullptr;
+#endif
 
 
 //-------------------------------------------------------------------------------------------------

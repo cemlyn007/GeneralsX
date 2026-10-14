@@ -59,6 +59,83 @@
  * his own choice.
  */
 //										m_connectionPairs[num nodes]	[round]			 [node index]
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_CLASS_STATIC_DEFINE(Int[MAX_SLOTS-1][MAX_SLOTS-1][MAX_SLOTS], NAT, m_connectionPairs, 
+{
+	{	// 2 nodes
+		//	node 0	node 1	node 2	node 3	node 4	node 5	node 6	node 7
+		{			1,			0,			-1,			-1,			-1,			-1,			-1,			-1},	// round 0
+		{			-1,			-1,			-1,			-1,			-1,			-1,			-1,			-1},	// round 1
+		{			-1,			-1,			-1,			-1,			-1,			-1,			-1,			-1},	// round 2
+		{			-1,			-1,			-1,			-1,			-1,			-1,			-1,			-1},	// round 3
+		{			-1,			-1,			-1,			-1,			-1,			-1,			-1,			-1},	// round 4
+		{			-1,			-1,			-1,			-1,			-1,			-1,			-1,			-1},	// round 5
+		{			-1,			-1,			-1,			-1,			-1,			-1,			-1,			-1}		// round 6
+	},
+	{	// 3 nodes
+		//	node 0	node 1	node 2	node 3	node 4	node 5	node 6	node 7
+		{			1,			0,			-1,			-1,			-1,			-1,			-1,			-1},	// round 0
+		{			2,			-1,			0,			-1,			-1,			-1,			-1,			-1},	// round 1
+		{			-1,			2,			1,			-1,			-1,			-1,			-1,			-1},	// round 2
+		{			-1,			-1,			-1,			-1,			-1,			-1,			-1,			-1},	// round 3
+		{			-1,			-1,			-1,			-1,			-1,			-1,			-1,			-1},	// round 4
+		{			-1,			-1,			-1,			-1,			-1,			-1,			-1,			-1},	// round 5
+		{			-1,			-1,			-1,			-1,			-1,			-1,			-1,			-1}		// round 6
+	},
+	{	// 4 nodes
+		//	node 0	node 1	node 2	node 3	node 4	node 5	node 6	node 7
+		{			1,			0,			3,			2,			-1,			-1,			-1,			-1},	// round 0
+		{			2,			3,			0,			1,			-1,			-1,			-1,			-1},	// round 1
+		{			3,			2,			1,			0,			-1,			-1,			-1,			-1},	// round 2
+		{			-1,			-1,			-1,			-1,			-1,			-1,			-1,			-1},	// round 3
+		{			-1,			-1,			-1,			-1,			-1,			-1,			-1,			-1},	// round 4
+		{			-1,			-1,			-1,			-1,			-1,			-1,			-1,			-1},	// round 5
+		{			-1,			-1,			-1,			-1,			-1,			-1,			-1,			-1}		// round 6
+	},
+	{	// 5 nodes
+		//	node 0	node 1	node 2	node 3	node 4	node 5	node 6	node 7
+		{			2,			4,			0,			-1,			1,			-1,			-1,			-1},	// round 0
+		{			-1,			3,			4,			1,			2,			-1,			-1,			-1},	// round 1
+		{			3,			2,			1,			0,			-1,			-1,			-1,			-1},	// round 2
+		{			4,			-1,			3,			2,			0,			-1,			-1,			-1},	// round 3
+		{			1,			0,			-1,			4,			3,			-1,			-1,			-1},	// round 4
+		{			-1,			-1,			-1,			-1,			-1,			-1,			-1,			-1},	// round 5
+		{			-1,			-1,			-1,			-1,			-1,			-1,			-1,			-1}		// round 6
+	},
+	{	// 6 nodes
+		//	node 0	node 1	node 2	node 3	node 4	node 5	node 6	node 7
+		{			3,			5,			4,			0,			2,			1,			-1,			-1},	// round 0
+		{			2,			4,			0,			5,			1,			3,			-1,			-1},	// round 1
+		{			4,			3,			5,			1,			0,			2,			-1,			-1},	// round 2
+		{			1,			0,			3,			2,			5,			4,			-1,			-1},	// round 3
+		{			5,			2,			1,			4,			3,			0,			-1,			-1},	// round 4
+		{			-1,			-1,			-1,			-1,			-1,			-1,			-1,			-1},	// round 5
+		{			-1,			-1,			-1,			-1,			-1,			-1,			-1,			-1}		// round 6
+	},
+	{	// 7 nodes
+		//	node 0	node 1	node 2	node 3	node 4	node 5	node 6	node 7
+		{			-1,			6,			5,			4,			3,			2,			1,			-1},	// round 0
+		{			2,			-1,			0,			6,			5,			4,			3,			-1},	// round 1
+		{			4,			3,			-1,			1,			0,			6,			5,			-1},	// round 2
+		{			6,			5,			4,			-1,			2,			1,			0,			-1},	// round 3
+		{			1,			0,			6,			5,			-1,			3,			2,			-1},	// round 4
+		{			3,			2,			1,			0,			6,			-1,			4,			-1},	// round 5
+		{			5,			4,			3,			2,			1,			0,			-1,			-1}		// round 6
+	},
+	{	// 8 nodes
+		//	node 0	node 1	node 2	node 3	node 4	node 5	node 6	node 7
+		{			4,			5,			6,			7,			0,			1,			2,			3},		// round 0
+		{			5,			4,			7,			6,			1,			0,			3,			2},		// round 1
+		{			3,			6,			5,			0,			7,			2,			1,			4},		// round 2
+		{			2,			7,			0,			5,			6,			3,			4,			1},		// round 3
+		{			6,			3,			4,			1,			2,			7,			0,			5},		// round 4
+		{			1,			0,			3,			2,			5,			4,			7,			6},		// round 5
+		{			7,			2,			1,			4,			3,			6,			5,			0}		// round 6
+	}
+});
+#define m_connectionPairs RTS_ENGINE_GLOBAL_REF(m_connectionPairs)
+#else
 /* static */ Int NAT::m_connectionPairs[MAX_SLOTS-1][MAX_SLOTS-1][MAX_SLOTS] =
 {
 	{	// 2 nodes
@@ -132,13 +209,44 @@
 		{			7,			2,			1,			4,			3,			6,			5,			0}		// round 6
 	}
 };
+#endif
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_CLASS_STATIC_DEFINE(Int, NAT, m_timeBetweenRetries, 500); // .5 seconds between retries sounds good to me.
+#define m_timeBetweenRetries RTS_ENGINE_GLOBAL_REF(m_timeBetweenRetries)
+#else
 /* static */ Int NAT::m_timeBetweenRetries = 500; // .5 seconds between retries sounds good to me.
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_CLASS_STATIC_DEFINE(time_t, NAT, m_manglerRetryTimeInterval, 300); // sounds good to me.
+#define m_manglerRetryTimeInterval RTS_ENGINE_GLOBAL_REF(m_manglerRetryTimeInterval)
+#else
 /* static */ time_t NAT::m_manglerRetryTimeInterval = 300; // sounds good to me.
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_CLASS_STATIC_DEFINE(Int, NAT, m_maxAllowedManglerRetries, 25); // works for me.
+#define m_maxAllowedManglerRetries RTS_ENGINE_GLOBAL_REF(m_maxAllowedManglerRetries)
+#else
 /* static */ Int NAT::m_maxAllowedManglerRetries = 25; // works for me.
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_CLASS_STATIC_DEFINE(time_t, NAT, m_keepaliveInterval, 15000); // 15 seconds between keepalive packets seems good.
+#define m_keepaliveInterval RTS_ENGINE_GLOBAL_REF(m_keepaliveInterval)
+#else
 /* static */ time_t NAT::m_keepaliveInterval = 15000; // 15 seconds between keepalive packets seems good.
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_CLASS_STATIC_DEFINE(time_t, NAT, m_timeToWaitForPort, 15000); // wait for 15 seconds for the other player's port number.
+#define m_timeToWaitForPort RTS_ENGINE_GLOBAL_REF(m_timeToWaitForPort)
+#else
 /* static */ time_t NAT::m_timeToWaitForPort = 15000; // wait for 15 seconds for the other player's port number.
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_CLASS_STATIC_DEFINE(time_t, NAT, m_timeForRoundTimeout, 15000); // wait for at most 15 seconds for each connection round to finish.
+#define m_timeForRoundTimeout RTS_ENGINE_GLOBAL_REF(m_timeForRoundTimeout)
+#else
 /* static */ time_t NAT::m_timeForRoundTimeout = 15000; // wait for at most 15 seconds for each connection round to finish.
+#endif
 
 #if !RTS_ENGINE_CONTEXT
 NAT *TheNAT = nullptr;
@@ -180,7 +288,11 @@ NAT::~NAT() {
 // check to see if this connection is done for us, or if it has failed.
 enum { MS_TO_WAIT_FOR_STATS = 5000 };
 NATStateType NAT::update() {
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(UnsignedInt, s_startStatWaitTime, 0);
+#else
 	static UnsignedInt s_startStatWaitTime = 0;
+#endif
 	if (m_NATState == NATSTATE_DONE) {
 		m_NATState = NATSTATE_IDLE;
 	} else if (m_NATState == NATSTATE_WAITFORSTATS) {

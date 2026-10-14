@@ -71,9 +71,24 @@ RTS_ENGINE_GLOBAL(NameKeyType, winMapPreviewID, NAMEKEY_INVALID);
 #else
 static NameKeyType winMapPreviewID = NAMEKEY_INVALID;
 #endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, parent, nullptr);
+#define parent RTS_ENGINE_GLOBAL_REF(parent)
+#else
 static GameWindow *parent = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, mapList, nullptr);
+#define mapList RTS_ENGINE_GLOBAL_REF(mapList)
+#else
 static GameWindow *mapList = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, winMapPreview, nullptr);
+#define winMapPreview RTS_ENGINE_GLOBAL_REF(winMapPreview)
+#else
 static GameWindow *winMapPreview = nullptr;
+#endif
 #if RTS_ENGINE_CONTEXT
 RTS_ENGINE_GLOBAL(NameKeyType, radioButtonSystemMapsID, NAMEKEY_INVALID);
 #define radioButtonSystemMapsID RTS_ENGINE_GLOBAL_REF(radioButtonSystemMapsID)
@@ -87,7 +102,12 @@ RTS_ENGINE_GLOBAL(NameKeyType, radioButtonUserMapsID, NAMEKEY_INVALID);
 static NameKeyType radioButtonUserMapsID = NAMEKEY_INVALID;
 #endif
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*[MAX_SLOTS], buttonMapStartPosition, {0});
+#define buttonMapStartPosition RTS_ENGINE_GLOBAL_REF(buttonMapStartPosition)
+#else
 static GameWindow *buttonMapStartPosition[MAX_SLOTS] = {0};
+#endif
 static NameKeyType buttonMapStartPositionID[MAX_SLOTS] = { NAMEKEY_INVALID,NAMEKEY_INVALID,
 																									NAMEKEY_INVALID,NAMEKEY_INVALID,
 																										NAMEKEY_INVALID,NAMEKEY_INVALID,
@@ -98,7 +118,12 @@ static NameKeyType buttonMapStartPositionID[MAX_SLOTS] = { NAMEKEY_INVALID,NAMEK
 void positionStartSpots( AsciiString mapName, GameWindow *buttonMapStartPositions[], GameWindow *mapWindow);
 static const char *layoutFilename = "LanGameOptionsMenu.wnd";
 static const char *parentName = "LanGameOptionsMenuParent";
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 Tables no engine writes are constant (docs/EMBEDDING.md).
+static const char * const gadgetsToHide[] =
+#else
 static const char *gadgetsToHide[] =
+#endif
 {
 	"MapWindow",
 	//"StaticTextTitle",
@@ -112,7 +137,11 @@ static const char *gadgetsToHide[] =
 
 	nullptr
 };
+#if RTS_ENGINE_CONTEXT
+static const char * const perPlayerGadgetsToHide[] =
+#else
 static const char *perPlayerGadgetsToHide[] =
+#endif
 {
 	"ComboBoxTeam",
 	"ComboBoxColor",

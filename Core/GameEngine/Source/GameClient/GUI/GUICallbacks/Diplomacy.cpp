@@ -109,8 +109,18 @@ RTS_ENGINE_GLOBAL(NameKeyType, radioButtonBuddiesID, NAMEKEY_INVALID);
 #else
 static NameKeyType radioButtonBuddiesID = NAMEKEY_INVALID;
 #endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, radioButtonInGame, nullptr);
+#define radioButtonInGame RTS_ENGINE_GLOBAL_REF(radioButtonInGame)
+#else
 static GameWindow *radioButtonInGame = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, radioButtonBuddies, nullptr);
+#define radioButtonBuddies RTS_ENGINE_GLOBAL_REF(radioButtonBuddies)
+#else
 static GameWindow *radioButtonBuddies = nullptr;
+#endif
 #if RTS_ENGINE_CONTEXT
 RTS_ENGINE_GLOBAL(NameKeyType, winInGameID, NAMEKEY_INVALID);
 #define winInGameID RTS_ENGINE_GLOBAL_REF(winInGameID)
@@ -129,9 +139,24 @@ RTS_ENGINE_GLOBAL(NameKeyType, winSoloID, NAMEKEY_INVALID);
 #else
 static NameKeyType winSoloID = NAMEKEY_INVALID;
 #endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, winInGame, nullptr);
+#define winInGame RTS_ENGINE_GLOBAL_REF(winInGame)
+#else
 static GameWindow *winInGame = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, winBuddies, nullptr);
+#define winBuddies RTS_ENGINE_GLOBAL_REF(winBuddies)
+#else
 static GameWindow *winBuddies = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, winSolo, nullptr);
+#define winSolo RTS_ENGINE_GLOBAL_REF(winSolo)
+#else
 static GameWindow *winSolo = nullptr;
+#endif
 #if RTS_ENGINE_CONTEXT
 // GeneralsX @feature cemlyn007 28/09/2026 Per engine: GameLogic::clearGameData (headless too) resets this
 // engine's diplomacy popup (HideDiplomacy, ResetDiplomacy) and VictoryConditions populates it, so these

@@ -45,10 +45,30 @@
 #include "GameNetwork/LANAPI.h"
 
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, parent, nullptr);
+#define parent RTS_ENGINE_GLOBAL_REF(parent)
+#else
 static GameWindow *parent = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, staticTextGameName, nullptr);
+#define staticTextGameName RTS_ENGINE_GLOBAL_REF(staticTextGameName)
+#else
 static GameWindow *staticTextGameName = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, staticTextMapName, nullptr);
+#define staticTextMapName RTS_ENGINE_GLOBAL_REF(staticTextMapName)
+#else
 static GameWindow *staticTextMapName = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, listBoxPlayers, nullptr);
+#define listBoxPlayers RTS_ENGINE_GLOBAL_REF(listBoxPlayers)
+#else
 static GameWindow *listBoxPlayers = nullptr;
+#endif
 static GameWindow *winCrates = nullptr;
 static GameWindow *winSuperWeapons = nullptr;
 static GameWindow *winFreeForAll = nullptr;
@@ -97,7 +117,12 @@ RTS_ENGINE_GLOBAL(NameKeyType, winFreeForAllID, NAMEKEY_INVALID);
 static NameKeyType winFreeForAllID = NAMEKEY_INVALID;
 #endif
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(WindowLayout*, gameInfoWindowLayout, nullptr);
+#define gameInfoWindowLayout RTS_ENGINE_GLOBAL_REF(gameInfoWindowLayout)
+#else
 static WindowLayout *gameInfoWindowLayout = nullptr;
+#endif
 // PUBLIC FUNCTIONS ///////////////////////////////////////////////////////////////////////////////
 
 void CreateLANGameInfoWindow( GameWindow *sizeAndPosWin )
@@ -132,8 +157,16 @@ void DestroyGameInfoWindow()
 
 void RefreshGameInfoWindow(GameInfo *gameInfo, UnicodeString gameName)
 {
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(const Image*, randomIcon, TheMappedImageCollection->findImageByName("GameinfoRANDOM"));
+#else
 	static const Image *randomIcon = TheMappedImageCollection->findImageByName("GameinfoRANDOM");
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(const Image*, observerIcon, TheMappedImageCollection->findImageByName("GameinfoOBSRVR"));
+#else
 	static const Image *observerIcon = TheMappedImageCollection->findImageByName("GameinfoOBSRVR");
+#endif
 	if(!gameInfoWindowLayout || !gameInfo )
 		return;
 

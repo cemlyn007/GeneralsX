@@ -61,9 +61,24 @@ static NameKeyType buttonDisconnectID = NAMEKEY_INVALID;
 #endif
 
 // Window Pointers ------------------------------------------------------------------------
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, parentWOLStatus, nullptr);
+#define parentWOLStatus RTS_ENGINE_GLOBAL_REF(parentWOLStatus)
+#else
 static GameWindow *parentWOLStatus = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, buttonDisconnect, nullptr);
+#define buttonDisconnect RTS_ENGINE_GLOBAL_REF(buttonDisconnect)
+#else
 static GameWindow *buttonDisconnect = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(GameWindow*, progressTextWindow, nullptr);
+#define progressTextWindow RTS_ENGINE_GLOBAL_REF(progressTextWindow)
+#else
 GameWindow *progressTextWindow = nullptr;
+#endif
 
 //-------------------------------------------------------------------------------------------------
 /** Initialize the WOL Status Menu */

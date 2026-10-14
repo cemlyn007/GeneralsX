@@ -100,9 +100,24 @@ RTS_ENGINE_GLOBAL(NameKeyType, buttonOkID, NAMEKEY_INVALID);
 static NameKeyType buttonOkID = NAMEKEY_INVALID;
 #endif
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, parentPopup, nullptr);
+#define parentPopup RTS_ENGINE_GLOBAL_REF(parentPopup)
+#else
 static GameWindow *parentPopup = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, textEntryGamePassword, nullptr);
+#define textEntryGamePassword RTS_ENGINE_GLOBAL_REF(textEntryGamePassword)
+#else
 static GameWindow *textEntryGamePassword = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, buttonOk, nullptr);
+#define buttonOk RTS_ENGINE_GLOBAL_REF(buttonOk)
+#else
 static GameWindow *buttonOk = nullptr;
+#endif
 
 static void joinGame( AsciiString password );
 

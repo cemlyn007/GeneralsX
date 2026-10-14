@@ -55,7 +55,12 @@ void CopyWcharToWindowsWideChar( WideCharWindows *dest, const WideChar *src, Uns
 
 wchar_t *GetWindowsWideCharAsWchar( WideCharWindows *src )
 {
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+	RTS_ENGINE_STATIC(wchar_t[MAX_COMPUTERNAME_LENGTH], buf);
+#else
 	static wchar_t buf[MAX_COMPUTERNAME_LENGTH];
+#endif
 	// Get the length of the string
 	UnsignedInt len = 0;
 	while (src[len] != 0)

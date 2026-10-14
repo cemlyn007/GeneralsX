@@ -22,6 +22,16 @@ namespace rts
 
 // TheSuperHackers @feature Adds support for launching multiple game clients and keeping track of their instance id.
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+#define s_instanceIndex RTS_ENGINE_GLOBAL_REF(s_instanceIndex)
+#endif
+#if RTS_ENGINE_CONTEXT
+#define s_isMultiInstance RTS_ENGINE_GLOBAL_REF(s_isMultiInstance)
+#endif
+#if RTS_ENGINE_CONTEXT
+#define s_mutexHandle RTS_ENGINE_GLOBAL_REF(s_mutexHandle)
+#endif
 class ClientInstance
 {
 public:
@@ -49,9 +59,30 @@ public:
 	static const char* getFirstInstanceName();
 
 private:
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_CLASS_STATIC(HANDLE, s_mutexHandle);
+#else
 	static HANDLE s_mutexHandle;
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_CLASS_STATIC(UnsignedInt, s_instanceIndex);
+#else
 	static UnsignedInt s_instanceIndex;
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_CLASS_STATIC(Bool, s_isMultiInstance);
+#else
 	static Bool s_isMultiInstance;
+#endif
 };
 
 } // namespace rts
+#if RTS_ENGINE_CONTEXT
+#undef s_instanceIndex
+#if RTS_ENGINE_CONTEXT
+#undef s_isMultiInstance
+#endif
+#if RTS_ENGINE_CONTEXT
+#undef s_mutexHandle
+#endif
+#endif

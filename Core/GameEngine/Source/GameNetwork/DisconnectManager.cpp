@@ -130,7 +130,12 @@ void DisconnectManager::update(ConnectionManager *conMgr) {
 				if (ThePinger)
 				{
 					//use next ping server
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+					RTS_ENGINE_STATIC(size_t, serverIndex, 0);
+#else
 					static size_t serverIndex = 0;
+#endif
 					serverIndex++;
 
 					AsciiStringList pingServers = TheGameSpyConfig->getPingServers();

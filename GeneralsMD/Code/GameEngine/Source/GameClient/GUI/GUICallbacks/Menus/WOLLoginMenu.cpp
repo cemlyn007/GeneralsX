@@ -80,15 +80,45 @@
 Bool GameSpyUseProfiles = false;
 #endif // ALLOW_NON_PROFILED_LOGIN
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Bool, webBrowserActive, FALSE);
+#define webBrowserActive RTS_ENGINE_GLOBAL_REF(webBrowserActive)
+#else
 static Bool webBrowserActive = FALSE;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Bool, useWebBrowserForTOS, FALSE);
+#define useWebBrowserForTOS RTS_ENGINE_GLOBAL_REF(useWebBrowserForTOS)
+#else
 static Bool useWebBrowserForTOS = FALSE;
+#endif
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Bool, isShuttingDown, false);
+#define isShuttingDown RTS_ENGINE_GLOBAL_REF(isShuttingDown)
+#else
 static Bool isShuttingDown = false;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Bool, buttonPushed, false);
+#define buttonPushed RTS_ENGINE_GLOBAL_REF(buttonPushed)
+#else
 static Bool buttonPushed = false;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(const char*, nextScreen, nullptr);
+#define nextScreen RTS_ENGINE_GLOBAL_REF(nextScreen)
+#else
 static const char *nextScreen = nullptr;
+#endif
 
 static const UnsignedInt loginTimeoutInMS = 10000;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(UnsignedInt, loginAttemptTime, 0);
+#define loginAttemptTime RTS_ENGINE_GLOBAL_REF(loginAttemptTime)
+#else
 static UnsignedInt loginAttemptTime = 0;
+#endif
 
 class GameSpyLoginPreferences : public UserPreferences
 {
@@ -316,7 +346,12 @@ AsciiStringList GameSpyLoginPreferences::getEmails()
 	return theList;
 }
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameSpyLoginPreferences*, loginPref, nullptr);
+#define loginPref RTS_ENGINE_GLOBAL_REF(loginPref)
+#else
 static GameSpyLoginPreferences *loginPref = nullptr;
+#endif
 
 static void startPings()
 {
@@ -488,29 +523,109 @@ static NameKeyType textEntryYearID =				NAMEKEY_INVALID;	// profile
 #endif
 
 // Window Pointers ------------------------------------------------------------------------
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, parentWOLLogin, nullptr);
+#define parentWOLLogin RTS_ENGINE_GLOBAL_REF(parentWOLLogin)
+#else
 static GameWindow *parentWOLLogin =						nullptr;
+#endif
 #if RTS_ENGINE_CONTEXT
 RTS_ENGINE_GLOBAL(GameWindow*, buttonBack, nullptr);
 #define buttonBack RTS_ENGINE_GLOBAL_REF(buttonBack)
 #else
 static GameWindow *buttonBack =								nullptr;
 #endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, buttonLogin, nullptr);
+#define buttonLogin RTS_ENGINE_GLOBAL_REF(buttonLogin)
+#else
 static GameWindow *buttonLogin =							nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, buttonCreateAccount, nullptr);
+#define buttonCreateAccount RTS_ENGINE_GLOBAL_REF(buttonCreateAccount)
+#else
 static GameWindow *buttonCreateAccount =			nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, buttonUseAccount, nullptr);
+#define buttonUseAccount RTS_ENGINE_GLOBAL_REF(buttonUseAccount)
+#else
 static GameWindow *buttonUseAccount =					nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, buttonDontUseAccount, nullptr);
+#define buttonDontUseAccount RTS_ENGINE_GLOBAL_REF(buttonDontUseAccount)
+#else
 static GameWindow *buttonDontUseAccount =			nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, buttonTOS, nullptr);
+#define buttonTOS RTS_ENGINE_GLOBAL_REF(buttonTOS)
+#else
 static GameWindow *buttonTOS						=			nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, parentTOS, nullptr);
+#define parentTOS RTS_ENGINE_GLOBAL_REF(parentTOS)
+#else
 static GameWindow *parentTOS						=			nullptr;
+#endif
 static GameWindow *buttonTOSOK					=			nullptr;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, listboxTOS, nullptr);
+#define listboxTOS RTS_ENGINE_GLOBAL_REF(listboxTOS)
+#else
 static GameWindow *listboxTOS						=			nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, comboBoxEmail, nullptr);
+#define comboBoxEmail RTS_ENGINE_GLOBAL_REF(comboBoxEmail)
+#else
 static GameWindow *comboBoxEmail =						nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, comboBoxLoginName, nullptr);
+#define comboBoxLoginName RTS_ENGINE_GLOBAL_REF(comboBoxLoginName)
+#else
 static GameWindow *comboBoxLoginName =				nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, textEntryLoginName, nullptr);
+#define textEntryLoginName RTS_ENGINE_GLOBAL_REF(textEntryLoginName)
+#else
 static GameWindow *textEntryLoginName =				nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, textEntryPassword, nullptr);
+#define textEntryPassword RTS_ENGINE_GLOBAL_REF(textEntryPassword)
+#else
 static GameWindow *textEntryPassword =				nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, checkBoxRememberPassword, nullptr);
+#define checkBoxRememberPassword RTS_ENGINE_GLOBAL_REF(checkBoxRememberPassword)
+#else
 static GameWindow *checkBoxRememberPassword =	nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, textEntryMonth, nullptr);
+#define textEntryMonth RTS_ENGINE_GLOBAL_REF(textEntryMonth)
+#else
 static GameWindow *textEntryMonth =				nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, textEntryDay, nullptr);
+#define textEntryDay RTS_ENGINE_GLOBAL_REF(textEntryDay)
+#else
 static GameWindow *textEntryDay =				nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, textEntryYear, nullptr);
+#define textEntryYear RTS_ENGINE_GLOBAL_REF(textEntryYear)
+#else
 static GameWindow *textEntryYear =				nullptr;
+#endif
 
 void EnableLoginControls( Bool state )
 {
@@ -835,7 +950,12 @@ void WOLLoginMenuInit( WindowLayout *layout, void *userData )
 //-------------------------------------------------------------------------------------------------
 /** WOL Login Menu shutdown method */
 //-------------------------------------------------------------------------------------------------
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Bool, loggedInOK, false);
+#define loggedInOK RTS_ENGINE_GLOBAL_REF(loggedInOK)
+#else
 static Bool loggedInOK = false;
+#endif
 void WOLLoginMenuShutdown( WindowLayout *layout, void *userData )
 {
 	isShuttingDown = true;

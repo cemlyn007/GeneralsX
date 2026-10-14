@@ -81,7 +81,13 @@ FirewallHelperClass * createFirewallHelper()
  * HISTORY:                                                                                    *
  *   3/15/01 5:03PM ST : Created                                                               *
  *=============================================================================================*/
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_CLASS_STATIC_DEFINE(Int, FirewallHelperClass, m_sourcePortPool, 4096);
+#define m_sourcePortPool RTS_ENGINE_GLOBAL_REF(m_sourcePortPool)
+#else
 /* static */ Int FirewallHelperClass::m_sourcePortPool = 4096;
+#endif
 
 FirewallHelperClass::FirewallHelperClass()
 {

@@ -120,12 +120,37 @@ static NameKeyType windowSortBuddiesID = NAMEKEY_INVALID;
 static GameWindow *buttonSortAlpha = nullptr;
 static GameWindow *buttonSortPing = nullptr;
 static GameWindow *buttonSortBuddies = nullptr;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, windowSortAlpha, nullptr);
+#define windowSortAlpha RTS_ENGINE_GLOBAL_REF(windowSortAlpha)
+#else
 static GameWindow *windowSortAlpha = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, windowSortPing, nullptr);
+#define windowSortPing RTS_ENGINE_GLOBAL_REF(windowSortPing)
+#else
 static GameWindow *windowSortPing = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, windowSortBuddies, nullptr);
+#define windowSortBuddies RTS_ENGINE_GLOBAL_REF(windowSortBuddies)
+#else
 static GameWindow *windowSortBuddies = nullptr;
+#endif
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameSortType, theGameSortType, GAMESORT_ALPHA_ASCENDING);
+#define theGameSortType RTS_ENGINE_GLOBAL_REF(theGameSortType)
+#else
 static GameSortType theGameSortType = GAMESORT_ALPHA_ASCENDING;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Bool, sortBuddies, TRUE);
+#define sortBuddies RTS_ENGINE_GLOBAL_REF(sortBuddies)
+#else
 static Bool sortBuddies = TRUE;
+#endif
 static void showSortIcons()
 {
 	if (windowSortAlpha && windowSortPing)
@@ -170,7 +195,12 @@ static void showSortIcons()
 		}
 	}
 }
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(LobbyGameModeFilter, theLobbyFilter, LOBBY_FILTER_ALL);
+#define theLobbyFilter RTS_ENGINE_GLOBAL_REF(theLobbyFilter)
+#else
 LobbyGameModeFilter theLobbyFilter = LOBBY_FILTER_ALL;
+#endif
 
 LobbyGameModeFilter detectGameMode(const std::string& name)
 {
@@ -256,14 +286,34 @@ static NameKeyType listboxLobbyGamesLargeID = NAMEKEY_INVALID;
 //static NameKeyType listboxLobbyGameInfoID = NAMEKEY_INVALID;
 
 // Window Pointers ------------------------------------------------------------------------
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, parent, nullptr);
+#define parent RTS_ENGINE_GLOBAL_REF(parent)
+#else
 static GameWindow *parent = nullptr;
+#endif
 //static GameWindow *parentGameListSmall = nullptr;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, parentGameListLarge, nullptr);
+#define parentGameListLarge RTS_ENGINE_GLOBAL_REF(parentGameListLarge)
+#else
 static GameWindow *parentGameListLarge = nullptr;
+#endif
        //GameWindow *listboxLobbyGamesSmall = nullptr;
+#if RTS_ENGINE_CONTEXT
+       RTS_ENGINE_EXTERN_GLOBAL_DEFINE(GameWindow*, listboxLobbyGamesLarge, nullptr);
+#define listboxLobbyGamesLarge RTS_ENGINE_GLOBAL_REF(listboxLobbyGamesLarge)
+#else
        GameWindow *listboxLobbyGamesLarge = nullptr;
+#endif
        //GameWindow *listboxLobbyGameInfo = nullptr;
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(const Image*[3], pingImages, { nullptr, nullptr, nullptr });
+#define pingImages RTS_ENGINE_GLOBAL_REF(pingImages)
+#else
 static const Image *pingImages[3] = { nullptr, nullptr, nullptr };
+#endif
 
 static void gameTooltip(GameWindow *window,
 													WinInstanceData *instData,
@@ -417,7 +467,12 @@ static void gameTooltip(GameWindow *window,
 	TheMouse->setCursorTooltip( tooltip, 10, nullptr, 2.0f ); // the text and width are the only params used.  the others are the default values.
 }
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Bool, isSmall, TRUE);
+#define isSmall RTS_ENGINE_GLOBAL_REF(isSmall)
+#else
 static Bool isSmall = TRUE;
+#endif
 
 GameWindow *GetGameListBox()
 {
@@ -505,7 +560,12 @@ void ReleaseWindowInfo()
 }
 
 typedef std::set<GameSpyStagingRoom *> BuddyGameSet;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(BuddyGameSet*, theBuddyGames, nullptr);
+#define theBuddyGames RTS_ENGINE_GLOBAL_REF(theBuddyGames)
+#else
 static BuddyGameSet *theBuddyGames = nullptr;
+#endif
 static void populateBuddyGames()
 {
 	BuddyInfoMap *m = TheGameSpyInfo->getBuddyMap();

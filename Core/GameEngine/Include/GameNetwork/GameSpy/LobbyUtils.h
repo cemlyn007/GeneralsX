@@ -63,5 +63,11 @@ enum LobbyGameModeFilter CPP_11(: Int)
     LOBBY_FILTER_AOD,
 };
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_EXTERN_GLOBAL(LobbyGameModeFilter, theLobbyFilter);
+#define theLobbyFilter RTS_ENGINE_GLOBAL_REF(theLobbyFilter)
+#else
 extern LobbyGameModeFilter theLobbyFilter;
+#endif
 LobbyGameModeFilter detectGameMode(const std::string& name);

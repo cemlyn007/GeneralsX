@@ -58,21 +58,87 @@
 
 ///////////////////////////////////////////////////////////////////////////////////////
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(Bool, checkingForPatchBeforeGameSpy, FALSE);
+#define checkingForPatchBeforeGameSpy RTS_ENGINE_GLOBAL_REF(checkingForPatchBeforeGameSpy)
+#else
 static Bool checkingForPatchBeforeGameSpy = FALSE;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Int, checksLeftBeforeOnline, 0);
+#define checksLeftBeforeOnline RTS_ENGINE_GLOBAL_REF(checksLeftBeforeOnline)
+#else
 static Int checksLeftBeforeOnline = 0;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Int, timeThroughOnline, 0); // used to avoid having old callbacks cause problems
+#define timeThroughOnline RTS_ENGINE_GLOBAL_REF(timeThroughOnline)
+#else
 static Int timeThroughOnline = 0; // used to avoid having old callbacks cause problems
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Bool, mustDownloadPatch, FALSE);
+#define mustDownloadPatch RTS_ENGINE_GLOBAL_REF(mustDownloadPatch)
+#else
 static Bool mustDownloadPatch = FALSE;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Bool, cantConnectBeforeOnline, FALSE);
+#define cantConnectBeforeOnline RTS_ENGINE_GLOBAL_REF(cantConnectBeforeOnline)
+#else
 static Bool cantConnectBeforeOnline = FALSE;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(std::list<QueuedDownload>, queuedDownloads);
+#define queuedDownloads RTS_ENGINE_GLOBAL_REF(queuedDownloads)
+#else
 static std::list<QueuedDownload> queuedDownloads;
+#endif
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(char*, MOTDBuffer, nullptr);
+#define MOTDBuffer RTS_ENGINE_GLOBAL_REF(MOTDBuffer)
+#else
 static char *MOTDBuffer = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(char*, configBuffer, nullptr);
+#define configBuffer RTS_ENGINE_GLOBAL_REF(configBuffer)
+#else
 static char *configBuffer = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(GameWindow*, onlineCancelWindow, nullptr);
+#define onlineCancelWindow RTS_ENGINE_GLOBAL_REF(onlineCancelWindow)
+#else
 GameWindow *onlineCancelWindow = nullptr;
+#endif
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Bool, s_asyncDNSThreadDone, TRUE);
+#define s_asyncDNSThreadDone RTS_ENGINE_GLOBAL_REF(s_asyncDNSThreadDone)
+#else
 static Bool s_asyncDNSThreadDone = TRUE;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Bool, s_asyncDNSThreadSucceeded, FALSE);
+#define s_asyncDNSThreadSucceeded RTS_ENGINE_GLOBAL_REF(s_asyncDNSThreadSucceeded)
+#else
 static Bool s_asyncDNSThreadSucceeded = FALSE;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Bool, s_asyncDNSLookupInProgress, FALSE);
+#define s_asyncDNSLookupInProgress RTS_ENGINE_GLOBAL_REF(s_asyncDNSLookupInProgress)
+#else
 static Bool s_asyncDNSLookupInProgress = FALSE;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(HANDLE, s_asyncDNSThreadHandle, nullptr);
+#define s_asyncDNSThreadHandle RTS_ENGINE_GLOBAL_REF(s_asyncDNSThreadHandle)
+#else
 static HANDLE s_asyncDNSThreadHandle = nullptr;
+#endif
 enum {
 	LOOKUP_INPROGRESS,
 	LOOKUP_FAILED,
@@ -733,8 +799,16 @@ DWORD WINAPI asyncGethostbynameThreadFunc( void * szName )
 
 int asyncGethostbyname(char * szName)
 {
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(int, stat, 0);
+#else
 	static int            stat = 0;
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(unsigned long, threadid);
+#else
 	static unsigned long  threadid;
+#endif
 
 	if( stat == 0 )
 	{
@@ -768,7 +842,12 @@ int asyncGethostbyname(char * szName)
 // GameSpy's HTTP SDK has had at least 1 crash bug, so we're going to just bail and
 // never try again if they crash us.  We won't be able to get back online again (we'll
 // time out) but at least we'll live.
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Bool, isHttpOk, TRUE);
+#define isHttpOk RTS_ENGINE_GLOBAL_REF(isHttpOk)
+#else
 static Bool isHttpOk = TRUE;
+#endif
 
 void HTTPThinkWrapper()
 {

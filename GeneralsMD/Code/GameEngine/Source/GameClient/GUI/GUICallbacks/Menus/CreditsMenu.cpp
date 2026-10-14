@@ -69,7 +69,13 @@
 static NameKeyType parentMainMenuID = NAMEKEY_INVALID;
 
 // window pointers --------------------------------------------------------------------------------
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(GameWindow*, parentMainMenu, nullptr);
+#define parentMainMenu RTS_ENGINE_GLOBAL_REF(parentMainMenu)
+#else
 static GameWindow *parentMainMenu = nullptr;
+#endif
 
 //-----------------------------------------------------------------------------
 // PUBLIC FUNCTIONS ///////////////////////////////////////////////////////////

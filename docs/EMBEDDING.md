@@ -49,7 +49,10 @@ for the build without the context.
 
 `RTS_ENGINE_GLOBAL_REF(name)` is the call `name_rtsEngineGlobal()`, so a
 qualified use (`Class::name`) and a use through an object still name the
-static.
+static. Where a file also declares a local, a parameter or a member with the
+static's name, the `#define` is suspended (`#undef`, then defined again) around
+that declaration's function or block. Where one expression uses both, the use
+of the static names `RTS_ENGINE_GLOBAL_REF(name)` itself, with no `#define`.
 
 A context destroys its statics newest first, since a static's destructor may
 use another. An allocator whose objects other statics may hold, such as an
@@ -82,8 +85,10 @@ is a per-engine static, and so is a flag that guards filling one.
 
 Data no engine writes is constant, so it is read-only and shared: tables are
 `const`, and the constant vectors and matrices (`Vector3`, `Matrix3x3`,
-`Matrix3D`) and bit masks (`BitFlags`) have `constexpr` constructors, so they
-are constant-initialised. The empty `StringClass` and `WideStringClass`
+`Matrix3D`) and bit masks (`BitFlags`) have `constexpr` constructors, and
+`GameMakeColor` is `constexpr`, so they are constant-initialised. A function
+that only reads a table takes it as `const char * const *`, so the table can
+be constant. The empty `StringClass` and `WideStringClass`
 buffers are constants that no constructor writes. A string constant is a
 `constexpr` literal, not a `std::string`, which static initialisation builds
 in writable storage, and a pointer to a string literal is itself `const`. An

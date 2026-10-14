@@ -61,14 +61,24 @@ static NameKeyType windowLadderID = NAMEKEY_INVALID;
 
 
 // window pointers --------------------------------------------------------------------------------
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, parentWindow, nullptr);
+#define parentWindow RTS_ENGINE_GLOBAL_REF(parentWindow)
+#else
 static GameWindow *parentWindow = nullptr;
+#endif
 #if RTS_ENGINE_CONTEXT
 RTS_ENGINE_GLOBAL(GameWindow*, buttonBack, nullptr);
 #define buttonBack RTS_ENGINE_GLOBAL_REF(buttonBack)
 #else
 static GameWindow *buttonBack = nullptr;
 #endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, windowLadder, nullptr);
+#define windowLadder RTS_ENGINE_GLOBAL_REF(windowLadder)
+#else
 static GameWindow *windowLadder = nullptr;
+#endif
 
 
 //-------------------------------------------------------------------------------------------------

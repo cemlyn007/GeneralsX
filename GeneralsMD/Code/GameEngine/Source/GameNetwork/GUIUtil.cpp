@@ -50,7 +50,13 @@
 
 // -----------------------------------------------------------------------------
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(Bool, winInitialized, FALSE);
+#define winInitialized RTS_ENGINE_GLOBAL_REF(winInitialized)
+#else
 static Bool winInitialized = FALSE;
+#endif
 
 void EnableSlotListUpdates( Bool val )
 {
@@ -129,8 +135,14 @@ void EnableAcceptControls(Bool Enabled, GameInfo *myGame, GameWindow *comboPlaye
 
 // -----------------------------------------------------------------------------
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 Tables no engine writes are constant (docs/EMBEDDING.md).
+void ShowUnderlyingGUIElements( Bool show, const char *layoutFilename, const char *parentName,
+															 const char * const *gadgetsToHide, const char * const *perPlayerGadgetsToHide )
+#else
 void ShowUnderlyingGUIElements( Bool show, const char *layoutFilename, const char *parentName,
 															 const char **gadgetsToHide, const char **perPlayerGadgetsToHide )
+#endif
 {
 	AsciiString parentNameStr;
 	parentNameStr.format("%s:%s", layoutFilename, parentName);
@@ -146,7 +158,11 @@ void ShowUnderlyingGUIElements( Bool show, const char *layoutFilename, const cha
 	GameWindow *win;
 
 	Int player;
+#if RTS_ENGINE_CONTEXT
+	const char * const *text;
+#else
 	const char **text;
+#endif
 
 	text = gadgetsToHide;
 	while (*text)

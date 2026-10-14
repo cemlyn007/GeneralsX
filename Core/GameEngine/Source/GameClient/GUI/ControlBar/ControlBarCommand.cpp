@@ -69,7 +69,12 @@
 
 // PRIVATE DATA ///////////////////////////////////////////////////////////////////////////////////
 static GameWindow *commandWindows[ MAX_COMMANDS_PER_SET ];
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(Bool, commandWindowsInitialized, FALSE);
+#define commandWindowsInitialized RTS_ENGINE_GLOBAL_REF(commandWindowsInitialized)
+#else
 Bool commandWindowsInitialized = FALSE;
+#endif
 static Color BuildClockColor = GameMakeColor(0,0,0,100);
 // STATIC DATA STORAGE ////////////////////////////////////////////////////////////////////////////
 #if RTS_ENGINE_CONTEXT
@@ -559,9 +564,17 @@ void ControlBar::resetBuildQueueData()
 void ControlBar::populateBuildQueue( Object *producer )
 {
 /// @todo srj -- remove hard-coding here, please
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(const CommandButton*, cancelUnitCommand, findCommandButton( "Command_CancelUnitCreate" ));
+#else
 	static const CommandButton *cancelUnitCommand = findCommandButton( "Command_CancelUnitCreate" );
+#endif
 /// @todo srj -- remove hard-coding here, please
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(const CommandButton*, cancelUpgradeCommand, findCommandButton( "Command_CancelUpgradeCreate" ));
+#else
 	static const CommandButton *cancelUpgradeCommand = findCommandButton( "Command_CancelUpgradeCreate" );
+#endif
 #if RTS_ENGINE_CONTEXT
 // GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
 	RTS_ENGINE_STATIC(NameKeyType[ MAX_BUILD_QUEUE_BUTTONS ], buildQueueIDs);

@@ -149,8 +149,18 @@ static NameKeyType buttonNotificationID = NAMEKEY_INVALID;
 
 
 // Window Pointers ------------------------------------------------------------------------
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, parent, nullptr);
+#define parent RTS_ENGINE_GLOBAL_REF(parent)
+#else
 static GameWindow *parent = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, buttonHide, nullptr);
+#define buttonHide RTS_ENGINE_GLOBAL_REF(buttonHide)
+#else
 static GameWindow *buttonHide = nullptr;
+#endif
 static GameWindow *buttonAddBuddy = nullptr;
 static GameWindow *buttonDeleteBuddy = nullptr;
 static GameWindow *textEntry = nullptr;
@@ -158,18 +168,53 @@ static GameWindow *listboxBuddy = nullptr;
 static GameWindow *listboxChat = nullptr;
 static GameWindow *buttonAcceptBuddy = nullptr;
 static GameWindow *buttonDenyBuddy = nullptr;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, radioButtonBuddies, nullptr);
+#define radioButtonBuddies RTS_ENGINE_GLOBAL_REF(radioButtonBuddies)
+#else
 static GameWindow *radioButtonBuddies = nullptr;
+#endif
 static GameWindow *radioButtonIgnore = nullptr;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, parentBuddies, nullptr);
+#define parentBuddies RTS_ENGINE_GLOBAL_REF(parentBuddies)
+#else
 static GameWindow *parentBuddies = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, parentIgnore, nullptr);
+#define parentIgnore RTS_ENGINE_GLOBAL_REF(parentIgnore)
+#else
 static GameWindow *parentIgnore = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, listboxIgnore, nullptr);
+#define listboxIgnore RTS_ENGINE_GLOBAL_REF(listboxIgnore)
+#else
 static GameWindow *listboxIgnore = nullptr;
+#endif
 
 static Bool isOverlayActive = false;
 void insertChat( BuddyMessage msg );
 // RightClick pointers ---------------------------------------------------------------------
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, rcMenu, nullptr);
+#define rcMenu RTS_ENGINE_GLOBAL_REF(rcMenu)
+#else
 static GameWindow *rcMenu = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(WindowLayout*, noticeLayout, nullptr);
+#define noticeLayout RTS_ENGINE_GLOBAL_REF(noticeLayout)
+#else
 static WindowLayout *noticeLayout = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(UnsignedInt, noticeExpires, 0);
+#define noticeExpires RTS_ENGINE_GLOBAL_REF(noticeExpires)
+#else
 static UnsignedInt noticeExpires = 0;
+#endif
 #if defined(SAGE_USE_NGMP)
 	enum { NOTIFICATION_EXPIRES = 5000 };
 #else
@@ -180,8 +225,18 @@ void setUnignoreText( WindowLayout *layout, AsciiString nick, GPProfile id);
 void refreshIgnoreList();
 void showNotificationBox( AsciiString nick, UnicodeString message);
 void deleteNotificationBox();
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Bool, lastNotificationWasStatus, FALSE);
+#define lastNotificationWasStatus RTS_ENGINE_GLOBAL_REF(lastNotificationWasStatus)
+#else
 static Bool lastNotificationWasStatus = FALSE;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Int, numOnlineInNotification, 0);
+#define numOnlineInNotification RTS_ENGINE_GLOBAL_REF(numOnlineInNotification)
+#else
 static Int numOnlineInNotification = 0;
+#endif
 
 class BuddyControls
 {

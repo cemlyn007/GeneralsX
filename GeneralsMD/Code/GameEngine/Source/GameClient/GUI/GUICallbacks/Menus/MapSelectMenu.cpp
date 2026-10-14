@@ -61,13 +61,43 @@ RTS_ENGINE_GLOBAL(NameKeyType, radioButtonUserMapsID, NAMEKEY_INVALID);
 #else
 static NameKeyType radioButtonUserMapsID = NAMEKEY_INVALID;
 #endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, mapList, nullptr);
+#define mapList RTS_ENGINE_GLOBAL_REF(mapList)
+#else
 static GameWindow *mapList = nullptr;
+#endif
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Bool, showSoloMaps, true);
+#define showSoloMaps RTS_ENGINE_GLOBAL_REF(showSoloMaps)
+#else
 static Bool showSoloMaps = true;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Bool, isShuttingDown, false);
+#define isShuttingDown RTS_ENGINE_GLOBAL_REF(isShuttingDown)
+#else
 static Bool isShuttingDown = false;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Bool, startGame, false);
+#define startGame RTS_ENGINE_GLOBAL_REF(startGame)
+#else
 static Bool startGame = false;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Bool, buttonPushed, false);
+#define buttonPushed RTS_ENGINE_GLOBAL_REF(buttonPushed)
+#else
 static Bool buttonPushed = false;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameDifficulty, s_AIDiff, DIFFICULTY_NORMAL);
+#define s_AIDiff RTS_ENGINE_GLOBAL_REF(s_AIDiff)
+#else
 static GameDifficulty s_AIDiff = DIFFICULTY_NORMAL;
+#endif
 static void setupGameStart(AsciiString mapName)
 {
 	startGame = true;

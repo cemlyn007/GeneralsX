@@ -67,7 +67,13 @@
 // DEFINES ////////////////////////////////////////////////////////////////////
 // Sets up the user's OS set doubleclick time so if they don't like it... they can
 // change it in their OS.
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md). No
+// #define for doubleClickTime: _ListboxData has a member of that name.
+RTS_ENGINE_GLOBAL(UnsignedInt, doubleClickTime, GetDoubleClickTime());
+#else
 static UnsignedInt doubleClickTime = GetDoubleClickTime();
+#endif
 
 // PRIVATE TYPES //////////////////////////////////////////////////////////////
 typedef struct _AddMessageStruct
@@ -821,7 +827,11 @@ WindowMsgHandledType GadgetListBoxInput( GameWindow *window, UnsignedInt msg,
 			}
 
 			//Bool dblClicked = FALSE;
+#if RTS_ENGINE_CONTEXT
+			if( list->doubleClickTime + RTS_ENGINE_GLOBAL_REF(doubleClickTime) > timeGetTime() &&
+#else
 			if( list->doubleClickTime + doubleClickTime > timeGetTime() &&
+#endif
 					(i == oldPos || (oldPos == -1 && ( i>=0 && i<list->endPos ) )) )
 			{
 				int temp;

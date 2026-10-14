@@ -187,7 +187,12 @@ Bool IsInGameChatActive() {
 extern "C" {
 int getQR2HostingStatus();
 }
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL(int, isThreadHosting);
+#define isThreadHosting RTS_ENGINE_GLOBAL_REF(isThreadHosting)
+#else
 extern int isThreadHosting;
+#endif
 
 Bool handleInGameSlashCommands(UnicodeString uText)
 {
@@ -219,7 +224,11 @@ Bool handleInGameSlashCommands(UnicodeString uText)
 // ------------------------------------------------------------------------------------------------
 void ToggleInGameChat( Bool immediate )
 {
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(Bool, justHid, false);
+#else
 	static Bool justHid = false;
+#endif
 	if (justHid)
 	{
 		justHid = false;
