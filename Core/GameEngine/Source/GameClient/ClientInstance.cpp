@@ -22,13 +22,29 @@
 
 namespace rts
 {
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_CLASS_STATIC_DEFINE(HANDLE, ClientInstance, s_mutexHandle, nullptr);
+#define s_mutexHandle RTS_ENGINE_GLOBAL_REF(s_mutexHandle)
+#else
 HANDLE ClientInstance::s_mutexHandle = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_CLASS_STATIC_DEFINE(UnsignedInt, ClientInstance, s_instanceIndex, 0);
+#define s_instanceIndex RTS_ENGINE_GLOBAL_REF(s_instanceIndex)
+#else
 UnsignedInt ClientInstance::s_instanceIndex = 0;
+#endif
 
 #if defined(RTS_MULTI_INSTANCE)
 Bool ClientInstance::s_isMultiInstance = true;
 #else
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_CLASS_STATIC_DEFINE(Bool, ClientInstance, s_isMultiInstance, false);
+#define s_isMultiInstance RTS_ENGINE_GLOBAL_REF(s_isMultiInstance)
+#else
 Bool ClientInstance::s_isMultiInstance = false;
+#endif
 #endif
 
 bool ClientInstance::initialize()

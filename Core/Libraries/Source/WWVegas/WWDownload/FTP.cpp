@@ -79,9 +79,20 @@
 /*************************************************************************/
 
 //static HOSTENT  gThreadHost;
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(struct sockaddr_in, gThreadAddress);
+#define gThreadAddress RTS_ENGINE_GLOBAL_REF(gThreadAddress)
+#else
 struct sockaddr_in  gThreadAddress;
+#endif
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(int, gThreadFlag);
+#define gThreadFlag RTS_ENGINE_GLOBAL_REF(gThreadFlag)
+#else
 static int		 gThreadFlag;
+#endif
 
 /*************************************************************************/
 /*_$                      Private Prototypes                             */
@@ -277,8 +288,16 @@ DWORD WINAPI gethostbynameA( void * szName )
 
 int Cftp::AsyncGetHostByName(char * szName, struct sockaddr_in &address )
 {
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(int, stat, 0);
+#else
 	static int            stat = 0;
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(unsigned long, threadid);
+#else
 	static unsigned long  threadid;
+#endif
 
 	if( stat == 0 )
 	{
@@ -676,7 +695,11 @@ HRESULT  Cftp::LogoffFromServer()
 HRESULT  Cftp::FindFile( LPCSTR szRemoteFileName, int * piSize )
 {
 	char command[ 256 ];
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(char[ 256 ], listline, {0});
+#else
 	static char listline[ 256 ] = {0};
+#endif
 
 	int i, iReply;
 	char ext[ 10 ];

@@ -72,9 +72,19 @@ static NameKeyType listboxLocaleID = NAMEKEY_INVALID;
 #endif
 
 // Window Pointers ------------------------------------------------------------------------
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, parentLocaleSelect, nullptr);
+#define parentLocaleSelect RTS_ENGINE_GLOBAL_REF(parentLocaleSelect)
+#else
 static GameWindow *parentLocaleSelect = nullptr;
+#endif
 static GameWindow *buttonOk = nullptr;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, listboxLocale, nullptr);
+#define listboxLocale RTS_ENGINE_GLOBAL_REF(listboxLocale)
+#else
 static GameWindow *listboxLocale = nullptr;
+#endif
 
 //-------------------------------------------------------------------------------------------------
 /** Initialize the WOL Status Menu */

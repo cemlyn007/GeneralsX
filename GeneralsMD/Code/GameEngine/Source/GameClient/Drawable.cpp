@@ -142,7 +142,12 @@ static GameFont *ResolveDrawableCaptionFont()
  */
 class DynamicAudioEventInfoStatic : public DynamicAudioEventInfo
 {};
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(DynamicAudioEventInfoStatic, s_noSoundMarker);
+#define s_noSoundMarker RTS_ENGINE_GLOBAL_REF(s_noSoundMarker)
+#else
 static DynamicAudioEventInfoStatic s_noSoundMarker;
+#endif
 
 static DynamicAudioEventInfo* getNoSoundMarker()
 {

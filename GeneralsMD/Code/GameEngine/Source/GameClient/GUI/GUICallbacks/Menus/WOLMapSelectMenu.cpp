@@ -64,9 +64,24 @@ RTS_ENGINE_GLOBAL(NameKeyType, listboxMap, NAMEKEY_INVALID);
 #else
 static NameKeyType listboxMap = NAMEKEY_INVALID;
 #endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, parent, nullptr);
+#define parent RTS_ENGINE_GLOBAL_REF(parent)
+#else
 static GameWindow *parent = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Bool, raiseMessageBoxes, FALSE);
+#define raiseMessageBoxes RTS_ENGINE_GLOBAL_REF(raiseMessageBoxes)
+#else
 static Bool raiseMessageBoxes = FALSE;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, winMapPreview, nullptr);
+#define winMapPreview RTS_ENGINE_GLOBAL_REF(winMapPreview)
+#else
 static GameWindow *winMapPreview = nullptr;
+#endif
 static NameKeyType winMapPreviewID = NAMEKEY_INVALID;
 
 #if RTS_ENGINE_CONTEXT
@@ -82,16 +97,36 @@ RTS_ENGINE_GLOBAL(NameKeyType, radioButtonUserMapsID, NAMEKEY_INVALID);
 static NameKeyType radioButtonUserMapsID = NAMEKEY_INVALID;
 #endif
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL(WindowLayout*, WOLMapSelectLayout);
+#define WOLMapSelectLayout RTS_ENGINE_GLOBAL_REF(WOLMapSelectLayout)
+#else
 extern WindowLayout *WOLMapSelectLayout;			///< Map selection overlay
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, mapList, nullptr);
+#define mapList RTS_ENGINE_GLOBAL_REF(mapList)
+#else
 static GameWindow *mapList = nullptr;
+#endif
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*[MAX_SLOTS], buttonMapStartPosition, {0});
+#define buttonMapStartPosition RTS_ENGINE_GLOBAL_REF(buttonMapStartPosition)
+#else
 static GameWindow *buttonMapStartPosition[MAX_SLOTS] = {0};
+#endif
 static NameKeyType buttonMapStartPositionID[MAX_SLOTS] = { NAMEKEY_INVALID,NAMEKEY_INVALID,
 																									NAMEKEY_INVALID,NAMEKEY_INVALID,
 																										NAMEKEY_INVALID,NAMEKEY_INVALID,
 																										NAMEKEY_INVALID,NAMEKEY_INVALID };
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, winMapWindow, nullptr);
+#define winMapWindow RTS_ENGINE_GLOBAL_REF(winMapWindow)
+#else
 static GameWindow *winMapWindow = nullptr;
+#endif
 
 #include "GameNetwork/GeneralsOnline/NGMP_interfaces.h"
 
@@ -112,7 +147,12 @@ static void NullifyControls(void)
 
 static const char *layoutFilename = "GameSpyGameOptionsMenu.wnd";
 static const char *parentName = "GameSpyGameOptionsMenuParent";
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 Tables no engine writes are constant (docs/EMBEDDING.md).
+static const char * const gadgetsToHide[] =
+#else
 static const char *gadgetsToHide[] =
+#endif
 {
 	"MapWindow",
 	//"StaticTextGameName",
@@ -126,7 +166,11 @@ static const char *gadgetsToHide[] =
 
 	nullptr
 };
+#if RTS_ENGINE_CONTEXT
+static const char * const perPlayerGadgetsToHide[] =
+#else
 static const char *perPlayerGadgetsToHide[] =
+#endif
 {
 	"ComboBoxTeam",
 	"ComboBoxColor",

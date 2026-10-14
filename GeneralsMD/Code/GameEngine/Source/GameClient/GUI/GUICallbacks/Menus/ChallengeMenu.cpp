@@ -94,56 +94,211 @@ static NameKeyType backdropID = NAMEKEY_INVALID;
 static NameKeyType bioParentID = NAMEKEY_INVALID;
 
 // window pointers --------------------------------------------------------------------------------
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, parentMenu, nullptr);
+#define parentMenu RTS_ENGINE_GLOBAL_REF(parentMenu)
+#else
 static GameWindow *parentMenu = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, buttonPlay, nullptr);
+#define buttonPlay RTS_ENGINE_GLOBAL_REF(buttonPlay)
+#else
 static GameWindow *buttonPlay = nullptr;
+#endif
 #if RTS_ENGINE_CONTEXT
 RTS_ENGINE_GLOBAL(GameWindow*, buttonBack, nullptr);
 #define buttonBack RTS_ENGINE_GLOBAL_REF(buttonBack)
 #else
 static GameWindow *buttonBack = nullptr;
 #endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, bioPortrait, nullptr);
+#define bioPortrait RTS_ENGINE_GLOBAL_REF(bioPortrait)
+#else
 static GameWindow *bioPortrait = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, bioLine1Entry, nullptr);
+#define bioLine1Entry RTS_ENGINE_GLOBAL_REF(bioLine1Entry)
+#else
 static GameWindow *bioLine1Entry = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, bioLine2Entry, nullptr);
+#define bioLine2Entry RTS_ENGINE_GLOBAL_REF(bioLine2Entry)
+#else
 static GameWindow *bioLine2Entry = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, bioLine3Entry, nullptr);
+#define bioLine3Entry RTS_ENGINE_GLOBAL_REF(bioLine3Entry)
+#else
 static GameWindow *bioLine3Entry = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, bioLine4Entry, nullptr);
+#define bioLine4Entry RTS_ENGINE_GLOBAL_REF(bioLine4Entry)
+#else
 static GameWindow *bioLine4Entry = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*[NUM_GENERALS], buttonGeneralPosition, {nullptr});
+#define buttonGeneralPosition RTS_ENGINE_GLOBAL_REF(buttonGeneralPosition)
+#else
 static GameWindow *buttonGeneralPosition[NUM_GENERALS] = {nullptr};
+#endif
 static GameWindow *backdrop = nullptr;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, bioParent, nullptr);
+#define bioParent RTS_ENGINE_GLOBAL_REF(bioParent)
+#else
 static GameWindow *bioParent = nullptr;
+#endif
 
 //static NameKeyType testWinID = NAMEKEY_INVALID;
 //static GameWindow *testWin = nullptr;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(WindowVideoManager*, wndVideoManager, nullptr);
+#define wndVideoManager RTS_ENGINE_GLOBAL_REF(wndVideoManager)
+#else
 static WindowVideoManager *wndVideoManager = nullptr;
+#endif
 
 //
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Int, initialGadgetDelay, 2);
+#define initialGadgetDelay RTS_ENGINE_GLOBAL_REF(initialGadgetDelay)
+#else
 static Int	initialGadgetDelay = 2;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Bool, justEntered, FALSE);
+#define justEntered RTS_ENGINE_GLOBAL_REF(justEntered)
+#else
 static Bool justEntered = FALSE;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Bool, isShuttingDown, FALSE);
+#define isShuttingDown RTS_ENGINE_GLOBAL_REF(isShuttingDown)
+#else
 static Bool isShuttingDown = FALSE;
+#endif
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Int, lastButtonIndex, -1);
+#define lastButtonIndex RTS_ENGINE_GLOBAL_REF(lastButtonIndex)
+#else
 static Int lastButtonIndex = -1;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(Int, lastHilitedIndex, -1);
+#define lastHilitedIndex RTS_ENGINE_GLOBAL_REF(lastHilitedIndex)
+#else
 Int lastHilitedIndex = -1;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(Bool, isAutoSelecting, FALSE);
+#define isAutoSelecting RTS_ENGINE_GLOBAL_REF(isAutoSelecting)
+#else
 Bool isAutoSelecting = FALSE;
+#endif
 
 // for use by the teletype style bio text display
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(UnicodeString, bioLine1);
+#define bioLine1 RTS_ENGINE_GLOBAL_REF(bioLine1)
+#else
 UnicodeString bioLine1;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(UnicodeString, bioLine2);
+#define bioLine2 RTS_ENGINE_GLOBAL_REF(bioLine2)
+#else
 UnicodeString bioLine2;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(UnicodeString, bioLine3);
+#define bioLine3 RTS_ENGINE_GLOBAL_REF(bioLine3)
+#else
 UnicodeString bioLine3;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(UnicodeString, bioLine4);
+#define bioLine4 RTS_ENGINE_GLOBAL_REF(bioLine4)
+#else
 UnicodeString bioLine4;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(UnicodeString, bioLine1Readout);
+#define bioLine1Readout RTS_ENGINE_GLOBAL_REF(bioLine1Readout)
+#else
 UnicodeString bioLine1Readout;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(UnicodeString, bioLine2Readout);
+#define bioLine2Readout RTS_ENGINE_GLOBAL_REF(bioLine2Readout)
+#else
 UnicodeString bioLine2Readout;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(UnicodeString, bioLine3Readout);
+#define bioLine3Readout RTS_ENGINE_GLOBAL_REF(bioLine3Readout)
+#else
 UnicodeString bioLine3Readout;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(UnicodeString, bioLine4Readout);
+#define bioLine4Readout RTS_ENGINE_GLOBAL_REF(bioLine4Readout)
+#else
 UnicodeString bioLine4Readout;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(Int, bioTextPosition, 0);
+#define bioTextPosition RTS_ENGINE_GLOBAL_REF(bioTextPosition)
+#else
 Int bioTextPosition = 0;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(Int, bioTotalLength, 0);
+#define bioTotalLength RTS_ENGINE_GLOBAL_REF(bioTotalLength)
+#else
 Int bioTotalLength = 0;
+#endif
 
 // for use by the intro animation
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Int, buttonSequenceStep, 0);
+#define buttonSequenceStep RTS_ENGINE_GLOBAL_REF(buttonSequenceStep)
+#else
 static Int buttonSequenceStep = 0;
+#endif
 
 // audio
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(AudioHandle, lastSelectionSound, 0);
+#define lastSelectionSound RTS_ENGINE_GLOBAL_REF(lastSelectionSound)
+#else
 AudioHandle lastSelectionSound = 0;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(AudioHandle, lastPreviewSound, 0);
+#define lastPreviewSound RTS_ENGINE_GLOBAL_REF(lastPreviewSound)
+#else
 AudioHandle lastPreviewSound = 0;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Int, introAudioMagicNumber, 0);
+#define introAudioMagicNumber RTS_ENGINE_GLOBAL_REF(introAudioMagicNumber)
+#else
 static Int introAudioMagicNumber = 0;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Bool, hasPlayedIntroAudio, FALSE);
+#define hasPlayedIntroAudio RTS_ENGINE_GLOBAL_REF(hasPlayedIntroAudio)
+#else
 static Bool hasPlayedIntroAudio = FALSE;
+#endif
 
 
 //-------------------------------------------------------------------------------------------------

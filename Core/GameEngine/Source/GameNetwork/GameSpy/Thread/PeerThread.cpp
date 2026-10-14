@@ -83,12 +83,33 @@ static LogClass s_stateChangedLog("StateChanged.txt");
 #define USE_BROADCAST_KEYS
 
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(int, isThreadHosting, 0);
+#define isThreadHosting RTS_ENGINE_GLOBAL_REF(isThreadHosting)
+#else
 int isThreadHosting = 0;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(UnsignedInt, s_lastStateChangedHeartbeat, 0);
+#define s_lastStateChangedHeartbeat RTS_ENGINE_GLOBAL_REF(s_lastStateChangedHeartbeat)
+#else
 static UnsignedInt s_lastStateChangedHeartbeat = 0;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Bool, s_wantStateChangedHeartbeat, FALSE);
+#define s_wantStateChangedHeartbeat RTS_ENGINE_GLOBAL_REF(s_wantStateChangedHeartbeat)
+#else
 static Bool s_wantStateChangedHeartbeat = FALSE;
+#endif
 static UnsignedInt s_heartbeatInterval = 10000;
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(SOCKET, qr2Sock, INVALID_SOCKET);
+#define qr2Sock RTS_ENGINE_GLOBAL_REF(qr2Sock)
+#else
 static SOCKET qr2Sock = INVALID_SOCKET;
+#endif
 
 enum
 {
@@ -179,6 +200,11 @@ GameSpyPeerMessageQueueInterface *TheGameSpyPeerMessageQueue;
 
 //-------------------------------------------------------------------------
 
+#if RTS_ENGINE_CONTEXT
+#define s_keys RTS_ENGINE_GLOBAL_REF(s_keys)
+#define s_valueBuffers RTS_ENGINE_GLOBAL_REF(s_valueBuffers)
+#define s_values RTS_ENGINE_GLOBAL_REF(s_values)
+#endif
 class PeerThreadClass : public ThreadClass
 {
 
@@ -286,9 +312,15 @@ private:
 
 #ifdef USE_BROADCAST_KEYS
 	enum { NumKeys = 6, ValBufSize = 20 };
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_CLASS_STATIC(const char *[NumKeys], s_keys);
+	RTS_ENGINE_CLASS_STATIC(char[NumKeys][ValBufSize], s_valueBuffers);
+	RTS_ENGINE_CLASS_STATIC(const char *[NumKeys], s_values);
+#else
 	static const char *s_keys[NumKeys];
 	static char s_valueBuffers[NumKeys][ValBufSize];
 	static const char *s_values[NumKeys];
+#endif
 
 	typedef std::map<std::string, int> PlayerStatMap;
 	PlayerStatMap m_groupRoomStats;
@@ -334,10 +366,17 @@ private:
 };
 
 #ifdef USE_BROADCAST_KEYS
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_CLASS_STATIC_DEFINE(const char*[6], PeerThreadClass, s_keys, { "b_locale", "b_wins", "b_losses", "b_points", "b_side", "b_pre" });
+RTS_ENGINE_CLASS_STATIC_DEFINE(char[6][20], PeerThreadClass, s_valueBuffers, { "", "", "", "", "", "" });
+RTS_ENGINE_CLASS_STATIC_DEFINE(const char*[6], PeerThreadClass, s_values, { s_valueBuffers[0], s_valueBuffers[1], s_valueBuffers[2],
+	s_valueBuffers[3], s_valueBuffers[4], s_valueBuffers[5]});
+#else
 const char* PeerThreadClass::s_keys[6] = { "b_locale", "b_wins", "b_losses", "b_points", "b_side", "b_pre" };
 char PeerThreadClass::s_valueBuffers[6][20] = { "", "", "", "", "", "" };
 const char* PeerThreadClass::s_values[6] = { s_valueBuffers[0], s_valueBuffers[1], s_valueBuffers[2],
 	s_valueBuffers[3], s_valueBuffers[4], s_valueBuffers[5]};
+#endif
 
 void PeerThreadClass::trackStatsForPlayer(RoomType roomType, const char *nick, const char *key, const char *val)
 {
@@ -1129,7 +1168,11 @@ static SerialAuthResult doCDKeyAuthentication( PEER peer )
 #define INBUF_LEN 256
 void checkQR2Queries( PEER peer, SOCKET sock )
 {
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(char[INBUF_LEN], indata);
+#else
 	static char indata[INBUF_LEN];
+#endif
 	struct sockaddr_in saddr;
 	socklen_t saddrlen = sizeof(struct sockaddr_in);
 	fd_set set;
@@ -1154,7 +1197,12 @@ void checkQR2Queries( PEER peer, SOCKET sock )
 	}
 }
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(UnsignedInt, localIP, 0);
+#define localIP RTS_ENGINE_GLOBAL_REF(localIP)
+#else
 static UnsignedInt localIP = 0;
+#endif
 
 void PeerThreadClass::Thread_Function()
 {
@@ -1810,7 +1858,12 @@ static void qmProfileIDCallback( PEER peer, PEERBool success, const char *nick, 
 	*i = profileID;
 }
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Int, matchbotProfileID, 0);
+#define matchbotProfileID RTS_ENGINE_GLOBAL_REF(matchbotProfileID)
+#else
 static Int matchbotProfileID = 0;
+#endif
 void quickmatchEnumPlayersCallback( PEER peer, PEERBool success, RoomType roomType, int index, const char * nick, int flags, void * param )
 {
 	PeerThreadClass *t = (PeerThreadClass *)param;

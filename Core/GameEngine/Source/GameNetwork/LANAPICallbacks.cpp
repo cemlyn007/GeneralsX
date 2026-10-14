@@ -51,7 +51,13 @@
 #if !RTS_ENGINE_CONTEXT
 LANAPI *TheLAN = nullptr;
 #endif
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_EXTERN_GLOBAL(Bool, LANbuttonPushed);
+#define LANbuttonPushed RTS_ENGINE_GLOBAL_REF(LANbuttonPushed)
+#else
 extern Bool LANbuttonPushed;
+#endif
 
 
 //Colors used for the chat dialogs

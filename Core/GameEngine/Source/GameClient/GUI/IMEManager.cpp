@@ -84,7 +84,13 @@ IMEManagerInterface *TheIMEManager = nullptr;
 
 // GeneralsX @refactor cemlyn007 30/09/2026 The window handles (PLAN-023 Phase 8, stage RR2a-2).
 #include "Common/ApplicationWindow.h"
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_EXTERN_GLOBAL(Int, IMECandidateWindowLineSpacing);
+#define IMECandidateWindowLineSpacing RTS_ENGINE_GLOBAL_REF(IMECandidateWindowLineSpacing)
+#else
 extern Int	IMECandidateWindowLineSpacing;
+#endif
 
 //----------------------------------------------------------------------------
 //         Defines

@@ -118,8 +118,6 @@ HAND = [
     # throttle (GameClient::update) and W3DStatusCircle's colour (every engine's setTeamColor). The
     # other TUs' statics of the same names (the WOL and download menus' staticTextPlayer/staticTextStatus)
     # fall to the GUI blanket below.
-    (RENDER, "", "re:staticTextPlayer|staticTextStatus", "with RTS_ENGINE_CONTEXT only the online menus' statics of these names are left (WOLGameSetupMenu.cpp's staticTextPlayer, DownloadMenu.cpp's staticTextStatus); the source column shows the first definition the search finds, the OFF-build one in ControlBarObserver.cpp or Diplomacy.cpp (those are PER_ENGINE_STATIC fields with the context on): " + UI),
-    (GLOBAL, "", "re:ParticleSystem::(computePointOnUnitSphere|computeParticleVelocity|computeParticlePosition)\\(.*\\)::\\w+", "thread_local returned-by-pointer scratch, consumed at once (PLAN-023 Phase 5b): per thread by design"),
     # ---------------------------------------------------------------------------------------------------
     # Process-global on purpose.
     (GLOBAL, "", "re:rts::t_engine|rts::g_noEngine|rts::\\(anonymous namespace\\)::theNextSlotIndex", "the EngineContext mechanism itself (PLAN-023 Decision 1)"),
@@ -134,20 +132,14 @@ HAND = [
     (GLOBAL, "", "re:__argc|__argv", "the process's argv (the executable's, set by rlgenerals' launcher; PLAN-023 Phase 5 BootConfig replaces it): boot/shutdown only, serialized by the host (only CommandLine's boot-time parse reads it)"),
     (GLOBAL, "", "re:critSec[1-5]|FilterSoftwareVulkanICDs\\(\\)::hw_icds", "the game executable's own (SDL3Main), unused by an embedding host"),
     (GLOBAL, "", "re:rts::WorkingDirectory::\\w+", "the startup working directory (one per process): boot/shutdown only, serialized by the host (CommandLine's boot-time parse writes and reads it)"),
-    (GLOBAL, "", "re:rts::ClientInstance::\\w+", "the process's single-instance mutex"),
     (GLOBAL, "", "s_assetFallbackPath", "the install's asset fallback root: every engine's boot (StdBIGFileSystem::init) sets it, but setAssetRootPath writes only a change, and with RTS_ENGINE_CONTEXT only by the first boot, which settles it even when it resolves no root (another root from a later boot is refused with a stderr message and a DEBUG_CRASH): the engines of a process share one install, so only the first boot writes while later engines' file lookups read it (PLAN-023 Phase 5b)"),
     (GLOBAL, "", "StdLocalFileSystem::setAssetRootPath(AsciiString const&)::s_assetRootSettled", "std::atomic flag: set by the first boot's setAssetRootPath (even with no root), after which a different root is refused (PLAN-023 Phase 5b)"),
     (GLOBAL, "", "re:s_thread|s_done|s_hasUpdate|s_latestTag", "update checker (menus), one per process"),
     (GLOBAL, "", "re:thread_id_map(_mutex)?|next_thread_id", "pthread-to-Win32 thread id map (CompatLib), process-wide by nature"),
-    (CONST, "", "GameSpyColorDefaults", "the online chat colors' defaults (Chat.cpp), which each engine's GameSpyColor (a PER_ENGINE_STATIC, PLAN-023 Phase 5b) starts from; never written"),
     (GLOBAL, "", "NGMP_OnlineServicesManager::getInstance()::instance", "the process's GeneralsOnline session, logged into from the online menus of the one UI engine: with RTS_ENGINE_CONTEXT only a non-headless engine calls getInstance() (GameEngine::init, every update, its menus and ~GameEngine; headless engines skip it), and there is at most one such engine per process, so no other engine touches the instance (PLAN-023 Phase 5b)"),
-    (GLOBAL, "", "re:theLobbyFilter|isThreadHosting|NET_CRC_INTERVAL|MIN_LOGIC_FRAMES|MAX_FRAMES_AHEAD|MIN_RUNAHEAD|FRAME_DATA_LENGTH|FRAMES_TO_KEEP|commandsReadyDebugSpewage", NET),
     # Not the whole of GameNetwork/: GameInfo.cpp (skirmish setup), LANGameInfo.cpp, GameMessageParser.cpp and
     # NetworkUtil.cpp are reached without a network, so their statics are classified by name.
     (GLOBAL, "", "file:/GameNetwork/(GameSpy/|GeneralsOnline/|WOLBrowser/|GameSpy\\w*\\.cpp|LANAPI\\w*\\.cpp|NAT\\.cpp|FirewallHelper\\.cpp|Connection(Manager)?\\.cpp|DisconnectManager\\.cpp|Network\\.cpp|GUIUtil\\.cpp|Transport\\.cpp|udp\\.cpp|FileTransfer\\.cpp|DownloadManager\\.cpp|IPEnumeration\\.cpp|NetPacket\\w*\\.cpp|NetCommand\\w*\\.cpp|NetMessageStream\\.cpp|FrameData\\w*\\.cpp|FrameMetrics\\.cpp|User\\.cpp)", NET),
-    (GLOBAL, "", "s_commandID", "network command ID counter (NetworkUtil GenerateNextCommandID): only networked games' NetCommandMsgs take IDs; " + NET),
-    (GLOBAL, "", "file:/WWDownload/", "patch/map downloader (menus only), one per process"),
-    (GLOBAL, "", "re:TheLobbyQueuedUTMs.*", "GameSpy lobby menu queue (menu state; one UI engine per process)"),
     (CONST, "", "re:rts::WorkingDirectory::saveStartupWorkingDirectory\\(\\)::len", "captures the process's own startup cwd (::GetCurrentDirectory): the same OS-level value for every engine in the process, written once"),
     (GLOBAL, "", "OpenALAudioManager::isOnScreen(Coord3D const*) const::dummy", "write-only out-parameter, never read"),
     (GLOBAL, "", "s_screenshotWrittenQueue", "screenshot writer queue (render mode; its thread reads no engine state)"),
@@ -159,8 +151,6 @@ HAND = [
     (CONST, "", "re:gli::.*::Table|stbiw__encode_png_line\\(.*\\)::(firstmap|mapping)|pi_lo|tiny", "table/constant in header-only third-party code"),
     (CONST, "", "re:replayExtention|lastReplayFileName|PORTABLE_(SAVE|MAPS|USER_MAPS)|g_csfFile|g_strFile|statsDir|ignoredChars", "constant string, never reassigned"),
     (CONST, "", "re:Surfaces|ShakeIntensities|EMITTER_TYPE_NAMES|ReportCategoryNames", "name table, never written"),
-    (CONST, "", "re:s_noSoundMarker|ThingTemplate::s_audioEventNoSound", "default-constructed 'no sound' marker, returned by const pointer"),
-    (CONST, "", "re:gameWindowFieldList|layoutScriptTable", ".wnd parse table (names and parsers)"),
     (CONST, "", "re:_\\w+(Loader|Factory)|_NullPrototype|_TwiddlerPersistFactory", LOADER),
     # ---------------------------------------------------------------------------------------------------
     # Debug only.
@@ -178,7 +168,6 @@ HAND = [
     # audit found LocalFile.cpp's s_totalOpen and ParticleBufferClass::TotalActiveCount had no reader (the
     # former a commented-out DEBUG_LOG, the latter a getter with no caller) and no debug assert either, so
     # both were deleted rather than reclassified; they are gone from the library too.
-    (DEBUG, "", "re:DebugDisplay::printf\\(.*\\)::text", "debug display text buffer"),
     # ---------------------------------------------------------------------------------------------------
     # PLAN-023 Phase 8 (stage RR1): the render state audit. Every WW3D2 and W3DDevice static that only a render
     # engine reaches, and the debug statistics its draw writes, in one of four classes (the blanket render-only
@@ -274,30 +263,15 @@ HAND = [
     # Drawable::s_modelLockCount was listed here as render-only, but while the one rendering engine's scene
     # locks it every headless engine's getDrawModules reads it on its own thread: it is an EngineContext
     # field now (drawableModelLockCount; PLAN-023 Phase 8, stage RR0a), so gone from the library.
-    (RENDER, "", "re:TheSupplyAndTechImageLocations", "skirmish menu map-preview markers (T3 listed it for Phase 4; only the menu reads it): " + UI),
-    (CONST, "", "commandWindowsInitialized", "never written (nothing but its definition names it)"),
-    (CONST, "", "WindowLayoutCurrentVersion", "never written"),
-    (CONST, "", "re:(guard variable for )?GameWindowManager::assignDefaultGadgetLook\\(.*\\)::\\w+", "set on the first call to a fixed color (winMakeColor of constants), the same in every engine"),
-    (RENDER, "", "re:ControlBar::populateBuildQueue\\(.*\\)::cancel(Unit|Upgrade)Command", "cached CommandButton*, but populateBuildQueue runs only from evaluateContextUI (ControlBar::update returns at once headless): " + UI),
-    (RENDER, "", "re:ControlBar::(showBuildTooltipLayout|populateBuildTooltipLayout)\\(.*\\)::\\w+", "tooltip on mouse hover over a command button (commandButtonTooltip): " + UI),
-    (RENDER, "", "re:radioButton(InGame|Buddies)|win(InGame|Buddies|Solo)", "written only by ShowDiplomacy (player input) and the online buddy overlay: " + UI),
-    (RENDER, "", "ToggleInGameChat(bool)::justHid", "chat toggle, set only on player input (ToggleInGameChat, from CommandXlat's chat keys): " + UI),
-    (RENDER, "", "re:staticTextMessage|buttonOk|shouldPause", "InGamePopupMessageInit only: headless, InGameUI::popupMessage's layout has no init (GameWindowManagerDummy's winCreateFromScript returns no init name): " + UI),
-    (RENDER, "", "re:ChallengeLoadScreen::activatePieces\\(.*\\)::textPos\\w+", "Generals' Challenge load screen teletype positions: GameLogic::getLoadScreen makes a ChallengeLoadScreen only for a challenge campaign, which only the shell's Generals' Challenge menu starts (" + UI + "); they are also reset (FRAME_TELETYPE_START) and consumed within one ChallengeLoadScreen::init call"),
     (RENDER, "", "file:/GUI/(?!" + HEADLESS_GUI + ")", UI),
-    (RENDER, "", "re:scrollDir|prevCursor|Mouse::updateMouseData\\(\\)::busy", "mouse/scroll input: headless has MouseDummy and no input"),
-    (RENDER, "", "file:Win32Mouse\\.cpp|SDL3Mouse\\.cpp", "the Win32 and SDL3 mouse cursors (cursorResources): headless has MouseDummy and no input"),
     (GLOBAL, "", "DX8Wrapper_IsWindowed", "the process's assert switch (Debug.cpp's ignoringAsserts): every headless engine's command line (parseHeadless) sets it false, and a rendering engine's DX8Wrapper::Init (false) and Set_Render_Device (the device's windowed flag) write it too, so it holds the last writer's value, not a fixed one; a std::atomic, since boots write it while other engines' assert paths read it (PLAN-023 Phase 5b)"),
     # Only device-only WW3D2 files: mesh, meshmdl, meshgeometry, rendobj, texture, ww3d, dx8renderer,
     # part_emt and part_buf are reached by a headless engine too (models, bones, emitters, asset loading),
     # so their statics are classified by name below or above.
-    (RENDER, "", "parent", "a menu's parent window, one per menu TU (in-game popup, lobby, score screen, map select, ...): " + UI),
-    (GLOBAL, "", "pingImages", "the online lobby's and WOL game setup's ping images: " + NET),
     (DEBUG, "", "statistics_requested", "DX8 mesh-renderer statistics request (debug display)"),
     (DEBUG, "", "RenderObjPersistFactoryClass::Load(ChunkLoadClass&) const::count", "warning limiters (two in the function)"),
     (CONST, "", "DX8TextureCategoryClass::m_gForceMultiply", "never written: SetForceMultiply has no caller"),
     (CONST, "", "MeshClass::Legacy_Meshes_Fogged", "never written"),
     (CONST, "", "ParticleBufferClass::LODMaxScreenSizes", "never written: Set_LOD_Max_Screen_Size has no caller"),
     (CONST, "", "re:ParticleEmitterClass::(DebugDisable|DefaultRemoveOnComplete)", "never written: Disable_All_Emitters / Set_Default_Remove_On_Complete have no caller"),
-    (RENDER, "", "listboxLobbyGamesLarge", UI),
 ]

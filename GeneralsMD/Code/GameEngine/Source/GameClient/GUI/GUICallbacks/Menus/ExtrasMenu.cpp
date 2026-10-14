@@ -76,13 +76,43 @@ RTS_ENGINE_GLOBAL(NameKeyType, sliderDrawDistanceID, NAMEKEY_INVALID);
 static NameKeyType sliderDrawDistanceID = NAMEKEY_INVALID;
 #endif
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, sliderMaxCameraHeight, nullptr);
+#define sliderMaxCameraHeight RTS_ENGINE_GLOBAL_REF(sliderMaxCameraHeight)
+#else
 static GameWindow *sliderMaxCameraHeight = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, sliderMinCameraHeight, nullptr);
+#define sliderMinCameraHeight RTS_ENGINE_GLOBAL_REF(sliderMinCameraHeight)
+#else
 static GameWindow *sliderMinCameraHeight = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, sliderCameraPitch, nullptr);
+#define sliderCameraPitch RTS_ENGINE_GLOBAL_REF(sliderCameraPitch)
+#else
 static GameWindow *sliderCameraPitch = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, sliderScrollSpeed, nullptr);
+#define sliderScrollSpeed RTS_ENGINE_GLOBAL_REF(sliderScrollSpeed)
+#else
 static GameWindow *sliderScrollSpeed = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, sliderDrawDistance, nullptr);
+#define sliderDrawDistance RTS_ENGINE_GLOBAL_REF(sliderDrawDistance)
+#else
 static GameWindow *sliderDrawDistance = nullptr;
+#endif
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(OptionPreferences*, pref, nullptr);
+#define pref RTS_ENGINE_GLOBAL_REF(pref)
+#else
 static OptionPreferences *pref = nullptr;
+#endif
 
 // Slider ranges (matching .wnd definitions)
 static const Int SLIDER_MAX_CAMERA_HEIGHT_MIN = 100;

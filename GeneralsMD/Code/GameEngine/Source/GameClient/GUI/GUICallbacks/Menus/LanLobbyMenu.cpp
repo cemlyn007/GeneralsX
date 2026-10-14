@@ -62,13 +62,43 @@
 #include "GameNetwork/LANAPICallbacks.h"
 #include "GameNetwork/LANGameInfo.h"
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(Bool, LANisShuttingDown, false);
+#define LANisShuttingDown RTS_ENGINE_GLOBAL_REF(LANisShuttingDown)
+#else
 Bool LANisShuttingDown = false;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(Bool, LANbuttonPushed, false);
+#define LANbuttonPushed RTS_ENGINE_GLOBAL_REF(LANbuttonPushed)
+#else
 Bool LANbuttonPushed = false;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(Bool, LANSocketErrorDetected, FALSE);
+#define LANSocketErrorDetected RTS_ENGINE_GLOBAL_REF(LANSocketErrorDetected)
+#else
 Bool LANSocketErrorDetected = FALSE;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(char*, LANnextScreen, nullptr);
+#define LANnextScreen RTS_ENGINE_GLOBAL_REF(LANnextScreen)
+#else
 char *LANnextScreen = nullptr;
+#endif
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Int, initialGadgetDelay, 2);
+#define initialGadgetDelay RTS_ENGINE_GLOBAL_REF(initialGadgetDelay)
+#else
 static Int	initialGadgetDelay = 2;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Bool, justEntered, FALSE);
+#define justEntered RTS_ENGINE_GLOBAL_REF(justEntered)
+#else
 static Bool justEntered = FALSE;
+#endif
 
 
 
@@ -378,9 +408,24 @@ static GameWindow *buttonJoin = nullptr;
 static GameWindow *buttonDirectConnect = nullptr;
 static GameWindow *buttonChat = nullptr;
 static GameWindow *staticToolTip = nullptr;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, textEntryPlayerName, nullptr);
+#define textEntryPlayerName RTS_ENGINE_GLOBAL_REF(textEntryPlayerName)
+#else
 static GameWindow *textEntryPlayerName = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, textEntryChat, nullptr);
+#define textEntryChat RTS_ENGINE_GLOBAL_REF(textEntryChat)
+#else
 static GameWindow *textEntryChat = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, staticTextGameInfo, nullptr);
+#define staticTextGameInfo RTS_ENGINE_GLOBAL_REF(staticTextGameInfo)
+#else
 static GameWindow *staticTextGameInfo = nullptr;
+#endif
 
 //external declarations of the Gadgets the callbacks can use
 #if RTS_ENGINE_CONTEXT
@@ -389,20 +434,45 @@ RTS_ENGINE_EXTERN_GLOBAL_DEFINE(NameKeyType, listboxChatWindowID, NAMEKEY_INVALI
 #else
 NameKeyType listboxChatWindowID = NAMEKEY_INVALID;
 #endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(GameWindow*, listboxChatWindow, nullptr);
+#define listboxChatWindow RTS_ENGINE_GLOBAL_REF(listboxChatWindow)
+#else
 GameWindow *listboxChatWindow = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(GameWindow*, listboxPlayers, nullptr);
+#define listboxPlayers RTS_ENGINE_GLOBAL_REF(listboxPlayers)
+#else
 GameWindow *listboxPlayers = nullptr;
+#endif
 #if RTS_ENGINE_CONTEXT
 RTS_ENGINE_EXTERN_GLOBAL_DEFINE(NameKeyType, listboxGamesID, NAMEKEY_INVALID);
 #define listboxGamesID RTS_ENGINE_GLOBAL_REF(listboxGamesID)
 #else
 NameKeyType listboxGamesID = NAMEKEY_INVALID;
 #endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(GameWindow*, listboxGames, nullptr);
+#define listboxGames RTS_ENGINE_GLOBAL_REF(listboxGames)
+#else
 GameWindow *listboxGames = nullptr;
+#endif
 
 // hack to disable framerate limiter in LAN games
 //static Bool shellmapOn;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Bool, useFpsLimit);
+#define useFpsLimit RTS_ENGINE_GLOBAL_REF(useFpsLimit)
+#else
 static Bool useFpsLimit;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(UnicodeString, defaultName);
+#define defaultName RTS_ENGINE_GLOBAL_REF(defaultName)
+#else
 static UnicodeString defaultName;
+#endif
 
 static void playerTooltip(GameWindow *window,
 													WinInstanceData *instData,

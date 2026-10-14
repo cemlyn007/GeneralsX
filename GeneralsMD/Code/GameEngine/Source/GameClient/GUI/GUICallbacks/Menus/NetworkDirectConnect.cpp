@@ -57,11 +57,31 @@
 
 // PRIVATE DATA ///////////////////////////////////////////////////////////////////////////////////
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL(Bool, LANbuttonPushed);
+#define LANbuttonPushed RTS_ENGINE_GLOBAL_REF(LANbuttonPushed)
+#else
 extern Bool LANbuttonPushed;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL(Bool, LANisShuttingDown);
+#define LANisShuttingDown RTS_ENGINE_GLOBAL_REF(LANisShuttingDown)
+#else
 extern Bool LANisShuttingDown;
+#endif
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Bool, isShuttingDown, false);
+#define isShuttingDown RTS_ENGINE_GLOBAL_REF(isShuttingDown)
+#else
 static Bool isShuttingDown = false;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Bool, buttonPushed, false);
+#define buttonPushed RTS_ENGINE_GLOBAL_REF(buttonPushed)
+#else
 static Bool buttonPushed = false;
+#endif
 
 #if RTS_ENGINE_CONTEXT
 // GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
@@ -109,9 +129,24 @@ static GameWindow *buttonBack = nullptr;
 #endif
 static GameWindow *buttonHost = nullptr;
 static GameWindow *buttonJoin = nullptr;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, editPlayerName, nullptr);
+#define editPlayerName RTS_ENGINE_GLOBAL_REF(editPlayerName)
+#else
 static GameWindow *editPlayerName = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, comboboxRemoteIP, nullptr);
+#define comboboxRemoteIP RTS_ENGINE_GLOBAL_REF(comboboxRemoteIP)
+#else
 static GameWindow *comboboxRemoteIP = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, staticLocalIP, nullptr);
+#define staticLocalIP RTS_ENGINE_GLOBAL_REF(staticLocalIP)
+#else
 static GameWindow *staticLocalIP = nullptr;
+#endif
 
 void PopulateRemoteIPComboBox()
 {

@@ -764,16 +764,49 @@ Int updateTeletypeText( Int num_chars, GameWindow* window, UnicodeString full_te
 
 void ChallengeLoadScreen::activatePieces( Int frame, const GeneralPersona *generalPlayer, const GeneralPersona *generalOpponent )
 {
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+	RTS_ENGINE_STATIC(Int, textPosBigNameRight, 0);
+#else
 	static Int textPosBigNameRight = 0;
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(Int, textPosNameRight, 0);
+#else
 	static Int textPosNameRight = 0;
+#endif
 	static Int textPosAgeRight = 0;
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(Int, textPosBirthplaceRight, 0);
+#else
 	static Int textPosBirthplaceRight = 0;
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(Int, textPosStrategyRight, 0);
+#else
 	static Int textPosStrategyRight = 0;
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(Int, textPosBigNameLeft, 0);
+#else
 	static Int textPosBigNameLeft = 0;
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(Int, textPosNameLeft, 0);
+#else
 	static Int textPosNameLeft = 0;
+#endif
 	static Int textPosAgeLeft = 0;
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(Int, textPosBirthplaceLeft, 0);
+#else
 	static Int textPosBirthplaceLeft = 0;
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(Int, textPosStrategyLeft, 0);
+#else
 	static Int textPosStrategyLeft = 0;
+#endif
 
 	AudioEventRTS eventLeftGeneral( generalPlayer->getNameSound() );
 	AudioEventRTS eventVS("Taunts_GCAnnouncer12");

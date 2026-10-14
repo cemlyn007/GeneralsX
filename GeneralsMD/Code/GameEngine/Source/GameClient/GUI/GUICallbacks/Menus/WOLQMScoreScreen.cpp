@@ -67,8 +67,18 @@ static NameKeyType buttonQuickmatchID = NAMEKEY_INVALID;
 #endif
 
 // Window Pointers ------------------------------------------------------------------------
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, parentWOLQMScore, nullptr);
+#define parentWOLQMScore RTS_ENGINE_GLOBAL_REF(parentWOLQMScore)
+#else
 static GameWindow *parentWOLQMScore = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, buttonDisconnect, nullptr);
+#define buttonDisconnect RTS_ENGINE_GLOBAL_REF(buttonDisconnect)
+#else
 static GameWindow *buttonDisconnect = nullptr;
+#endif
 static GameWindow *buttonQuickmatch = nullptr;
 
 //-------------------------------------------------------------------------------------------------

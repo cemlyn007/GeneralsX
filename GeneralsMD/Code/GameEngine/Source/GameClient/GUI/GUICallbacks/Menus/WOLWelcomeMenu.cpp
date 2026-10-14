@@ -82,15 +82,36 @@
 #endif
 
 // PRIVATE DATA ///////////////////////////////////////////////////////////////////////////////////
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Bool, isShuttingDown, FALSE);
+#define isShuttingDown RTS_ENGINE_GLOBAL_REF(isShuttingDown)
+#else
 static Bool isShuttingDown = FALSE;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Bool, buttonPushed, FALSE);
+#define buttonPushed RTS_ENGINE_GLOBAL_REF(buttonPushed)
+#else
 static Bool buttonPushed = FALSE;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(const char*, nextScreen, nullptr);
+#define nextScreen RTS_ENGINE_GLOBAL_REF(nextScreen)
+#else
 static const char *nextScreen = nullptr;
+#endif
 static uint32_t s_lastRenderedStatsVersion = 0; // GeneralsX @feature Track version of NGMP global stats rendered
 static bool statsRendered = false; // GeneralsX @feature Track if NGMP global stats were rendered
 static bool motdRendered = false;  // GeneralsX @feature Track if NGMP MOTD was rendered
 
 // GeneralsX @feature fbraz3 03/09/2026 Map MOTD listbox rows to clickable URLs
+#if RTS_ENGINE_CONTEXT
+using s_motdRowUrls_rtsEngineType = std::map<Int, std::string>;
+RTS_ENGINE_GLOBAL(s_motdRowUrls_rtsEngineType, s_motdRowUrls);
+#define s_motdRowUrls RTS_ENGINE_GLOBAL_REF(s_motdRowUrls)
+#else
 static std::map<Int, std::string> s_motdRowUrls;
+#endif
 
 // GeneralsX @refactor fbraz3 08/09/2026 Use NGMP::OpenURL, ShellExecute, or SDL_OpenURL for URL opening
 static void OpenBrowserURL(const std::string& url)
@@ -150,6 +171,25 @@ static std::string ExtractURLFromLine(std::string& inOutText)
 	return inOutText.substr(pos, end - pos);
 }
 
+#if RTS_ENGINE_CONTEXT
+using g_mapServiceIndexToPlayerTemplateString_rtsEngineType = std::unordered_map<int, std::string>;
+RTS_ENGINE_GLOBAL(g_mapServiceIndexToPlayerTemplateString_rtsEngineType, g_mapServiceIndexToPlayerTemplateString, 
+{
+	{ 0, "USA" },
+	{ 1, "China" },
+	{ 2, "GLA" },
+	{ 3, "AmericaSuperWeaponGeneral" },
+	{ 4, "AmericaLaserGeneral" },
+	{ 5, "AmericaAirForceGeneral" },
+	{ 6, "ChinaTankGeneral" },
+	{ 7, "ChinaInfantryGeneral" },
+	{ 8, "ChinaNukeGeneral" },
+	{ 9, "GLAToxinGeneral" },
+	{ 10, "GLADemolitionGeneral" },
+	{ 11, "GLAStealthGeneral" }
+});
+#define g_mapServiceIndexToPlayerTemplateString RTS_ENGINE_GLOBAL_REF(g_mapServiceIndexToPlayerTemplateString)
+#else
 static std::unordered_map<int, std::string> g_mapServiceIndexToPlayerTemplateString =
 {
 	{ 0, "USA" },
@@ -165,6 +205,7 @@ static std::unordered_map<int, std::string> g_mapServiceIndexToPlayerTemplateStr
 	{ 10, "GLADemolitionGeneral" },
 	{ 11, "GLAStealthGeneral" }
 };
+#endif
 
 // window ids ------------------------------------------------------------------------------
 #if RTS_ENGINE_CONTEXT
@@ -224,23 +265,48 @@ RTS_ENGINE_GLOBAL(NameKeyType, buttonOptionsID, NAMEKEY_INVALID);
 static NameKeyType buttonOptionsID = NAMEKEY_INVALID;
 #endif
 // Window Pointers ------------------------------------------------------------------------
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, parentWOLWelcome, nullptr);
+#define parentWOLWelcome RTS_ENGINE_GLOBAL_REF(parentWOLWelcome)
+#else
 static GameWindow *parentWOLWelcome = nullptr;
+#endif
 #if RTS_ENGINE_CONTEXT
 RTS_ENGINE_GLOBAL(GameWindow*, buttonBack, nullptr);
 #define buttonBack RTS_ENGINE_GLOBAL_REF(buttonBack)
 #else
 static GameWindow *buttonBack = nullptr;
 #endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, buttonQuickMatch, nullptr);
+#define buttonQuickMatch RTS_ENGINE_GLOBAL_REF(buttonQuickMatch)
+#else
 static GameWindow *buttonQuickMatch = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, buttonLobby, nullptr);
+#define buttonLobby RTS_ENGINE_GLOBAL_REF(buttonLobby)
+#else
 static GameWindow *buttonLobby = nullptr;
+#endif
 static GameWindow *buttonBuddies = nullptr;
 static GameWindow *buttonLadder = nullptr;
 static GameWindow *buttonMyInfo = nullptr;
 static GameWindow *buttonbuttonOptions = nullptr;
 static WindowLayout *welcomeLayout = nullptr;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, listboxInfo, nullptr);
+#define listboxInfo RTS_ENGINE_GLOBAL_REF(listboxInfo)
+#else
 static GameWindow *listboxInfo = nullptr;
+#endif
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, staticTextServerName, nullptr);
+#define staticTextServerName RTS_ENGINE_GLOBAL_REF(staticTextServerName)
+#else
 static GameWindow *staticTextServerName = nullptr;
+#endif
 static GameWindow *staticTextLastUpdated = nullptr;
 
 static GameWindow *staticTextLadderWins = nullptr;
@@ -254,8 +320,18 @@ static GameWindow *staticTextHighscoreLosses = nullptr;
 static GameWindow *staticTextHighscoreRank = nullptr;
 static GameWindow *staticTextHighscorePoints = nullptr;
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(UnicodeString, gServerName);
+#define gServerName RTS_ENGINE_GLOBAL_REF(gServerName)
+#else
 static UnicodeString gServerName;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Bool, s_welcomeAudioPlayed, FALSE);
+#define s_welcomeAudioPlayed RTS_ENGINE_GLOBAL_REF(s_welcomeAudioPlayed)
+#else
 static Bool s_welcomeAudioPlayed = FALSE;
+#endif
 void updateServerDisplay(UnicodeString serverName)
 {
 	if (staticTextServerName)
@@ -357,7 +433,12 @@ static void shutdownComplete( WindowLayout *layout )
 /** Handle Num Players Online data */
 //-------------------------------------------------------------------------------------------------
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Int, lastNumPlayersOnline, 0);
+#define lastNumPlayersOnline RTS_ENGINE_GLOBAL_REF(lastNumPlayersOnline)
+#else
 static Int lastNumPlayersOnline = 0;
+#endif
 
 static UnsignedByte grabUByte(const char *s)
 {
@@ -481,8 +562,19 @@ void HandleNumPlayersOnline( Int numPlayersOnline )
 //-------------------------------------------------------------------------------------------------
 /** Handle Overall Stats data */
 //-------------------------------------------------------------------------------------------------
+#if RTS_ENGINE_CONTEXT
+using s_winStats_rtsEngineType = std::map<AsciiString,float>;
+RTS_ENGINE_GLOBAL(s_winStats_rtsEngineType, s_winStats);
+#define s_winStats RTS_ENGINE_GLOBAL_REF(s_winStats)
+#else
 static std::map<AsciiString,float> s_winStats;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(float, s_totalWinPercent, 0);
+#define s_totalWinPercent RTS_ENGINE_GLOBAL_REF(s_totalWinPercent)
+#else
 static float s_totalWinPercent = 0;
+#endif
 
 static const char* FindNextNumber( const char* pStart )
 {
@@ -637,7 +729,12 @@ void UpdateLocalPlayerStats()
 	}
 }
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Bool, raiseMessageBoxes, FALSE);
+#define raiseMessageBoxes RTS_ENGINE_GLOBAL_REF(raiseMessageBoxes)
+#else
 static Bool raiseMessageBoxes = FALSE;
+#endif
 //-------------------------------------------------------------------------------------------------
 /** Initialize the WOL Welcome Menu */
 //-------------------------------------------------------------------------------------------------

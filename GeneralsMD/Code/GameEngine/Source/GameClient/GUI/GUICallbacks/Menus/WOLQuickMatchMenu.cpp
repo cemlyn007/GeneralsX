@@ -201,46 +201,166 @@ static NameKeyType comboBoxColorID = NAMEKEY_INVALID;
 
 
 // Window Pointers ------------------------------------------------------------------------
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, parentWOLQuickMatch, nullptr);
+#define parentWOLQuickMatch RTS_ENGINE_GLOBAL_REF(parentWOLQuickMatch)
+#else
 static GameWindow *parentWOLQuickMatch = nullptr;
+#endif
 #if RTS_ENGINE_CONTEXT
 RTS_ENGINE_GLOBAL(GameWindow*, buttonBack, nullptr);
 #define buttonBack RTS_ENGINE_GLOBAL_REF(buttonBack)
 #else
 static GameWindow *buttonBack = nullptr;
 #endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, buttonStart, nullptr);
+#define buttonStart RTS_ENGINE_GLOBAL_REF(buttonStart)
+#else
 static GameWindow *buttonStart = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, buttonStop, nullptr);
+#define buttonStop RTS_ENGINE_GLOBAL_REF(buttonStop)
+#else
 static GameWindow *buttonStop = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, buttonWiden, nullptr);
+#define buttonWiden RTS_ENGINE_GLOBAL_REF(buttonWiden)
+#else
 static GameWindow *buttonWiden = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(GameWindow*, quickmatchTextWindow, nullptr);
+#define quickmatchTextWindow RTS_ENGINE_GLOBAL_REF(quickmatchTextWindow)
+#else
 GameWindow *quickmatchTextWindow = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, listboxMapSelect, nullptr);
+#define listboxMapSelect RTS_ENGINE_GLOBAL_REF(listboxMapSelect)
+#else
 static GameWindow *listboxMapSelect = nullptr;
+#endif
 //static GameWindow *textEntryMaxDisconnects = nullptr;
 //static GameWindow *textEntryMaxPoints = nullptr;
 //static GameWindow *textEntryMinPoints = nullptr;
 static GameWindow *textEntryWaitTime = nullptr;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, comboBoxNumPlayers, nullptr);
+#define comboBoxNumPlayers RTS_ENGINE_GLOBAL_REF(comboBoxNumPlayers)
+#else
 static GameWindow *comboBoxNumPlayers = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, comboBoxMaxPing, nullptr);
+#define comboBoxMaxPing RTS_ENGINE_GLOBAL_REF(comboBoxMaxPing)
+#else
 static GameWindow *comboBoxMaxPing = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, comboBoxLadder, nullptr);
+#define comboBoxLadder RTS_ENGINE_GLOBAL_REF(comboBoxLadder)
+#else
 static GameWindow *comboBoxLadder = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, comboBoxDisabledLadder, nullptr); // enable and disable this, but never use it.  it is a stand-in for comboBoxLadder for when there are no ladders
+#define comboBoxDisabledLadder RTS_ENGINE_GLOBAL_REF(comboBoxDisabledLadder)
+#else
 static GameWindow *comboBoxDisabledLadder = nullptr; // enable and disable this, but never use it.  it is a stand-in for comboBoxLadder for when there are no ladders
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, comboBoxMaxDisconnects, nullptr);
+#define comboBoxMaxDisconnects RTS_ENGINE_GLOBAL_REF(comboBoxMaxDisconnects)
+#else
 static GameWindow *comboBoxMaxDisconnects = nullptr;
+#endif
 static GameWindow *staticTextNumPlayers = nullptr;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, comboBoxSide, nullptr);
+#define comboBoxSide RTS_ENGINE_GLOBAL_REF(comboBoxSide)
+#else
 static GameWindow *comboBoxSide = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, comboBoxColor, nullptr);
+#define comboBoxColor RTS_ENGINE_GLOBAL_REF(comboBoxColor)
+#else
 static GameWindow *comboBoxColor = nullptr;
+#endif
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Bool, isShuttingDown, false);
+#define isShuttingDown RTS_ENGINE_GLOBAL_REF(isShuttingDown)
+#else
 static Bool isShuttingDown = false;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Bool, buttonPushed, false);
+#define buttonPushed RTS_ENGINE_GLOBAL_REF(buttonPushed)
+#else
 static Bool buttonPushed = false;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(const char*, nextScreen, nullptr);
+#define nextScreen RTS_ENGINE_GLOBAL_REF(nextScreen)
+#else
 static const char *nextScreen = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Bool, raiseMessageBoxes, false);
+#define raiseMessageBoxes RTS_ENGINE_GLOBAL_REF(raiseMessageBoxes)
+#else
 static Bool raiseMessageBoxes = false;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Bool, isInInit, FALSE);
+#define isInInit RTS_ENGINE_GLOBAL_REF(isInInit)
+#else
 static Bool isInInit = FALSE;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(const Image*, selectedImage, nullptr);
+#define selectedImage RTS_ENGINE_GLOBAL_REF(selectedImage)
+#else
 static const Image *selectedImage = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(const Image*, unselectedImage, nullptr);
+#define unselectedImage RTS_ENGINE_GLOBAL_REF(unselectedImage)
+#else
 static const Image *unselectedImage = nullptr;
+#endif
 #if defined(SAGE_USE_NGMP)
 static std::vector<int> s_qmRowToPlaylistMapIndex;
 #endif
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(bool, isPopulatingLadderBox, false);
+#define isPopulatingLadderBox RTS_ENGINE_GLOBAL_REF(isPopulatingLadderBox)
+#else
 static bool isPopulatingLadderBox = false;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Int, maxPingEntries, 0);
+#define maxPingEntries RTS_ENGINE_GLOBAL_REF(maxPingEntries)
+#else
 static Int maxPingEntries = 0;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Int, maxPoints, 100);
+#define maxPoints RTS_ENGINE_GLOBAL_REF(maxPoints)
+#else
 static Int maxPoints= 100;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Int, minPoints, 0);
+#define minPoints RTS_ENGINE_GLOBAL_REF(minPoints)
+#else
 static Int minPoints = 0;
+#endif
 
 static const LadderInfo * getLadderInfo();
 

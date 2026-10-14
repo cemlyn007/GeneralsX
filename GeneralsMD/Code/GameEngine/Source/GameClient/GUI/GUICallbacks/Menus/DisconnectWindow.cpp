@@ -41,7 +41,12 @@
 #include "Common/NameKeyGenerator.h"
 
 // Private Data -----------------------------
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(WindowLayout*, disconnectMenuLayout);
+#define disconnectMenuLayout RTS_ENGINE_GLOBAL_REF(disconnectMenuLayout)
+#else
 static WindowLayout *disconnectMenuLayout;
+#endif
 
 #if RTS_ENGINE_CONTEXT
 // GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
@@ -57,8 +62,18 @@ RTS_ENGINE_GLOBAL(NameKeyType, textDisplayID, NAMEKEY_INVALID);
 static NameKeyType textDisplayID = NAMEKEY_INVALID;
 #endif
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, textEntryWindow, nullptr);
+#define textEntryWindow RTS_ENGINE_GLOBAL_REF(textEntryWindow)
+#else
 static GameWindow *textEntryWindow = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, textDisplayWindow, nullptr);
+#define textDisplayWindow RTS_ENGINE_GLOBAL_REF(textDisplayWindow)
+#else
 static GameWindow *textDisplayWindow = nullptr;
+#endif
 
 #if RTS_ENGINE_CONTEXT
 RTS_ENGINE_GLOBAL(NameKeyType, buttonQuitID, NAMEKEY_INVALID);
@@ -66,7 +81,12 @@ RTS_ENGINE_GLOBAL(NameKeyType, buttonQuitID, NAMEKEY_INVALID);
 #else
 static NameKeyType buttonQuitID = NAMEKEY_INVALID;
 #endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, buttonQuitWindow, nullptr);
+#define buttonQuitWindow RTS_ENGINE_GLOBAL_REF(buttonQuitWindow)
+#else
 static GameWindow *buttonQuitWindow = nullptr;
+#endif
 
 #if RTS_ENGINE_CONTEXT
 RTS_ENGINE_GLOBAL(NameKeyType, buttonVotePlayer1ID, NAMEKEY_INVALID);
@@ -111,13 +131,48 @@ RTS_ENGINE_GLOBAL(NameKeyType, buttonVotePlayer7ID, NAMEKEY_INVALID);
 static NameKeyType buttonVotePlayer7ID = NAMEKEY_INVALID;
 #endif
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, buttonVotePlayer1Window, nullptr);
+#define buttonVotePlayer1Window RTS_ENGINE_GLOBAL_REF(buttonVotePlayer1Window)
+#else
 static GameWindow *buttonVotePlayer1Window = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, buttonVotePlayer2Window, nullptr);
+#define buttonVotePlayer2Window RTS_ENGINE_GLOBAL_REF(buttonVotePlayer2Window)
+#else
 static GameWindow *buttonVotePlayer2Window = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, buttonVotePlayer3Window, nullptr);
+#define buttonVotePlayer3Window RTS_ENGINE_GLOBAL_REF(buttonVotePlayer3Window)
+#else
 static GameWindow *buttonVotePlayer3Window = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, buttonVotePlayer4Window, nullptr);
+#define buttonVotePlayer4Window RTS_ENGINE_GLOBAL_REF(buttonVotePlayer4Window)
+#else
 static GameWindow *buttonVotePlayer4Window = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, buttonVotePlayer5Window, nullptr);
+#define buttonVotePlayer5Window RTS_ENGINE_GLOBAL_REF(buttonVotePlayer5Window)
+#else
 static GameWindow *buttonVotePlayer5Window = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, buttonVotePlayer6Window, nullptr);
+#define buttonVotePlayer6Window RTS_ENGINE_GLOBAL_REF(buttonVotePlayer6Window)
+#else
 static GameWindow *buttonVotePlayer6Window = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, buttonVotePlayer7Window, nullptr);
+#define buttonVotePlayer7Window RTS_ENGINE_GLOBAL_REF(buttonVotePlayer7Window)
+#else
 static GameWindow *buttonVotePlayer7Window = nullptr;
+#endif
 
 static void InitDisconnectWindow() {
 	textEntryID = TheNameKeyGenerator->nameToKey( "DisconnectScreen.wnd:TextEntry");

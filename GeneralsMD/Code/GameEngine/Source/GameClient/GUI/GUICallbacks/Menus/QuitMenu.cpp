@@ -87,12 +87,37 @@ static GameWindow *quitConfirmationWindow = nullptr;
 #endif
 
 //external declarations of the Gadgets the callbacks can use
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(WindowLayout*, saveLoadMenuLayout, nullptr);
+#define saveLoadMenuLayout RTS_ENGINE_GLOBAL_REF(saveLoadMenuLayout)
+#else
 static WindowLayout *saveLoadMenuLayout = nullptr;
+#endif
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, buttonRestartWin, nullptr);
+#define buttonRestartWin RTS_ENGINE_GLOBAL_REF(buttonRestartWin)
+#else
 static GameWindow *buttonRestartWin	= nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, buttonSaveLoadWin, nullptr);
+#define buttonSaveLoadWin RTS_ENGINE_GLOBAL_REF(buttonSaveLoadWin)
+#else
 static GameWindow *buttonSaveLoadWin = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, buttonOptionsWin, nullptr);
+#define buttonOptionsWin RTS_ENGINE_GLOBAL_REF(buttonOptionsWin)
+#else
 static GameWindow *buttonOptionsWin = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, buttonExitWin, nullptr);
+#define buttonExitWin RTS_ENGINE_GLOBAL_REF(buttonExitWin)
+#else
 static GameWindow *buttonExitWin = nullptr;
+#endif
 
 #if RTS_ENGINE_CONTEXT
 // GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).

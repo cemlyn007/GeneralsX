@@ -221,46 +221,141 @@ static NameKeyType comboBoxStartingCashID = NAMEKEY_INVALID;
 #endif
 
 // Window Pointers ------------------------------------------------------------------------
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, staticTextGameSpeed, nullptr);
+#define staticTextGameSpeed RTS_ENGINE_GLOBAL_REF(staticTextGameSpeed)
+#else
 static GameWindow *staticTextGameSpeed = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, parentSkirmishGameOptions, nullptr);
+#define parentSkirmishGameOptions RTS_ENGINE_GLOBAL_REF(parentSkirmishGameOptions)
+#else
 static GameWindow *parentSkirmishGameOptions = nullptr;
+#endif
 #if RTS_ENGINE_CONTEXT
 RTS_ENGINE_GLOBAL(GameWindow*, buttonExit, nullptr);
 #define buttonExit RTS_ENGINE_GLOBAL_REF(buttonExit)
 #else
 static GameWindow *buttonExit = nullptr;
 #endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, buttonStart, nullptr);
+#define buttonStart RTS_ENGINE_GLOBAL_REF(buttonStart)
+#else
 static GameWindow *buttonStart = nullptr;
+#endif
 static GameWindow *buttonSelectMap = nullptr;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, textEntryMapDisplay, nullptr);
+#define textEntryMapDisplay RTS_ENGINE_GLOBAL_REF(textEntryMapDisplay)
+#else
 static GameWindow *textEntryMapDisplay = nullptr;
+#endif
 static GameWindow *buttonReset = nullptr;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, windowMap, nullptr);
+#define windowMap RTS_ENGINE_GLOBAL_REF(windowMap)
+#else
 static GameWindow *windowMap = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, textEntryPlayerName, nullptr);
+#define textEntryPlayerName RTS_ENGINE_GLOBAL_REF(textEntryPlayerName)
+#else
 static GameWindow *textEntryPlayerName = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, checkBoxLimitSuperweapons, nullptr);
+#define checkBoxLimitSuperweapons RTS_ENGINE_GLOBAL_REF(checkBoxLimitSuperweapons)
+#else
 static GameWindow *checkBoxLimitSuperweapons = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, comboBoxStartingCash, nullptr);
+#define comboBoxStartingCash RTS_ENGINE_GLOBAL_REF(comboBoxStartingCash)
+#else
 static GameWindow *comboBoxStartingCash = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*[MAX_SLOTS], comboBoxPlayer, {0});
+#define comboBoxPlayer RTS_ENGINE_GLOBAL_REF(comboBoxPlayer)
+#else
 static GameWindow *comboBoxPlayer[MAX_SLOTS] = {0};
+#endif
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*[MAX_SLOTS], comboBoxColor, {0});
+#define comboBoxColor RTS_ENGINE_GLOBAL_REF(comboBoxColor)
+#else
 static GameWindow *comboBoxColor[MAX_SLOTS] = {0};
+#endif
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*[MAX_SLOTS], comboBoxPlayerTemplate, {0});
+#define comboBoxPlayerTemplate RTS_ENGINE_GLOBAL_REF(comboBoxPlayerTemplate)
+#else
 static GameWindow *comboBoxPlayerTemplate[MAX_SLOTS] = {0};
+#endif
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*[MAX_SLOTS], comboBoxTeam, {0});
+#define comboBoxTeam RTS_ENGINE_GLOBAL_REF(comboBoxTeam)
+#else
 static GameWindow *comboBoxTeam[MAX_SLOTS] = {0};
+#endif
 
 //static GameWindow *buttonStartPosition[MAX_SLOTS] = {0};
 //
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*[MAX_SLOTS], buttonMapStartPosition, {0});
+#define buttonMapStartPosition RTS_ENGINE_GLOBAL_REF(buttonMapStartPosition)
+#else
 static GameWindow *buttonMapStartPosition[MAX_SLOTS] = {0};
+#endif
 //external declarations of the Gadgets the callbacks can use
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(WindowLayout*, skirmishMapSelectLayout, nullptr);
+#define skirmishMapSelectLayout RTS_ENGINE_GLOBAL_REF(skirmishMapSelectLayout)
+#else
 WindowLayout *skirmishMapSelectLayout = nullptr;
+#endif
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Int, initialGadgetDelay, 2);
+#define initialGadgetDelay RTS_ENGINE_GLOBAL_REF(initialGadgetDelay)
+#else
 static Int	initialGadgetDelay = 2;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Bool, justEntered, FALSE);
+#define justEntered RTS_ENGINE_GLOBAL_REF(justEntered)
+#else
 static Bool justEntered = FALSE;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Bool, buttonPushed, FALSE);
+#define buttonPushed RTS_ENGINE_GLOBAL_REF(buttonPushed)
+#else
 static Bool buttonPushed = FALSE;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Bool, stillNeedsToSetOptions, FALSE);
+#define stillNeedsToSetOptions RTS_ENGINE_GLOBAL_REF(stillNeedsToSetOptions)
+#else
 static Bool stillNeedsToSetOptions = FALSE;
+#endif
 void skirmishUpdateSlotList();
 static void populateSkirmishBattleHonors();
 // GeneralsX @tweak felipebraz 20/06/2026 Change Skirmish speed limit to represent FPS limit (30..120)
 enum{ GREATER_NO_FPS_LIMIT = 120};
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(Bool, doUpdateSlotList, TRUE);
+#define doUpdateSlotList RTS_ENGINE_GLOBAL_REF(doUpdateSlotList)
+#else
 Bool doUpdateSlotList = TRUE;
+#endif
 
 static Int getNextSelectablePlayer(Int start)
 {
@@ -601,7 +696,12 @@ void reallyDoStart()
 	}
 }
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(Bool, sandboxOk, FALSE);
+#define sandboxOk RTS_ENGINE_GLOBAL_REF(sandboxOk)
+#else
 Bool sandboxOk = FALSE;
+#endif
 static void startPressed()
 {
 
@@ -747,7 +847,12 @@ void positionStartSpotControls( GameWindow *win, GameWindow *mapWindow, Coord3D 
 	}
 	win->winSetPosition(gadgetPos.x,gadgetPos.y);
 }
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(TechAndSupplyImages, TheSupplyAndTechImageLocations);
+#define TheSupplyAndTechImageLocations RTS_ENGINE_GLOBAL_REF(TheSupplyAndTechImageLocations)
+#else
 TechAndSupplyImages TheSupplyAndTechImageLocations;
+#endif
 
 void positionAdditionalImages( MapMetaData *mmd, GameWindow *mapWindow, Bool force)
 {
@@ -756,7 +861,11 @@ void positionAdditionalImages( MapMetaData *mmd, GameWindow *mapWindow, Bool for
 
 	if( !mmd || !mapWindow || mapWindow->winIsHidden())
 		return;
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(MapMetaData*, prevMMD, nullptr);
+#else
 	static MapMetaData *prevMMD = nullptr;
+#endif
 	if(force)
 		prevMMD = nullptr;
 	// we already populated the supply and tech image locations.
@@ -818,7 +927,11 @@ void positionStartSpots( AsciiString mapName, GameWindow *buttonMapStartPosition
 	{
 		mapWindow->winSetUserData(nullptr);
 
+#if RTS_ENGINE_CONTEXT
+		RTS_ENGINE_STATIC(const Image*, unknownImage, nullptr);
+#else
 		static const Image *unknownImage = nullptr;
+#endif
 		if (!unknownImage)
 			unknownImage = TheMappedImageCollection->findImageByName("UnknownMap");
 		if (unknownImage)
@@ -858,7 +971,11 @@ void positionStartSpots( AsciiString mapName, GameWindow *buttonMapStartPosition
 			}
 			else
 			{
+#if RTS_ENGINE_CONTEXT
+				RTS_ENGINE_STATIC(const Image*, unknownImage, nullptr);
+#else
 				static const Image *unknownImage = nullptr;
+#endif
 				if (!unknownImage)
 					unknownImage = TheMappedImageCollection->findImageByName("UnknownMap");
 				if (unknownImage)
@@ -1328,7 +1445,12 @@ void initSkirmishGameOptions()
 
 static const char *layoutFilename = "SkirmishGameOptionsMenu.wnd";
 static const char *parentName = "SkirmishGameOptionsMenuParent";
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 Tables no engine writes are constant (docs/EMBEDDING.md).
+static const char * const gadgetsToHide[] =
+#else
 static const char *gadgetsToHide[] =
+#endif
 {
 	"TextEntryPlayerName",
 	"StaticTextPlayers",
@@ -1337,7 +1459,11 @@ static const char *gadgetsToHide[] =
 	"StaticTextFaction",
 	nullptr
 };
+#if RTS_ENGINE_CONTEXT
+static const char * const perPlayerGadgetsToHide[] =
+#else
 static const char *perPlayerGadgetsToHide[] =
+#endif
 {
 	"ComboBoxPlayer",
 	"ComboBoxTeam",

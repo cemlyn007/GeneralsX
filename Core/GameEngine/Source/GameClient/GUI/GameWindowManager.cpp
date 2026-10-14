@@ -60,7 +60,13 @@
 #if !RTS_ENGINE_CONTEXT
 GameWindowManager *TheWindowManager = nullptr;
 #endif
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(UnsignedInt, WindowLayoutCurrentVersion, 2);
+#define WindowLayoutCurrentVersion RTS_ENGINE_GLOBAL_REF(WindowLayoutCurrentVersion)
+#else
 UnsignedInt WindowLayoutCurrentVersion = 2;
+#endif
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // PRIVATE FUNCTIONS //////////////////////////////////////////////////////////////////////////////
@@ -2820,37 +2826,161 @@ void GameWindowManager::assignDefaultGadgetLook( GameWindow *gadget,
 																								 Bool assignVisual )
 {
 	UnsignedByte alpha = 255;
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(Color, red, winMakeColor( 255,   0,   0, alpha ));
+#else
 	static Color red				= winMakeColor( 255,   0,   0, alpha );
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(Color, darkRed, winMakeColor( 128,   0,   0, alpha ));
+#else
 	static Color darkRed		= winMakeColor( 128,   0,   0, alpha );
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(Color, lightRed, winMakeColor( 255, 128, 128, alpha ));
+#else
 	static Color lightRed		= winMakeColor( 255, 128, 128, alpha );
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(Color, green, winMakeColor(   0, 255,   0, alpha ));
+#else
 	static Color green			= winMakeColor(   0, 255,   0, alpha );
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(Color, darkGreen, winMakeColor(   0, 128,   0, alpha ));
+#else
 	static Color darkGreen	= winMakeColor(   0, 128,   0, alpha );
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(Color, lightGreen, winMakeColor( 128, 255, 128, alpha ));
+#else
 	static Color lightGreen	= winMakeColor( 128, 255, 128, alpha );
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(Color, blue, winMakeColor(   0,   0, 255, alpha ));
+#else
 	static Color blue				= winMakeColor(   0,   0, 255, alpha );
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(Color, darkBlue, winMakeColor(   0,   0, 128, alpha ));
+#else
 	static Color darkBlue		= winMakeColor(   0,   0, 128, alpha );
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(Color, lightBlue, winMakeColor( 128, 128, 255, alpha ));
+#else
 	static Color lightBlue	= winMakeColor( 128, 128, 255, alpha );
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(Color, purple, winMakeColor( 255,   0, 255, alpha ));
+#else
 	static Color purple			= winMakeColor( 255,   0, 255, alpha );
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(Color, darkPurple, winMakeColor( 128,   0, 128, alpha ));
+#else
 	static Color darkPurple	= winMakeColor( 128,   0, 128, alpha );
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(Color, lightPurple, winMakeColor( 255, 128, 255, alpha ));
+#else
 	static Color lightPurple= winMakeColor( 255, 128, 255, alpha );
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(Color, yellow, winMakeColor( 255, 255,   0, alpha ));
+#else
 	static Color yellow			= winMakeColor( 255, 255,   0, alpha );
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(Color, darkYellow, winMakeColor( 128, 128,   0, alpha ));
+#else
 	static Color darkYellow	= winMakeColor( 128, 128,   0, alpha );
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(Color, lightYellow, winMakeColor( 255, 255, 128, alpha ));
+#else
 	static Color lightYellow= winMakeColor( 255, 255, 128, alpha );
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(Color, cyan, winMakeColor(   0, 255, 255, alpha ));
+#else
 	static Color cyan				= winMakeColor(   0, 255, 255, alpha );
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(Color, darkCyan, winMakeColor(  64, 128, 128, alpha ));
+#else
 	static Color darkCyan		= winMakeColor(  64, 128, 128, alpha );
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(Color, lightCyan, winMakeColor( 128, 255, 255, alpha ));
+#else
 	static Color lightCyan	= winMakeColor( 128, 255, 255, alpha );
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(Color, gray, winMakeColor( 128, 128, 128, alpha ));
+#else
 	static Color gray				= winMakeColor( 128, 128, 128, alpha );
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(Color, darkGray, winMakeColor(  64,  64,  64, alpha ));
+#else
 	static Color darkGray		= winMakeColor(  64,  64,  64, alpha );
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(Color, lightGray, winMakeColor( 192, 192, 192, alpha ));
+#else
 	static Color lightGray	= winMakeColor( 192, 192, 192, alpha );
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(Color, black, winMakeColor(   0,   0,   0, alpha ));
+#else
 	static Color black			= winMakeColor(   0,   0,   0, alpha );
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(Color, white, winMakeColor( 254, 254, 254, alpha ));
+#else
 	static Color white			= winMakeColor( 254, 254, 254, alpha );
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(Color, enabledText, white);
+#else
 	static Color enabledText					= white;
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(Color, enabledTextBorder, darkGray);
+#else
 	static Color enabledTextBorder		= darkGray;
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(Color, disabledText, darkGray);
+#else
 	static Color disabledText					= darkGray;
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(Color, disabledTextBorder, black);
+#else
 	static Color disabledTextBorder		= black;
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(Color, hiliteText, lightBlue);
+#else
 	static Color hiliteText						= lightBlue;
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(Color, hiliteTextBorder, blue);
+#else
 	static Color hiliteTextBorder			= blue;
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(Color, imeCompositeText, green);
+#else
 	static Color imeCompositeText				= green;
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(Color, imeCompositeTextBorder, blue);
+#else
 	static Color imeCompositeTextBorder	= blue;
+#endif
 	WinInstanceData *instData;
 
 	// sanity

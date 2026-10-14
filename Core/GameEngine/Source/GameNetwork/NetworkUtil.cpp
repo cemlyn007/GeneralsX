@@ -29,11 +29,37 @@
 
 // TheSuperHackers @tweak Mauller 26/08/2025 reduce the minimum runahead from 10
 // This lets network games run at latencies down to 133ms when the network conditions allow
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(Int, MIN_LOGIC_FRAMES, 5);
+#define MIN_LOGIC_FRAMES RTS_ENGINE_GLOBAL_REF(MIN_LOGIC_FRAMES)
+#else
 Int MIN_LOGIC_FRAMES = 5;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(Int, MAX_FRAMES_AHEAD, 128);
+#define MAX_FRAMES_AHEAD RTS_ENGINE_GLOBAL_REF(MAX_FRAMES_AHEAD)
+#else
 Int MAX_FRAMES_AHEAD = 128;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(Int, MIN_RUNAHEAD, 4);
+#define MIN_RUNAHEAD RTS_ENGINE_GLOBAL_REF(MIN_RUNAHEAD)
+#else
 Int MIN_RUNAHEAD = 4;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(Int, FRAME_DATA_LENGTH, (MAX_FRAMES_AHEAD+1)*2);
+#define FRAME_DATA_LENGTH RTS_ENGINE_GLOBAL_REF(FRAME_DATA_LENGTH)
+#else
 Int FRAME_DATA_LENGTH = (MAX_FRAMES_AHEAD+1)*2;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(Int, FRAMES_TO_KEEP, (MAX_FRAMES_AHEAD/2) + 1);
+#define FRAMES_TO_KEEP RTS_ENGINE_GLOBAL_REF(FRAMES_TO_KEEP)
+#else
 Int FRAMES_TO_KEEP = (MAX_FRAMES_AHEAD/2) + 1;
+#endif
 
 #ifdef DEBUG_LOGGING
 
@@ -110,7 +136,12 @@ UnsignedInt ResolveIP(AsciiString host)
 /**
  * Returns the next network command ID.
  */
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(UnsignedShort, s_commandID, 0);
+#define s_commandID RTS_ENGINE_GLOBAL_REF(s_commandID)
+#else
 static UnsignedShort s_commandID = 0;
+#endif
 UnsignedShort GenerateNextCommandID()
 {
 	return s_commandID++;

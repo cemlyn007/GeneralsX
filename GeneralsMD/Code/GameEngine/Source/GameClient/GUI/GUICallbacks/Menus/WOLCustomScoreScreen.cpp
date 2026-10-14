@@ -70,8 +70,18 @@ static NameKeyType buttonLobbyID = NAMEKEY_INVALID;
 #endif
 
 // Window Pointers ------------------------------------------------------------------------
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, parentWOLCustomScore, nullptr);
+#define parentWOLCustomScore RTS_ENGINE_GLOBAL_REF(parentWOLCustomScore)
+#else
 static GameWindow *parentWOLCustomScore = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, buttonDisconnect, nullptr);
+#define buttonDisconnect RTS_ENGINE_GLOBAL_REF(buttonDisconnect)
+#else
 static GameWindow *buttonDisconnect = nullptr;
+#endif
 static GameWindow *buttonLobby = nullptr;
 
 //-------------------------------------------------------------------------------------------------

@@ -107,6 +107,10 @@ struct ManglerMessage {
 static const Int MAX_NUM_MANGLERS = 4;
 static const UnsignedShort MANGLER_PORT = 4321;
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+#define m_sourcePortPool RTS_ENGINE_GLOBAL_REF(m_sourcePortPool)
+#endif
 class FirewallHelperClass {
 
 	public:
@@ -259,7 +263,11 @@ class FirewallHelperClass {
 		** Needs to be static so that previous communications with the manglers
 		** don't affect the current one.
 		*/
+#if RTS_ENGINE_CONTEXT
+		RTS_ENGINE_CLASS_STATIC(Int, m_sourcePortPool);
+#else
 		static Int m_sourcePortPool;
+#endif
 
 		/*
 		** Spare sockets used for detecting mangling and such.
@@ -289,3 +297,6 @@ class FirewallHelperClass {
 extern FirewallHelperClass *TheFirewallHelper;
 #endif
 FirewallHelperClass * createFirewallHelper();
+#if RTS_ENGINE_CONTEXT
+#undef m_sourcePortPool
+#endif

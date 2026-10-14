@@ -61,8 +61,18 @@ static NameKeyType buttonCancelID = NAMEKEY_INVALID;
 #endif
 
 // Window Pointers ------------------------------------------------------------------------
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, parentWOLMessageWindow, nullptr);
+#define parentWOLMessageWindow RTS_ENGINE_GLOBAL_REF(parentWOLMessageWindow)
+#else
 static GameWindow *parentWOLMessageWindow = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, buttonCancel, nullptr);
+#define buttonCancel RTS_ENGINE_GLOBAL_REF(buttonCancel)
+#else
 static GameWindow *buttonCancel = nullptr;
+#endif
 
 
 //-------------------------------------------------------------------------------------------------

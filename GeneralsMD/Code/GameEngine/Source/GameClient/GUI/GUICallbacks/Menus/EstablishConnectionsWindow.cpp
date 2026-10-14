@@ -32,7 +32,12 @@
 #include "GameNetwork/GUIUtil.h"
 #include "GameNetwork/GameSpy/StagingRoomGameInfo.h"
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(WindowLayout*, establishConnectionsLayout);
+#define establishConnectionsLayout RTS_ENGINE_GLOBAL_REF(establishConnectionsLayout)
+#else
 static WindowLayout *establishConnectionsLayout;
+#endif
 
 #if RTS_ENGINE_CONTEXT
 // GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
@@ -76,7 +81,12 @@ static GameWindow *staticPlayer7Status = nullptr;
 
 static const char *layoutFilename = "GameSpyGameOptionsMenu.wnd";
 static const char *parentName = "GameSpyGameOptionsMenuParent";
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 Tables no engine writes are constant (docs/EMBEDDING.md).
+static const char * const gadgetsToHide[] =
+#else
 static const char *gadgetsToHide[] =
+#endif
 {
 	"MapWindow",
 	"StaticTextGameName",
@@ -90,7 +100,11 @@ static const char *gadgetsToHide[] =
 	"StaticTextMapPreview",
 	nullptr
 };
+#if RTS_ENGINE_CONTEXT
+static const char * const perPlayerGadgetsToHide[] =
+#else
 static const char *perPlayerGadgetsToHide[] =
+#endif
 {
 	"ComboBoxTeam",
 	"ComboBoxColor",
@@ -104,7 +118,11 @@ static const char *perPlayerGadgetsToHide[] =
 
 static const char *qmlayoutFilename = "WOLQuickMatchMenu.wnd";
 static const char *qmparentName = "WOLQuickMatchMenuParent";
+#if RTS_ENGINE_CONTEXT
+static const char * const qmgadgetsToHide[] =
+#else
 static const char *qmgadgetsToHide[] =
+#endif
 {
 	"StaticTextTitle",
 	"ButtonBack",
@@ -115,7 +133,11 @@ static const char *qmgadgetsToHide[] =
 	"ButtonStart",
 	nullptr
 };
+#if RTS_ENGINE_CONTEXT
+static const char * const qmperPlayerGadgetsToHide[] =
+#else
 static const char *qmperPlayerGadgetsToHide[] =
+#endif
 {
 	//"ButtonStartPosition",
 	nullptr
