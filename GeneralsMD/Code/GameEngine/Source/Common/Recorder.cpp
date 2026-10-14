@@ -59,8 +59,14 @@ constexpr const UnsignedInt replayBufferBytes = 8192;
 Int REPLAY_CRC_INTERVAL = 100;
 #endif
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 Strings no engine writes are constant (docs/EMBEDDING.md).
+const char * const replayExtention = ".rep";
+const char * const lastReplayFileName = "00000000";	// a name the user is unlikely to ever type, but won't cause panic & confusion
+#else
 const char *replayExtention = ".rep";
 const char *lastReplayFileName = "00000000";	// a name the user is unlikely to ever type, but won't cause panic & confusion
+#endif
 
 // TheSuperHackers @tweak helmutbuhler 25/04/2025
 // The replay header contains two time fields; startTime and endTime of type time_t.

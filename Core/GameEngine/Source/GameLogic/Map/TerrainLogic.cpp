@@ -68,7 +68,12 @@ TerrainLogic *TheTerrainLogic = nullptr;
 #endif
 
 // STATIC /////////////////////////////////////////////////////////////////////////////////////////
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 The grid water handle is a constant whose address marks grid water (docs/EMBEDDING.md).
+const WaterHandle TerrainLogic::m_gridWaterHandle;
+#else
 WaterHandle TerrainLogic::m_gridWaterHandle;
+#endif
 
 // Waypoint ///////////////////////////////////////////////////////////////////////////////////////
 
