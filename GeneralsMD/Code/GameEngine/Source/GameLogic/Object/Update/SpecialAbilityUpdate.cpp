@@ -1105,7 +1105,12 @@ SpecialPowerModuleInterface* SpecialAbilityUpdate::getMySPM()
 Bool SpecialAbilityUpdate::initLaser(Object* specialObject, Object* target )
 {
   const SpecialAbilityUpdateModuleData* data = getSpecialAbilityUpdateModuleData();
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+  RTS_ENGINE_STATIC(NameKeyType, key_LaserUpdate, NAMEKEY( "LaserUpdate" ));
+#else
   static NameKeyType key_LaserUpdate = NAMEKEY( "LaserUpdate" );
+#endif
   Drawable *draw = specialObject->getDrawable();
   if( !draw )
   {
@@ -1346,7 +1351,11 @@ void SpecialAbilityUpdate::triggerAbilityEffect()
       Object *charge = createSpecialObject();
       if( charge )
       {
+#if RTS_ENGINE_CONTEXT
+        RTS_ENGINE_STATIC(NameKeyType, key_StickyBombUpdate, NAMEKEY( "StickyBombUpdate" ));
+#else
         static NameKeyType key_StickyBombUpdate = NAMEKEY( "StickyBombUpdate" );
+#endif
         StickyBombUpdate *update = (StickyBombUpdate*)charge->findUpdateModule( key_StickyBombUpdate );
         if( !update )
         {
@@ -1537,7 +1546,11 @@ void SpecialAbilityUpdate::triggerAbilityEffect()
         }
       }
 
+#if RTS_ENGINE_CONTEXT
+      RTS_ENGINE_STATIC(NameKeyType, key_StickyBombUpdate, NAMEKEY( "StickyBombUpdate" ));
+#else
       static NameKeyType key_StickyBombUpdate = NAMEKEY( "StickyBombUpdate" );
+#endif
       if( m_targetID == INVALID_ID && !m_targetPos.x && !m_targetPos.y && !m_targetPos.z )
       {
         //If there is no target object nor position, then we are detonating the existing charges.

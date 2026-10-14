@@ -101,21 +101,67 @@ enum { COLUMN_PLAYERNAME = 1 };
 
 // window ids ------------------------------------------------------------------------------
 static NameKeyType parentWOLLobbyID = NAMEKEY_INVALID;
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(NameKeyType, buttonBackID, NAMEKEY_INVALID);
+#define buttonBackID RTS_ENGINE_GLOBAL_REF(buttonBackID)
+#else
 static NameKeyType buttonBackID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonHostID, NAMEKEY_INVALID);
+#define buttonHostID RTS_ENGINE_GLOBAL_REF(buttonHostID)
+#else
 static NameKeyType buttonHostID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonRefreshID, NAMEKEY_INVALID);
+#define buttonRefreshID RTS_ENGINE_GLOBAL_REF(buttonRefreshID)
+#else
 static NameKeyType buttonRefreshID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonJoinID, NAMEKEY_INVALID);
+#define buttonJoinID RTS_ENGINE_GLOBAL_REF(buttonJoinID)
+#else
 static NameKeyType buttonJoinID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonBuddyID, NAMEKEY_INVALID);
+#define buttonBuddyID RTS_ENGINE_GLOBAL_REF(buttonBuddyID)
+#else
 static NameKeyType buttonBuddyID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonChatID, NAMEKEY_INVALID);
+#define buttonChatID RTS_ENGINE_GLOBAL_REF(buttonChatID)
+#else
 static NameKeyType buttonChatID = NAMEKEY_INVALID;
+#endif
 static NameKeyType textEntryChatID = NAMEKEY_INVALID;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, listboxLobbyPlayersID, NAMEKEY_INVALID);
+#define listboxLobbyPlayersID RTS_ENGINE_GLOBAL_REF(listboxLobbyPlayersID)
+#else
 static NameKeyType listboxLobbyPlayersID = NAMEKEY_INVALID;
+#endif
 static NameKeyType listboxLobbyChatID = NAMEKEY_INVALID;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, comboLobbyGroupRoomsID, NAMEKEY_INVALID);
+#define comboLobbyGroupRoomsID RTS_ENGINE_GLOBAL_REF(comboLobbyGroupRoomsID)
+#else
 static NameKeyType comboLobbyGroupRoomsID = NAMEKEY_INVALID;
+#endif
 //static NameKeyType // sliderChatAdjustID = NAMEKEY_INVALID;
 
 // Window Pointers ------------------------------------------------------------------------
 static GameWindow *parentWOLLobby = nullptr;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, buttonBack, nullptr);
+#define buttonBack RTS_ENGINE_GLOBAL_REF(buttonBack)
+#else
 static GameWindow *buttonBack = nullptr;
+#endif
 static GameWindow *buttonHost = nullptr;
 static GameWindow *buttonRefresh = nullptr;
 static GameWindow *buttonJoin = nullptr;
@@ -1950,7 +1996,11 @@ WindowMsgHandledType WOLLobbyMenuSystem( GameWindow *window, UnsignedInt msg,
 														 WindowMsgData mData1, WindowMsgData mData2 )
 {
 	UnicodeString txtInput;
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(NameKeyType, buttonGameListTypeToggleID, NAMEKEY_INVALID);
+#else
 	static NameKeyType buttonGameListTypeToggleID = NAMEKEY_INVALID;
+#endif
 
 	switch( msg )
 	{

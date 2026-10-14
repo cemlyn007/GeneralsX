@@ -72,15 +72,56 @@
 
 // PRIVATE DATA ///////////////////////////////////////////////////////////////////////////////////
 // window ids ------------------------------------------------------------------------------
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(NameKeyType, parentID, NAMEKEY_INVALID);
+#define parentID RTS_ENGINE_GLOBAL_REF(parentID)
+#else
 static NameKeyType parentID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, listboxInfoID, NAMEKEY_INVALID);
+#define listboxInfoID RTS_ENGINE_GLOBAL_REF(listboxInfoID)
+#else
 static NameKeyType listboxInfoID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonCloseID, NAMEKEY_INVALID);
+#define buttonCloseID RTS_ENGINE_GLOBAL_REF(buttonCloseID)
+#else
 static NameKeyType buttonCloseID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonBuddiesID, NAMEKEY_INVALID);
+#define buttonBuddiesID RTS_ENGINE_GLOBAL_REF(buttonBuddiesID)
+#else
 static NameKeyType buttonBuddiesID = NAMEKEY_INVALID;
+#endif
 //static NameKeyType buttonOptionsID = NAMEKEY_INVALID;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonSetLocaleID, NAMEKEY_INVALID);
+#define buttonSetLocaleID RTS_ENGINE_GLOBAL_REF(buttonSetLocaleID)
+#else
 static NameKeyType buttonSetLocaleID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonDeleteAccountID, NAMEKEY_INVALID);
+#define buttonDeleteAccountID RTS_ENGINE_GLOBAL_REF(buttonDeleteAccountID)
+#else
 static NameKeyType buttonDeleteAccountID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, checkBoxAsianFontID, NAMEKEY_INVALID);
+#define checkBoxAsianFontID RTS_ENGINE_GLOBAL_REF(checkBoxAsianFontID)
+#else
 static NameKeyType checkBoxAsianFontID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, checkBoxNonAsianFontID, NAMEKEY_INVALID);
+#define checkBoxNonAsianFontID RTS_ENGINE_GLOBAL_REF(checkBoxNonAsianFontID)
+#else
 static NameKeyType checkBoxNonAsianFontID = NAMEKEY_INVALID;
+#endif
 
 // Window Pointers ------------------------------------------------------------------------
 static GameWindow *parent = nullptr;

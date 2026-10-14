@@ -101,7 +101,12 @@ void StickyBombUpdate::initStickyBomb( Object *target, const Object *bomber, con
 	UnsignedInt now = TheGameLogic->getFrame();
 
 	//Also determine our lifetime.... for countdown purposes.
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+	RTS_ENGINE_STATIC(NameKeyType, key_LifetimeUpdate, NAMEKEY( "LifetimeUpdate" ));
+#else
 	static NameKeyType key_LifetimeUpdate = NAMEKEY( "LifetimeUpdate" );
+#endif
 	LifetimeUpdate *update = (LifetimeUpdate*)getObject()->findUpdateModule( key_LifetimeUpdate );
 	if( update )
 	{

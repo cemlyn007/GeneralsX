@@ -27,8 +27,7 @@
 //
 // The build force-includes this header into every engine translation unit (and a host must include it,
 // or force-include it, into every TU that touches an engine header). With RTS_ENGINE_CONTEXT off (the
-// default, upstream-shaped build) it only declares rts::withCurrentEngine, which then returns its argument,
-// and the per-engine static declarations of Common/EngineStatic.h, which then declare ordinary statics.
+// default, upstream-shaped build) it only declares rts::withCurrentEngine, which then returns its argument.
 //
 // GeneralsX @feature cemlyn007 14/10/2026 The embedding contract (docs/EMBEDDING.md): a context made for an embedded
 // engine keeps the host's EmbeddingConfig (Common/EmbeddingContract.h), its roots, modes and services. Statics that
@@ -143,13 +142,15 @@ struct EngineStaticHolder
 };
 
 // How to make and destroy one engine's copy of a per-engine static: `construct` constructs it in `size` bytes of
-// zero-filled storage aligned to `alignment`, using `closure`, and `destroy` destroys it in place.
+// zero-filled storage aligned to `alignment`, using `closure`, and `destroy` destroys it in place. A static destroyed
+// last (`destroyLast`, an allocator other statics' objects come from) is destroyed after every other one.
 struct EngineStaticType
 {
 	std::size_t size;
 	std::size_t alignment;
 	void (*construct)(void* storage, void* closure);
 	void (*destroy)(void* storage) noexcept;
+	bool destroyLast;
 };
 
 struct EngineStatics;
@@ -208,8 +209,9 @@ struct RTS_ENGINE_CONTEXT_API EngineContext
 	// Makes this engine's copy of the per-engine static `key` with `type` and `closure`, or returns the one another
 	// thread of this engine made first. A copy whose construction throws is not kept, and the next use tries again.
 	void* makeStatic(const EngineStaticKey& key, const EngineStaticType& type, void* closure);
-	// Destroys every per-engine static now, newest first, inside a Scope for this context (the engine's teardown
-	// calls it; the destructor does it for any made since). A later use makes a fresh one.
+	// Destroys every per-engine static now, inside a Scope for this context: newest first, those destroyed last after
+	// every other (the engine's teardown calls it; the destructor does it for any made since). A later use makes a
+	// fresh one.
 	void destroyStatics();
 	// The number of per-engine statics this context holds (for the lifecycle checks: g_noEngine must hold none).
 	std::size_t countStatics() const;
@@ -243,10 +245,22 @@ inline EngineContext* ctx() noexcept
 	return t_engine;
 }
 
+// GeneralsX @feature cemlyn007 14/10/2026 Whether an engine's context is current: code that may also run outside every
+// engine (a static's destructor at exit) leaves per-engine statics alone when none is.
+inline bool hasCurrentEngine() noexcept
+{
+	return t_engine != &g_noEngine;
+}
+
 // True when g_noEngine still has every singleton and direct field at its initial value and no slot object
 // (nothing assigned one, or used a PerEngineStatic, outside a Scope).
 RTS_ENGINE_CONTEXT_API bool noEngineIsPristine();
 
+// GeneralsX @refactor cemlyn007 14/10/2026 RTS_ENGINE_SCOPE_ENVIRONMENT: the Scope also installs the engine's
+// floating-point mode and "C" LC_NUMERIC, for the CMake build's hosts (the game executable and rlgenerals' old
+// launcher), which install nothing themselves. An embedding host installs that environment in its own entry gate
+// (docs/EMBEDDING.md), so without it a Scope only makes its context current, and keeps no cache of its own.
+#if RTS_ENGINE_SCOPE_ENVIRONMENT
 // GeneralsX @feature cemlyn007 28/09/2026 The per-thread state an engine relies on (PLAN-023 Phase 5b): the calling
 // thread's floating-point environment (with the x87 control word) and its locale, saved by a Scope that enters
 // an engine. Opaque here, so that this force-included header pulls in neither <cfenv> nor <locale.h>;
@@ -282,6 +296,7 @@ struct ThreadInvariants
 RTS_ENGINE_CONTEXT_API void enterEngineThreadInvariants(ThreadInvariants& saved) noexcept;
 // Restores what enterEngineThreadInvariants saved.
 RTS_ENGINE_CONTEXT_API void leaveEngineThreadInvariants(const ThreadInvariants& saved) noexcept;
+#endif
 
 // Makes `context` the current context for its lifetime, then restores the previous one. Scopes nest.
 // A null context means g_noEngine.
@@ -301,13 +316,17 @@ public:
 		EngineContext* const next = context != nullptr ? context : &g_noEngine;
 		m_entered = next != m_previous && next != &g_noEngine;
 		t_engine = next;
+#if RTS_ENGINE_SCOPE_ENVIRONMENT
 		if (m_entered)
 			enterEngineThreadInvariants(m_saved);
+#endif
 	}
 	~Scope()
 	{
+#if RTS_ENGINE_SCOPE_ENVIRONMENT
 		if (m_entered)
 			leaveEngineThreadInvariants(m_saved);
+#endif
 		t_engine = m_previous;
 	}
 
@@ -317,13 +336,15 @@ public:
 private:
 	EngineContext* m_previous;
 	bool m_entered;
+#if RTS_ENGINE_SCOPE_ENVIRONMENT
 	ThreadInvariants m_saved; // set only when m_entered
+#endif
 };
 
 // GeneralsX @feature cemlyn007 14/10/2026 The current engine's copy of the per-engine static `key`, made on its first
 // use in this engine: zero-filled, then constructed by `construct(storage)`, which placement-constructs an
 // EngineStaticHolder<T>. It is destroyed with the engine's context. See Common/EngineStatic.h.
-template <typename T, typename Construct>
+template <typename T, bool DestroyLast = false, typename Construct>
 T& engineStatic(const EngineStaticKey& key, Construct&& construct)
 {
 	EngineContext& context = *ctx();
@@ -335,6 +356,7 @@ T& engineStatic(const EngineStaticKey& key, Construct&& construct)
 			alignof(EngineStaticHolder<T>),
 			[](void* where, void* closure) { (*static_cast<std::remove_reference_t<Construct>*>(closure))(where); },
 			[](void* where) noexcept { static_cast<EngineStaticHolder<T>*>(where)->~EngineStaticHolder<T>(); },
+			DestroyLast,
 		};
 		storage = context.makeStatic(key, type, static_cast<void*>(&construct));
 	}
@@ -598,9 +620,6 @@ constexpr Function&& withCurrentEngine(Function&& function) noexcept
 	return std::forward<Function>(function);
 }
 } // namespace rts
-
-// Off: RTS_ENGINE_STATIC and RTS_ENGINE_GLOBAL declare the original statics.
-#include "EngineStatic.h"
 #endif
 
 #endif // __cplusplus && RTS_ENGINE_CONTEXT

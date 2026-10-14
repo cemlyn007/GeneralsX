@@ -60,7 +60,12 @@ public:
 Bool PartitionFilterFlammable::allow(Object *objOther)
 {
 	// It must be burnable in general, and burnable now
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+	RTS_ENGINE_STATIC(NameKeyType, key_FlammableUpdate, NAMEKEY("FlammableUpdate"));
+#else
 	static NameKeyType key_FlammableUpdate = NAMEKEY("FlammableUpdate");
+#endif
 	FlammableUpdate* fu = (FlammableUpdate*)objOther->findUpdateModule(key_FlammableUpdate);
 	if (fu == nullptr)
 		return FALSE;
@@ -147,7 +152,11 @@ UpdateSleepTime FireSpreadUpdate::update()
 			Object* objectToLight = ThePartitionManager->getClosestObject(getObject(), d->m_spreadTryRange, FROM_CENTER_3D, filters);
 			if( objectToLight )
 			{
+#if RTS_ENGINE_CONTEXT
+				RTS_ENGINE_STATIC(NameKeyType, key_FlammableUpdate, NAMEKEY("FlammableUpdate"));
+#else
 				static NameKeyType key_FlammableUpdate = NAMEKEY("FlammableUpdate");
+#endif
 				FlammableUpdate* fu = (FlammableUpdate*)objectToLight->findUpdateModule(key_FlammableUpdate);
 				if( fu )
 					fu->tryToIgnite();

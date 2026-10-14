@@ -65,4 +65,10 @@ __inline void DumpExceptionInfo( unsigned int u, EXCEPTION_POINTERS* e_info ) {}
 
 #endif
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_EXTERN_GLOBAL(AsciiString, g_LastErrorDump);
+#define g_LastErrorDump RTS_ENGINE_GLOBAL_REF(g_LastErrorDump)
+#else
 extern AsciiString g_LastErrorDump;
+#endif

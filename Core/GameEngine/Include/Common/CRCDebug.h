@@ -138,4 +138,10 @@ extern Int NET_CRC_INTERVAL;
 #else
 extern Int REPLAY_CRC_INTERVAL;
 #endif
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_EXTERN_GLOBAL(Bool, TheDebugIgnoreSyncErrors);
+#define TheDebugIgnoreSyncErrors RTS_ENGINE_GLOBAL_REF(TheDebugIgnoreSyncErrors)
+#else
 extern Bool TheDebugIgnoreSyncErrors;
+#endif

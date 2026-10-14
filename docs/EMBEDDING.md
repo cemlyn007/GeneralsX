@@ -35,19 +35,56 @@ through an `rts::ContextField` stand-in.
 A static variable that holds state is a per-engine static
 (`Common/EngineStatic.h`): each context holds its own copy, made on the first
 use in that engine, zero-filled and then initialised as the static was, and
-destroyed with the context, newest first. Two threads of one engine that reach
-it at once make it once.
+destroyed with the context. Two threads of one engine that reach it at once
+make it once. The upstream declaration stays, under `#if !RTS_ENGINE_CONTEXT`,
+for the build without the context.
 
-| Original declaration | Per-engine declaration |
+| Upstream declaration | Per-engine declaration |
 |---|---|
 | a function-local static | `RTS_ENGINE_STATIC(Type, name, initializer)` |
 | a file-scope static | `RTS_ENGINE_GLOBAL(Type, name, initializer)`, then `#define name RTS_ENGINE_GLOBAL_REF(name)` |
+| a global, declared `extern` elsewhere | `RTS_ENGINE_EXTERN_GLOBAL_DEFINE(Type, name, initializer)`, and `RTS_ENGINE_EXTERN_GLOBAL(Type, name)` with the `#define` where it was declared |
+| a static data member | `RTS_ENGINE_CLASS_STATIC(Type, name)` in the class and `RTS_ENGINE_CLASS_STATIC_DEFINE(Type, Class, name, initializer)`, with the `#define` before the class and in the files that use it, `#undef`'d at the end of the header |
 | an object that stands in for a static | `constexpr rts::PerEngineStatic<Type> name{}`, used through `name.get()` |
+
+`RTS_ENGINE_GLOBAL_REF(name)` is the call `name_rtsEngineGlobal()`, so a
+qualified use (`Class::name`) and a use through an object still name the
+static.
+
+A context destroys its statics newest first, since a static's destructor may
+use another. An allocator whose objects other statics may hold, such as an
+`AutoPoolClass` pool, is declared with `RTS_ENGINE_STATIC_LAST` and destroyed
+after every other static of its engine.
 
 Each per-engine static is identified by the address of a read-only
 `rts::EngineStaticKey` declared beside it, with the linkage the original static
 had. An inline function's static is therefore still one static in the program,
 and a file's static one per file. The key holds no engine state.
+
+A self-registering object (a persist or definition factory, a save-load
+subsystem) that upstream made at static initialisation is a per-engine static
+made by its library's initialisation in each engine: `WWSaveLoad::Init`
+(called by `WWMath::Init`), `WWMath::Init` and `WW3D::Init`.
+
+A global that one of an engine's objects installs itself in is per engine
+too, so each engine installs its own: each engine's `W3DFileSystem` sets that
+engine's `_TheFileFactory`, as upstream does in its one engine.
+
+## Name keys
+
+Each engine interns names in a `NameKeyGenerator` of its own, made by
+`GameEngine::init` and deleted with the engine, so a name's key depends only on
+the order in which that engine met its names. A static that caches a key (a
+`NAMEKEY("...")` in a function, a module's `getModuleNameKey`, a window's ID)
+is a per-engine static, and so is a flag that guards filling one.
+
+## Constants
+
+Data no engine writes is constant, so it is read-only and shared: tables are
+`const`, and the constant vectors and matrices (`Vector3`, `Matrix3x3`,
+`Matrix3D`) and bit masks (`BitFlags`) have `constexpr` constructors, so they
+are constant-initialised. The empty `StringClass` and `WideStringClass`
+buffers are constants that no constructor writes.
 
 ## The interfaces
 

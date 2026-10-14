@@ -2234,7 +2234,12 @@ Bool ScriptConditions::evaluateSkirmishSuppliesWithinDistancePerimeter(Parameter
 
 	Real maxValue = 0;
 	for (Object *them = iter->first(); them; them = iter->next()) {
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+		RTS_ENGINE_STATIC(const NameKeyType, key_warehouseUpdate, NAMEKEY("SupplyWarehouseDockUpdate"));
+#else
 		static const NameKeyType key_warehouseUpdate = NAMEKEY("SupplyWarehouseDockUpdate");
+#endif
 		SupplyWarehouseDockUpdate *warehouseModule = (SupplyWarehouseDockUpdate*) them->findUpdateModule( key_warehouseUpdate );
 		if (!warehouseModule) {
 			continue;

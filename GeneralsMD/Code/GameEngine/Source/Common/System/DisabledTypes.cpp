@@ -53,5 +53,7 @@ const char* const DisabledMaskType::s_bitNameList[] =
 };
 static_assert(ARRAY_SIZE(DisabledMaskType::s_bitNameList) == DisabledMaskType::NumBits + 1, "Incorrect array size");
 
-DisabledMaskType DISABLEDMASK_NONE;	// inits to all zeroes
-DisabledMaskType DISABLEDMASK_ALL(DisabledMaskType::kInitSetAll);
+// GeneralsX @refactor cemlyn007 14/10/2026 Constant, so read-only: engines share no writable state (docs/EMBEDDING.md).
+const DisabledMaskType DISABLEDMASK_NONE;	// inits to all zeroes
+const DisabledMaskType DISABLEDMASK_ALL(DisabledMaskType::kInitSetAll);
+static_assert(DISABLED_COUNT <= 64, "DISABLEDMASK_ALL is constant-initialised only for a mask of up to 64 bits (BitFlags.h)");

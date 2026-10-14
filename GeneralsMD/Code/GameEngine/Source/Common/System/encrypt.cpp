@@ -35,8 +35,19 @@ static char Base_String[MAX_CHARS] =
 
     "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789./";
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(char[MAX_ENCRYPTED_STRING + 1], Return_Buffer);
+#define Return_Buffer RTS_ENGINE_GLOBAL_REF(Return_Buffer)
+#else
 static char Return_Buffer[MAX_ENCRYPTED_STRING + 1];
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(char[MAX_ENCRYPTED_STRING + 1], Temp_Buffer);
+#define Temp_Buffer RTS_ENGINE_GLOBAL_REF(Temp_Buffer)
+#else
 static char Temp_Buffer [MAX_ENCRYPTED_STRING + 1];
+#endif
 
 /*******************************************************/
 /* This function is a simple one-way encryption that   */

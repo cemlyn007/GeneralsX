@@ -182,6 +182,17 @@ private:
 	// GeneralsX @bugfix cemlyn007 02/10/2026 atomic<unsigned> (not just unsigned) so Get_String can take a
 	// lock-free relaxed-load early-out when every temp buffer is in use, instead of taking m_Mutex on that
 	// path too; the authoritative test-and-set under m_Mutex is unaffected.
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @refactor cemlyn007 14/10/2026 The temporary buffers are per engine (Temp_Pool, wwstring.cpp). The empty
+	// string is a constant every engine shares read-only: nothing writes it (the constructors leave it alone).
+	struct TempPool;
+	static TempPool& Temp_Pool();
+	// This engine's temporary buffers, or null outside every engine, where a string uses none.
+	static TempPool* Find_Temp_Pool();
+
+	static const TCHAR	m_NullChar;
+	static TCHAR * const	m_EmptyString;
+#else
 	static std::atomic<unsigned> ReservedMask;
 	static char m_TempStrings[];
 
@@ -189,6 +200,7 @@ private:
 
 	static TCHAR	m_NullChar;
 	static TCHAR *	m_EmptyString;
+#endif
 };
 
 ///////////////////////////////////////////////////////////////////

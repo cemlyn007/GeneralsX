@@ -106,14 +106,12 @@ GlobalData* TheWritableGlobalData = nullptr;				///< The global data singleton
 //-------------------------------------------------------------------------------------------------
 #if RTS_ENGINE_CONTEXT
 // GeneralsX @feature cemlyn007 28/09/2026 Per engine (see the header)
-GlobalData::OriginalInContext GlobalData::m_theOriginal;
-
 GlobalData::OriginalInContext::operator GlobalData*() const
 {
 	return rts::ctx()->originalGlobalData;
 }
 
-GlobalData::OriginalInContext& GlobalData::OriginalInContext::operator=(GlobalData* original)
+const GlobalData::OriginalInContext& GlobalData::OriginalInContext::operator=(GlobalData* original) const
 {
 	rts::ctx()->originalGlobalData = original;
 	return *this;

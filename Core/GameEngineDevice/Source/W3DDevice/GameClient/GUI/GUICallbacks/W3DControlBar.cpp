@@ -625,7 +625,12 @@ void W3DCommandBarBackgroundDraw( GameWindow *window, WinInstanceData *instData 
 	ControlBarSchemeManager *man = TheControlBar->getControlBarSchemeManager();
 	if(!man)
 		return;
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+	RTS_ENGINE_STATIC(NameKeyType, winNamekey, TheNameKeyGenerator->nameToKey( "ControlBar.wnd:BackgroundMarker" ));
+#else
 	static NameKeyType winNamekey	= TheNameKeyGenerator->nameToKey( "ControlBar.wnd:BackgroundMarker" );
+#endif
 	GameWindow *win =  TheWindowManager->winGetWindowFromId(nullptr,winNamekey);
 	static ICoord2D basePos;
 	if(!win)
@@ -650,7 +655,11 @@ void W3DCommandBarForegroundDraw( GameWindow *window, WinInstanceData *instData 
 	if(!man)
 		return;
 
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(NameKeyType, winNamekey, TheNameKeyGenerator->nameToKey( "ControlBar.wnd:BackgroundMarker" ));
+#else
 	static NameKeyType winNamekey	= TheNameKeyGenerator->nameToKey( "ControlBar.wnd:BackgroundMarker" );
+#endif
 	GameWindow *win = TheWindowManager->winGetWindowFromId(nullptr,winNamekey);
 	static ICoord2D basePos;
 	if(!win)

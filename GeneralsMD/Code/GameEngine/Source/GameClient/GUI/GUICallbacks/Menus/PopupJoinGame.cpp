@@ -80,9 +80,25 @@
 //-----------------------------------------------------------------------------
 
 static NameKeyType parentPopupID = NAMEKEY_INVALID;
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(NameKeyType, textEntryGamePasswordID, NAMEKEY_INVALID);
+#define textEntryGamePasswordID RTS_ENGINE_GLOBAL_REF(textEntryGamePasswordID)
+#else
 static NameKeyType textEntryGamePasswordID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonCancelID, NAMEKEY_INVALID);
+#define buttonCancelID RTS_ENGINE_GLOBAL_REF(buttonCancelID)
+#else
 static NameKeyType buttonCancelID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonOkID, NAMEKEY_INVALID);
+#define buttonOkID RTS_ENGINE_GLOBAL_REF(buttonOkID)
+#else
 static NameKeyType buttonOkID = NAMEKEY_INVALID;
+#endif
 
 static GameWindow *parentPopup = nullptr;
 static GameWindow *textEntryGamePassword = nullptr;

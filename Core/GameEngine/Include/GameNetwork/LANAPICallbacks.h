@@ -44,17 +44,38 @@ extern LANAPI *TheLAN;
 
 //external declarations of the Gadgets the callbacks can use
 // LanLobby
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_EXTERN_GLOBAL(NameKeyType, listboxChatWindowID);
+#define listboxChatWindowID RTS_ENGINE_GLOBAL_REF(listboxChatWindowID)
+#else
 extern NameKeyType listboxChatWindowID;
+#endif
 extern GameWindow *listboxChatWindow;
 extern GameWindow *listboxPlayers;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL(NameKeyType, listboxGamesID);
+#define listboxGamesID RTS_ENGINE_GLOBAL_REF(listboxGamesID)
+#else
 extern NameKeyType listboxGamesID;
+#endif
 extern GameWindow *listboxGames;
 //LanGame Options screen
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL(NameKeyType, listboxChatWindowLanGameID);
+#define listboxChatWindowLanGameID RTS_ENGINE_GLOBAL_REF(listboxChatWindowLanGameID)
+#else
 extern NameKeyType listboxChatWindowLanGameID;
+#endif
 extern GameWindow *listboxChatWindowLanGame;
 extern WindowLayout *mapSelectLayout;
 // ScoreScreen
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL(NameKeyType, listboxChatWindowScoreScreenID);
+#define listboxChatWindowScoreScreenID RTS_ENGINE_GLOBAL_REF(listboxChatWindowScoreScreenID)
+#else
 extern NameKeyType listboxChatWindowScoreScreenID;
+#endif
 extern GameWindow *listboxChatWindowScoreScreen;
 
 

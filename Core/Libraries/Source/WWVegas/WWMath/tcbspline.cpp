@@ -50,7 +50,18 @@ DECLARE_FORCE_LINK(tcbspline);
 /*
 ** Save-Load stuff
 */
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 Per engine (Common/EngineStatic.h), made and so registered by WWMath::Init (docs/EMBEDDING.md).
+using _TCBSpline3DFactory_rtsEngineType = SimplePersistFactoryClass<TCBSpline3DClass,WWMATH_CHUNKID_TCBSPLINE3D>;
+RTS_ENGINE_GLOBAL(_TCBSpline3DFactory_rtsEngineType, _TCBSpline3DFactory);
+#define _TCBSpline3DFactory RTS_ENGINE_GLOBAL_REF(_TCBSpline3DFactory)
+void WWMath_Register_Tcbspline_Factories()
+{
+	_TCBSpline3DFactory;
+}
+#else
 SimplePersistFactoryClass<TCBSpline3DClass,WWMATH_CHUNKID_TCBSPLINE3D>	_TCBSpline3DFactory;
+#endif
 
 enum
 {

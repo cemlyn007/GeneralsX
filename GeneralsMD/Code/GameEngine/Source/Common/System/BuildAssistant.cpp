@@ -1227,7 +1227,13 @@ BuildAssistant::TileBuildInfo *BuildAssistant::buildTiledLocations( const ThingT
 	// return a struct filled out with the actual tiles used and the array of locations
 	// GeneralsX @feature cemlyn007 28/09/2026 thread_local: returned-by-pointer scratch the caller consumes at once, on its own
 	// thread (PLAN-023 Phase 5b).
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @refactor cemlyn007 14/10/2026 Per engine (Common/EngineStatic.h): an engine's logic runs on one thread at
+	// a time.
+	RTS_ENGINE_STATIC(TileBuildInfo, tileInfo);
+#else
 	static THREAD_LOCAL TileBuildInfo tileInfo;
+#endif
 	tileInfo.tilesUsed = tilesUsed;
 	tileInfo.positions = positions;
 	return &tileInfo;

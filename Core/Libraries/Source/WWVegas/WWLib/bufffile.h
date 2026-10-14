@@ -46,6 +46,10 @@
 /*
 **	This is the definition of a buffered read raw file class.
 */
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+#define _DesiredBufferSize RTS_ENGINE_GLOBAL_REF(_DesiredBufferSize)
+#endif
 class BufferedFileClass : public RawFileClass
 {
 	typedef RawFileClass BASECLASS;
@@ -74,5 +78,12 @@ class BufferedFileClass : public RawFileClass
 		unsigned int		BufferSize;			// The allocated size of the read buffer
 		int					BufferAvailable;	// The amount of data in the read buffer
 		int					BufferOffset;		// The data already given out
+#if RTS_ENGINE_CONTEXT
+		RTS_ENGINE_CLASS_STATIC(int, _DesiredBufferSize);
+#else
 		static	int		_DesiredBufferSize;
+#endif
 };
+#if RTS_ENGINE_CONTEXT
+#undef _DesiredBufferSize
+#endif

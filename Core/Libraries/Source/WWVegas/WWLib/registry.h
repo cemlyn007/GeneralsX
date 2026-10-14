@@ -45,6 +45,10 @@ class INIClass;
 /*
 **
 */
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+#define IsLocked RTS_ENGINE_GLOBAL_REF(IsLocked)
+#endif
 class	RegistryClass {
 public:
 	static bool Exists(const char* sub_key);
@@ -113,5 +117,12 @@ private:
 	//
 	// Use this to make the registry 'read only'. Useful for running multiple copies of the app.
 	//
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_CLASS_STATIC(bool, IsLocked);
+#else
 	static bool IsLocked;
+#endif
 };
+#if RTS_ENGINE_CONTEXT
+#undef IsLocked
+#endif

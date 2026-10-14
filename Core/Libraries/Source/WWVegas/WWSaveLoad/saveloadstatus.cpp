@@ -21,8 +21,19 @@
 
 #define MAX_STATUS_TEXT_ID 2
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(CriticalSectionClass, text_mutex);
+#define text_mutex RTS_ENGINE_GLOBAL_REF(text_mutex)
+#else
 static CriticalSectionClass text_mutex;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(StringClass[MAX_STATUS_TEXT_ID], status_text);
+#define status_text RTS_ENGINE_GLOBAL_REF(status_text)
+#else
 static StringClass status_text[MAX_STATUS_TEXT_ID];
+#endif
 
 void SaveLoadStatus::Set_Status_Text(const char* text,int id)
 {
@@ -39,7 +50,12 @@ void SaveLoadStatus::Get_Status_Text(StringClass& text, int id)
 	text=status_text[id];
 }
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(int, status_count);
+#define status_count RTS_ENGINE_GLOBAL_REF(status_count)
+#else
 static	int	status_count;
+#endif
 void	SaveLoadStatus::Reset_Status_Count()
 {
 	status_count = 0;

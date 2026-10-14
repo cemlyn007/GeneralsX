@@ -271,7 +271,12 @@ void SlowDeathBehavior::beginSlowDeath(const DamageInfo *damageInfo)
 			// with their own physics during slow death
 			if( obj->isDisabledByType( DISABLED_HELD ) )
 			{
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+				RTS_ENGINE_STATIC(NameKeyType, key_SlavedUpdate, NAMEKEY( "SlavedUpdate" ));
+#else
 				static NameKeyType key_SlavedUpdate = NAMEKEY( "SlavedUpdate" );
+#endif
 				SlavedUpdate* slave = (SlavedUpdate*)obj->findUpdateModule( key_SlavedUpdate );
 				if( slave )
 				{

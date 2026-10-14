@@ -62,9 +62,16 @@
   is not RTS_PROFILE_LEGACY. In these cases all calls will simply return
   empty data.
 */
+#if RTS_ENGINE_CONTEXT
+#define Instance RTS_ENGINE_GLOBAL_REF(Instance)
+#endif
 class ProfileFuncLevel
 {
   friend class Profile;
+#if RTS_ENGINE_CONTEXT
+  // GeneralsX @refactor cemlyn007 14/10/2026 Its per-engine Instance is made by its holder (Common/EngineStatic.h)
+  friend struct rts::EngineStaticHolder<ProfileFuncLevel>;
+#endif
 
   // no, no copying allowed!
   ProfileFuncLevel(const ProfileFuncLevel&);
@@ -243,5 +250,12 @@ private:
   /**
     \brief The only function level profiler instance.
   */
+#if RTS_ENGINE_CONTEXT
+  RTS_ENGINE_CLASS_STATIC(ProfileFuncLevel, Instance);
+#else
   static ProfileFuncLevel Instance;
+#endif
 };
+#if RTS_ENGINE_CONTEXT
+#undef Instance
+#endif

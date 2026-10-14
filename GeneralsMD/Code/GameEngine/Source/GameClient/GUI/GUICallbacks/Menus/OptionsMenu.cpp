@@ -94,7 +94,13 @@ static GameWindow *   comboBoxAntiAliasing     = nullptr;
 static NameKeyType    comboBoxResolutionID      = NAMEKEY_INVALID;
 static GameWindow *   comboBoxResolution       = nullptr;
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(NameKeyType, comboBoxDetailID, NAMEKEY_INVALID);
+#define comboBoxDetailID RTS_ENGINE_GLOBAL_REF(comboBoxDetailID)
+#else
 static NameKeyType    comboBoxDetailID      = NAMEKEY_INVALID;
+#endif
 static GameWindow *   comboBoxDetail        = nullptr;
 
 static NameKeyType		checkAlternateMouseID	= NAMEKEY_INVALID;
@@ -112,19 +118,44 @@ static GameWindow *		sliderScrollSpeed		= nullptr;
 static NameKeyType    checkLanguageFilterID = NAMEKEY_INVALID;
 static GameWindow *   checkLanguageFilter   = nullptr;
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, checkUseCameraID, NAMEKEY_INVALID);
+#define checkUseCameraID RTS_ENGINE_GLOBAL_REF(checkUseCameraID)
+#else
 static NameKeyType		checkUseCameraID		= NAMEKEY_INVALID;
+#endif
 static GameWindow *		checkUseCamera			= nullptr;
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, checkSaveCameraID, NAMEKEY_INVALID);
+#define checkSaveCameraID RTS_ENGINE_GLOBAL_REF(checkSaveCameraID)
+#else
 static NameKeyType		checkSaveCameraID		= NAMEKEY_INVALID;
+#endif
 static GameWindow *		checkSaveCamera			= nullptr;
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, checkDrawAnchorID, NAMEKEY_INVALID);
+#define checkDrawAnchorID RTS_ENGINE_GLOBAL_REF(checkDrawAnchorID)
+#else
 static NameKeyType		checkDrawAnchorID		= NAMEKEY_INVALID;
+#endif
 static GameWindow *		checkDrawAnchor			= nullptr;
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, checkMoveAnchorID, NAMEKEY_INVALID);
+#define checkMoveAnchorID RTS_ENGINE_GLOBAL_REF(checkMoveAnchorID)
+#else
 static NameKeyType		checkMoveAnchorID		= NAMEKEY_INVALID;
+#endif
 static GameWindow *		checkMoveAnchor			= nullptr;
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonFirewallRefreshID, NAMEKEY_INVALID);
+#define buttonFirewallRefreshID RTS_ENGINE_GLOBAL_REF(buttonFirewallRefreshID)
+#else
 static NameKeyType		buttonFirewallRefreshID	= NAMEKEY_INVALID;
+#endif
 static GameWindow *		buttonFirewallRefresh		= nullptr;
 //
 //static NameKeyType    checkAudioHardwareID = NAMEKEY_INVALID;
@@ -150,10 +181,20 @@ static GameWindow *   sliderGamma = nullptr;
 static NameKeyType    WinAdvancedDisplayID      = NAMEKEY_INVALID;
 static GameWindow *   WinAdvancedDisplay				= nullptr;
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, ButtonAdvancedAcceptID, NAMEKEY_INVALID);
+#define ButtonAdvancedAcceptID RTS_ENGINE_GLOBAL_REF(ButtonAdvancedAcceptID)
+#else
 static NameKeyType    ButtonAdvancedAcceptID      = NAMEKEY_INVALID;
+#endif
 static GameWindow *   ButtonAdvancedAccept				= nullptr;
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, ButtonAdvancedCancelID, NAMEKEY_INVALID);
+#define ButtonAdvancedCancelID RTS_ENGINE_GLOBAL_REF(ButtonAdvancedCancelID)
+#else
 static NameKeyType    ButtonAdvancedCancelID      = NAMEKEY_INVALID;
+#endif
 static GameWindow *   ButtonAdvancedCancel				= nullptr;
 
 static NameKeyType    sliderTextureResolutionID = NAMEKEY_INVALID;
@@ -1528,11 +1569,27 @@ WindowMsgHandledType OptionsMenuInput( GameWindow *window, UnsignedInt msg,
 WindowMsgHandledType OptionsMenuSystem( GameWindow *window, UnsignedInt msg,
 																				WindowMsgData mData1, WindowMsgData mData2 )
 {
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(NameKeyType, buttonBack, NAMEKEY_INVALID);
+#else
 	static NameKeyType buttonBack = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(NameKeyType, buttonDefaults, NAMEKEY_INVALID);
+#else
 	static NameKeyType buttonDefaults = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(NameKeyType, buttonAccept, NAMEKEY_INVALID);
+#else
 	static NameKeyType buttonAccept = NAMEKEY_INVALID;
+#endif
 	static NameKeyType buttonReplayMenu = NAMEKEY_INVALID;
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(NameKeyType, buttonKeyboardOptionsMenu, NAMEKEY_INVALID);
+#else
 	static NameKeyType buttonKeyboardOptionsMenu = NAMEKEY_INVALID;
+#endif
 
 	switch( msg )
 	{

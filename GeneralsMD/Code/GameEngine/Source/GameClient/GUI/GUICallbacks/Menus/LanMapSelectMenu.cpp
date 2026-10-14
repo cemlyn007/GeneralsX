@@ -46,15 +46,46 @@
 
 
 // PRIVATE DATA ///////////////////////////////////////////////////////////////////////////////////
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(NameKeyType, buttonBack, NAMEKEY_INVALID);
+#define buttonBack RTS_ENGINE_GLOBAL_REF(buttonBack)
+#else
 static NameKeyType buttonBack = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonOK, NAMEKEY_INVALID);
+#define buttonOK RTS_ENGINE_GLOBAL_REF(buttonOK)
+#else
 static NameKeyType buttonOK = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, listboxMap, NAMEKEY_INVALID);
+#define listboxMap RTS_ENGINE_GLOBAL_REF(listboxMap)
+#else
 static NameKeyType listboxMap = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, winMapPreviewID, NAMEKEY_INVALID);
+#define winMapPreviewID RTS_ENGINE_GLOBAL_REF(winMapPreviewID)
+#else
 static NameKeyType winMapPreviewID = NAMEKEY_INVALID;
+#endif
 static GameWindow *parent = nullptr;
 static GameWindow *mapList = nullptr;
 static GameWindow *winMapPreview = nullptr;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, radioButtonSystemMapsID, NAMEKEY_INVALID);
+#define radioButtonSystemMapsID RTS_ENGINE_GLOBAL_REF(radioButtonSystemMapsID)
+#else
 static NameKeyType radioButtonSystemMapsID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, radioButtonUserMapsID, NAMEKEY_INVALID);
+#define radioButtonUserMapsID RTS_ENGINE_GLOBAL_REF(radioButtonUserMapsID)
+#else
 static NameKeyType radioButtonUserMapsID = NAMEKEY_INVALID;
+#endif
 
 static GameWindow *buttonMapStartPosition[MAX_SLOTS] = {0};
 static NameKeyType buttonMapStartPositionID[MAX_SLOTS] = { NAMEKEY_INVALID,NAMEKEY_INVALID,

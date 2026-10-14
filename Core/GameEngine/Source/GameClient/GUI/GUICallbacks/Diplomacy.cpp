@@ -60,19 +60,75 @@
 
 //-------------------------------------------------------------------------------------------------
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(NameKeyType[MAX_SLOTS], staticTextPlayerID);
+#define staticTextPlayerID RTS_ENGINE_GLOBAL_REF(staticTextPlayerID)
+#else
 static NameKeyType staticTextPlayerID[MAX_SLOTS];
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType[MAX_SLOTS], staticTextSideID);
+#define staticTextSideID RTS_ENGINE_GLOBAL_REF(staticTextSideID)
+#else
 static NameKeyType staticTextSideID[MAX_SLOTS];
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType[MAX_SLOTS], staticTextTeamID);
+#define staticTextTeamID RTS_ENGINE_GLOBAL_REF(staticTextTeamID)
+#else
 static NameKeyType staticTextTeamID[MAX_SLOTS];
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType[MAX_SLOTS], staticTextStatusID);
+#define staticTextStatusID RTS_ENGINE_GLOBAL_REF(staticTextStatusID)
+#else
 static NameKeyType staticTextStatusID[MAX_SLOTS];
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType[MAX_SLOTS], buttonMuteID);
+#define buttonMuteID RTS_ENGINE_GLOBAL_REF(buttonMuteID)
+#else
 static NameKeyType buttonMuteID[MAX_SLOTS];
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType[MAX_SLOTS], buttonUnMuteID);
+#define buttonUnMuteID RTS_ENGINE_GLOBAL_REF(buttonUnMuteID)
+#else
 static NameKeyType buttonUnMuteID[MAX_SLOTS];
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, radioButtonInGameID, NAMEKEY_INVALID);
+#define radioButtonInGameID RTS_ENGINE_GLOBAL_REF(radioButtonInGameID)
+#else
 static NameKeyType radioButtonInGameID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, radioButtonBuddiesID, NAMEKEY_INVALID);
+#define radioButtonBuddiesID RTS_ENGINE_GLOBAL_REF(radioButtonBuddiesID)
+#else
 static NameKeyType radioButtonBuddiesID = NAMEKEY_INVALID;
+#endif
 static GameWindow *radioButtonInGame = nullptr;
 static GameWindow *radioButtonBuddies = nullptr;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, winInGameID, NAMEKEY_INVALID);
+#define winInGameID RTS_ENGINE_GLOBAL_REF(winInGameID)
+#else
 static NameKeyType winInGameID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, winBuddiesID, NAMEKEY_INVALID);
+#define winBuddiesID RTS_ENGINE_GLOBAL_REF(winBuddiesID)
+#else
 static NameKeyType winBuddiesID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, winSoloID, NAMEKEY_INVALID);
+#define winSoloID RTS_ENGINE_GLOBAL_REF(winSoloID)
+#else
 static NameKeyType winSoloID = NAMEKEY_INVALID;
+#endif
 static GameWindow *winInGame = nullptr;
 static GameWindow *winBuddies = nullptr;
 static GameWindow *winSolo = nullptr;
@@ -447,7 +503,11 @@ WindowMsgHandledType DiplomacySystem( GameWindow *window, UnsignedInt msg,
 		{
 			GameWindow *control = (GameWindow *)mData1;
 			NameKeyType controlID = (NameKeyType)control->winGetWindowId();
+#if RTS_ENGINE_CONTEXT
+			RTS_ENGINE_STATIC(NameKeyType, buttonHideID, NAMEKEY( "Diplomacy.wnd:ButtonHide" ));
+#else
 			static NameKeyType buttonHideID = NAMEKEY( "Diplomacy.wnd:ButtonHide" );
+#endif
 			if (controlID == buttonHideID)
 			{
 				HideDiplomacy( FALSE );

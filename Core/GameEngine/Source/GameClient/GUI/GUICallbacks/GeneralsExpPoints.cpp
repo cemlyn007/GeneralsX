@@ -141,7 +141,12 @@ WindowMsgHandledType GeneralsExpPointsSystem( GameWindow *window, UnsignedInt ms
 		{
 			GameWindow *control = (GameWindow *)mData1;
 			NameKeyType controlID = (NameKeyType)control->winGetWindowId();
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+			RTS_ENGINE_STATIC(NameKeyType, buttonExitID, NAMEKEY( "GeneralsExpPoints.wnd:ButtonExit" ));
+#else
 			static NameKeyType buttonExitID = NAMEKEY( "GeneralsExpPoints.wnd:ButtonExit" );
+#endif
 			if (controlID == buttonExitID)
 			{
 				TheControlBar->hidePurchaseScience();

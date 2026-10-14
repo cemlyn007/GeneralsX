@@ -48,8 +48,19 @@
 #include "GameClient/Mouse.h"
 
 // PUBLIC FUNCTIONS ///////////////////////////////////////////////////////////////////////////////
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(NameKeyType, radioButtonSystemMapsID, NAMEKEY_INVALID);
+#define radioButtonSystemMapsID RTS_ENGINE_GLOBAL_REF(radioButtonSystemMapsID)
+#else
 static NameKeyType radioButtonSystemMapsID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, radioButtonUserMapsID, NAMEKEY_INVALID);
+#define radioButtonUserMapsID RTS_ENGINE_GLOBAL_REF(radioButtonUserMapsID)
+#else
 static NameKeyType radioButtonUserMapsID = NAMEKEY_INVALID;
+#endif
 static GameWindow *mapList = nullptr;
 
 static Bool showSoloMaps = true;
@@ -300,12 +311,36 @@ WindowMsgHandledType MapSelectMenuInput( GameWindow *window, UnsignedInt msg,
 WindowMsgHandledType MapSelectMenuSystem( GameWindow *window, UnsignedInt msg,
 																				  WindowMsgData mData1, WindowMsgData mData2 )
 {
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(NameKeyType, buttonBack, NAMEKEY_INVALID);
+#else
 	static NameKeyType buttonBack = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(NameKeyType, buttonOK, NAMEKEY_INVALID);
+#else
 	static NameKeyType buttonOK = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(NameKeyType, listboxMap, NAMEKEY_INVALID);
+#else
 	static NameKeyType listboxMap = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(NameKeyType, radioButtonEasyAI, NAMEKEY_INVALID);
+#else
 	static NameKeyType radioButtonEasyAI = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(NameKeyType, radioButtonMediumAI, NAMEKEY_INVALID);
+#else
 	static NameKeyType radioButtonMediumAI = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(NameKeyType, radioButtonHardAI, NAMEKEY_INVALID);
+#else
 	static NameKeyType radioButtonHardAI = NAMEKEY_INVALID;
+#endif
 	switch( msg )
 	{
 
@@ -353,8 +388,16 @@ WindowMsgHandledType MapSelectMenuSystem( GameWindow *window, UnsignedInt msg,
 			GameWindow *control = (GameWindow *)mData1;
 			Int controlID = control->winGetWindowId();
 
+#if RTS_ENGINE_CONTEXT
+			RTS_ENGINE_STATIC(NameKeyType, singlePlayerID, NAMEKEY("MapSelectMenu.wnd:ButtonSinglePlayer"));
+#else
 			static NameKeyType singlePlayerID = NAMEKEY("MapSelectMenu.wnd:ButtonSinglePlayer");
+#endif
+#if RTS_ENGINE_CONTEXT
+			RTS_ENGINE_STATIC(NameKeyType, multiplayerID, NAMEKEY("MapSelectMenu.wnd:ButtonMultiplayer"));
+#else
 			static NameKeyType multiplayerID = NAMEKEY("MapSelectMenu.wnd:ButtonMultiplayer");
+#endif
 			if ( controlID == singlePlayerID )
 			{
 				showSoloMaps = true;

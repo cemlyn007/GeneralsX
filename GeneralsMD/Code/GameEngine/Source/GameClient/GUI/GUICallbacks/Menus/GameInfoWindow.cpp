@@ -53,13 +53,49 @@ static GameWindow *winCrates = nullptr;
 static GameWindow *winSuperWeapons = nullptr;
 static GameWindow *winFreeForAll = nullptr;
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(NameKeyType, parentID, NAMEKEY_INVALID);
+#define parentID RTS_ENGINE_GLOBAL_REF(parentID)
+#else
 static NameKeyType parentID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, staticTextGameNameID, NAMEKEY_INVALID);
+#define staticTextGameNameID RTS_ENGINE_GLOBAL_REF(staticTextGameNameID)
+#else
 static NameKeyType staticTextGameNameID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, staticTextMapNameID, NAMEKEY_INVALID);
+#define staticTextMapNameID RTS_ENGINE_GLOBAL_REF(staticTextMapNameID)
+#else
 static NameKeyType staticTextMapNameID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, listBoxPlayersID, NAMEKEY_INVALID);
+#define listBoxPlayersID RTS_ENGINE_GLOBAL_REF(listBoxPlayersID)
+#else
 static NameKeyType listBoxPlayersID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, winCratesID, NAMEKEY_INVALID);
+#define winCratesID RTS_ENGINE_GLOBAL_REF(winCratesID)
+#else
 static NameKeyType winCratesID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, winSuperWeaponsID, NAMEKEY_INVALID);
+#define winSuperWeaponsID RTS_ENGINE_GLOBAL_REF(winSuperWeaponsID)
+#else
 static NameKeyType winSuperWeaponsID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, winFreeForAllID, NAMEKEY_INVALID);
+#define winFreeForAllID RTS_ENGINE_GLOBAL_REF(winFreeForAllID)
+#else
 static NameKeyType winFreeForAllID = NAMEKEY_INVALID;
+#endif
 
 static WindowLayout *gameInfoWindowLayout = nullptr;
 // PUBLIC FUNCTIONS ///////////////////////////////////////////////////////////////////////////////

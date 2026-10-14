@@ -116,41 +116,207 @@ void DoCompressTest();
 
 
 // window ids -------------------------------------------------------------------------------------
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(NameKeyType, mainMenuID, NAMEKEY_INVALID);
+#define mainMenuID RTS_ENGINE_GLOBAL_REF(mainMenuID)
+#else
 static NameKeyType mainMenuID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, skirmishID, NAMEKEY_INVALID);
+#define skirmishID RTS_ENGINE_GLOBAL_REF(skirmishID)
+#else
 static NameKeyType skirmishID = NAMEKEY_INVALID;
+#endif
 // GeneralsX @feature fbraz3 18/09/2026 Enable Steam Custom Mission button
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonCustomMissionID, NAMEKEY_INVALID);
+#define buttonCustomMissionID RTS_ENGINE_GLOBAL_REF(buttonCustomMissionID)
+#else
 static NameKeyType buttonCustomMissionID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, onlineID, NAMEKEY_INVALID);
+#define onlineID RTS_ENGINE_GLOBAL_REF(onlineID)
+#else
 static NameKeyType onlineID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, networkID, NAMEKEY_INVALID);
+#define networkID RTS_ENGINE_GLOBAL_REF(networkID)
+#else
 static NameKeyType networkID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, optionsID, NAMEKEY_INVALID);
+#define optionsID RTS_ENGINE_GLOBAL_REF(optionsID)
+#else
 static NameKeyType optionsID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, exitID, NAMEKEY_INVALID);
+#define exitID RTS_ENGINE_GLOBAL_REF(exitID)
+#else
 static NameKeyType exitID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, motdID, NAMEKEY_INVALID);
+#define motdID RTS_ENGINE_GLOBAL_REF(motdID)
+#else
 static NameKeyType motdID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, worldBuilderID, NAMEKEY_INVALID);
+#define worldBuilderID RTS_ENGINE_GLOBAL_REF(worldBuilderID)
+#else
 static NameKeyType worldBuilderID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, getUpdateID, NAMEKEY_INVALID);
+#define getUpdateID RTS_ENGINE_GLOBAL_REF(getUpdateID)
+#else
 static NameKeyType getUpdateID = NAMEKEY_INVALID;
+#endif
 static NameKeyType buttonTRAININGID = NAMEKEY_INVALID;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonChallengeID, NAMEKEY_INVALID);
+#define buttonChallengeID RTS_ENGINE_GLOBAL_REF(buttonChallengeID)
+#else
 static NameKeyType buttonChallengeID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonUSAID, NAMEKEY_INVALID);
+#define buttonUSAID RTS_ENGINE_GLOBAL_REF(buttonUSAID)
+#else
 static NameKeyType buttonUSAID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonGLAID, NAMEKEY_INVALID);
+#define buttonGLAID RTS_ENGINE_GLOBAL_REF(buttonGLAID)
+#else
 static NameKeyType buttonGLAID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonChinaID, NAMEKEY_INVALID);
+#define buttonChinaID RTS_ENGINE_GLOBAL_REF(buttonChinaID)
+#else
 static NameKeyType buttonChinaID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonUSARecentSaveID, NAMEKEY_INVALID);
+#define buttonUSARecentSaveID RTS_ENGINE_GLOBAL_REF(buttonUSARecentSaveID)
+#else
 static NameKeyType buttonUSARecentSaveID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonUSALoadGameID, NAMEKEY_INVALID);
+#define buttonUSALoadGameID RTS_ENGINE_GLOBAL_REF(buttonUSALoadGameID)
+#else
 static NameKeyType buttonUSALoadGameID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonGLARecentSaveID, NAMEKEY_INVALID);
+#define buttonGLARecentSaveID RTS_ENGINE_GLOBAL_REF(buttonGLARecentSaveID)
+#else
 static NameKeyType buttonGLARecentSaveID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonGLALoadGameID, NAMEKEY_INVALID);
+#define buttonGLALoadGameID RTS_ENGINE_GLOBAL_REF(buttonGLALoadGameID)
+#else
 static NameKeyType buttonGLALoadGameID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonChinaRecentSaveID, NAMEKEY_INVALID);
+#define buttonChinaRecentSaveID RTS_ENGINE_GLOBAL_REF(buttonChinaRecentSaveID)
+#else
 static NameKeyType buttonChinaRecentSaveID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonChinaLoadGameID, NAMEKEY_INVALID);
+#define buttonChinaLoadGameID RTS_ENGINE_GLOBAL_REF(buttonChinaLoadGameID)
+#else
 static NameKeyType buttonChinaLoadGameID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonSinglePlayerID, NAMEKEY_INVALID);
+#define buttonSinglePlayerID RTS_ENGINE_GLOBAL_REF(buttonSinglePlayerID)
+#else
 static NameKeyType buttonSinglePlayerID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonMultiPlayerID, NAMEKEY_INVALID);
+#define buttonMultiPlayerID RTS_ENGINE_GLOBAL_REF(buttonMultiPlayerID)
+#else
 static NameKeyType buttonMultiPlayerID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonMultiBackID, NAMEKEY_INVALID);
+#define buttonMultiBackID RTS_ENGINE_GLOBAL_REF(buttonMultiBackID)
+#else
 static NameKeyType buttonMultiBackID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonSingleBackID, NAMEKEY_INVALID);
+#define buttonSingleBackID RTS_ENGINE_GLOBAL_REF(buttonSingleBackID)
+#else
 static NameKeyType buttonSingleBackID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonLoadReplayBackID, NAMEKEY_INVALID);
+#define buttonLoadReplayBackID RTS_ENGINE_GLOBAL_REF(buttonLoadReplayBackID)
+#else
 static NameKeyType buttonLoadReplayBackID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonReplayID, NAMEKEY_INVALID);
+#define buttonReplayID RTS_ENGINE_GLOBAL_REF(buttonReplayID)
+#else
 static NameKeyType buttonReplayID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonLoadReplayID, NAMEKEY_INVALID);
+#define buttonLoadReplayID RTS_ENGINE_GLOBAL_REF(buttonLoadReplayID)
+#else
 static NameKeyType buttonLoadReplayID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonLoadID, NAMEKEY_INVALID);
+#define buttonLoadID RTS_ENGINE_GLOBAL_REF(buttonLoadID)
+#else
 static NameKeyType buttonLoadID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonCreditsID, NAMEKEY_INVALID);
+#define buttonCreditsID RTS_ENGINE_GLOBAL_REF(buttonCreditsID)
+#else
 static NameKeyType buttonCreditsID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonEasyID, NAMEKEY_INVALID);
+#define buttonEasyID RTS_ENGINE_GLOBAL_REF(buttonEasyID)
+#else
 static NameKeyType buttonEasyID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonMediumID, NAMEKEY_INVALID);
+#define buttonMediumID RTS_ENGINE_GLOBAL_REF(buttonMediumID)
+#else
 static NameKeyType buttonMediumID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonHardID, NAMEKEY_INVALID);
+#define buttonHardID RTS_ENGINE_GLOBAL_REF(buttonHardID)
+#else
 static NameKeyType buttonHardID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonDiffBackID, NAMEKEY_INVALID);
+#define buttonDiffBackID RTS_ENGINE_GLOBAL_REF(buttonDiffBackID)
+#else
 static NameKeyType buttonDiffBackID = NAMEKEY_INVALID;
+#endif
 
 
 // window pointers --------------------------------------------------------------------------------

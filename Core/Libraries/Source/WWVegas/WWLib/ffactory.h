@@ -145,9 +145,25 @@ protected:
 };
 
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_EXTERN_GLOBAL(FileFactoryClass*, _TheFileFactory);
+#define _TheFileFactory RTS_ENGINE_GLOBAL_REF(_TheFileFactory)
+#else
 extern FileFactoryClass	*	_TheFileFactory;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL(RawFileFactoryClass*, _TheWritingFileFactory);
+#define _TheWritingFileFactory RTS_ENGINE_GLOBAL_REF(_TheWritingFileFactory)
+#else
 extern RawFileFactoryClass	*	_TheWritingFileFactory;
+#endif
 
 // No simple file factory.  jba.
 // (gth) re-enabling this because w3d view uses it
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL(SimpleFileFactoryClass*, _TheSimpleFileFactory);
+#define _TheSimpleFileFactory RTS_ENGINE_GLOBAL_REF(_TheSimpleFileFactory)
+#else
 extern SimpleFileFactoryClass	*	_TheSimpleFileFactory;
+#endif

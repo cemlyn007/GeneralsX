@@ -170,6 +170,18 @@ ObjectPoolClass<T,BLOCKSIZE> & AutoPoolClass<T,BLOCKSIZE>::Allocator() \
 	return *allocator; \
 } \
 extern int DEFINE_AUTO_POOL_requires_semicolon
+#elif RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 One allocator per engine (Common/EngineStatic.h), destroyed after every other
+// per-engine static of its engine, so after every object they hold, rather than never.
+#define DEFINE_AUTO_POOL(T,BLOCKSIZE) \
+template<> \
+ObjectPoolClass<T,BLOCKSIZE> & AutoPoolClass<T,BLOCKSIZE>::Allocator() \
+{ \
+	using rtsAllocatorType = ObjectPoolClass<T,BLOCKSIZE>; \
+	RTS_ENGINE_STATIC_LAST(rtsAllocatorType, allocator); \
+	return allocator; \
+} \
+extern int DEFINE_AUTO_POOL_requires_semicolon
 #else
 #define DEFINE_AUTO_POOL(T,BLOCKSIZE) \
 template<> \

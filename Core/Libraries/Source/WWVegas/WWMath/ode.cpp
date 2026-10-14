@@ -42,16 +42,67 @@
 #include "ode.h"
 #include <assert.h>
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(StateVectorClass, Y0);
+#define Y0 RTS_ENGINE_GLOBAL_REF(Y0)
+#else
 static StateVectorClass		Y0;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(StateVectorClass, Y1);
+#define Y1 RTS_ENGINE_GLOBAL_REF(Y1)
+#else
 static StateVectorClass		Y1;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(StateVectorClass, _WorkVector0);
+#define _WorkVector0 RTS_ENGINE_GLOBAL_REF(_WorkVector0)
+#else
 static StateVectorClass		_WorkVector0;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(StateVectorClass, _WorkVector1);
+#define _WorkVector1 RTS_ENGINE_GLOBAL_REF(_WorkVector1)
+#else
 static StateVectorClass		_WorkVector1;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(StateVectorClass, _WorkVector2);
+#define _WorkVector2 RTS_ENGINE_GLOBAL_REF(_WorkVector2)
+#else
 static StateVectorClass		_WorkVector2;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(StateVectorClass, _WorkVector3);
+#define _WorkVector3 RTS_ENGINE_GLOBAL_REF(_WorkVector3)
+#else
 static StateVectorClass		_WorkVector3;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(StateVectorClass, _WorkVector4);
+#define _WorkVector4 RTS_ENGINE_GLOBAL_REF(_WorkVector4)
+#else
 static StateVectorClass		_WorkVector4;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(StateVectorClass, _WorkVector5);
+#define _WorkVector5 RTS_ENGINE_GLOBAL_REF(_WorkVector5)
+#else
 static StateVectorClass		_WorkVector5;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(StateVectorClass, _WorkVector6);
+#define _WorkVector6 RTS_ENGINE_GLOBAL_REF(_WorkVector6)
+#else
 static StateVectorClass		_WorkVector6;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(StateVectorClass, _WorkVector7);
+#define _WorkVector7 RTS_ENGINE_GLOBAL_REF(_WorkVector7)
+#else
 static StateVectorClass		_WorkVector7;
+#endif
 
 /***********************************************************************************************
  * Euler_Solve -- uses Eulers method to integrate a system of ODE's                            *

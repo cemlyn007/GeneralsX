@@ -129,7 +129,12 @@ void W3DProjectileStreamDraw::doDrawModule(const Matrix3D* )
 	if (me == nullptr)
 		return;
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+	RTS_ENGINE_STATIC(NameKeyType, key_ProjectileStreamUpdate, NAMEKEY("ProjectileStreamUpdate"));
+#else
 	static NameKeyType key_ProjectileStreamUpdate = NAMEKEY("ProjectileStreamUpdate");
+#endif
 	ProjectileStreamUpdate* update = (ProjectileStreamUpdate*)me->findUpdateModule(key_ProjectileStreamUpdate);
 
 	const W3DProjectileStreamDrawModuleData *data = getW3DProjectileStreamDrawModuleData();

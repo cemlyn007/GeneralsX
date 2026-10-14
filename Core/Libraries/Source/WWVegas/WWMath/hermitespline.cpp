@@ -49,8 +49,24 @@ DECLARE_FORCE_LINK(hermitespline);
 /*
 ** Save-Load stuff
 */
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+// GeneralsX @refactor cemlyn007 14/10/2026 Per engine (Common/EngineStatic.h), made and so registered by WWMath::Init (docs/EMBEDDING.md).
+using _HermiteSpline3DFactory_rtsEngineType = SimplePersistFactoryClass<HermiteSpline3DClass,WWMATH_CHUNKID_HERMITESPLINE3D>;
+RTS_ENGINE_GLOBAL(_HermiteSpline3DFactory_rtsEngineType, _HermiteSpline3DFactory);
+#define _HermiteSpline3DFactory RTS_ENGINE_GLOBAL_REF(_HermiteSpline3DFactory)
+using _HermiteSpline1DFactory_rtsEngineType = SimplePersistFactoryClass<HermiteSpline1DClass,WWMATH_CHUNKID_HERMITESPLINE1D>;
+RTS_ENGINE_GLOBAL(_HermiteSpline1DFactory_rtsEngineType, _HermiteSpline1DFactory);
+#define _HermiteSpline1DFactory RTS_ENGINE_GLOBAL_REF(_HermiteSpline1DFactory)
+void WWMath_Register_Hermitespline_Factories()
+{
+	_HermiteSpline3DFactory;
+	_HermiteSpline1DFactory;
+}
+#else
 SimplePersistFactoryClass<HermiteSpline3DClass,WWMATH_CHUNKID_HERMITESPLINE3D>	_HermiteSpline3DFactory;
 SimplePersistFactoryClass<HermiteSpline1DClass,WWMATH_CHUNKID_HERMITESPLINE1D>	_HermiteSpline1DFactory;
+#endif
 
 enum
 {

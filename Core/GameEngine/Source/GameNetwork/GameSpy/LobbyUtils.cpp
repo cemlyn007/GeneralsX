@@ -79,12 +79,43 @@ enum {
 	COLUMN_PING,
 };
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(NameKeyType, buttonSortAlphaID, NAMEKEY_INVALID);
+#define buttonSortAlphaID RTS_ENGINE_GLOBAL_REF(buttonSortAlphaID)
+#else
 static NameKeyType buttonSortAlphaID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonSortPingID, NAMEKEY_INVALID);
+#define buttonSortPingID RTS_ENGINE_GLOBAL_REF(buttonSortPingID)
+#else
 static NameKeyType buttonSortPingID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonSortBuddiesID, NAMEKEY_INVALID);
+#define buttonSortBuddiesID RTS_ENGINE_GLOBAL_REF(buttonSortBuddiesID)
+#else
 static NameKeyType buttonSortBuddiesID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, windowSortAlphaID, NAMEKEY_INVALID);
+#define windowSortAlphaID RTS_ENGINE_GLOBAL_REF(windowSortAlphaID)
+#else
 static NameKeyType windowSortAlphaID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, windowSortPingID, NAMEKEY_INVALID);
+#define windowSortPingID RTS_ENGINE_GLOBAL_REF(windowSortPingID)
+#else
 static NameKeyType windowSortPingID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, windowSortBuddiesID, NAMEKEY_INVALID);
+#define windowSortBuddiesID RTS_ENGINE_GLOBAL_REF(windowSortBuddiesID)
+#else
 static NameKeyType windowSortBuddiesID = NAMEKEY_INVALID;
+#endif
 
 static GameWindow *buttonSortAlpha = nullptr;
 static GameWindow *buttonSortPing = nullptr;
@@ -216,7 +247,12 @@ static NameKeyType parentID = NAMEKEY_INVALID;
 //static NameKeyType parentGameListSmallID = NAMEKEY_INVALID;
 static NameKeyType parentGameListLargeID = NAMEKEY_INVALID;
 static NameKeyType listboxLobbyGamesSmallID = NAMEKEY_INVALID;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, listboxLobbyGamesLargeID, NAMEKEY_INVALID);
+#define listboxLobbyGamesLargeID RTS_ENGINE_GLOBAL_REF(listboxLobbyGamesLargeID)
+#else
 static NameKeyType listboxLobbyGamesLargeID = NAMEKEY_INVALID;
+#endif
 //static NameKeyType listboxLobbyGameInfoID = NAMEKEY_INVALID;
 
 // Window Pointers ------------------------------------------------------------------------

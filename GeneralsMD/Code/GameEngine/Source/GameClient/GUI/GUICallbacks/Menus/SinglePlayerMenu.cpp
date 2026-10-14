@@ -183,9 +183,22 @@ WindowMsgHandledType SinglePlayerMenuInput( GameWindow *window, UnsignedInt msg,
 WindowMsgHandledType SinglePlayerMenuSystem( GameWindow *window, UnsignedInt msg,
 														 WindowMsgData mData1, WindowMsgData mData2 )
 {
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+	RTS_ENGINE_STATIC(NameKeyType, buttonNew, NAMEKEY_INVALID);
+#else
 	static NameKeyType buttonNew = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(NameKeyType, buttonLoad, NAMEKEY_INVALID);
+#else
 	static NameKeyType buttonLoad = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(NameKeyType, buttonBack, NAMEKEY_INVALID);
+#else
 	static NameKeyType buttonBack = NAMEKEY_INVALID;
+#endif
 
 	switch( msg )
 	{

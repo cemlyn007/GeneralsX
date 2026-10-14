@@ -289,23 +289,89 @@ void LANPreferences::setStartingCash( const Money & startingCash )
 
 
 // window ids ------------------------------------------------------------------------------
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(NameKeyType, parentLanLobbyID, NAMEKEY_INVALID);
+#define parentLanLobbyID RTS_ENGINE_GLOBAL_REF(parentLanLobbyID)
+#else
 static NameKeyType parentLanLobbyID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonBackID, NAMEKEY_INVALID);
+#define buttonBackID RTS_ENGINE_GLOBAL_REF(buttonBackID)
+#else
 static NameKeyType buttonBackID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonClearID, NAMEKEY_INVALID);
+#define buttonClearID RTS_ENGINE_GLOBAL_REF(buttonClearID)
+#else
 static NameKeyType buttonClearID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonHostID, NAMEKEY_INVALID);
+#define buttonHostID RTS_ENGINE_GLOBAL_REF(buttonHostID)
+#else
 static NameKeyType buttonHostID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonJoinID, NAMEKEY_INVALID);
+#define buttonJoinID RTS_ENGINE_GLOBAL_REF(buttonJoinID)
+#else
 static NameKeyType buttonJoinID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonDirectConnectID, NAMEKEY_INVALID);
+#define buttonDirectConnectID RTS_ENGINE_GLOBAL_REF(buttonDirectConnectID)
+#else
 static NameKeyType buttonDirectConnectID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonChatID, NAMEKEY_INVALID);
+#define buttonChatID RTS_ENGINE_GLOBAL_REF(buttonChatID)
+#else
 static NameKeyType buttonChatID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, staticToolTipID, NAMEKEY_INVALID);
+#define staticToolTipID RTS_ENGINE_GLOBAL_REF(staticToolTipID)
+#else
 static NameKeyType staticToolTipID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, textEntryPlayerNameID, NAMEKEY_INVALID);
+#define textEntryPlayerNameID RTS_ENGINE_GLOBAL_REF(textEntryPlayerNameID)
+#else
 static NameKeyType textEntryPlayerNameID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, textEntryChatID, NAMEKEY_INVALID);
+#define textEntryChatID RTS_ENGINE_GLOBAL_REF(textEntryChatID)
+#else
 static NameKeyType textEntryChatID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, listboxPlayersID, NAMEKEY_INVALID);
+#define listboxPlayersID RTS_ENGINE_GLOBAL_REF(listboxPlayersID)
+#else
 static NameKeyType listboxPlayersID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, staticTextGameInfoID, NAMEKEY_INVALID);
+#define staticTextGameInfoID RTS_ENGINE_GLOBAL_REF(staticTextGameInfoID)
+#else
 static NameKeyType staticTextGameInfoID = NAMEKEY_INVALID;
+#endif
 
 
 // Window Pointers ------------------------------------------------------------------------
 static GameWindow *parentLanLobby = nullptr;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, buttonBack, nullptr);
+#define buttonBack RTS_ENGINE_GLOBAL_REF(buttonBack)
+#else
 static GameWindow *buttonBack = nullptr;
+#endif
 static GameWindow *buttonClear = nullptr;
 static GameWindow *buttonHost = nullptr;
 static GameWindow *buttonJoin = nullptr;
@@ -317,10 +383,20 @@ static GameWindow *textEntryChat = nullptr;
 static GameWindow *staticTextGameInfo = nullptr;
 
 //external declarations of the Gadgets the callbacks can use
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(NameKeyType, listboxChatWindowID, NAMEKEY_INVALID);
+#define listboxChatWindowID RTS_ENGINE_GLOBAL_REF(listboxChatWindowID)
+#else
 NameKeyType listboxChatWindowID = NAMEKEY_INVALID;
+#endif
 GameWindow *listboxChatWindow = nullptr;
 GameWindow *listboxPlayers = nullptr;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(NameKeyType, listboxGamesID, NAMEKEY_INVALID);
+#define listboxGamesID RTS_ENGINE_GLOBAL_REF(listboxGamesID)
+#else
 NameKeyType listboxGamesID = NAMEKEY_INVALID;
+#endif
 GameWindow *listboxGames = nullptr;
 
 // hack to disable framerate limiter in LAN games

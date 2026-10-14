@@ -141,12 +141,26 @@ static Bool raiseMessageBoxes = false;
 static Bool launchGameNext = FALSE;
 
 // window ids ------------------------------------------------------------------------------
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(NameKeyType, parentWOLGameSetupID, NAMEKEY_INVALID);
+#define parentWOLGameSetupID RTS_ENGINE_GLOBAL_REF(parentWOLGameSetupID)
+#else
 static NameKeyType parentWOLGameSetupID = NAMEKEY_INVALID;
+#endif
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType[MAX_SLOTS], comboBoxPlayerID, { NAMEKEY_INVALID,NAMEKEY_INVALID,
+																											NAMEKEY_INVALID,NAMEKEY_INVALID,
+																											NAMEKEY_INVALID,NAMEKEY_INVALID,
+																											NAMEKEY_INVALID,NAMEKEY_INVALID });
+#define comboBoxPlayerID RTS_ENGINE_GLOBAL_REF(comboBoxPlayerID)
+#else
 static NameKeyType comboBoxPlayerID[MAX_SLOTS] = { NAMEKEY_INVALID,NAMEKEY_INVALID,
 																											NAMEKEY_INVALID,NAMEKEY_INVALID,
 																											NAMEKEY_INVALID,NAMEKEY_INVALID,
 																											NAMEKEY_INVALID,NAMEKEY_INVALID };
+#endif
 
 static NameKeyType staticTextPlayerID[MAX_SLOTS] = { NAMEKEY_INVALID,NAMEKEY_INVALID,
 																											NAMEKEY_INVALID,NAMEKEY_INVALID,
@@ -158,51 +172,148 @@ static NameKeyType buttonAcceptID[MAX_SLOTS] = { NAMEKEY_INVALID,NAMEKEY_INVALID
 																									NAMEKEY_INVALID,NAMEKEY_INVALID,
 																									NAMEKEY_INVALID,NAMEKEY_INVALID };
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType[MAX_SLOTS], comboBoxColorID, { NAMEKEY_INVALID,NAMEKEY_INVALID,
+																										NAMEKEY_INVALID,NAMEKEY_INVALID,
+																										NAMEKEY_INVALID,NAMEKEY_INVALID,
+																										NAMEKEY_INVALID,NAMEKEY_INVALID });
+#define comboBoxColorID RTS_ENGINE_GLOBAL_REF(comboBoxColorID)
+#else
 static NameKeyType comboBoxColorID[MAX_SLOTS] = { NAMEKEY_INVALID,NAMEKEY_INVALID,
 																										NAMEKEY_INVALID,NAMEKEY_INVALID,
 																										NAMEKEY_INVALID,NAMEKEY_INVALID,
 																										NAMEKEY_INVALID,NAMEKEY_INVALID };
+#endif
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType[MAX_SLOTS], comboBoxPlayerTemplateID, { NAMEKEY_INVALID,NAMEKEY_INVALID,
+																										NAMEKEY_INVALID,NAMEKEY_INVALID,
+																										NAMEKEY_INVALID,NAMEKEY_INVALID,
+																										NAMEKEY_INVALID,NAMEKEY_INVALID });
+#define comboBoxPlayerTemplateID RTS_ENGINE_GLOBAL_REF(comboBoxPlayerTemplateID)
+#else
 static NameKeyType comboBoxPlayerTemplateID[MAX_SLOTS] = { NAMEKEY_INVALID,NAMEKEY_INVALID,
 																										NAMEKEY_INVALID,NAMEKEY_INVALID,
 																										NAMEKEY_INVALID,NAMEKEY_INVALID,
 																										NAMEKEY_INVALID,NAMEKEY_INVALID };
+#endif
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType[MAX_SLOTS], comboBoxTeamID, { NAMEKEY_INVALID,NAMEKEY_INVALID,
+																										NAMEKEY_INVALID,NAMEKEY_INVALID,
+																										NAMEKEY_INVALID,NAMEKEY_INVALID,
+																										NAMEKEY_INVALID,NAMEKEY_INVALID });
+#define comboBoxTeamID RTS_ENGINE_GLOBAL_REF(comboBoxTeamID)
+#else
 static NameKeyType comboBoxTeamID[MAX_SLOTS] = { NAMEKEY_INVALID,NAMEKEY_INVALID,
 																										NAMEKEY_INVALID,NAMEKEY_INVALID,
 																										NAMEKEY_INVALID,NAMEKEY_INVALID,
 																										NAMEKEY_INVALID,NAMEKEY_INVALID };
+#endif
 //static NameKeyType buttonStartPositionID[MAX_SLOTS] = { NAMEKEY_INVALID,NAMEKEY_INVALID,
 //																										NAMEKEY_INVALID,NAMEKEY_INVALID,
 //																										NAMEKEY_INVALID,NAMEKEY_INVALID,
 //																										NAMEKEY_INVALID,NAMEKEY_INVALID };
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType[MAX_SLOTS], buttonMapStartPositionID, { NAMEKEY_INVALID,NAMEKEY_INVALID,
+																										NAMEKEY_INVALID,NAMEKEY_INVALID,
+																										NAMEKEY_INVALID,NAMEKEY_INVALID,
+																										NAMEKEY_INVALID,NAMEKEY_INVALID });
+#define buttonMapStartPositionID RTS_ENGINE_GLOBAL_REF(buttonMapStartPositionID)
+#else
 static NameKeyType buttonMapStartPositionID[MAX_SLOTS] = { NAMEKEY_INVALID,NAMEKEY_INVALID,
 																										NAMEKEY_INVALID,NAMEKEY_INVALID,
 																										NAMEKEY_INVALID,NAMEKEY_INVALID,
 																										NAMEKEY_INVALID,NAMEKEY_INVALID };
+#endif
 static NameKeyType genericPingWindowID[MAX_SLOTS] = { NAMEKEY_INVALID,NAMEKEY_INVALID,
 																										NAMEKEY_INVALID,NAMEKEY_INVALID,
 																										NAMEKEY_INVALID,NAMEKEY_INVALID,
 																										NAMEKEY_INVALID,NAMEKEY_INVALID };
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, textEntryChatID, NAMEKEY_INVALID);
+#define textEntryChatID RTS_ENGINE_GLOBAL_REF(textEntryChatID)
+#else
 static NameKeyType textEntryChatID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, textEntryMapDisplayID, NAMEKEY_INVALID);
+#define textEntryMapDisplayID RTS_ENGINE_GLOBAL_REF(textEntryMapDisplayID)
+#else
 static NameKeyType textEntryMapDisplayID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonBackID, NAMEKEY_INVALID);
+#define buttonBackID RTS_ENGINE_GLOBAL_REF(buttonBackID)
+#else
 static NameKeyType buttonBackID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonStartID, NAMEKEY_INVALID);
+#define buttonStartID RTS_ENGINE_GLOBAL_REF(buttonStartID)
+#else
 static NameKeyType buttonStartID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonChatID, NAMEKEY_INVALID);
+#define buttonChatID RTS_ENGINE_GLOBAL_REF(buttonChatID)
+#else
 static NameKeyType buttonChatID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonSelectMapID, NAMEKEY_INVALID);
+#define buttonSelectMapID RTS_ENGINE_GLOBAL_REF(buttonSelectMapID)
+#else
 static NameKeyType buttonSelectMapID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, windowMapID, NAMEKEY_INVALID);
+#define windowMapID RTS_ENGINE_GLOBAL_REF(windowMapID)
+#else
 static NameKeyType windowMapID = NAMEKEY_INVALID;
+#endif
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, windowMapSelectMapID, NAMEKEY_INVALID);
+#define windowMapSelectMapID RTS_ENGINE_GLOBAL_REF(windowMapSelectMapID)
+#else
 static NameKeyType windowMapSelectMapID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, checkBoxUseStatsID, NAMEKEY_INVALID);
+#define checkBoxUseStatsID RTS_ENGINE_GLOBAL_REF(checkBoxUseStatsID)
+#else
 static NameKeyType checkBoxUseStatsID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, checkBoxLimitSuperweaponsID, NAMEKEY_INVALID);
+#define checkBoxLimitSuperweaponsID RTS_ENGINE_GLOBAL_REF(checkBoxLimitSuperweaponsID)
+#else
 static NameKeyType checkBoxLimitSuperweaponsID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, comboBoxStartingCashID, NAMEKEY_INVALID);
+#define comboBoxStartingCashID RTS_ENGINE_GLOBAL_REF(comboBoxStartingCashID)
+#else
 static NameKeyType comboBoxStartingCashID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, checkBoxLimitArmiesID, NAMEKEY_INVALID);
+#define checkBoxLimitArmiesID RTS_ENGINE_GLOBAL_REF(checkBoxLimitArmiesID)
+#else
 static NameKeyType checkBoxLimitArmiesID = NAMEKEY_INVALID;
+#endif
 
 // Window Pointers ------------------------------------------------------------------------
 static GameWindow *parentWOLGameSetup = nullptr;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, buttonBack, nullptr);
+#define buttonBack RTS_ENGINE_GLOBAL_REF(buttonBack)
+#else
 static GameWindow *buttonBack = nullptr;
+#endif
 static GameWindow *buttonStart = nullptr;
 static GameWindow *buttonSelectMap = nullptr;
 static GameWindow *buttonChat = nullptr;
@@ -546,7 +657,12 @@ void pingTooltip(GameWindow *window, WinInstanceData *instData, UnsignedInt mous
 
 //external declarations of the Gadgets the callbacks can use
 GameWindow *listboxGameSetupChat = nullptr;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(NameKeyType, listboxGameSetupChatID, NAMEKEY_INVALID);
+#define listboxGameSetupChatID RTS_ENGINE_GLOBAL_REF(listboxGameSetupChatID)
+#else
 NameKeyType listboxGameSetupChatID = NAMEKEY_INVALID;
+#endif
 
 static void handleColorSelection(int index)
 {
@@ -3309,7 +3425,11 @@ WindowMsgHandledType WOLGameSetupMenuSystem( GameWindow *window, UnsignedInt msg
 
 				GameWindow *control = (GameWindow *)mData1;
 				Int controlID = control->winGetWindowId();
+#if RTS_ENGINE_CONTEXT
+				RTS_ENGINE_STATIC(Int, buttonCommunicatorID, NAMEKEY("GameSpyGameOptionsMenu.wnd:ButtonCommunicator"));
+#else
 				static Int buttonCommunicatorID = NAMEKEY("GameSpyGameOptionsMenu.wnd:ButtonCommunicator");
+#endif
 				if ( controlID == buttonBackID )
 				{
 					savePlayerInfo();

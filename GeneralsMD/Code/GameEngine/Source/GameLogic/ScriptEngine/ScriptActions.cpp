@@ -560,7 +560,12 @@ void ScriptActions::doCreateReinforcements(const AsciiString& team, const AsciiS
 
 	//Check to see if we have a transport, and if our transport has paradrop capabilities. If this is the
 	//case, we'll need to create each unit inside "parachute containers".
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+	RTS_ENGINE_STATIC(NameKeyType, key_DeliverPayloadAIUpdate, NAMEKEY("DeliverPayloadAIUpdate"));
+#else
 	static NameKeyType key_DeliverPayloadAIUpdate = NAMEKEY("DeliverPayloadAIUpdate");
+#endif
 	DeliverPayloadAIUpdate *dp = nullptr;
 	if( transport )
 	{
@@ -2202,7 +2207,11 @@ void ScriptActions::doTeamHuntWithCommandButton(const AsciiString& teamName, con
 			case GUICOMMANDMODE_CONVERT_TO_CARBOMB:
 			case GUICOMMANDMODE_SABOTAGE_BUILDING:
 			{
+#if RTS_ENGINE_CONTEXT
+					RTS_ENGINE_STATIC(NameKeyType, key_CommandButtonHuntUpdate, NAMEKEY("CommandButtonHuntUpdate"));
+#else
 					static NameKeyType key_CommandButtonHuntUpdate = NAMEKEY("CommandButtonHuntUpdate");
+#endif
 
 					CommandButtonHuntUpdate* huntUpdate = (CommandButtonHuntUpdate*)obj->findUpdateModule(key_CommandButtonHuntUpdate);
 					if( huntUpdate  )
@@ -3731,7 +3740,11 @@ void ScriptActions::doNamedSetBoobytrapped( const AsciiString& thingTemplateName
 			Object *boobytrap = TheThingFactory->newObject( thing, obj->getTeam() );
 			if( boobytrap )
 			{
+#if RTS_ENGINE_CONTEXT
+				RTS_ENGINE_STATIC(NameKeyType, key_StickyBombUpdate, NAMEKEY( "StickyBombUpdate" ));
+#else
 				static NameKeyType key_StickyBombUpdate = NAMEKEY( "StickyBombUpdate" );
+#endif
 				StickyBombUpdate *update = (StickyBombUpdate*)boobytrap->findUpdateModule( key_StickyBombUpdate );
 				if( update )
 				{
@@ -3770,7 +3783,11 @@ void ScriptActions::doTeamSetBoobytrapped( const AsciiString& thingTemplateName,
 			Object *boobytrap = TheThingFactory->newObject( thing, obj->getTeam() );
 			if( boobytrap )
 			{
+#if RTS_ENGINE_CONTEXT
+				RTS_ENGINE_STATIC(NameKeyType, key_StickyBombUpdate, NAMEKEY( "StickyBombUpdate" ));
+#else
 				static NameKeyType key_StickyBombUpdate = NAMEKEY( "StickyBombUpdate" );
+#endif
 				StickyBombUpdate *update = (StickyBombUpdate*)boobytrap->findUpdateModule( key_StickyBombUpdate );
 				if( update )
 				{
@@ -5202,7 +5219,11 @@ void ScriptActions::doSetWarehouseValue( const AsciiString& warehouseName, Int c
 		return;
 	}
 
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(const NameKeyType, warehouseModuleKey, TheNameKeyGenerator->nameToKey( "SupplyWarehouseDockUpdate" ));
+#else
 	static const NameKeyType warehouseModuleKey = TheNameKeyGenerator->nameToKey( "SupplyWarehouseDockUpdate" );
+#endif
 	SupplyWarehouseDockUpdate *warehouseModule = (SupplyWarehouseDockUpdate *)obj->findUpdateModule( warehouseModuleKey );
 	if( warehouseModule == nullptr )
 		return;
@@ -6530,7 +6551,11 @@ void ScriptActions::doNamedSetTrainHeld( const AsciiString &locoName, const Bool
 	if( obj )
 	{
 
+#if RTS_ENGINE_CONTEXT
+		RTS_ENGINE_STATIC(const NameKeyType, rrkey, NAMEKEY( "RailroadBehavior" ));
+#else
 		static const NameKeyType rrkey = NAMEKEY( "RailroadBehavior" );
+#endif
 		RailroadBehavior *rBehavior = (RailroadBehavior*)obj->findUpdateModule( rrkey );
 
     if ( rBehavior )

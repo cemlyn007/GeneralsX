@@ -135,7 +135,8 @@ public:
 
 	WWINLINE explicit Matrix3D(float m[12]);
 
-	WWINLINE explicit Matrix3D(
+	// GeneralsX @refactor cemlyn007 14/10/2026 constexpr, so constant vectors and matrices are constant-initialised and read-only.
+	WWINLINE constexpr explicit Matrix3D(
 		float m11,float m12,float m13,float m14,
 		float m21,float m22,float m23,float m24,
 		float m31,float m32,float m33,float m34
@@ -421,16 +422,14 @@ WWINLINE Matrix3D::Matrix3D(float m[12])
 	Row[2].Set(m[8],m[9],m[10],m[11]);
 }
 
-WWINLINE Matrix3D::Matrix3D
+WWINLINE constexpr Matrix3D::Matrix3D
 (
 	float m11,float m12,float m13,float m14,
 	float m21,float m22,float m23,float m24,
 	float m31,float m32,float m33,float m34
 )
+	: Row{Vector4(m11,m12,m13,m14), Vector4(m21,m22,m23,m24), Vector4(m31,m32,m33,m34)}
 {
-	Row[0].Set(m11,m12,m13,m14);
-	Row[1].Set(m21,m22,m23,m24);
-	Row[2].Set(m31,m32,m33,m34);
 }
 
 WWINLINE Matrix3D::Matrix3D

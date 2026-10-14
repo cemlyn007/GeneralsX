@@ -99,11 +99,20 @@ void ShowInGameChat( Bool immediate )
 	{
 		chatWindow = TheWindowManager->winCreateFromScript( "InGameChat.wnd" );
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+		RTS_ENGINE_STATIC(NameKeyType, textEntryChatID, TheNameKeyGenerator->nameToKey( "InGameChat.wnd:TextEntryChat" ));
+#else
 		static NameKeyType textEntryChatID = TheNameKeyGenerator->nameToKey( "InGameChat.wnd:TextEntryChat" );
+#endif
 		chatTextEntry = TheWindowManager->winGetWindowFromId( nullptr, textEntryChatID );
 		GadgetTextEntrySetText( chatTextEntry, UnicodeString::TheEmptyString );
 
+#if RTS_ENGINE_CONTEXT
+		RTS_ENGINE_STATIC(NameKeyType, chatTypeStaticTextID, TheNameKeyGenerator->nameToKey( "InGameChat.wnd:StaticTextChatType" ));
+#else
 		static NameKeyType chatTypeStaticTextID = TheNameKeyGenerator->nameToKey( "InGameChat.wnd:StaticTextChatType" );
+#endif
 		chatTypeStaticText = TheWindowManager->winGetWindowFromId( nullptr, chatTypeStaticTextID );
 	}
 	TheWindowManager->winSetFocus( chatTextEntry );
@@ -357,7 +366,11 @@ WindowMsgHandledType InGameChatSystem( GameWindow *window, UnsignedInt msg,
 		case GBM_SELECTED:
 		{
 			GameWindow *control = (GameWindow *)mData1;
+#if RTS_ENGINE_CONTEXT
+			RTS_ENGINE_STATIC(NameKeyType, buttonClearID, TheNameKeyGenerator->nameToKey( "InGameChat.wnd:ButtonClear" ));
+#else
 			static NameKeyType buttonClearID = TheNameKeyGenerator->nameToKey( "InGameChat.wnd:ButtonClear" );
+#endif
 			if (control && control->winGetWindowId() == buttonClearID)
 			{
 				if (chatTextEntry)

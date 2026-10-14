@@ -72,16 +72,32 @@
 WindowMsgHandledType KeyboardTextEntryInput( GameWindow *window, UnsignedInt msg,
 													 WindowMsgData mData1, WindowMsgData mData2 );
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(NameKeyType, buttonBackID, NAMEKEY_INVALID);
+#define buttonBackID RTS_ENGINE_GLOBAL_REF(buttonBackID)
+#else
 static NameKeyType buttonBackID = NAMEKEY_INVALID;
+#endif
 static GameWindow *buttonBack = nullptr;
 
 static NameKeyType parentKeyboardOptionsMenuID = NAMEKEY_INVALID;
 static GameWindow *parentKeyboardOptionsMenu = nullptr;
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, comboBoxCategoryListID, NAMEKEY_INVALID);
+#define comboBoxCategoryListID RTS_ENGINE_GLOBAL_REF(comboBoxCategoryListID)
+#else
 static NameKeyType comboBoxCategoryListID = NAMEKEY_INVALID;
+#endif
 static GameWindow *comboBoxCategoryList = nullptr;
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, listBoxCommandListID, NAMEKEY_INVALID);
+#define listBoxCommandListID RTS_ENGINE_GLOBAL_REF(listBoxCommandListID)
+#else
 static NameKeyType listBoxCommandListID = NAMEKEY_INVALID;
+#endif
 static GameWindow *listBoxCommandList   = nullptr;
 
 static NameKeyType staticTextDescriptionID = NAMEKEY_INVALID;
@@ -90,13 +106,23 @@ static GameWindow *staticTextDescription   = nullptr;
 static NameKeyType staticTextCurrentHotkeyID = NAMEKEY_INVALID;
 static GameWindow *staticTextCurrentHotkey     = nullptr;
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonResetAllID, NAMEKEY_INVALID);
+#define buttonResetAllID RTS_ENGINE_GLOBAL_REF(buttonResetAllID)
+#else
 static NameKeyType buttonResetAllID = NAMEKEY_INVALID;
+#endif
 static GameWindow *buttonResetAll   = nullptr;
 
 static NameKeyType textEntryAssignHotkeyID = NAMEKEY_INVALID;
 static GameWindow *textEntryAssignHotkey   = nullptr;
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonAssignID, NAMEKEY_INVALID);
+#define buttonAssignID RTS_ENGINE_GLOBAL_REF(buttonAssignID)
+#else
 static NameKeyType buttonAssignID = NAMEKEY_INVALID;
+#endif
 static GameWindow *buttonAssign = nullptr;
 
 //use Bools to test if modifiers are used

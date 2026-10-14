@@ -50,8 +50,24 @@ DECLARE_FORCE_LINK(cardinalspline);
 /*
 ** Save-Load stuff
 */
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+// GeneralsX @refactor cemlyn007 14/10/2026 Per engine (Common/EngineStatic.h), made and so registered by WWMath::Init (docs/EMBEDDING.md).
+using _CardinalSpline3DFactory_rtsEngineType = SimplePersistFactoryClass<CardinalSpline3DClass,WWMATH_CHUNKID_CARDINALSPLINE3D>;
+RTS_ENGINE_GLOBAL(_CardinalSpline3DFactory_rtsEngineType, _CardinalSpline3DFactory);
+#define _CardinalSpline3DFactory RTS_ENGINE_GLOBAL_REF(_CardinalSpline3DFactory)
+using _CardinalSpline1DFactory_rtsEngineType = SimplePersistFactoryClass<CardinalSpline1DClass,WWMATH_CHUNKID_CARDINALSPLINE1D>;
+RTS_ENGINE_GLOBAL(_CardinalSpline1DFactory_rtsEngineType, _CardinalSpline1DFactory);
+#define _CardinalSpline1DFactory RTS_ENGINE_GLOBAL_REF(_CardinalSpline1DFactory)
+void WWMath_Register_Cardinalspline_Factories()
+{
+	_CardinalSpline3DFactory;
+	_CardinalSpline1DFactory;
+}
+#else
 SimplePersistFactoryClass<CardinalSpline3DClass,WWMATH_CHUNKID_CARDINALSPLINE3D>	_CardinalSpline3DFactory;
 SimplePersistFactoryClass<CardinalSpline1DClass,WWMATH_CHUNKID_CARDINALSPLINE1D>	_CardinalSpline1DFactory;
+#endif
 
 enum
 {

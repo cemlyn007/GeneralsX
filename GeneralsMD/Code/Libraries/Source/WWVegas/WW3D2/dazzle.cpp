@@ -1524,7 +1524,17 @@ class DazzlePersistFactoryClass : public PersistFactoryClass
 	};
 };
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 Per engine (Common/EngineStatic.h), made and so registered by WW3D::Init (docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(DazzlePersistFactoryClass, _DazzleFactory);
+#define _DazzleFactory RTS_ENGINE_GLOBAL_REF(_DazzleFactory)
+void WW3D_Register_Dazzle_Factory()
+{
+	_DazzleFactory;
+}
+#else
 static DazzlePersistFactoryClass _DazzleFactory;
+#endif
 
 uint32 DazzlePersistFactoryClass::Chunk_ID() const
 {

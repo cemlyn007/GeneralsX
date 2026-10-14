@@ -167,19 +167,70 @@ static std::unordered_map<int, std::string> g_mapServiceIndexToPlayerTemplateStr
 };
 
 // window ids ------------------------------------------------------------------------------
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(NameKeyType, parentWOLWelcomeID, NAMEKEY_INVALID);
+#define parentWOLWelcomeID RTS_ENGINE_GLOBAL_REF(parentWOLWelcomeID)
+#else
 static NameKeyType parentWOLWelcomeID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonBackID, NAMEKEY_INVALID);
+#define buttonBackID RTS_ENGINE_GLOBAL_REF(buttonBackID)
+#else
 static NameKeyType buttonBackID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonQuickMatchID, NAMEKEY_INVALID);
+#define buttonQuickMatchID RTS_ENGINE_GLOBAL_REF(buttonQuickMatchID)
+#else
 static NameKeyType buttonQuickMatchID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonLobbyID, NAMEKEY_INVALID);
+#define buttonLobbyID RTS_ENGINE_GLOBAL_REF(buttonLobbyID)
+#else
 static NameKeyType buttonLobbyID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonBuddiesID, NAMEKEY_INVALID);
+#define buttonBuddiesID RTS_ENGINE_GLOBAL_REF(buttonBuddiesID)
+#else
 static NameKeyType buttonBuddiesID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonLadderID, NAMEKEY_INVALID);
+#define buttonLadderID RTS_ENGINE_GLOBAL_REF(buttonLadderID)
+#else
 static NameKeyType buttonLadderID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonMyInfoID, NAMEKEY_INVALID);
+#define buttonMyInfoID RTS_ENGINE_GLOBAL_REF(buttonMyInfoID)
+#else
 static NameKeyType buttonMyInfoID = NAMEKEY_INVALID;
+#endif
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, listboxInfoID, NAMEKEY_INVALID);
+#define listboxInfoID RTS_ENGINE_GLOBAL_REF(listboxInfoID)
+#else
 static NameKeyType listboxInfoID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonOptionsID, NAMEKEY_INVALID);
+#define buttonOptionsID RTS_ENGINE_GLOBAL_REF(buttonOptionsID)
+#else
 static NameKeyType buttonOptionsID = NAMEKEY_INVALID;
+#endif
 // Window Pointers ------------------------------------------------------------------------
 static GameWindow *parentWOLWelcome = nullptr;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, buttonBack, nullptr);
+#define buttonBack RTS_ENGINE_GLOBAL_REF(buttonBack)
+#else
 static GameWindow *buttonBack = nullptr;
+#endif
 static GameWindow *buttonQuickMatch = nullptr;
 static GameWindow *buttonLobby = nullptr;
 static GameWindow *buttonBuddies = nullptr;

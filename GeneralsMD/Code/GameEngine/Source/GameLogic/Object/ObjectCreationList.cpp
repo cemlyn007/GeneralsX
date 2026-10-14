@@ -207,7 +207,12 @@ public:
 			ai->aiAttackPosition( secondary, m_numberOfShots, CMD_FROM_AI );
 		}
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+		RTS_ENGINE_STATIC(NameKeyType, key_RadiusDecalUpdate, NAMEKEY("RadiusDecalUpdate"));
+#else
 		static NameKeyType key_RadiusDecalUpdate = NAMEKEY("RadiusDecalUpdate");
+#endif
 		RadiusDecalUpdate *rd = (RadiusDecalUpdate*)primaryObject->findUpdateModule(key_RadiusDecalUpdate);
 		if (rd)
 		{
@@ -407,7 +412,11 @@ public:
 					die->setCreator(INVALID_ID);
 			}
 
+#if RTS_ENGINE_CONTEXT
+			RTS_ENGINE_STATIC(NameKeyType, key_DeliverPayloadAIUpdate, NAMEKEY("DeliverPayloadAIUpdate"));
+#else
 			static NameKeyType key_DeliverPayloadAIUpdate = NAMEKEY("DeliverPayloadAIUpdate");
+#endif
 			DeliverPayloadAIUpdate *ai = (DeliverPayloadAIUpdate*)transport->findUpdateModule(key_DeliverPayloadAIUpdate);
 			if( ai )
 			{
@@ -938,7 +947,11 @@ protected:
 	{
 		obj->setProducer(sourceObj);
 
+#if RTS_ENGINE_CONTEXT
+		RTS_ENGINE_STATIC(NameKeyType, key_LifetimeUpdate, NAMEKEY("LifetimeUpdate"));
+#else
 		static NameKeyType key_LifetimeUpdate = NAMEKEY("LifetimeUpdate");
+#endif
 		LifetimeUpdate* lup = (LifetimeUpdate*)obj->findUpdateModule(key_LifetimeUpdate);
 		if( lup )
 		{
@@ -1236,7 +1249,11 @@ protected:
 
 		if( BitIsSet( m_disposition, FLOATING ) )
 		{
+#if RTS_ENGINE_CONTEXT
+			RTS_ENGINE_STATIC(NameKeyType, key, NAMEKEY( "FloatUpdate" ));
+#else
 			static NameKeyType key = NAMEKEY( "FloatUpdate" );
+#endif
 			FloatUpdate *floatUpdate = (FloatUpdate *)obj->findUpdateModule( key );
 
 			if( floatUpdate )

@@ -2081,8 +2081,17 @@ void InGameUI::update()
 	static UnsignedInt lastMoney = ~0u;
 	static UnsignedInt lastIncome = ~0u;
 #endif
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+	RTS_ENGINE_STATIC(NameKeyType, moneyWindowKey, TheNameKeyGenerator->nameToKey( "ControlBar.wnd:MoneyDisplay" ));
+#else
 	static NameKeyType moneyWindowKey = TheNameKeyGenerator->nameToKey( "ControlBar.wnd:MoneyDisplay" );
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(NameKeyType, powerWindowKey, TheNameKeyGenerator->nameToKey( "ControlBar.wnd:PowerWindow" ));
+#else
 	static NameKeyType powerWindowKey = TheNameKeyGenerator->nameToKey( "ControlBar.wnd:PowerWindow" );
+#endif
 
 	GameWindow *moneyWin = TheWindowManager->winGetWindowFromId( nullptr, moneyWindowKey );
 	GameWindow *powerWin = TheWindowManager->winGetWindowFromId( nullptr, powerWindowKey );
@@ -2627,7 +2636,11 @@ void InGameUI::createMouseoverHint( const GameMessage *msg )
 			//(e.g. AngryMob), Lets fool the UI into creating the hint for the NEXUS instead...
  			if (obj->isKindOf( KINDOF_IGNORED_IN_GUI ))
  			{
+#if RTS_ENGINE_CONTEXT
+ 				RTS_ENGINE_STATIC(NameKeyType, key_MobMemberSlavedUpdate, NAMEKEY( "MobMemberSlavedUpdate" ));
+#else
  				static NameKeyType key_MobMemberSlavedUpdate = NAMEKEY( "MobMemberSlavedUpdate" );
+#endif
  				MobMemberSlavedUpdate *MMSUpdate = (MobMemberSlavedUpdate*)obj->findUpdateModule( key_MobMemberSlavedUpdate );
  				if( MMSUpdate )
  				{
@@ -2748,7 +2761,11 @@ void InGameUI::createMouseoverHint( const GameMessage *msg )
 #endif
 			UnicodeString warehouseFeedback;
 			// Add on dollar amount of warehouse contents so people don't freak out until the art is hooked up
+#if RTS_ENGINE_CONTEXT
+			RTS_ENGINE_STATIC(const NameKeyType, warehouseModuleKey, TheNameKeyGenerator->nameToKey( "SupplyWarehouseDockUpdate" ));
+#else
 			static const NameKeyType warehouseModuleKey = TheNameKeyGenerator->nameToKey( "SupplyWarehouseDockUpdate" );
+#endif
 			SupplyWarehouseDockUpdate *warehouseModule = (SupplyWarehouseDockUpdate *)obj->findUpdateModule( warehouseModuleKey );
 			if( warehouseModule != nullptr )
 			{
@@ -6165,7 +6182,11 @@ WindowMsgHandledType IdleWorkerSystem( GameWindow *window, UnsignedInt msg,
 		case GBM_SELECTED:
 		{
 			GameWindow *control = (GameWindow *)mData1;
+#if RTS_ENGINE_CONTEXT
+			RTS_ENGINE_STATIC(NameKeyType, buttonSelectID, NAMEKEY( "IdleWorker.wnd:ButtonSelectNextIdleWorker" ));
+#else
 			static NameKeyType buttonSelectID = NAMEKEY( "IdleWorker.wnd:ButtonSelectNextIdleWorker" );
+#endif
 			if (control && control->winGetWindowId() == buttonSelectID)
 			{
 				TheInGameUI->selectNextIdleWorker();

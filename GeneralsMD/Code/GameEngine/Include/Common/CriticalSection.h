@@ -110,8 +110,10 @@ class ScopedCriticalSection
 // That does not extend to one string object written by more than one thread: a process-global static
 // AsciiString/UnicodeString must not be assigned or mutated after the first engine's boot (priming) instead
 // (PLAN-023 Phase 5b item 2).
+#if !RTS_ENGINE_CONTEXT
 extern CriticalSection *TheAsciiStringCriticalSection;
 extern CriticalSection *TheUnicodeStringCriticalSection;
 extern CriticalSection *TheDmaCriticalSection;
 extern CriticalSection *TheMemoryPoolCriticalSection;
 extern CriticalSection *TheDebugLogCriticalSection;
+#endif

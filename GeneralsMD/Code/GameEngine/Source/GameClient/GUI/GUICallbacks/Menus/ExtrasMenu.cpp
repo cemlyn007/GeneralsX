@@ -44,11 +44,37 @@
 #include "GameClient/Display.h"
 
 // Widget IDs and pointers
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(NameKeyType, sliderMaxCameraHeightID, NAMEKEY_INVALID);
+#define sliderMaxCameraHeightID RTS_ENGINE_GLOBAL_REF(sliderMaxCameraHeightID)
+#else
 static NameKeyType sliderMaxCameraHeightID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, sliderMinCameraHeightID, NAMEKEY_INVALID);
+#define sliderMinCameraHeightID RTS_ENGINE_GLOBAL_REF(sliderMinCameraHeightID)
+#else
 static NameKeyType sliderMinCameraHeightID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, sliderCameraPitchID, NAMEKEY_INVALID);
+#define sliderCameraPitchID RTS_ENGINE_GLOBAL_REF(sliderCameraPitchID)
+#else
 static NameKeyType sliderCameraPitchID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, sliderScrollSpeedID, NAMEKEY_INVALID);
+#define sliderScrollSpeedID RTS_ENGINE_GLOBAL_REF(sliderScrollSpeedID)
+#else
 static NameKeyType sliderScrollSpeedID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, sliderDrawDistanceID, NAMEKEY_INVALID);
+#define sliderDrawDistanceID RTS_ENGINE_GLOBAL_REF(sliderDrawDistanceID)
+#else
 static NameKeyType sliderDrawDistanceID = NAMEKEY_INVALID;
+#endif
 
 static GameWindow *sliderMaxCameraHeight = nullptr;
 static GameWindow *sliderMinCameraHeight = nullptr;
@@ -198,9 +224,21 @@ static void setDefaults()
 WindowMsgHandledType ExtrasMenuSystem(GameWindow *window, UnsignedInt msg,
 																				WindowMsgData mData1, WindowMsgData mData2)
 {
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(NameKeyType, buttonBack, NAMEKEY_INVALID);
+#else
 	static NameKeyType buttonBack = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(NameKeyType, buttonDefaults, NAMEKEY_INVALID);
+#else
 	static NameKeyType buttonDefaults = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(NameKeyType, buttonAccept, NAMEKEY_INVALID);
+#else
 	static NameKeyType buttonAccept = NAMEKEY_INVALID;
+#endif
 
 	switch (msg) {
 

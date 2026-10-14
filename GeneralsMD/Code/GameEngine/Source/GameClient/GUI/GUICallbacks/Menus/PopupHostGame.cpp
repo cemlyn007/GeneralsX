@@ -84,13 +84,34 @@
 //-----------------------------------------------------------------------------
 
 static NameKeyType parentPopupID = NAMEKEY_INVALID;
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(NameKeyType, textEntryGameNameID, NAMEKEY_INVALID);
+#define textEntryGameNameID RTS_ENGINE_GLOBAL_REF(textEntryGameNameID)
+#else
 static NameKeyType textEntryGameNameID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonCreateGameID, NAMEKEY_INVALID);
+#define buttonCreateGameID RTS_ENGINE_GLOBAL_REF(buttonCreateGameID)
+#else
 static NameKeyType buttonCreateGameID = NAMEKEY_INVALID;
+#endif
 static NameKeyType checkBoxAllowObserversID = NAMEKEY_INVALID;
 static NameKeyType textEntryGameDescriptionID = NAMEKEY_INVALID;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonCancelID, NAMEKEY_INVALID);
+#define buttonCancelID RTS_ENGINE_GLOBAL_REF(buttonCancelID)
+#else
 static NameKeyType buttonCancelID = NAMEKEY_INVALID;
+#endif
 static NameKeyType textEntryLadderPasswordID = NAMEKEY_INVALID;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, comboBoxLadderNameID, NAMEKEY_INVALID);
+#define comboBoxLadderNameID RTS_ENGINE_GLOBAL_REF(comboBoxLadderNameID)
+#else
 static NameKeyType comboBoxLadderNameID = NAMEKEY_INVALID;
+#endif
 static NameKeyType textEntryGamePasswordID = NAMEKEY_INVALID;
 static NameKeyType checkBoxLimitArmiesID = NAMEKEY_INVALID;
 static NameKeyType checkBoxUseStatsID = NAMEKEY_INVALID;
