@@ -60,7 +60,13 @@
 /*
 ** Class static members:
 */
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_CLASS_STATIC_DEFINE(Vector3*, MetalMapManagerClass, _NormalTable, nullptr);
+#define _NormalTable RTS_ENGINE_GLOBAL_REF(_NormalTable)
+#else
 Vector3 * MetalMapManagerClass::_NormalTable = nullptr;
+#endif
 
 /***********************************************************************************************
  * MMMC::MetalMapManagerClass -- Create metal map manager from INI                             *
@@ -361,7 +367,11 @@ void MetalMapManagerClass::initialize_normal_table()
 	// NOTE: changing the actual static _NormalTable member must be the last thing this function
 	// does to avoid synchronization errors.
 
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(Vector3[METALMAP_SIZE_2], _normal_table);
+#else
 	static Vector3 _normal_table[METALMAP_SIZE_2];
+#endif
 
 	// Calculate vectors (area outside sphere should be filled with a radial fill of the vectors at
 	// the sphere's edge to avoid aliasing artifacts)

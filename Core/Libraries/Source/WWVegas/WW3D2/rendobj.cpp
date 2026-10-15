@@ -1253,7 +1253,12 @@ PersistClass *	RenderObjPersistFactoryClass::Load(ChunkLoadClass & cload) const
 
 	// if the object we saved didn't have a name, replace it with null
 	if (strlen(name) == 0) {
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+		RTS_ENGINE_STATIC(int, count, 0);
+#else
 		static int count = 0;
+#endif
 		if ( count++ < 10 ) {
 			WWDEBUG_SAY(("RenderObjPersistFactory attempted to load an un-named render object!"));
 			WWDEBUG_SAY(("Replacing it with a null render object!"));
@@ -1264,7 +1269,11 @@ PersistClass *	RenderObjPersistFactoryClass::Load(ChunkLoadClass & cload) const
 	RenderObjClass * new_obj = WW3DAssetManager::Get_Instance()->Create_Render_Obj(name);
 
 	if (new_obj == nullptr) {
+#if RTS_ENGINE_CONTEXT
+		RTS_ENGINE_STATIC(int, count, 0);
+#else
 		static int count = 0;
+#endif
 		if ( count++ < 10 ) {
 			WWDEBUG_SAY(("RenderObjPersistFactory failed to create object: %s!!",name));
 			WWDEBUG_SAY(("Either the asset for this object is gone or you tried to save a procedural object."));

@@ -60,6 +60,10 @@ class OBBoxClass;
 **
 **
 */
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+#define EnablePerPolygonCulling RTS_ENGINE_GLOBAL_REF(EnablePerPolygonCulling)
+#endif
 class MaterialPassClass : public RefCountClass
 {
 public:
@@ -101,7 +105,11 @@ protected:
 	bool							EnableOnTranslucentMeshes;
 
 	OBBoxClass *				CullVolume;
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_CLASS_STATIC(bool, EnablePerPolygonCulling);
+#else
 	static bool					EnablePerPolygonCulling;
+#endif
 
 };
 
@@ -112,3 +120,6 @@ inline TextureClass * MaterialPassClass::Peek_Texture(int stage) const
 	WWASSERT(stage < MAX_TEX_STAGES);
 	return Texture[stage];
 }
+#if RTS_ENGINE_CONTEXT
+#undef EnablePerPolygonCulling
+#endif

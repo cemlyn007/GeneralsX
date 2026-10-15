@@ -272,7 +272,12 @@ void W3DRadar::radarToPixel( const ICoord2D *radar, ICoord2D *pixel,
 void W3DRadar::drawHeroIcon( Int pixelX, Int pixelY, Int width, Int height, const Coord3D *pos )
 {
 	// get the hero icon image
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+	RTS_ENGINE_STATIC(const Image*, image, (Image *)TheMappedImageCollection->findImageByName("HeroReticle"));
+#else
 	static const Image *image = (Image *)TheMappedImageCollection->findImageByName("HeroReticle");
+#endif
 	if (image != nullptr)
 	{
 		// convert world to radar coords
@@ -600,7 +605,11 @@ void W3DRadar::drawEvents( Int pixelX, Int pixelY, Int width, Int height )
 			// if we haven't played the sound for this event, do it now that we can see it
 			if( m_event[ i ].soundPlayed == FALSE && m_event[i].type != RADAR_EVENT_BEACON_PULSE )
 			{
+#if RTS_ENGINE_CONTEXT
+				RTS_ENGINE_STATIC(AudioEventRTS, eventSound, AudioEventRTS("RadarEvent"));
+#else
 				static AudioEventRTS eventSound("RadarEvent");
+#endif
 				TheAudio->addAudioEvent( &eventSound );
 
 			}

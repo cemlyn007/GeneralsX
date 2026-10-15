@@ -55,14 +55,25 @@
 // passed as an argument, so that engines on separate threads do not share it (PLAN-023 Phase 5b).
 
 // This debug setting disables particles from being generated
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_CLASS_STATIC_DEFINE(bool, ParticleEmitterClass, DebugDisable, false);
+#define DebugDisable RTS_ENGINE_GLOBAL_REF(DebugDisable)
+#else
 bool ParticleEmitterClass::DebugDisable = false;
+#endif
 
 // This is used to set the global behavior of emitters...
 // Should they be removed from the scene when they complete their
 // emissions, or should they stay in the scene.  (For editing purposes)
 // (gth) 09/17/2000 - particle emitters now have a local RemoveOnComplete flag
 // which is initialized to the state of DefaultRemoveOnComplete.
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_CLASS_STATIC_DEFINE(bool, ParticleEmitterClass, DefaultRemoveOnComplete, true);
+#define DefaultRemoveOnComplete RTS_ENGINE_GLOBAL_REF(DefaultRemoveOnComplete)
+#else
 bool ParticleEmitterClass::DefaultRemoveOnComplete = true;
+#endif
 
 
 ParticleEmitterClass::ParticleEmitterClass(float emit_rate, unsigned int burst_size,

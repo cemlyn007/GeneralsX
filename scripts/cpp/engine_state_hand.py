@@ -95,11 +95,6 @@ HAND = [
     # and its three lists, the particle buffers' rand_gen and the mesh/material/texture/decal ID counters are
     # PER_ENGINE_STATICs; WorldHeightMap::m_alphaTiles is a member (so gone from the library, the slot
     # indexes rule:per-engine-static). What is left here is process-wide by design.
-    (GLOBAL, "", "table_once", "std::once_flag of a table built once per process from constants (motchan's filter table; PLAN-023 Phase 3)"),
-    (GLOBAL, "", "filtertable", "motchan's filter table: built once per process under std::call_once from constants (PLAN-023 Phase 3)"),
-    (GLOBAL, "", "TheW3DFrameLengthInMsec", "the W3D frame length: every engine's GameClient::init sets it to MSEC_PER_LOGICFRAME_REAL, its initial value, and with RTS_ENGINE_CONTEXT W3DGameClient::setFrameRate refuses a different value (a stderr message and a DEBUG_CRASH) rather than write it (PLAN-023 Phase 5b), so no engine writes it after static initialization"),
-    (GLOBAL, "", "re:W3DAssetManager::Create_Render_Obj\\(.*\\)::warning_count|WW3DAssetManager::Create_Render_Obj\\(.*\\)::warning_count", "missing-asset log limiter: bounds a log message count, and no engine state depends on it; a std::atomic, since any engine's thread may count (PLAN-023 Phase 5b)"),
-    (GLOBAL, "", "re:AssetStatusClass::Instance|AssetStatusReportMutex", "the one missing-asset report (the WWDEBUG destructor writes it out at exit) and its lock: every engine adds to it, under the lock (PLAN-023 Phase 5b), and none reads it"),
     # ---------------------------------------------------------------------------------------------------
     # PLAN-023 Phase 4: caches and remaining statics.
     # Done (PLAN-023 Phase 4 PR): every function-local cache of a per-engine pointer (the seven ActiveBody
@@ -141,7 +136,6 @@ HAND = [
     # NetworkUtil.cpp are reached without a network, so their statics are classified by name.
     (GLOBAL, "", "file:/GameNetwork/(GameSpy/|GeneralsOnline/|WOLBrowser/|GameSpy\\w*\\.cpp|LANAPI\\w*\\.cpp|NAT\\.cpp|FirewallHelper\\.cpp|Connection(Manager)?\\.cpp|DisconnectManager\\.cpp|Network\\.cpp|GUIUtil\\.cpp|Transport\\.cpp|udp\\.cpp|FileTransfer\\.cpp|DownloadManager\\.cpp|IPEnumeration\\.cpp|NetPacket\\w*\\.cpp|NetCommand\\w*\\.cpp|NetMessageStream\\.cpp|FrameData\\w*\\.cpp|FrameMetrics\\.cpp|User\\.cpp)", NET),
     (CONST, "", "re:rts::WorkingDirectory::saveStartupWorkingDirectory\\(\\)::len", "captures the process's own startup cwd (::GetCurrentDirectory): the same OS-level value for every engine in the process, written once"),
-    (GLOBAL, "", "s_screenshotWrittenQueue", "screenshot writer queue (render mode; its thread reads no engine state)"),
     (GLOBAL, "", "OPENSSL_ia32cap_P", "OpenSSL CPU capability word (third-party)"),
     (GLOBAL, "", "re:stbi__flip_vertically_on_write|stbi_write_(force_png_filter|png_compression_level|tga_with_rle)", "stb_image_write configuration, never changed"),
     # ---------------------------------------------------------------------------------------------------
@@ -149,8 +143,6 @@ HAND = [
     (CONST, "", "re:LZHL(De|En)coderStat::\\w+Table0", "LZHL static coding tables"),
     (CONST, "", "re:gli::.*::Table|stbiw__encode_png_line\\(.*\\)::(firstmap|mapping)|pi_lo|tiny", "table/constant in header-only third-party code"),
     (CONST, "", "re:replayExtention|lastReplayFileName|PORTABLE_(SAVE|MAPS|USER_MAPS)|g_csfFile|g_strFile|statsDir|ignoredChars", "constant string, never reassigned"),
-    (CONST, "", "re:Surfaces|ShakeIntensities|EMITTER_TYPE_NAMES|ReportCategoryNames", "name table, never written"),
-    (CONST, "", "re:_\\w+(Loader|Factory)|_NullPrototype|_TwiddlerPersistFactory", LOADER),
     # ---------------------------------------------------------------------------------------------------
     # Debug only.
     (DEBUG, "", "re:TheDebugIgnoreSyncErrors|TheCurrentIgnoreCrashPtr|g_LastErrorDump", "debug"),
@@ -185,7 +177,6 @@ HAND = [
     #                      viewer's included, so no menu, mouse cursor, control bar or radar is drawn).
     # `engine_state_symbols.py check --render` prints the render-per-engine and render-scratch rows by phase.
     # The runtime probe (engine_state_probe.py) checks this list against the writes a render engine makes.
-    (RPROC, "", "re:D3D8Lib|Direct3DCreate8Ptr|DX8Wrapper::Init\\(void\\*, bool\\)::s_d3d8LibMutex", "the D3D8 library and its Direct3DCreate8, loaded per process under a mutex (a failed load is retried) and never freed (RR1): a render engine's Shutdown no longer unloads it from under the next device"),
     (RPROC, "", "DX8Wrapper_FinalReleaseHook", "the embedding host's check before a render device's or Direct3D interface's last release (RR1): set once, before any render device"),
     (RPROC, "", "re:ApplicationWindow_(TryLock|Unlock)EventPump", "the embedding host's lock around its window's SDL calls (the event pump, the pillarbox resize check; RR4): an atomic set once, before the window's engine boots, and only read after that"),
     # RR2a-1 moved DX8Wrapper's device state (its class statics, dx8wrapper.cpp's file statics and globals) and
@@ -198,12 +189,6 @@ HAND = [
     # (constant-initialised, so read-only data); TheSDL3Window and ApplicationHWnd are EngineContext fields; and
     # W3DDisplay's FPS history and debug statistics are its members.
     (RCONST, "", "WW3DState::Defaults", "the WW3D state an engine without one reads (RR2a-2): every field at its upstream initial value, constant-initialized and never written (a host makes its pages read-only, W3D_Protect_Render_Defaults)"),
-    (RPROC, "", "W3D_Protect_Render_Defaults(bool)::s_exitHandlerOnce", "registers, once per process, the exit handler that makes the render defaults writable again for their static destructors (RR2a-2)"),
-    (RPROC, "", "W3D_Protect_Render_Defaults(bool)::s_readOnly", "which of the two render defaults' pages are read-only now, so that a failed call puts back only the pages it changed (RR2b): the host's switch, set before any engine boots"),
-    (DEBUG, "", "file:WW3D2/dx8rendererdebugger\\.cpp", "WW3D renderer debugger (DX8RendererDebugger::Enabled is never set)"),
-    (RCONST, "", "VertexMaterialClass::Apply_Null()::default_settings", "the null material's settings, constant data"),
-    (RCONST, "", "DAZZLE_INI_FILENAME", "the dazzle INI's name, never reassigned"),
-    (RCONST, "", "re:(src|dst)BlendLUT", "blend-mode lookup tables, built at static initialization from constants and only read"),
     # RR2b made WW3D2's device-dependent subsystems and draw scratch per engine, all PER_ENGINE_STATICs (so gone
     # from the library; the slot indexes are rule:per-engine-static): the missing texture, the dynamic vertex and
     # index buffers with their cursors and statistics, the vertex material presets, the box render system, the point
@@ -215,25 +200,6 @@ HAND = [
     # (every draw rescales or recolours them), the texture loader's queues, free lists and switches, the thumbnail
     # managers and Vector3Randomizer's RNG (the same seed for every engine). LineGroupClass::Render's offsets and
     # the box vertices are locals; the unused _LineRenderer, temp_ptrs and _TempClipFlagBuffer are left out.
-    (RCONST, "", "_DynamicFVFInfo", "the dynamic vertex buffers' vertex format, built at static initialization"),
-    (RCONST, "", "re:PointGroupClass::_ScreenspaceVertexLocationSizeTable|GroundMultiplier[XY]", "constant vectors, initialized statically and only read"),
-    (RCONST, "", "re:missing_image_(palette|pixels)", "the missing texture's image, constant data"),
-    (RCONST, "", "re:MetalMapManagerClass::(_NormalTable|initialize_normal_table\\(\\)::_normal_table)", "the metal map normal table, built from constants on first use"),
-    (RCONST, "", "MaterialPassClass::EnablePerPolygonCulling", "never written: Enable_Per_Polygon_Culling has no caller"),
-    (RCONST, "", "re:WW3D(Z)?FormatToD3DFormatConversionArray", "format conversion table, constant data"),
-    (RCONST, "", "DynamicMeshModel::Render(RenderInfoClass&)::default_uv", "a const local static, (0, 0)"),
-    (RPROC, "", "DX8WebBrowser::hWnd", "the embedded web browser's window, a Linux stub never initialized"),
-    (RCONST, "", "re:_BoxVerts|_BoxFaces|_BoxVertexNormals|W3DVolumetricShadow::RenderMeshVolumeBounds\\(.*\\)::_Box(Verts|Faces)", "unit-box geometry (boxrobj.cpp's, and W3DVolumetricShadow::RenderMeshVolumeBounds'), initialized statically from constants and only read"),
-    (RCONST, "", "_BoxShader", "the box shader, a const copy of a preset made at static initialization (RR2b)"),
-    (RCONST, "", "re:DAZZLE_(LIST|INTENSITY_POW|SIZE_POW|AREA|SCALE_X|SCALE_Y|INTENSITY|DIRECTION_AREA|DIRECTION|TEXTURE|COLOR|TEST_COLOR|LENSFLARE)_STRING|HALO_(INTENSITY_POW|SCALE_X_STRING|SCALE_Y_STRING|INTENSITY_STRING|TEXTURE_STRING|COLOR_STRING)|FADEOUT_(START|END)_STRING|SIZE_OPTIMIZATION_LIMIT_STRING|HISTORY_WEIGHT_STRING|USE_CAMERA_TRANSLATION|BLINK_(PERIOD|ON_TIME)_STRING|LENSFLARE_(LIST|TEXTURE)_STRING|FLARE_(COUNT|LOCATION|SIZE|COLOR|UV)_STRING|RADIUS_STRING", "dazzle.ini key names, never reassigned"),
-    (RCONST, "", "re:default_dazzle_shader|default_halo_shader|vis_shader|debug_shader", "dazzle shaders, built once at static initialization (Init_Shaders, RR2b) and only read"),
-    (RCONST, "", "_DefaultVisibilityHandler", "the default dazzle visibility handler, a stateless object"),
-    (RCONST, "", "re:_LightingLODCutoff2?", "written only by LightEnvironmentClass::Set_Lighting_LOD_Cutoff, which Zero Hour never calls: the initial values for every engine"),
-    (RCONST, "", "MeshMatDescClass::NullShader", "the 'no shader' marker, built at static initialization and only compared against"),
-    (RPROC, "", "re:_(Foreground|Background)CriticalSection", "the texture loader's locks: process-wide, but no longer held across a synchronous load (RR2b): an engine's queues and tasks are its own, and only its thread touches them (no loader thread runs on Unix)"),
-    (RPROC, "", "_TextureLoadThread", "the background texture loader thread, which never runs on Unix (ThreadClass::Execute returns at once): nothing is loaded off the engine's thread"),
-    (RCONST, "", "ThumbnailManagerClass::CreateThumbnailIfNotFound", "never written: Create_Thumbnail_If_Not_Found has no caller"),
-    (RCONST, "", "SortingRendererClass::_EnableTriangleDraw", "never written: _Enable_Triangle_Draw has no caller"),
     # The terrain, tree, bib, bridge, road, status-circle, water and player-colour shaders (detailOpaqueShader,
     # detailAlphaShader, zFillAlphaShader, PlayerColorShader; one per TU) left the writable data at RR2a-2: they
     # are `static const`, and ShaderClass's constructor from bits is constexpr, so they are constant-initialised
@@ -245,17 +211,6 @@ HAND = [
     # smudge manager's statics are members of their owners; the shadow and height-map scratch, draw's letterbox time,
     # the infantry light cap and the shroud's debug texture are locals. The reverse format tables are constexpr. The
     # snow table, WWMath::Random_Float and the shatter pattern draw from per-engine generators (PER_ENGINE_STATICs).
-    (RCONST, "", "waveTypeInfo", "the water wave types' parameters, constant data"),
-    (RCONST, "", "re:SHADOW_(DECAL_)?(VERTEX|INDEX)_SIZE", "shadow buffer sizes, never changed"),
-    (RCONST, "", "guard variable for W3DProjectedShadow::updateTexture(Vector3&)::uvData", "the guard of a constant uv table (the table itself is not in the library's symbols)"),
-    (RCONST, "", "re:W3DVolumetricShadow::Update\\(\\)::originCompareVector|W3DProjectedShadowManager::(addShadow|createDecalShadow)\\(.*\\)::defaultDecalName", "constants built once under the static-init guard"),
-    (RPROC, "", "re:s_filtered(Resolutions|Dirty)", "the options menu's resolution list: " + UI),
-    (RCONST, "", "animationDisableOverride", "the ghost objects' material override, default-constructed and only pointed at"),
-    (RCONST, "", "(anonymous namespace)::LoadUnicodeFallbackFont(int, bool, char const*)::kFallbackUnicodeFonts", "font name list, constant data"),
-    (RPROC, "", "re:W3DRadar::(drawHeroIcon|drawEvents)\\(.*\\)::\\w+", "W3DRadar's draw (the radar window): " + UI),
-    (RPROC, "", "file:/W3DDevice/GameClient/GUI/", "W3D menus, control bar, gadgets and window borders: " + UI),
-    (RPROC, "", "mutex", "the W3D mouse cursor's critical section (W3DMouse.cpp; the name's other candidate site, WWLib's lzo.cpp, is not built): only an engine with a real mouse, " + UI),
-    (RPROC, "", "file:W3DMouse\\.cpp", "the W3D mouse cursor (its textures, models, images and animation thread): only an engine with a real mouse, " + UI),
     # ---------------------------------------------------------------------------------------------------
     # Render only (and UI only).
     # Drawable::s_modelLockCount was listed here as render-only, but while the one rendering engine's scene
@@ -266,10 +221,4 @@ HAND = [
     # Only device-only WW3D2 files: mesh, meshmdl, meshgeometry, rendobj, texture, ww3d, dx8renderer,
     # part_emt and part_buf are reached by a headless engine too (models, bones, emitters, asset loading),
     # so their statics are classified by name below or above.
-    (DEBUG, "", "statistics_requested", "DX8 mesh-renderer statistics request (debug display)"),
-    (DEBUG, "", "RenderObjPersistFactoryClass::Load(ChunkLoadClass&) const::count", "warning limiters (two in the function)"),
-    (CONST, "", "DX8TextureCategoryClass::m_gForceMultiply", "never written: SetForceMultiply has no caller"),
-    (CONST, "", "MeshClass::Legacy_Meshes_Fogged", "never written"),
-    (CONST, "", "ParticleBufferClass::LODMaxScreenSizes", "never written: Set_LOD_Max_Screen_Size has no caller"),
-    (CONST, "", "re:ParticleEmitterClass::(DebugDisable|DefaultRemoveOnComplete)", "never written: Disable_All_Emitters / Set_Default_Remove_On_Complete have no caller"),
 ]

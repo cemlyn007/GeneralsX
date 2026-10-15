@@ -65,8 +65,19 @@ enum
 ///////////////////////////////////////////////////////////////////////////////
 // PRIVATE DATA ///////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(Bool, bordersInit, FALSE);
+#define bordersInit RTS_ENGINE_GLOBAL_REF(bordersInit)
+#else
 static Bool bordersInit = FALSE;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(const Image*[NUM_BORDER_PIECES], borderPieces, { nullptr });
+#define borderPieces RTS_ENGINE_GLOBAL_REF(borderPieces)
+#else
 static const Image *borderPieces[NUM_BORDER_PIECES] = { nullptr };
+#endif
 
 // PUBLIC DATA ////////////////////////////////////////////////////////////////
 

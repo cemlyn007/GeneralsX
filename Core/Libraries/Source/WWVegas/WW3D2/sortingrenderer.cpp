@@ -52,7 +52,13 @@
 #include <list>
 
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_CLASS_STATIC_DEFINE(bool, SortingRendererClass, _EnableTriangleDraw, true);
+#define _EnableTriangleDraw RTS_ENGINE_GLOBAL_REF(_EnableTriangleDraw)
+#else
 bool SortingRendererClass::_EnableTriangleDraw=true;
+#endif
 #if RTS_ENGINE_CONTEXT
 // GeneralsX @feature cemlyn007 30/09/2026 Per engine: the sorting buffer sizes, which a render boot with
 // -incrementalAGPBuf shrinks (SetMinVertexBufferSize; PLAN-023 Phase 8, stage RR2b).

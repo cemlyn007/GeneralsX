@@ -72,7 +72,12 @@ FontCharsClass *LoadUnicodeFallbackFont(Int size, Bool bold, const char *base_na
 	// then known-good Unicode fonts. We iterate all candidates and pick the first that loads AND has a
 	// different family from the base font. This avoids returning a font that lacks Cyrillic coverage
 	// (e.g., Arial on macOS) when a better universal font like "Arial Unicode MS" is available.
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 Data no engine writes is constant (docs/EMBEDDING.md).
+	static const char * const kFallbackUnicodeFonts[] = {
+#else
 	static const char *kFallbackUnicodeFonts[] = {
+#endif
 		"Arial Unicode MS",
 		"Arial Unicode",
 		"Arial",

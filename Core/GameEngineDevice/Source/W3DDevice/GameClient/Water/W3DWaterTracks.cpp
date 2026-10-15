@@ -108,7 +108,12 @@ struct waveInfo
 	const char *m_waveTypeName;			//name of this wave type.
 };
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 Data no engine writes is constant (docs/EMBEDDING.md).
+const waveInfo waveTypeInfo[WaveTypeMax]=
+#else
 waveInfo waveTypeInfo[WaveTypeMax]=
+#endif
 {
 	{28.0f, 18.0f, 25.0f, 0.018f, 900, 0.01f, 0.18f, 1500, 0,"wave256.tga","Pond"},	//pond
 	{55.0f, 36.0f, 80.0f, 0.015f, 2000, 0.5f, 0.18f, 1000, 6267,"wave256.tga","Ocean"},	//ocean

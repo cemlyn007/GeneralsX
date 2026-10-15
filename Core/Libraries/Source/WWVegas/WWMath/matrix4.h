@@ -71,7 +71,12 @@ public:
 	/*
 	** Constructors
 	*/
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @refactor cemlyn007 15/10/2026 Trivial, so a value-initialised one is zero and constant (the render defaults, w3drenderstate.h).
+	Matrix4x4() = default;
+#else
 	Matrix4x4() {};
+#endif
 	Matrix4x4(const Matrix4x4 & m);
 
 	WWINLINE explicit Matrix4x4(bool identity);

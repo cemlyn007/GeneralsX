@@ -54,8 +54,19 @@ const float DIFFUSE_TO_AMBIENT_FRACTION = 1.0f;
 */
 // TheSuperHackers @fix xezon 13/03/2025 Set integer type as per the original.
 // TODO: Investigate if it should be a float.
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(int, _LightingLODCutoff, static_cast<int>(0.5f));
+#define _LightingLODCutoff RTS_ENGINE_GLOBAL_REF(_LightingLODCutoff)
+#else
 static int _LightingLODCutoff			= 0.5f;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(int, _LightingLODCutoff2, static_cast<int>(0.5f * 0.5f));
+#define _LightingLODCutoff2 RTS_ENGINE_GLOBAL_REF(_LightingLODCutoff2)
+#else
 static int _LightingLODCutoff2			= 0.5f * 0.5f;
+#endif
 
 
 /************************************************************************************************

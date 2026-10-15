@@ -47,7 +47,6 @@
 // GeneralsX @refactor cemlyn007 14/10/2026 The empty string is a read-only constant, and the temporary buffers are this
 // engine's (docs/EMBEDDING.md).
 const TCHAR		StringClass::m_NullChar					= 0;
-TCHAR * const	StringClass::m_EmptyString				= const_cast<TCHAR *>(&StringClass::m_NullChar);
 
 struct StringClass::TempPool
 {

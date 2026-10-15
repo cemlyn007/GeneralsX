@@ -129,7 +129,13 @@ static constexpr rts::PerEngineStatic<unsigned> MeshDebugIdCount_perEngine{};
 static unsigned MeshDebugIdCount;
 #endif
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_CLASS_STATIC_DEFINE(bool, MeshClass, Legacy_Meshes_Fogged, true);
+#define Legacy_Meshes_Fogged RTS_ENGINE_GLOBAL_REF(Legacy_Meshes_Fogged)
+#else
 bool MeshClass::Legacy_Meshes_Fogged = true;
+#endif
 #if RTS_ENGINE_CONTEXT
 // GeneralsX @feature cemlyn007 30/09/2026 Per engine: the decal polygon scratch, filled and consumed
 // within one decal or projection (PLAN-023 Phase 8, stage RR2b).

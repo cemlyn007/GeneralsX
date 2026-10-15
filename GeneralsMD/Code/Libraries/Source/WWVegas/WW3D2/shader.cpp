@@ -378,11 +378,18 @@ class Blend
 {
 public:
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @refactor cemlyn007 15/10/2026 constexpr, so the blend tables are constant-initialised and read-only.
+	constexpr Blend(D3DBLEND f, bool ab) : func(f), useAlpha(ab)
+	{
+	}
+#else
 	Blend(D3DBLEND f, bool ab)
 	{
 		func = f;
 		useAlpha = ab;
 	}
+#endif
 
 	D3DBLEND	func;
 	bool		useAlpha;

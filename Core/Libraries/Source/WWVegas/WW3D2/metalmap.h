@@ -56,6 +56,10 @@ class INIClass;
 #define METALMAP_SIZE 16
 #define METALMAP_SIZE_2 (METALMAP_SIZE * METALMAP_SIZE)
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+#define _NormalTable RTS_ENGINE_GLOBAL_REF(_NormalTable)
+#endif
 class MetalMapManagerClass {
 
 public:
@@ -88,7 +92,11 @@ public:
 private:
 
 	// 16 x 16 table of cameraspace normals for the environment maps
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_CLASS_STATIC(Vector3*, _NormalTable);
+#else
 	static Vector3 *	_NormalTable;
+#endif
 	void					initialize_normal_table();	// Utility function
 
 	// Utility function - shared CTor code
@@ -112,3 +120,6 @@ private:
 	// Use 16-bit metal maps or not
 	bool					Use16Bit;
 };
+#if RTS_ENGINE_CONTEXT
+#undef _NormalTable
+#endif

@@ -47,9 +47,19 @@
 //////////////////////////////////////////////////////////////////////
 
 // these statics are used for single-threaded use of the IntersectionClass ONLY
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_CLASS_STATIC_DEFINE(Vector3, IntersectionClass, _RayLocation, Vector3(0,0,0));
+RTS_ENGINE_CLASS_STATIC_DEFINE(Vector3, IntersectionClass, _RayDirection, Vector3(0,0,0));
+RTS_ENGINE_CLASS_STATIC_DEFINE(Vector3, IntersectionClass, _IntersectionNormal, Vector3(0,0,0));
+#define _RayLocation RTS_ENGINE_GLOBAL_REF(_RayLocation)
+#define _RayDirection RTS_ENGINE_GLOBAL_REF(_RayDirection)
+#define _IntersectionNormal RTS_ENGINE_GLOBAL_REF(_IntersectionNormal)
+#else
 Vector3 IntersectionClass::_RayLocation(0,0,0);
 Vector3 IntersectionClass::_RayDirection(0,0,0);
 Vector3 IntersectionClass::_IntersectionNormal(0,0,0);
+#endif
 
 
 bool IntersectionClass::Intersect_Screen_Point_RenderObject(float screen_x, float screen_y, const LayerClass &Layer, RenderObjClass *RObj, IntersectionResultClass *FinalResult)

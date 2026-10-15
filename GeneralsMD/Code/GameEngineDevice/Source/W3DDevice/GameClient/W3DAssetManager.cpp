@@ -793,7 +793,12 @@ RenderObjClass * W3DAssetManager::Create_Render_Obj(
 	if (proto == nullptr)
 	{
 		// GeneralsX @feature cemlyn007 28/09/2026 Atomic: any engine's thread may count a missing asset (PLAN-023 Phase 5b).
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+		RTS_ENGINE_STATIC(std::atomic<int>, warning_count, std::atomic<int>(0));
+#else
 		static std::atomic<int> warning_count(0);
+#endif
 		if (++warning_count <= 20)
 		{
 			WWDEBUG_SAY(("WARNING: Failed to create Render Object: %s",name));

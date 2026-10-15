@@ -112,17 +112,33 @@ void W3DPowerDraw( GameWindow *window, WinInstanceData *instData )
 {
 	//static const Image *endBarYellow = TheMappedImageCollection->findImageByName("PowerBarYellowEndR");
 	//static const Image *beginBarYellow = TheMappedImageCollection->findImageByName("PowerBarYellowEndL");
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(const Image*, centerBarYellow, TheMappedImageCollection->findImageByName("PowerPointY"));
+#else
 	static const Image *centerBarYellow = TheMappedImageCollection->findImageByName("PowerPointY");
+#endif
 	//static const Image *endBarRed = TheMappedImageCollection->findImageByName("PowerBarRedEndR");
 	//static const Image *beginBarRed = TheMappedImageCollection->findImageByName("PowerBarRedEndL");
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(const Image*, centerBarRed, TheMappedImageCollection->findImageByName("PowerPointR"));
+#else
 	static const Image *centerBarRed = TheMappedImageCollection->findImageByName("PowerPointR");
+#endif
 	//static const Image *endBarGreen = TheMappedImageCollection->findImageByName("PowerBarGreenEndR");
 	//static const Image *beginBarGreen = TheMappedImageCollection->findImageByName("PowerBarGreenEndL");
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(const Image*, centerBarGreen, TheMappedImageCollection->findImageByName("PowerPointG"));
+#else
 	static const Image *centerBarGreen = TheMappedImageCollection->findImageByName("PowerPointG");
+#endif
 	//const Image *endBar = nullptr;
 	//const Image *beginBar = nullptr;
 	const Image *centerBar = nullptr;
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(const Image*, slider, TheMappedImageCollection->findImageByName("PowerBarSlider"));
+#else
 	static const Image *slider = TheMappedImageCollection->findImageByName("PowerBarSlider");
+#endif
 	Player* player = TheControlBar->getCurrentlyViewedPlayer();
 
 	if(!player || !TheGlobalData)
@@ -138,7 +154,11 @@ void W3DPowerDraw( GameWindow *window, WinInstanceData *instData )
 	window->winGetScreenPosition( &pos.x, &pos.y );
 	window->winGetSize( &size.x, &size.y );
 
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(Real, pixelsPerInterval, size.x / TheGlobalData->m_powerBarIntervals);
+#else
 	static Real pixelsPerInterval = size.x / TheGlobalData->m_powerBarIntervals;
+#endif
 	Int delta = TheGlobalData->m_powerBarYellowRange;
 
 	if((consumption > energy->getProduction() - delta) && (consumption <= energy->getProduction()))
@@ -269,19 +289,59 @@ void W3DPowerDraw( GameWindow *window, WinInstanceData *instData )
 
 void W3DPowerDrawA( GameWindow *window, WinInstanceData *instData )
 {
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(const Image*, endBarYellow, TheMappedImageCollection->findImageByName("PowerBarYellowEndR"));
+#else
 	static const Image *endBarYellow = TheMappedImageCollection->findImageByName("PowerBarYellowEndR");
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(const Image*, beginBarYellow, TheMappedImageCollection->findImageByName("PowerBarYellowEndL"));
+#else
 	static const Image *beginBarYellow = TheMappedImageCollection->findImageByName("PowerBarYellowEndL");
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(const Image*, centerBarYellow, TheMappedImageCollection->findImageByName("PowerBarYellow"));
+#else
 	static const Image *centerBarYellow = TheMappedImageCollection->findImageByName("PowerBarYellow");
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(const Image*, endBarRed, TheMappedImageCollection->findImageByName("PowerBarRedEndR"));
+#else
 	static const Image *endBarRed = TheMappedImageCollection->findImageByName("PowerBarRedEndR");
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(const Image*, beginBarRed, TheMappedImageCollection->findImageByName("PowerBarRedEndL"));
+#else
 	static const Image *beginBarRed = TheMappedImageCollection->findImageByName("PowerBarRedEndL");
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(const Image*, centerBarRed, TheMappedImageCollection->findImageByName("PowerBarRed"));
+#else
 	static const Image *centerBarRed = TheMappedImageCollection->findImageByName("PowerBarRed");
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(const Image*, endBarGreen, TheMappedImageCollection->findImageByName("PowerBarGreenEndR"));
+#else
 	static const Image *endBarGreen = TheMappedImageCollection->findImageByName("PowerBarGreenEndR");
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(const Image*, beginBarGreen, TheMappedImageCollection->findImageByName("PowerBarGreenEndL"));
+#else
 	static const Image *beginBarGreen = TheMappedImageCollection->findImageByName("PowerBarGreenEndL");
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(const Image*, centerBarGreen, TheMappedImageCollection->findImageByName("PowerBarGreen"));
+#else
 	static const Image *centerBarGreen = TheMappedImageCollection->findImageByName("PowerBarGreen");
+#endif
 	const Image *endBar = nullptr;
 	const Image *beginBar = nullptr;
 	const Image *centerBar = nullptr;
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(const Image*, slider, TheMappedImageCollection->findImageByName("PowerBarSlider"));
+#else
 	static const Image *slider = TheMappedImageCollection->findImageByName("PowerBarSlider");
+#endif
 	Player* player = TheControlBar->getCurrentlyViewedPlayer();
 
 	if(!player || !TheGlobalData)
@@ -297,7 +357,11 @@ void W3DPowerDrawA( GameWindow *window, WinInstanceData *instData )
 	window->winGetScreenPosition( &pos.x, &pos.y );
 	window->winGetSize( &size.x, &size.y );
 
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(Real, pixelsPerInterval, size.x / TheGlobalData->m_powerBarIntervals);
+#else
 	static Real pixelsPerInterval = size.x / TheGlobalData->m_powerBarIntervals;
+#endif
 	Int delta = TheGlobalData->m_powerBarYellowRange;
 
 	if((consumption > energy->getProduction() - delta) && (consumption <= energy->getProduction()))
@@ -474,9 +538,21 @@ void W3DCommandBarGenExpDraw( GameWindow *window, WinInstanceData *instData )
 	if (!player)
 		return;
 
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(const Image*, endBar, TheMappedImageCollection->findImageByName("GenExpBarTop1"));
+#else
 	static const Image *endBar = TheMappedImageCollection->findImageByName("GenExpBarTop1");
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(const Image*, beginBar, TheMappedImageCollection->findImageByName("GenExpBarBottom1"));
+#else
 	static const Image *beginBar = TheMappedImageCollection->findImageByName("GenExpBarBottom1");
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(const Image*, centerBar, TheMappedImageCollection->findImageByName("GenExpBar1"));
+#else
 	static const Image *centerBar = TheMappedImageCollection->findImageByName("GenExpBar1");
+#endif
 	Int progress = 0;
 	Int skillPointsRequired = player->getSkillPointsLevelUp() - player->getSkillPointsLevelDown();
 
@@ -632,7 +708,11 @@ void W3DCommandBarBackgroundDraw( GameWindow *window, WinInstanceData *instData 
 	static NameKeyType winNamekey	= TheNameKeyGenerator->nameToKey( "ControlBar.wnd:BackgroundMarker" );
 #endif
 	GameWindow *win =  TheWindowManager->winGetWindowFromId(nullptr,winNamekey);
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(ICoord2D, basePos);
+#else
 	static ICoord2D basePos;
+#endif
 	if(!win)
 	{
 		return;
@@ -661,7 +741,11 @@ void W3DCommandBarForegroundDraw( GameWindow *window, WinInstanceData *instData 
 	static NameKeyType winNamekey	= TheNameKeyGenerator->nameToKey( "ControlBar.wnd:BackgroundMarker" );
 #endif
 	GameWindow *win = TheWindowManager->winGetWindowFromId(nullptr,winNamekey);
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(ICoord2D, basePos);
+#else
 	static ICoord2D basePos;
+#endif
 	if(!win)
 	{
 		return;
@@ -912,9 +996,21 @@ void drawSkinnyBorder( Int x, Int y, Int width, Int height)
 void W3DCommandBarHelpPopupDraw( GameWindow *window, WinInstanceData *instData )
 {
 
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(const Image*, endBar, TheMappedImageCollection->findImageByName("Helpbox-top"));
+#else
 	static const Image *endBar = TheMappedImageCollection->findImageByName("Helpbox-top");
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(const Image*, beginBar, TheMappedImageCollection->findImageByName("Helpbox-bottom"));
+#else
 	static const Image *beginBar = TheMappedImageCollection->findImageByName("Helpbox-bottom");
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(const Image*, centerBar, TheMappedImageCollection->findImageByName("Helpbox-middle"));
+#else
 	static const Image *centerBar = TheMappedImageCollection->findImageByName("Helpbox-middle");
+#endif
 
 	ICoord2D pos, size;
 	window->winGetScreenPosition( &pos.x, &pos.y );

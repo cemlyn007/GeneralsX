@@ -81,7 +81,13 @@ protected:
 
 //Dummy material override which we assign to all ghost objects to disable their
 //texture animation.
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(RenderObjClass::Material_Override, animationDisableOverride);
+#define animationDisableOverride RTS_ENGINE_GLOBAL_REF(animationDisableOverride)
+#else
 static RenderObjClass::Material_Override animationDisableOverride;
+#endif
 
 //Helper function used to disable all UV mapper animations on a given model.
 //Also use this pass to disable muzzle effects.

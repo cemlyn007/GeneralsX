@@ -141,7 +141,13 @@
 /*
 ** Loader Instance
 */
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(HLodLoaderClass, _HLodLoader);
+#define _HLodLoader RTS_ENGINE_GLOBAL_REF(_HLodLoader)
+#else
 HLodLoaderClass			_HLodLoader;
+#endif
 
 
 /**

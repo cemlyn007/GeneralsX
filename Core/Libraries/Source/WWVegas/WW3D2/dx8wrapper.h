@@ -105,7 +105,8 @@ class DX8Caps;
 
 struct DX8FrameStatistics
 {
-	DX8FrameStatistics() :
+	// GeneralsX @refactor cemlyn007 15/10/2026 constexpr, for the render defaults (w3drenderstate.h).
+	constexpr DX8FrameStatistics() :
 		matrix_changes(0),
 		material_changes(0),
 		vertex_buffer_changes(0),
@@ -247,8 +248,20 @@ struct RenderStateStruct
 	IndexBufferClass* index_buffer;
 	unsigned short index_base_offset;
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @refactor cemlyn007 15/10/2026 constexpr, every member initialised, for the render defaults
+	// (w3drenderstate.h). A new one is what a value-initialised W3DRenderState held before: all zero but the shader.
+	constexpr RenderStateStruct()
+		: shader(), material(nullptr), Textures{}, Lights{}, LightEnable{}, world(), view(), vertex_buffer_types{},
+		  index_buffer_type(0), vba_offset(0), vba_count(0), iba_offset(0), vertex_buffers{}, index_buffer(nullptr),
+		  index_base_offset(0)
+	{
+	}
+	constexpr ~RenderStateStruct();
+#else
 	RenderStateStruct();
 	~RenderStateStruct();
+#endif
 
 	RenderStateStruct& operator= (const RenderStateStruct& src);
 };
@@ -1518,6 +1531,7 @@ WWINLINE void DX8Wrapper::Release_Render_State()
 }
 
 
+#if !RTS_ENGINE_CONTEXT
 WWINLINE RenderStateStruct::RenderStateStruct()
 	:
 	material(0),
@@ -1528,8 +1542,13 @@ WWINLINE RenderStateStruct::RenderStateStruct()
 	for (i=0;i<MAX_TEXTURE_STAGES;++i) Textures[i]=0;
   //lightsHash = (unsigned)this;
 }
+#endif
 
+#if RTS_ENGINE_CONTEXT
+constexpr RenderStateStruct::~RenderStateStruct()
+#else
 WWINLINE RenderStateStruct::~RenderStateStruct()
+#endif
 {
 	unsigned i;
 	REF_PTR_RELEASE(material);

@@ -73,6 +73,10 @@ A global that one of an engine's objects installs itself in is per engine
 too, so each engine installs its own: each engine's `W3DFileSystem` sets that
 engine's `_TheFileFactory`, as upstream does in its one engine.
 
+Each engine holds its own reference to the D3D8 library: `DX8Wrapper::Init`
+loads it and `DX8Wrapper::Shutdown` frees it. The host holds a reference of its
+own while any render engine lives, so DXVK stays loaded between engines.
+
 ## Name keys
 
 Each engine interns names in a `NameKeyGenerator` of its own, made by
@@ -100,6 +104,14 @@ C++20's `std::bitset` sets a bit at compile time only below the 64th, so a
 constant mask is constant-initialised only while all its bits lie there. A
 constant mask with a higher bit (`KINDOFMASK_FS`, the weapon-slot model
 conditions) is a per-engine static instead, built on its first use.
+
+The default render states, `W3DRenderState::Defaults` and
+`WW3DState::Defaults`, are `constexpr` constants. An engine that does not
+render reads them in place of a render state of its own. The vectors, strings,
+math types and shaders inside them construct and destroy an empty one at
+compile time, so the defaults lie in read-only storage: `.rodata`, or
+`.data.rel.ro` where they hold a vtable pointer, which the loader makes
+read-only before any code runs. Nothing can write them.
 
 ## The interfaces
 

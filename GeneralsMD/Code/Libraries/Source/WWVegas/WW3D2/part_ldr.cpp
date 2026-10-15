@@ -54,10 +54,20 @@
 //
 //	Global variable initialization
 //
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(ParticleEmitterLoaderClass, _ParticleEmitterLoader);
+#define _ParticleEmitterLoader RTS_ENGINE_GLOBAL_REF(_ParticleEmitterLoader)
+#else
 ParticleEmitterLoaderClass	_ParticleEmitterLoader;
+#endif
 
 //	This array is declared in "W3D_File.h"
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 Data no engine writes is constant (docs/EMBEDDING.md).
+const char * const EMITTER_TYPE_NAMES[EMITTER_TYPEID_COUNT] =
+#else
 const char *EMITTER_TYPE_NAMES[EMITTER_TYPEID_COUNT] =
+#endif
 {
 	"Default"
 };

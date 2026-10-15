@@ -56,6 +56,10 @@ struct IDirect3DDevice8;
 **
 ** DX8 interface wrapper class.  This encapsulates the BrowserEngine interface.
 */
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+#define hWnd RTS_ENGINE_GLOBAL_REF(hWnd)
+#endif
 class DX8WebBrowser
 {
 public:
@@ -84,7 +88,14 @@ public:
 
 private:
 	// The window handle of the application.  This is initialized by Initialize().
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_CLASS_STATIC(HWND, hWnd);
+#else
 	static				HWND						hWnd;
+#endif
 };
 
+#if RTS_ENGINE_CONTEXT
+#undef hWnd
+#endif
 #endif
