@@ -268,6 +268,8 @@ protected:
 	rts::ResourceLedger *m_ledger = nullptr;
 	std::optional<rts::ResourceLedger::Id> m_alcDeviceRecord;
 	std::optional<rts::ResourceLedger::Id> m_alcContextRecord;
+	// GeneralsX @feature cemlyn007 15/10/2026 The engine whose threads the context is bound to (see openDevice).
+	rts::EngineContext *m_threadBoundEngine = nullptr;
 #endif
 };
 
