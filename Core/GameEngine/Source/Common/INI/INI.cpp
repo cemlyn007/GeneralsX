@@ -64,6 +64,10 @@
 #include "strtok_r.h"
 #include "Common/FatalEngineError.h"
 #include "Common/EngineFault.h"
+#if RTS_ENGINE_CONTEXT
+#include <string>
+#include "Common/InvalidInputData.h"
+#endif
 
 #if __cplusplus >= 201611L && !defined(__APPLE__)
 #define USE_STD_FROM_CHARS_PARSING 1
@@ -397,6 +401,49 @@ static INIFieldParseProc findFieldParse(const FieldParse* parseTable, const char
 	}
 }
 
+#if RTS_ENGINE_CONTEXT
+//-------------------------------------------------------------------------------------------------
+/** GeneralsX @feature cemlyn007 15/10/2026 Inside a handler only: throws an InvalidInputData naming `filename` for
+	* what the INI parser throws on bad data (an INIException, an INI error code or another error code but running
+	* out of memory), and returns for anything else, the sink's unwind included. */
+//-------------------------------------------------------------------------------------------------
+static void rethrowInvalidINIData( const AsciiString& filename, UnsignedInt lineNum )
+{
+	if (rts::faultRaised())
+		return;
+	std::string reason;
+	try
+	{
+		throw;
+	}
+	catch (const rts::InvalidInputData&)
+	{
+		return;
+	}
+	catch (const INIException& error)
+	{
+		reason = error.mFailureMessage != nullptr ? error.mFailureMessage : "invalid data";
+		while (!reason.empty() && (reason.back() == '\n' || reason.back() == '\r'))
+			reason.pop_back();
+	}
+	catch (ErrorCode code)
+	{
+		if (code == ERROR_OUT_OF_MEMORY)
+			return;
+		reason = "invalid data at line " + std::to_string(lineNum);
+	}
+	catch (decltype(INI_INVALID_DATA))
+	{
+		reason = "invalid data at line " + std::to_string(lineNum);
+	}
+	catch (...)
+	{
+		return;
+	}
+	throw rts::InvalidInputData(filename.str(), reason);
+}
+#endif
+
 //-------------------------------------------------------------------------------------------------
 /** Load and parse an INI file */
 //-------------------------------------------------------------------------------------------------
@@ -477,7 +524,13 @@ UnsignedInt INI::load( AsciiString filename, INILoadType loadType, Xfer *pXfer )
 				{
 					DEBUG_CRASH( ("[LINE: %d - FILE: '%s'] Unknown block '%s'",
 														 getLineNum(), getFilename().str(), token ) );
+#if RTS_ENGINE_CONTEXT
+					// GeneralsX @feature cemlyn007 15/10/2026 Bad data in a game file is the host's input (Common/InvalidInputData.h)
+					throw rts::InvalidInputData(filename.str(),
+						"unknown block '" + std::string(token) + "' at line " + std::to_string(getLineNum()));
+#else
 					throw INI_UNKNOWN_TOKEN;
+#endif
 				}
 
 			}
@@ -490,8 +543,14 @@ UnsignedInt INI::load( AsciiString filename, INILoadType loadType, Xfer *pXfer )
 	{
 		fprintf(stderr, "[INI] ERROR in load('%s') - exception caught\n", filename.str());
 		fflush(stderr);
+		const UnsignedInt lineNum = getLineNum();
 		unPrepFile();
 
+#if RTS_ENGINE_CONTEXT
+		// GeneralsX @feature cemlyn007 15/10/2026 What the INI parser throws on bad data is the host's input, an
+		// InvalidInputData naming the file, not a fault (Common/InvalidInputData.h). Everything else propagates.
+		rethrowInvalidINIData(filename, lineNum);
+#endif
 		// propagate the exception.
 		throw;
 	}

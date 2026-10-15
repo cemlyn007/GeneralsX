@@ -68,6 +68,10 @@
 #include "Lib/PathUtil.h"
 #include "Common/FatalEngineError.h"
 #include "Common/EngineFault.h"
+#if RTS_ENGINE_CONTEXT
+#include <string>
+#include "Common/InvalidInputData.h"
+#endif
 
 
 // PUBLIC DATA ////////////////////////////////////////////////////////////////////////////////////
@@ -682,26 +686,26 @@ SaveResult GameState::missionSave()
 
 #if RTS_ENGINE_CONTEXT
 // ------------------------------------------------------------------------------------------------
-/** GeneralsX @feature cemlyn007 15/10/2026 Inside a handler only: whether the exception being handled is one a save's
-	* readers throw on bad data, an xfer status or a save code. */
+/** GeneralsX @feature cemlyn007 15/10/2026 Inside a handler only: what is wrong with the save's data, if the exception
+	* being handled is one a save's readers throw on bad data (an xfer status or a save code), and empty otherwise. */
 // ------------------------------------------------------------------------------------------------
-static Bool caughtInvalidSaveData()
+static std::string caughtInvalidSaveData()
 {
 	try
 	{
 		throw;
 	}
-	catch (XferStatus)
+	catch (XferStatus status)
 	{
-		return TRUE;
+		return "the save's data is invalid (xfer status " + std::to_string(static_cast<Int>(status)) + ")";
 	}
-	catch (SaveCode)
+	catch (SaveCode code)
 	{
-		return TRUE;
+		return "the save's data is invalid (save code " + std::to_string(static_cast<Int>(code)) + ")";
 	}
 	catch (...)
 	{
-		return FALSE;
+		return std::string();
 	}
 }
 #endif
@@ -746,6 +750,9 @@ SaveCode GameState::loadGame( AvailableGameInfo gameInfo )
 
 	// load the save data
 	Bool error = FALSE;
+#if RTS_ENGINE_CONTEXT
+	std::string invalidData;
+#endif
 	try
 	{
 
@@ -782,7 +789,8 @@ SaveCode GameState::loadGame( AvailableGameInfo gameInfo )
 #if RTS_ENGINE_CONTEXT
 		// GeneralsX @feature cemlyn007 15/10/2026 The catch-all at the top of a load: what the save's readers throw on
 		// bad data is invalid data, and anything else a fault (Common/EngineFault.h).
-		if (!caughtInvalidSaveData())
+		invalidData = caughtInvalidSaveData();
+		if (invalidData.empty())
 			rts::faultFromCaughtException("Uncaught Exception during GameState::loadGame");
 #endif
 		error = TRUE;
@@ -796,6 +804,13 @@ SaveCode GameState::loadGame( AvailableGameInfo gameInfo )
 
 	try
 	{
+#if RTS_ENGINE_CONTEXT
+		// GeneralsX @feature cemlyn007 15/10/2026 A save whose data failed to load is not post-processed: the fix-ups
+		// would run over half-loaded objects, and the load ends in an InvalidInputData with no game loaded.
+		if (error == TRUE)
+			m_snapshotPostProcessList.clear();
+		else
+#endif
 		// do the post-process from a save game load
 		gameStatePostProcessLoad();
 	}
@@ -811,7 +826,8 @@ SaveCode GameState::loadGame( AvailableGameInfo gameInfo )
 #if RTS_ENGINE_CONTEXT
 		// GeneralsX @feature cemlyn007 15/10/2026 The catch-all at the top of a load: what the save's readers throw on
 		// bad data is invalid data, and anything else a fault (Common/EngineFault.h).
-		if (!caughtInvalidSaveData())
+		invalidData = caughtInvalidSaveData();
+		if (invalidData.empty())
 			rts::faultFromCaughtException("Uncaught Exception during GameState::loadGame");
 #endif
 		error = TRUE;
@@ -821,11 +837,21 @@ SaveCode GameState::loadGame( AvailableGameInfo gameInfo )
 	if( error == TRUE )
 	{
 		// clear it out, again
+#if RTS_ENGINE_CONTEXT
+		// GeneralsX @feature cemlyn007 15/10/2026 A save with invalid data is the host's bad input: the engine is left with
+		// no game loaded and the error names the save (Common/InvalidInputData.h). An engine whose logic is not up yet
+		// has no game to clear.
+		if (TheGameLogic != nullptr && TheGameLogic->isInGame())
+			TheGameLogic->clearGameData( FALSE );
+		TheGameEngine->reset();
+		throw rts::InvalidInputData(filepath.str(), invalidData);
+#else
 		if (TheGameLogic->isInGame())
 			TheGameLogic->clearGameData( FALSE );
 		TheGameEngine->reset();
 
 		return SC_INVALID_DATA;	// you can't use a naked "throw" outside of a catch statement!
+#endif
 
 	}
 

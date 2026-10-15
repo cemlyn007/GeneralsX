@@ -70,6 +70,7 @@
 #include "Common/Errors.h"
 #include "Common/INI.h"
 #include "Common/INIException.h"
+#include "Common/InvalidInputData.h"
 #endif
 // GeneralsX @bugfix cemlyn007 02/10/2026 Guard <atomic> the same way WWLib/mutex.h does, so the
 // vc6/vc6-debug/vc6-profile presets (which still build this shared Core file) keep working.
@@ -943,6 +944,14 @@ void rts::faultFromCaughtException(const char* uncaughtReason)
 	try
 	{
 		throw;
+	}
+	catch (const rts::InvalidInputData& error)
+	{
+		// GeneralsX @feature cemlyn007 15/10/2026 The host's bad input is an ordinary error, never a fault
+		// (Common/InvalidInputData.h); only where it cannot unwind does it become one.
+		if (!faultCannotUnwind())
+			throw;
+		reason = error.what();
 	}
 	catch (const INIException& error)
 	{
