@@ -34,6 +34,9 @@
 #include "Common/GameMemory.h"
 #include "Common/LocalFileSystem.h"
 #include "Common/Registry.h"
+#if RTS_ENGINE_CONTEXT
+#include "Common/EngineFiles.h"
+#endif
 
 #include "Win32Device/Common/Win32BIGFile.h"
 #include "Win32Device/Common/Win32BIGFileSystem.h"
@@ -125,6 +128,9 @@ static void trimRight(char* text)
 	}
 }
 
+// GeneralsX @refactor cemlyn007 15/10/2026 Not with RTS_ENGINE_CONTEXT: the engine's assets are under its own asset root
+// (EmbeddingConfig::assetRoot), not found from the environment, an INI beside the executable or the working directory.
+#if !RTS_ENGINE_CONTEXT
 static Bool extractIniValue(const char* iniPath, const char* sectionName, const char* keyName, AsciiString& value)
 {
 	FILE* fp = fopen(iniPath, "r");
@@ -291,6 +297,7 @@ static Bool sanitizeConfiguredPath(const char* rawValue, AsciiString& sanitizedP
 
 	return sanitizedPath.isNotEmpty();
 }
+#endif
 
 // GeneralsX @bugfix UnicodeApocalypse 11/09/2026 allowPatchPrecedence must be FALSE for fallback
 // roots so their Patch*.big can't outrank content already loaded from the primary root.
@@ -310,6 +317,9 @@ static Bool tryLoadBigFiles(TBigFileSystem* fileSystem, const AsciiString& direc
 	return loaded;
 }
 
+// GeneralsX @refactor cemlyn007 15/10/2026 Not with RTS_ENGINE_CONTEXT: the engine's assets are under its own asset root
+// (EmbeddingConfig::assetRoot), not found from the environment, an INI beside the executable or the working directory.
+#if !RTS_ENGINE_CONTEXT
 static Bool tryResolveFromIni(const AsciiString& exeDirectory, const char* keyName, AsciiString& resolvedPath)
 {
 	static const char* iniCandidates[] = {
@@ -502,6 +512,7 @@ static void loadBaseGeneralsAssetsForZH(TBigFileSystem* fileSystem, const AsciiS
 	}
 }
 #endif
+#endif
 
 }
 
@@ -517,6 +528,19 @@ void Win32BIGFileSystem::init() {
 		return;
 	}
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 15/10/2026 The engine's archives are the ones in its asset root, and for Zero Hour the base
+	// game's in the root's ZH_Generals directory, as the Steam install lays them out (Common/EngineFiles.h).
+	const AsciiString assetRoot(rts::engineAssetRoot().string().c_str());
+	const Bool loadedPrimaryAssets = tryLoadBigFiles(this, assetRoot, "asset-root");
+	DEBUG_ASSERTCRASH(loadedPrimaryAssets, ("No BIG files were loaded for the primary game assets."));
+	(void)loadedPrimaryAssets;
+#if RTS_ZEROHOUR
+	AsciiString baseGeneralsDirectory = assetRoot;
+	baseGeneralsDirectory.concat("/ZH_Generals");
+	tryLoadBigFiles(this, baseGeneralsDirectory, "asset-root-generals", FALSE, FALSE);
+#endif
+#else
 	AsciiString primaryAssetsDirectory;
 	const Bool loadedPrimaryAssets = loadPrimaryGameAssets(this, &primaryAssetsDirectory);
 	DEBUG_ASSERTCRASH(loadedPrimaryAssets, ("No BIG files were loaded for the primary game assets."));
@@ -524,6 +548,7 @@ void Win32BIGFileSystem::init() {
 
 #if RTS_ZEROHOUR
     loadBaseGeneralsAssetsForZH(this, primaryAssetsDirectory);
+#endif
 #endif
 }
 

@@ -402,23 +402,23 @@ class ScopeInvariants(unittest.TestCase):
         self.assertLess(grown, 100 * 1024, f"the heap grew by {grown} bytes over 1000 threads")
 
 
-# GeneralsX @refactor cemlyn007 15/10/2026 The asset root and the guard that settles it are per engine
-# (baseline-engine-specs task 4.9): rlgenerals' //third_party/generalsx/tests:asset_root_test checks that each engine
-# settles its own, that one engine refuses a second root, and that a root with no engine current is refused.
+# GeneralsX @refactor cemlyn007 15/10/2026 The asset root is the engine's EmbeddingConfig::assetRoot (baseline-engine-specs
+# task 5.3): rlgenerals' //third_party/generalsx/tests:rooted_files_test checks that each engine reads its own root.
 
 
-class BootPassesTheRootUnconditionally(unittest.TestCase):
-    def test_the_big_file_system_settles_the_root_even_when_empty(self):
-        # StdBIGFileSystem::init is the call site that makes the usual first boot (BIGs found through the current
-        # directory, no root resolved) settle the engine's root. It cannot be run without a game install, so
-        # this checks the source: under RTS_ENGINE_CONTEXT the call must not sit behind an isNotEmpty() guard.
+class BootLoadsTheEnginesOwnAssetRoot(unittest.TestCase):
+    def test_the_big_file_system_loads_the_engines_asset_root(self):
+        # StdBIGFileSystem::init cannot be run here without a game install, so this checks the source: under
+        # RTS_ENGINE_CONTEXT it loads the archives of the engine's own asset root and searches nowhere else.
         source = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "Core", "GameEngineDevice",
                               "Source", "StdDevice", "Common", "StdBIGFileSystem.cpp")
         with open(source) as f:
             text = f.read()
-        branch = text.split("#if RTS_ENGINE_CONTEXT", 1)[1].split("#else", 1)[0]
-        self.assertIn("setAssetRootPath(primaryAssetsDirectory)", branch)
-        self.assertNotIn("isNotEmpty", branch)
+        init = text.split("void StdBIGFileSystem::init()", 1)[1]
+        branch = init.split("#if RTS_ENGINE_CONTEXT", 1)[1].split("#else", 1)[0]
+        self.assertIn("rts::engineAssetRoot()", branch)
+        self.assertNotIn("setAssetRootPath", branch)
+        self.assertNotIn("getenv", branch)
 
 
 def find_library_path():

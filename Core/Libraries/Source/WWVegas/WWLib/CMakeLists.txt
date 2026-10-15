@@ -197,4 +197,6 @@ target_precompile_headers(core_wwlib PRIVATE
 target_link_libraries(core_wwlib PRIVATE
     core_wwcommon
     corei_always
+    # GeneralsX @feature cemlyn007 15/10/2026 Its files are opened through the engine's file layer (Common/EngineFiles.h)
+    corei_gameengine_include
 )

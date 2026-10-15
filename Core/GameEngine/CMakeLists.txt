@@ -37,6 +37,7 @@ set(GAMEENGINE_SRC
     Include/Common/DynamicAudioEventInfo.h
     Include/Common/EngineContext.h
     Include/Common/EngineContextFields.inl
+    Include/Common/EngineFiles.h
     Include/Common/EngineSingletonMacros.h
     Include/Common/EngineSingletons.inl
 #    Include/Common/encrypt.h
@@ -670,6 +671,7 @@ set(GAMEENGINE_SRC
 #    Source/Common/System/Geometry.cpp
 #    Source/Common/System/KindOf.cpp
 #    Source/Common/System/List.cpp
+    Source/Common/System/EngineFiles.cpp
     Source/Common/System/LocalFile.cpp
     Source/Common/System/LocalFileSystem.cpp
     Source/Common/System/MiniDumper.cpp

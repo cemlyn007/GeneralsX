@@ -60,6 +60,20 @@
 #include	<errno.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 15/10/2026 A raw file is opened, removed and inspected through the engine's file layer, which
+// roots its name and records the open file in the engine's ResourceLedger (Common/EngineFiles.h).
+#include "Common/EngineFiles.h"
+#define RAWFILE_OPEN(name, mode) rts::openEngineFile(name, mode)
+#define RAWFILE_CLOSE(handle) rts::closeEngineFile(handle)
+#define RAWFILE_REMOVE(name) rts::removeEngineFile(name)
+#define RAWFILE_PATH(name) rts::resolveEnginePath(name).c_str()
+#else
+#define RAWFILE_OPEN(name, mode) fopen(name, mode)
+#define RAWFILE_CLOSE(handle) fclose(handle)
+#define RAWFILE_REMOVE(name) unlink(name)
+#define RAWFILE_PATH(name) (name)
+#endif
 
 
 #if 0		//#ifdef NEVER    (gth) the MAX sdk must #define NEVER! yikes :-)
@@ -431,19 +445,19 @@ int RawFileClass::Open(int rights)
 				break;
 
 			case READ:
-				Handle = fopen(Filename, "rb");
+				Handle = RAWFILE_OPEN(Filename, "rb");
 				break;
 
 			case WRITE:
-				Handle = fopen(Filename, "wb");
+				Handle = RAWFILE_OPEN(Filename, "wb");
 				break;
 
 			case READ|WRITE:
 				// First try to open an existing file in read/write mode.
-				Handle = fopen(Filename, "rb+");
+				Handle = RAWFILE_OPEN(Filename, "rb+");
 				// If that fails, try to create a new file in read/write mode.
 				if(Handle == NULL_HANDLE) {
-					Handle = fopen(Filename, "wb+");
+					Handle = RAWFILE_OPEN(Filename, "wb+");
 				}
 				break;
 		}
@@ -517,7 +531,7 @@ bool RawFileClass::Is_Available(int forced)
 	*/
 	for (;;) {
 
-		Handle=fopen(Filename,"r");
+		Handle=RAWFILE_OPEN(Filename, "r");
 
 		if (Handle == NULL_HANDLE) {
 			return(false);
@@ -529,7 +543,7 @@ bool RawFileClass::Is_Available(int forced)
 	**	Since the file could be opened, then close it and return that the file exists.
 	*/
 	int closeok;
-	closeok=((fclose(Handle)==0)?true:false);
+	closeok=((RAWFILE_CLOSE(Handle)==0)?true:false);
 	if (! closeok) {
 		Error(errno, false, Filename);
 	}
@@ -565,7 +579,7 @@ void RawFileClass::Close()
 		**	Try to close the file. If there was an error (who knows what that could be), then
 		**	call the error routine.
 		*/
-		int closeok=(fclose(Handle)==0)?true:false;
+		int closeok=(RAWFILE_CLOSE(Handle)==0)?true:false;
 
 		if (!closeok) {
 			Error(errno, false, Filename);
@@ -956,7 +970,7 @@ int RawFileClass::Delete()
 			return(false);
 		}
 
-		int deleteok=(unlink(Filename)==0)?true:false;
+		int deleteok=(RAWFILE_REMOVE(Filename)==0)?true:false;
 
 		if (! deleteok) {
 			Error(errno, false, Filename);
@@ -996,14 +1010,14 @@ unsigned long RawFileClass::Get_Date_Time()
 	if (Is_Open()) {
 		// If file is open proceed normally
 		struct stat statbuf;
-		stat(Filename, &statbuf);
+		stat(RAWFILE_PATH(Filename), &statbuf);
 		retval = statbuf.st_mtime;
 	} else {
 		// If file not open open it, if open succeeded proceed normally and then close to put
 		// everything back the way we found it.
 		if (Open()) {
 			struct stat statbuf;
-			stat(Filename, &statbuf);
+			stat(RAWFILE_PATH(Filename), &statbuf);
 			retval = statbuf.st_mtime;
 			Close();
 

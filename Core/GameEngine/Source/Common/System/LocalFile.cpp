@@ -61,6 +61,14 @@
 #include "Common/UnicodeString.h"
 #include "Lib/BaseType.h"
 #include "Common/PerfTimer.h"
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 15/10/2026 A local file is opened through the engine's file layer, which roots its path and
+// records it in the engine's ResourceLedger (Common/EngineFiles.h).
+#include "Common/EngineFiles.h"
+#if !USE_BUFFERED_IO
+#error "RTS_ENGINE_CONTEXT opens local files through the buffered file layer (Common/EngineFiles.h)"
+#endif
+#endif
 
 
 
@@ -192,7 +200,11 @@ Bool LocalFile::open( const Char *filename, Int access, size_t bufferSize )
 		mode = binary ? "rb" : "r";
 	}
 
+#if RTS_ENGINE_CONTEXT
+	m_file = rts::openEngineFile(filename, mode);
+#else
 	m_file = fopen(filename, mode);
+#endif
 	if (m_file == nullptr)
 	{
 		goto error;
@@ -317,7 +329,11 @@ void LocalFile::closeFile()
 #if USE_BUFFERED_IO
 	if (m_file)
 	{
+#if RTS_ENGINE_CONTEXT
+		rts::closeEngineFile(m_file);
+#else
 		fclose(m_file);
+#endif
 		m_file = nullptr;
 	}
 #else

@@ -47,7 +47,11 @@ public:
 	// separate. Relative paths like "Data\Scripts\..." are resolved from cwd on Windows (where cwd == install dir)
 	// and must also be resolvable from the asset root (CNC_GENERALS_ZH_PATH) on Linux/macOS.
 	// This no-op default allows Win32LocalFileSystem to inherit it unchanged.
+	// GeneralsX @refactor cemlyn007 15/10/2026 With RTS_ENGINE_CONTEXT the asset root is the engine's own
+	// (EmbeddingConfig::assetRoot), fixed when its context is made, so nothing sets it (Common/EngineFiles.h).
+#if !RTS_ENGINE_CONTEXT
 	virtual void setAssetRootPath(const AsciiString& /*path*/) {}
+#endif
 
 protected:
 };
