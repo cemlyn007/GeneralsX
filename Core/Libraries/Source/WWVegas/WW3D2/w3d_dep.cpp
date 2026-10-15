@@ -560,7 +560,12 @@ static const char * Make_W3D_Filename (const char *w3d_name)
 
 	// Copy the w3d name into a static buffer, turn it into lowercase
 	// letters, and append a ".w3d" file extension. That's the filename.
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+	RTS_ENGINE_STATIC(char[64], buffer);
+#else
 	static char buffer[64];
+#endif
 	if (*w3d_name == 0)
 	{
 		// Empty W3D name case.

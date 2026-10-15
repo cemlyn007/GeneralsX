@@ -49,7 +49,13 @@ constexpr rts::PerEngineStatic<ThumbnailManagerState> ThumbnailManagerState_perE
 static DLListClass<ThumbnailManagerClass> ThumbnailManagerList;
 static ThumbnailManagerClass* GlobalThumbnailManager;
 #endif
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_CLASS_STATIC_DEFINE(bool, ThumbnailManagerClass, CreateThumbnailIfNotFound, false);
+#define CreateThumbnailIfNotFound RTS_ENGINE_GLOBAL_REF(CreateThumbnailIfNotFound)
+#else
 bool ThumbnailManagerClass::CreateThumbnailIfNotFound=false;
+#endif
 
 static void Create_Hash_Name(StringClass& name, const StringClass& thumb_name)
 {

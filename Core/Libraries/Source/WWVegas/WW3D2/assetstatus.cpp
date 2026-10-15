@@ -26,11 +26,27 @@
 // GeneralsX @feature cemlyn007 28/09/2026 The one missing-asset report is process-wide (its WWDEBUG destructor writes
 // it out at exit), and every engine adds to it: engines on separate threads add under this lock (PLAN-023
 // Phase 5b).
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(std::mutex, AssetStatusReportMutex);
+#define AssetStatusReportMutex RTS_ENGINE_GLOBAL_REF(AssetStatusReportMutex)
+#else
 static std::mutex AssetStatusReportMutex;
+#endif
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_CLASS_STATIC_DEFINE(AssetStatusClass, AssetStatusClass, Instance);
+#define Instance RTS_ENGINE_GLOBAL_REF(Instance)
+#else
 AssetStatusClass AssetStatusClass::Instance;
+#endif
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 Data no engine writes is constant (docs/EMBEDDING.md).
+const char * const ReportCategoryNames[AssetStatusClass::REPORT_COUNT]={
+#else
 const char* ReportCategoryNames[AssetStatusClass::REPORT_COUNT]={
+#endif
 	"LOAD_ON_DEMAND_ROBJ",
 	"LOAD_ON_DEMAND_HANIM",
 	"LOAD_ON_DEMAND_HTREE",

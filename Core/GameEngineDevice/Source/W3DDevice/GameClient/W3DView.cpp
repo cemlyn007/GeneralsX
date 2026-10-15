@@ -100,7 +100,13 @@
 #include "W3DDevice/GameClient/CameraShakeSystem.h"
 
 // 30 fps
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(Real, TheW3DFrameLengthInMsec, MSEC_PER_LOGICFRAME_REAL); // default is 33msec/frame == 30fps. but we may change it depending on sys config.
+#define TheW3DFrameLengthInMsec RTS_ENGINE_GLOBAL_REF(TheW3DFrameLengthInMsec)
+#else
 Real TheW3DFrameLengthInMsec = MSEC_PER_LOGICFRAME_REAL; // default is 33msec/frame == 30fps. but we may change it depending on sys config.
+#endif
 static const Real DRAWABLE_OVERSCAN = 75.0f;  ///< 3D world coords of how much to overscan in the 3D screen region
 
 constexpr const Real NearZ = MAP_XY_FACTOR; ///< Set the near to MAP_XY_FACTOR. Improves z buffer resolution.

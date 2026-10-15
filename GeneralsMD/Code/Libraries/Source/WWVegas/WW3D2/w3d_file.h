@@ -1792,7 +1792,12 @@ enum
 // The definition of this string array can be found in
 // Part_Ldr.cpp.  Please update this array accordingly.
 //
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 Data no engine writes is constant (docs/EMBEDDING.md).
+extern const char * const EMITTER_TYPE_NAMES[EMITTER_TYPEID_COUNT];
+#else
 extern const char *EMITTER_TYPE_NAMES[EMITTER_TYPEID_COUNT];
+#endif
 
 struct W3dEmitterHeaderStruct
 {

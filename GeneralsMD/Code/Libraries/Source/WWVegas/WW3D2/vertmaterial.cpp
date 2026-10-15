@@ -987,7 +987,12 @@ void VertexMaterialClass::Apply() const
 void VertexMaterialClass::Apply_Null()
 {
 	int i;
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @refactor cemlyn007 15/10/2026 Data no engine writes is constant (docs/EMBEDDING.md).
+	static const D3DMATERIAL8 default_settings =
+#else
 	static D3DMATERIAL8 default_settings =
+#endif
 	{
 		{ 1.0f, 1.0f, 1.0f, 1.0f },	// diffuse
 		{ 1.0f, 1.0f, 1.0f, 1.0f },	// ambient

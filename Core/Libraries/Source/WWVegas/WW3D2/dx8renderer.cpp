@@ -61,7 +61,13 @@
 #include "stripoptimizer.h"
 #include "meshgeometry.h"
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_CLASS_STATIC_DEFINE(bool, DX8TextureCategoryClass, m_gForceMultiply, false); // Forces opaque materials to use the multiply blend - pseudo transparent effect.  jba.
+#define m_gForceMultiply RTS_ENGINE_GLOBAL_REF(m_gForceMultiply)
+#else
 bool DX8TextureCategoryClass::m_gForceMultiply = false; // Forces opaque materials to use the multiply blend - pseudo transparent effect.  jba.
+#endif
 // ----------------------------------------------------------------------------
 
 #if RTS_ENGINE_CONTEXT
@@ -2191,7 +2197,12 @@ void DX8MeshRendererClass::Register_Mesh_Type(MeshModelClass* mmc)
 	}
 }
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(unsigned, statistics_requested, 0);
+#define statistics_requested RTS_ENGINE_GLOBAL_REF(statistics_requested)
+#else
 static unsigned statistics_requested=0;
+#endif
 
 void DX8MeshRendererClass::Request_Log_Statistics()
 {

@@ -88,7 +88,12 @@ public:
 
 
 	// Constructors
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @refactor cemlyn007 15/10/2026 Trivial, so a value-initialised one is zero and constant (the render defaults, w3drenderstate.h).
+	Vector3() = default;
+#else
 	WWINLINE Vector3() {};
+#endif
 	WWINLINE Vector3(const Vector3 & v) { X = v.X; Y = v.Y; Z = v.Z; }
 	// GeneralsX @refactor cemlyn007 14/10/2026 constexpr, so constant vectors and matrices are constant-initialised and read-only.
 	WWINLINE constexpr Vector3(float x, float y, float z) : X(x), Y(y), Z(z) {}

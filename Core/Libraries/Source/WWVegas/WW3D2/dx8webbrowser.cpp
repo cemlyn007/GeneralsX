@@ -271,7 +271,13 @@ void	DX8WebBrowser::Navigate(const char* browsername, const char* url)
 // TheSuperHackers @build felipebraz 13/02/2026 (P3)
 // Embedded web browser is Windows-specific. On Linux, browsing operations are stubs.
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_CLASS_STATIC_DEFINE(HWND, DX8WebBrowser, hWnd, nullptr);
+#define hWnd RTS_ENGINE_GLOBAL_REF(hWnd)
+#else
 HWND DX8WebBrowser::hWnd = nullptr;
+#endif
 
 bool DX8WebBrowser::Initialize(const char* badpageurl,
                                 const char* loadingpageurl,

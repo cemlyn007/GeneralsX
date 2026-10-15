@@ -49,15 +49,50 @@
 
 
 //Since there can't be more than 1 mouse, might as well keep these static.
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(CriticalSectionClass, mutex);
+#define mutex RTS_ENGINE_GLOBAL_REF(mutex)
+#else
 static CriticalSectionClass mutex;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Bool, isThread);
+#define isThread RTS_ENGINE_GLOBAL_REF(isThread)
+#else
 static Bool isThread;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(TextureClass*[Mouse::NUM_MOUSE_CURSORS][MAX_2D_CURSOR_ANIM_FRAMES], cursorTextures);	///<Textures for each cursor type
+#define cursorTextures RTS_ENGINE_GLOBAL_REF(cursorTextures)
+#else
 static TextureClass *cursorTextures[Mouse::NUM_MOUSE_CURSORS][MAX_2D_CURSOR_ANIM_FRAMES];	///<Textures for each cursor type
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(const Image*[Mouse::NUM_MOUSE_CURSORS], cursorImages);			///<Images for use with the RM_POLYGON method.
+#define cursorImages RTS_ENGINE_GLOBAL_REF(cursorImages)
+#else
 static const Image *cursorImages[Mouse::NUM_MOUSE_CURSORS];			///<Images for use with the RM_POLYGON method.
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(RenderObjClass*[Mouse::NUM_MOUSE_CURSORS], cursorModels);	///< W3D models for each cursor type
+#define cursorModels RTS_ENGINE_GLOBAL_REF(cursorModels)
+#else
 static RenderObjClass *cursorModels[Mouse::NUM_MOUSE_CURSORS];	///< W3D models for each cursor type
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(HAnimClass*[Mouse::NUM_MOUSE_CURSORS], cursorAnims);		///< W3D animations for each cursor type
+#define cursorAnims RTS_ENGINE_GLOBAL_REF(cursorAnims)
+#else
 static HAnimClass			*cursorAnims[Mouse::NUM_MOUSE_CURSORS];		///< W3D animations for each cursor type
+#endif
 
 ///Mouse polling/update thread function
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+class MouseThreadClass : public ThreadClass
+#else
 static class MouseThreadClass : public ThreadClass
+#endif
 {
 
 public:
@@ -65,7 +100,13 @@ public:
 
 	virtual void Thread_Function() override;
 
+#if RTS_ENGINE_CONTEXT
+};
+RTS_ENGINE_GLOBAL(MouseThreadClass, thread);
+#define thread RTS_ENGINE_GLOBAL_REF(thread)
+#else
 } thread;
+#endif
 
 void MouseThreadClass::Thread_Function()
 {

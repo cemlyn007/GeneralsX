@@ -207,7 +207,12 @@ public:
 	static void				_Shutdown();
 
 private:
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @refactor cemlyn007 15/10/2026 Data no engine writes is constant (docs/EMBEDDING.md).
+	static const Vector3 _ScreenspaceVertexLocationSizeTable[2][3];
+#else
 	static Vector3 _ScreenspaceVertexLocationSizeTable[2][3];
+#endif
 #if !RTS_ENGINE_CONTEXT
 	// GeneralsX @feature cemlyn007 30/09/2026 With RTS_ENGINE_CONTEXT, per engine: pointgr.cpp (PLAN-023 Phase 8,
 	// stage RR2b).

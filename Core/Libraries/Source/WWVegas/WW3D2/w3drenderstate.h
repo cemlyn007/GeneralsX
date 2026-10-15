@@ -31,8 +31,8 @@
 // current engine's field (w3drenderstate_names.h), or, where the name is also a member of another class used
 // there (BitDepth, Textures), an rts::IndirectContextField stand-in. An engine with no render state reads
 // W3DRenderState::Defaults, every field at its upstream initial value (IsInitted false, no device, no caps),
-// which is what a headless engine read from the statics before. Nothing may write the defaults: the struct is page
-// aligned, so they fill whole pages of their own, which W3D_Protect_Render_Defaults makes read-only (RR2a-2).
+// which is what a headless engine read from the statics before. Nothing can write the defaults: they are a constexpr
+// constant in read-only storage.
 //
 // Part of dx8wrapper.h, which includes it once the types below are declared: include dx8wrapper.h, not this.
 #pragma once
@@ -104,7 +104,7 @@ struct DebugStatisticsState
 // The fields keep the statics' names and upstream initial values. It has no user-provided constructor, so
 // `new W3DRenderState()` zero-initialises it before the member initialisers and constructors run, exactly as a
 // static's storage was: a fresh engine starts where a fresh process started.
-struct RTS_ENGINE_CONTEXT_API alignas(::rts::renderStateAlignment) W3DRenderState
+struct RTS_ENGINE_CONTEXT_API W3DRenderState
 {
 	// dx8wrapper.cpp's DEFAULT_RESOLUTION_WIDTH, ... (checked there).
 	static constexpr int DefaultResolutionWidth = 640;
@@ -112,9 +112,9 @@ struct RTS_ENGINE_CONTEXT_API alignas(::rts::renderStateAlignment) W3DRenderStat
 	static constexpr int DefaultBitDepth = 32;
 	static constexpr int DefaultTextureBitDepth = 16;
 
-	// Every field at its upstream initial value, for an engine with no render state (see above). Nothing may
-	// write it: only reads reach it.
-	static W3DRenderState Defaults;
+	// Every field at its upstream initial value, for an engine with no render state (see above): a constexpr
+	// constant (dx8wrapper.cpp), so only reads reach it.
+	static const W3DRenderState Defaults;
 
 	// DX8Wrapper's class statics (dx8wrapper.h).
 	DX8_CleanupHook* m_pCleanupHook;
@@ -225,14 +225,6 @@ struct RTS_ENGINE_CONTEXT_API alignas(::rts::renderStateAlignment) W3DRenderStat
 	// GeneralsX @bugfix cemlyn007 01/10/2026 False until WW3D::Init takes it, also in the Defaults (RR3).
 	bool OwnedByWW3D = false;
 };
-
-// GeneralsX @feature cemlyn007 30/09/2026 Makes the pages of W3DRenderState::Defaults and WW3DState::Defaults
-// read-only (or writable again), so that a write to them, which would leak one engine's render state into every
-// engine without one, faults where it happens instead of passing unseen (PLAN-023 Phase 8, stage RR2a-2). An
-// embedding host calls it once, before any engine boots; the first call also registers an exit handler that makes
-// them writable again for their static destructors. Returns false where it cannot (a page size that does not divide
-// rts::renderStateAlignment, or no mprotect: Windows), and then a failed protect changes neither; a failed unprotect makes writable every page it can (RR2b).
-RTS_ENGINE_CONTEXT_API bool W3D_Protect_Render_Defaults(bool readOnly);
 
 // The current engine's render state, or W3DRenderState::Defaults for an engine that has none.
 inline W3DRenderState& W3D_Render_State() noexcept

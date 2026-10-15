@@ -124,7 +124,12 @@
 #include "Lib/BaseType.h"
 
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 Data no engine writes is constant (docs/EMBEDDING.md).
+const char * const DAZZLE_INI_FILENAME="DAZZLE.INI";
+#else
 const char* DAZZLE_INI_FILENAME="DAZZLE.INI";
+#endif
 
 /**********************************************************************************
 **
@@ -143,7 +148,9 @@ unsigned int											WW3D::PreviousSyncTime = 0;
 #if RTS_ENGINE_CONTEXT
 // GeneralsX @feature cemlyn007 30/09/2026 WW3D's statics are the current engine's WW3DState fields (ww3d.h; PLAN-023
 // Phase 8, stage RR2a-2), with the upstream initial values there.
-constinit WW3DState WW3DState::Defaults;
+// GeneralsX @refactor cemlyn007 15/10/2026 constexpr, so the defaults are a constant in read-only storage
+// (docs/EMBEDDING.md).
+constexpr WW3DState WW3DState::Defaults{};
 
 static_assert(TextureFilterClass::TEXTURE_FILTER_BILINEAR == 2 && TextureFilterClass::TEXTURE_FILTER_ANISOTROPIC_2X == 2,
 	"WW3DState's TextureFilter and AnisotropyLevel defaults (ww3d.h)");

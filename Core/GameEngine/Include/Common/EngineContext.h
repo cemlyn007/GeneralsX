@@ -109,21 +109,6 @@ struct SDL_Window;
 namespace rts
 {
 
-// GeneralsX @feature cemlyn007 30/09/2026 The alignment, and so the size granule, of the render states an engine's
-// w3dRender and ww3dState point to (W3DRenderState, WW3DState): the largest memory page size the target can run with
-// (16 KiB on Apple silicon; 4 KiB on x86 and x86-64; 64 KiB on every other target, whose kernels may be built with
-// 4, 16 or 64 KiB pages), so that their defaults fill whole pages of their own, which a host can make
-// read-only (W3D_Protect_Render_Defaults; PLAN-023 Phase 8, stage RR2a-2).
-// GeneralsX @bugfix cemlyn007 30/09/2026 64 KiB wherever a larger page is possible, where 4 KiB made every protect
-// fail on a 16 or 64 KiB page kernel (PLAN-023 Phase 8, stage RR2b).
-#if defined(__APPLE__)
-inline constexpr std::size_t renderStateAlignment = 16384;
-#elif defined(__x86_64__) || defined(__i386__) || defined(_M_X64) || defined(_M_IX86)
-inline constexpr std::size_t renderStateAlignment = 4096;
-#else
-inline constexpr std::size_t renderStateAlignment = 65536;
-#endif
-
 // GeneralsX @feature cemlyn007 14/10/2026 The identity of one per-engine static (Common/EngineStatic.h,
 // PerEngineStatic): only its address is used, as the key of the static in each EngineContext's table. A key is
 // `constexpr`, so it is read-only and holds no engine state. It points to itself so that no two keys can have the same
@@ -503,11 +488,13 @@ struct ContextField : ContextFieldOps<ContextField<T, Field>, T>
 // GeneralsX @feature cemlyn007 30/09/2026 ContextField's indirect variant (PLAN-023 Phase 8, stage RR2a-1): state
 // that a direct EngineContext field points to (`S* EngineContext::*Pointer`, allocated only for some engines),
 // read through that pointer, or through `Defaults` (an S with every field at its default) while it is null.
-template <typename S, S* EngineContext::*Pointer, S& Defaults>
+// GeneralsX @refactor cemlyn007 15/10/2026 `Defaults` is a constexpr constant in read-only storage, which only reads
+// reach: a write through the reference this returns for it would fault (docs/EMBEDDING.md).
+template <typename S, S* EngineContext::*Pointer, const S& Defaults>
 inline S& indirectContext() noexcept
 {
 	S* const state = ctx()->*Pointer;
-	return state != nullptr ? *state : Defaults;
+	return state != nullptr ? *state : const_cast<S&>(Defaults);
 }
 
 // A stand-in for a class's static data member that moved into such a struct (member `Field`), declared as
@@ -516,7 +503,7 @@ inline S& indirectContext() noexcept
 // `std::addressof` give the stand-in's size and address, not the field's (scripts/cpp/engine_context_standins.py
 // fails on those), so a name used that way, or with `.`, needs a reference-returning macro instead. An array field also
 // takes `[]` and decays to a pointer to its first element.
-template <typename S, S* EngineContext::*Pointer, S& Defaults, typename T, T S::*Field>
+template <typename S, S* EngineContext::*Pointer, const S& Defaults, typename T, T S::*Field>
 struct IndirectContextField
 	: ContextFieldOps<IndirectContextField<S, Pointer, Defaults, T, Field>, T>
 {
@@ -529,7 +516,7 @@ struct IndirectContextField
 	}
 };
 
-template <typename S, S* EngineContext::*Pointer, S& Defaults, typename E, std::size_t N, E (S::*Field)[N]>
+template <typename S, S* EngineContext::*Pointer, const S& Defaults, typename E, std::size_t N, E (S::*Field)[N]>
 struct IndirectContextField<S, Pointer, Defaults, E[N], Field>
 {
 	// Same deleted copy/operator& backstop as ContextFieldOps (this specialisation does not derive from

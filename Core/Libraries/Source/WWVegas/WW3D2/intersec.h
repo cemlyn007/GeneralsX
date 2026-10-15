@@ -86,6 +86,12 @@ public:
 };
 
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+#define _RayLocation RTS_ENGINE_GLOBAL_REF(_RayLocation)
+#define _RayDirection RTS_ENGINE_GLOBAL_REF(_RayDirection)
+#define _IntersectionNormal RTS_ENGINE_GLOBAL_REF(_IntersectionNormal)
+#endif
 class IntersectionClass
 {
 	// member data
@@ -391,6 +397,17 @@ protected:
 	/*
 	**	Static vars available for use by temporary intersection class objects.
 	*/
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_CLASS_STATIC(Vector3, _RayLocation);
+	RTS_ENGINE_CLASS_STATIC(Vector3, _RayDirection);
+	RTS_ENGINE_CLASS_STATIC(Vector3, _IntersectionNormal);
+#else
 	static Vector3 _RayLocation, _RayDirection, _IntersectionNormal;
+#endif
 
 };
+#if RTS_ENGINE_CONTEXT
+#undef _RayLocation
+#undef _RayDirection
+#undef _IntersectionNormal
+#endif

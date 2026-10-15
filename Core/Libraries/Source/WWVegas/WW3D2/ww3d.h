@@ -139,13 +139,12 @@ struct WW3DEnums
 // lists and options write) and ww3d.cpp's file statics, as one struct with the statics' names and upstream initial
 // values. Each render engine owns one, rts::EngineContext::ww3dState, allocated beside its W3DRenderState
 // (DX8Wrapper::Create_Render_State) and freed with it at the end of WW3D::Shutdown; an engine that does not render
-// reads WW3DState::Defaults, which nothing may write (W3D_Protect_Render_Defaults makes its pages read-only). Page
-// aligned, so the defaults fill whole pages of their own.
-struct RTS_ENGINE_CONTEXT_API alignas(::rts::renderStateAlignment) WW3DState
+// reads WW3DState::Defaults, a constexpr constant in read-only storage, which nothing can write.
+struct RTS_ENGINE_CONTEXT_API WW3DState
 {
-	// Constant-initialised (a ww3d.cpp static_assert checks the texture filter values below), so it is valid before
-	// any dynamic initialiser runs, as the statics it replaces were.
-	static constinit WW3DState Defaults;
+	// Constant (a ww3d.cpp static_assert checks the texture filter values below), so it is valid before any dynamic
+	// initialiser runs, as the statics it replaces were.
+	static const WW3DState Defaults;
 
 	bool IsSortingEnabled = true;
 
