@@ -36,6 +36,9 @@ EmbeddingConfig makeExecutableEmbedding();
 FaultSink* executableFaultSink();
 QuitListener* executableQuitListener();
 ThreadStarter* executableThreadStarter();
+// GeneralsX @feature cemlyn007 15/10/2026 Asks every thread the executable started to stop and joins it, before its
+// engine's context goes.
+void stopExecutableThreads() noexcept;
 ResourceLedger* executableResourceLedger();
 std::filesystem::path executableAssetRoot();
 std::filesystem::path executableUserDataRoot();
