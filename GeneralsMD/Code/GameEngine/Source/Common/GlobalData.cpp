@@ -98,6 +98,10 @@
 #include <cerrno>   // errno
 #include <cstring>  // strerror()
 
+#if RTS_ENGINE_CONTEXT
+#include "Common/EngineFiles.h"
+#endif
+
 // PUBLIC DATA ////////////////////////////////////////////////////////////////////////////////////
 #if !RTS_ENGINE_CONTEXT
 GlobalData* TheWritableGlobalData = nullptr;				///< The global data singleton
@@ -1125,8 +1129,16 @@ GlobalData::GlobalData()
 	// its working setup were failing.
 	if (this == m_theOriginal)
 	{
+#if RTS_ENGINE_CONTEXT
+		// GeneralsX @feature cemlyn007 15/10/2026 The engine's user data root, with its trailing separator, which the host
+		// has already made (Common/EngineFiles.h).
+		m_userDataDir = rts::engineUserDataRoot().string().c_str();
+		if (!m_userDataDir.endsWith("/"))
+			m_userDataDir.concat('/');
+#else
 		m_userDataDir = BuildUserDataPathFromRegistry();
 		CreateDirectory(m_userDataDir.str(), nullptr);
+#endif
 	}
 
 	//-allAdvice feature
@@ -1471,6 +1483,9 @@ UnsignedInt GlobalData::generateExeCRC()
 	return exeCRC.get();
 }
 
+// GeneralsX @refactor cemlyn007 15/10/2026 Not with RTS_ENGINE_CONTEXT: the user data directory is the engine's user data
+// root (EmbeddingConfig::userDataRoot), which its host makes and checks before the engine starts.
+#if !RTS_ENGINE_CONTEXT
 // GeneralsX @refactor cemlyn007 02/10/2026 One place for "make this directory (recursively) and say
 // so on stderr if it cannot be used", instead of the create+stat+fprintf sequence copied at every
 // default-directory branch below plus a near-duplicate in setPath_UserData.
@@ -1750,3 +1765,4 @@ AsciiString GlobalData::BuildUserDataPathFromRegistry()
 
 	return userDataDir;
 }
+#endif

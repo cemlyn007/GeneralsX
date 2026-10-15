@@ -49,8 +49,10 @@ public:
 	virtual Bool createDirectory(AsciiString directory) override;
 	virtual AsciiString normalizePath(const AsciiString& filePath) const override;
 
-#ifndef _WIN32
+#if !defined(_WIN32) && !RTS_ENGINE_CONTEXT
 	// GeneralsX @bugfix felipebraz 23/03/2026 Set the asset root as a fallback search directory for relative paths.
+	// GeneralsX @refactor cemlyn007 15/10/2026 Not with RTS_ENGINE_CONTEXT: relative paths lie under the engine's asset
+	// root (Common/EngineFiles.h).
 	virtual void setAssetRootPath(const AsciiString& path) override;
 #endif
 

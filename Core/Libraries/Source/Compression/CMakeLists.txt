@@ -31,6 +31,8 @@ target_include_directories(core_compression INTERFACE
 target_link_libraries(core_compression PRIVATE
     corei_libraries_include
     corei_always
+    # GeneralsX @feature cemlyn007 15/10/2026 Its files are opened through the engine's file layer (Common/EngineFiles.h)
+    corei_gameengine_include
 )
 
 

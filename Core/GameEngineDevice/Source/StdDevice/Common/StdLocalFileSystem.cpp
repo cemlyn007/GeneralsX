@@ -42,13 +42,15 @@
 // On Linux/macOS the game binary's cwd and the data directory (asset root, CNC_GENERALS_ZH_PATH) are separate.
 // The StdBIGFileSystem sets this after resolving the primary asset directory so that relative paths like
 // "Data\Scripts\SkirmishScripts.scb" can be found in the asset root when the cwd lookup fails.
-#if RTS_ENGINE_CONTEXT
-// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
-RTS_ENGINE_GLOBAL(std::filesystem::path, s_assetFallbackPath);
-#define s_assetFallbackPath RTS_ENGINE_GLOBAL_REF(s_assetFallbackPath)
-#else
+// GeneralsX @refactor cemlyn007 15/10/2026 Not with RTS_ENGINE_CONTEXT: a relative path lies under the engine's own asset
+// root, and nothing is looked up in the working directory (Common/EngineFiles.h).
+#if !RTS_ENGINE_CONTEXT
 static std::filesystem::path s_assetFallbackPath;
 #endif
+#endif
+
+#if RTS_ENGINE_CONTEXT
+#include "Common/EngineFiles.h"
 #endif
 
 StdLocalFileSystem::StdLocalFileSystem() : LocalFileSystem()
@@ -58,6 +60,66 @@ StdLocalFileSystem::StdLocalFileSystem() : LocalFileSystem()
 StdLocalFileSystem::~StdLocalFileSystem() {
 }
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 15/10/2026 The file `filename` names under the engine's roots (rts::resolveEnginePath): a
+// relative path under the asset root, as upstream's under the working directory. A path that is not found as written is
+// matched case-insensitively, one part at a time, from the asset root for a relative path and from the file system's
+// root for an absolute one, as upstream matched it from the working directory.
+static std::filesystem::path fixFilenameFromWindowsPath(const Char *filename, Int access)
+{
+	std::string fixedFilename(filename);
+#ifndef _WIN32
+	std::replace(fixedFilename.begin(), fixedFilename.end(), '\\', '/');
+#endif
+	const Bool relative = std::filesystem::path(fixedFilename).is_relative();
+	std::filesystem::path path = rts::resolveEnginePath(fixedFilename.c_str());
+
+#ifndef _WIN32
+	const Bool write = (access & File::WRITE) != 0;
+	std::error_code ec;
+	if (std::filesystem::exists(path, ec) || (write && std::filesystem::exists(path.parent_path(), ec)))
+		return path;
+
+	const std::filesystem::path base = relative ? rts::engineAssetRoot().lexically_normal() : path.root_path();
+	std::filesystem::path pathFixed = base;
+	for (const auto& p : path.lexically_relative(base))
+	{
+		if (p.empty())
+			continue;
+		std::filesystem::path pathFixedPart;
+		if (std::filesystem::exists(pathFixed / p, ec))
+		{
+			pathFixedPart = p;
+		}
+		else
+		{
+			for (auto& entry : std::filesystem::directory_iterator(pathFixed, ec))
+			{
+				if (strcasecmp(entry.path().filename().string().c_str(), p.string().c_str()) == 0)
+				{
+					pathFixedPart = entry.path().filename();
+					break;
+				}
+			}
+		}
+
+		if (pathFixedPart.empty())
+		{
+			if (!write)
+			{
+				DEBUG_LOG(("StdLocalFileSystem::fixFilenameFromWindowsPath - Error finding file %s", filename));
+				return std::filesystem::path();
+			}
+			pathFixedPart = p;
+		}
+		pathFixed /= pathFixedPart;
+	}
+	path = pathFixed;
+#endif
+
+	return path;
+}
+#else
 //DECLARE_PERF_TIMER(StdLocalFileSystem_openFile)
 static std::filesystem::path fixFilenameFromWindowsPath(const Char *filename, Int access)
 {
@@ -202,6 +264,7 @@ static std::filesystem::path fixFilenameFromWindowsPath(const Char *filename, In
 
 	return path;
 }
+#endif
 
 File * StdLocalFileSystem::openFile(const Char *filename, Int access, size_t bufferSize)
 {
@@ -217,6 +280,17 @@ File * StdLocalFileSystem::openFile(const Char *filename, Int access, size_t buf
 	if (path.empty()) {
 		return nullptr;
 	}
+
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 15/10/2026 The asset root is read-only: a write anywhere but under the user data root is
+	// refused before any directory is made for it (Common/EngineFiles.h).
+	if ((access & File::WRITE) && !rts::isEngineWritablePath(path)) {
+		std::fprintf(stderr, "StdLocalFileSystem::openFile - '%s' is not under the engine's user data root: the write is refused\n",
+			path.string().c_str());
+		std::fflush(stderr);
+		return nullptr;
+	}
+#endif
 
 	if (access & File::WRITE) {
 		// if opening the file for writing, we need to make sure the directory is there
@@ -326,7 +400,14 @@ void StdLocalFileSystem::getFileListInDirectory(const AsciiString& currentDirect
 	Bool done = FALSE;
 	std::error_code ec;
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 15/10/2026 A relative directory is listed under the engine's asset root, and its files are
+	// named as upstream named them from the working directory: the directory as given, then the file's name.
+	const std::filesystem::path listedDirectory = rts::resolveEnginePath(fixedDirectory.c_str());
+	auto iter = std::filesystem::directory_iterator(listedDirectory, ec);
+#else
 	auto iter = std::filesystem::directory_iterator(fixedDirectory.c_str(), ec);
+#endif
 	// The default iterator constructor creates an end iterator
 	done = iter == std::filesystem::directory_iterator();
 
@@ -357,7 +438,11 @@ void StdLocalFileSystem::getFileListInDirectory(const AsciiString& currentDirect
 			(strcmp(filenameStr.c_str(), ".") != 0 && strcmp(filenameStr.c_str(), "..") != 0)) {
 			// if we haven't already, add this filename to the list.
 			// a stl set should only allow one copy of each filename
+#if RTS_ENGINE_CONTEXT
+			AsciiString newFilename = (std::filesystem::path(fixedDirectory) / iter->path().filename()).string().c_str();
+#else
 			AsciiString newFilename = iter->path().string().c_str();
+#endif
 			if (filenameList.find(newFilename) == filenameList.end()) {
 				filenameList.insert(newFilename);
 			}
@@ -372,7 +457,11 @@ void StdLocalFileSystem::getFileListInDirectory(const AsciiString& currentDirect
 	}
 
 	if (searchSubdirectories) {
+#if RTS_ENGINE_CONTEXT
+		auto iter = std::filesystem::directory_iterator(listedDirectory, ec);
+#else
 		auto iter = std::filesystem::directory_iterator(fixedDirectory, ec);
+#endif
 
 		if (ec) {
 			reportDirectoryListingError("Error opening subdirectory", fixedDirectory, ec);
@@ -457,7 +546,14 @@ Bool StdLocalFileSystem::createDirectory(AsciiString directory)
 
 	if ((!fixedDirectory.empty()) && (fixedDirectory.length() < _MAX_DIR)) {
 		// Convert to host path
+#if RTS_ENGINE_CONTEXT
+		// GeneralsX @feature cemlyn007 15/10/2026 Made only under the engine's user data root (Common/EngineFiles.h).
+		const std::filesystem::path path = rts::resolveEnginePath(fixedDirectory.c_str());
+		if (!rts::isEngineWritablePath(path))
+			return FALSE;
+#else
 		std::filesystem::path path(std::move(fixedDirectory));
+#endif
 
 		std::error_code ec;
 		result = std::filesystem::create_directory(path, ec);
@@ -480,7 +576,7 @@ AsciiString StdLocalFileSystem::normalizePath(const AsciiString& filePath) const
 	return AsciiString(pathNonNormalized.lexically_normal().string().c_str());
 }
 
-#ifndef _WIN32
+#if !defined(_WIN32) && !RTS_ENGINE_CONTEXT
 // GeneralsX @bugfix felipebraz 23/03/2026 Receive the asset root path from StdBIGFileSystem after it resolves
 // CNC_GENERALS_ZH_PATH. Used as a fallback in fixFilenameFromWindowsPath so that loose data files
 // (e.g. Data\Scripts\SkirmishScripts.scb) can be found even when cwd != asset root directory.
@@ -492,26 +588,6 @@ void StdLocalFileSystem::setAssetRootPath(const AsciiString& path)
 	// a process share one install, so only the first boot writes the process-wide path while later engines' file
 	// lookups on other threads read it (PLAN-023 Phase 5b).
 	std::filesystem::path assetRootPath(std::move(p));
-#if RTS_ENGINE_CONTEXT
-	// GeneralsX @bugfix cemlyn007 28/09/2026 Settled by the first boot, whether it names a root or none (an empty one
-	// is passed too): a later boot naming another root is refused rather than changing the path under the engines
-	// already reading it (the host boots every engine on one install).
-	// GeneralsX @refactor cemlyn007 15/10/2026 With RTS_ENGINE_CONTEXT the path and this guard are the engine's, so each
-	// engine settles its own (docs/EMBEDDING.md).
-	RTS_ENGINE_STATIC(std::atomic<bool>, s_assetRootSettled, {false});
-	if (s_assetRootSettled.exchange(true))
-	{
-		if (s_assetFallbackPath != assetRootPath)
-		{
-			std::fprintf(stderr, "StdLocalFileSystem::setAssetRootPath - the asset fallback path is settled ('%s'): '%s' refused\n",
-				s_assetFallbackPath.string().c_str(), assetRootPath.string().c_str());
-			std::fflush(stderr);
-			DEBUG_CRASH(("StdLocalFileSystem::setAssetRootPath - the asset fallback path is settled ('%s'): '%s' refused",
-				s_assetFallbackPath.string().c_str(), assetRootPath.string().c_str()));
-		}
-		return;
-	}
-#endif
 	if (s_assetFallbackPath == assetRootPath)
 		return;
 	s_assetFallbackPath = std::move(assetRootPath);
