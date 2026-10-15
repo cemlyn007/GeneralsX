@@ -61,6 +61,16 @@
 #include "Common/CommandLine.h"
 #include "Common/Debug.h"
 #include "Common/FatalEngineError.h"
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 15/10/2026 The crash paths end in the context's FaultSink (Common/EngineFault.h)
+#include <filesystem>
+#include <string>
+#include "Common/EmbeddingContract.h"
+#include "Common/EngineFault.h"
+#include "Common/Errors.h"
+#include "Common/INI.h"
+#include "Common/INIException.h"
+#endif
 // GeneralsX @bugfix cemlyn007 02/10/2026 Guard <atomic> the same way WWLib/mutex.h does, so the
 // vc6/vc6-debug/vc6-profile presets (which still build this shared Core file) keep working.
 #if !(defined(_MSC_VER) && _MSC_VER < 1300)
@@ -90,8 +100,12 @@
 // Horrible reference, but we really, really need to know if we are windowed.
 // GeneralsX @feature cemlyn007 28/09/2026 Atomic: every headless engine's command line writes it and any engine's
 // assert path reads it, so engines on separate threads would race on a plain bool (PLAN-023 Phase 5b).
+// GeneralsX @refactor cemlyn007 15/10/2026 With RTS_ENGINE_CONTEXT the engine's render mode decides instead, and the
+// process-wide switch goes (see ignoringAsserts).
+#if !RTS_ENGINE_CONTEXT
 #include <atomic>
 extern std::atomic<bool> DX8Wrapper_IsWindowed;
+#endif
 // GeneralsX @refactor cemlyn007 30/09/2026 The window handles (PLAN-023 Phase 8, stage RR2a-2).
 #include "Common/ApplicationWindow.h"
 
@@ -142,7 +156,11 @@ static THREAD_ID theMainThreadID = 0;
 // PUBLIC DATA
 // ----------------------------------------------------------------------------
 
+// GeneralsX @refactor cemlyn007 15/10/2026 With RTS_ENGINE_CONTEXT DEBUG_CRASH keeps no "ignore from now on" flag,
+// which was process-wide (Common/Debug.h).
+#if !RTS_ENGINE_CONTEXT
 char* TheCurrentIgnoreCrashPtr = nullptr;
+#endif
 #ifdef DEBUG_LOGGING
 UnsignedInt DebugLevelMask = 0;
 const char *TheDebugLevels[DEBUG_LEVEL_MAX] = {
@@ -175,8 +193,16 @@ static void doStackDump();
 // ----------------------------------------------------------------------------
 inline Bool ignoringAsserts()
 {
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @refactor cemlyn007 15/10/2026 Only an engine that renders to a window may show the assertion
+	// dialog: the engine's render mode replaces the process-wide DX8Wrapper_IsWindowed.
+	const rts::EmbeddingConfig* const embedding = rts::ctx()->embedding();
+	if (embedding == nullptr || embedding->render != rts::RenderMode::window)
+		return true;
+#else
 	if (!DX8Wrapper_IsWindowed)
 		return true;
+#endif
 	if (TheGlobalData && TheGlobalData->m_headless)
 		return true;
 #ifdef DEBUG_CRASHING
@@ -311,7 +337,12 @@ static int doCrashBox(const char *buffer, Bool logResult)
 			if (logResult)
 				DebugLog("[Abort]");
 #endif
+#if RTS_ENGINE_CONTEXT
+			// GeneralsX @feature cemlyn007 15/10/2026 Abort is the assertion crash, which ends in the FaultSink
+			AssertionCrash(buffer);
+#else
 			_exit(1);
+#endif
 			break;
 		case IDRETRY:
 #ifdef DEBUG_LOGGING
@@ -576,6 +607,15 @@ void DebugCrash(const char *format, ...)
 
 	const int result = doCrashBox(theCrashBuffer, useLogging);
 
+#if RTS_ENGINE_CONTEXT
+	if (result == IDIGNORE)
+	{
+		if( TheKeyboard )
+			TheKeyboard->resetKeys();
+		if( TheMouse )
+			TheMouse->reset();
+	}
+#else
 	if (result == IDIGNORE && TheCurrentIgnoreCrashPtr != nullptr)
 	{
 		int yn;
@@ -594,6 +634,7 @@ void DebugCrash(const char *format, ...)
 		if( TheMouse )
 			TheMouse->reset();
 	}
+#endif
 
 }
 #endif
@@ -742,9 +783,16 @@ double SimpleProfiler::getAverageTime()
 	#define RELEASECRASH_FILE_NAME				"ReleaseCrashInfo.txt"
 	#define RELEASECRASH_FILE_NAME_PREV		"ReleaseCrashInfoPrev.txt"
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @refactor cemlyn007 15/10/2026 Per engine (Common/EngineStatic.h): the crash report each engine
+	// writes, which the stack dump's callback writes to.
+	RTS_ENGINE_GLOBAL(FILE*, theReleaseCrashLogFile, nullptr);
+	#define theReleaseCrashLogFile RTS_ENGINE_GLOBAL_REF(theReleaseCrashLogFile)
+#else
 	// GeneralsX @bugfix cemlyn007 03/10/2026 Per thread: engines fault on their own threads, and a shared handle
 	// would be opened, written and closed by two faulting engines at once.
 	static THREAD_LOCAL FILE *theReleaseCrashLogFile = nullptr;
+#endif
 
 	static void releaseCrashLogOutput(const char *buffer)
 	{
@@ -756,6 +804,7 @@ double SimpleProfiler::getAverageTime()
 	}
 
 
+#if !RTS_ENGINE_CONTEXT
 static void TriggerMiniDump()
 {
 #ifdef RTS_ENABLE_CRASHDUMP
@@ -769,8 +818,197 @@ static void TriggerMiniDump()
 	MiniDumper::shutdownMiniDumper();
 #endif
 }
+#endif
 
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 15/10/2026 Every crash path ends in the context's FaultSink (Common/EngineFault.h):
+// the crash report is written into the user data root of the context's EmbeddingConfig, and the sink latches the
+// fault and unwinds out of the engine. This replaces the process-wide embedded mode, fault latch and teardown flag.
+namespace
+{
+
+// GeneralsX @bugfix cemlyn007 15/10/2026 localtime_r/asctime_r: engines fault on their own threads, and
+// localtime/asctime share one buffer in the process.
+std::string crashTimeString()
+{
+	const time_t now = time(nullptr);
+	struct tm local;
+	char text[64] = "";
+#ifdef _WIN32
+	if (localtime_s(&local, &now) == 0)
+		asctime_s(text, sizeof(text), &local);
+#else
+	if (localtime_r(&now, &local) != nullptr)
+		asctime_r(&local, text);
+#endif
+	return text;
+}
+
+// Upstream's ReleaseCrashInfo.txt in the user data root, the one before it kept as ReleaseCrashInfoPrev.txt:
+// `writeHeader` writes the lines before the stack dump.
+template <class WriteHeader>
+void writeCrashReport(const rts::EmbeddingConfig& embedding, WriteHeader writeHeader)
+{
+	const std::string current = (embedding.userDataRoot / RELEASECRASH_FILE_NAME).string();
+	const std::string previous = (embedding.userDataRoot / RELEASECRASH_FILE_NAME_PREV).string();
+
+	remove(previous.c_str());
+	if (rename(current.c_str(), previous.c_str()) != 0)
+		remove(current.c_str());
+
+	theReleaseCrashLogFile = fopen(current.c_str(), "w");
+	if (theReleaseCrashLogFile)
+	{
+		writeHeader(theReleaseCrashLogFile);
+		const int STACKTRACE_SIZE	= 12;
+		const int STACKTRACE_SKIP = 6;
+		void* stacktrace[STACKTRACE_SIZE];
+		::FillStackAddresses(stacktrace, STACKTRACE_SIZE, STACKTRACE_SKIP);
+		::StackDumpFromAddresses(stacktrace, STACKTRACE_SIZE, releaseCrashLogOutput);
+
+		fflush(theReleaseCrashLogFile);
+		fclose(theReleaseCrashLogFile);
+		theReleaseCrashLogFile = nullptr;
+	}
+}
+
+// Marks the fault raised and hands it to the sink. In the teardown window, when `mayReturn`, the sink's unwind
+// stops here and this returns; otherwise the sink does not return.
+void handFaultToSink(const rts::EmbeddingConfig& embedding, std::string reason, bool mayReturn)
+{
+	rts::ctx()->faultRaised = true;
+	if (!mayReturn || !rts::faultCannotUnwind())
+		embedding.faultSink->fault(std::move(reason));
+	try
+	{
+		embedding.faultSink->fault(std::move(reason));
+	}
+	catch (...)
+	{
+	}
+}
+
+// The release crash's report (the reason, the last error dump and the stack), then the sink.
+void raiseReleaseCrash(const char* reason, bool mayReturn)
+{
+	const rts::EmbeddingConfig& embedding = rts::currentEmbedding("the fault sink");
+	const std::string reasonBytes = reason != nullptr ? reason : "";
+	if (!rts::faultRaised())
+	{
+		writeCrashReport(embedding, [&](FILE* file)
+		{
+			fprintf(file, "Release Crash at %s; Reason %s\n", crashTimeString().c_str(), reasonBytes.c_str());
+			fprintf(file, "\nLast error:\n%s\n\nCurrent stack:\n", g_LastErrorDump.str());
+		});
+	}
+	handFaultToSink(embedding, reasonBytes, mayReturn);
+}
+
+std::string errorCodeText(UnsignedInt code)
+{
+	char text[32];
+	snprintf(text, sizeof(text), "error code 0x%08X", code);
+	return text;
+}
+
+} // namespace
+
+bool rts::faultRaised()
+{
+	return rts::ctx()->faultRaised;
+}
+
+void rts::beginEngineTeardown()
+{
+	rts::EngineContext* const context = rts::ctx();
+	if (context != &rts::g_noEngine)
+		context->engineTearingDown = true;
+}
+
+bool rts::faultCannotUnwind()
+{
+	return rts::ctx()->engineTearingDown || std::uncaught_exceptions() != 0;
+}
+
+void rts::faultFromCaughtException(const char* uncaughtReason)
+{
+	if (faultRaised())
+	{
+		if (faultCannotUnwind())
+			return;
+		throw;
+	}
+	std::string reason = uncaughtReason;
+	try
+	{
+		throw;
+	}
+	catch (const INIException& error)
+	{
+		if (error.mFailureMessage != nullptr)
+			reason = error.mFailureMessage;
+	}
+	catch (ErrorCode code)
+	{
+		reason += " (" + errorCodeText(code) + ")";
+	}
+	catch (decltype(INI_INVALID_DATA) code)
+	{
+		reason += " (" + errorCodeText(code) + ")";
+	}
+	catch (const std::exception& error)
+	{
+		reason += " (";
+		reason += error.what();
+		reason += ")";
+	}
+	catch (...)
+	{
+	}
+	raiseReleaseCrash(reason.c_str(), true);
+}
+
+void ReleaseCrash(const char *reason)
+{
+	raiseReleaseCrash(reason, true);
+}
+
+void ReleaseCrashNoReturn(const char *reason)
+{
+	raiseReleaseCrash(reason, false);
+	std::abort();
+}
+
+void AssertionCrash(const char *message)
+{
+	raiseReleaseCrash(message, true);
+}
+
+void ReleaseCrashLocalized(const AsciiString& p, const AsciiString& m)
+{
+	if (!TheGameText) {
+		ReleaseCrash(m.str());
+		return;
+	}
+
+	const UnicodeString mesg = TheGameText->fetch(m);
+	AsciiString reason;
+	reason.translate(mesg);
+
+	const rts::EmbeddingConfig& embedding = rts::currentEmbedding("the fault sink");
+	if (!rts::faultRaised())
+	{
+		writeCrashReport(embedding, [&](FILE* file)
+		{
+			fprintf(file, "Release Crash at %s; Reason %ls\n", crashTimeString().c_str(), mesg.str());
+		});
+	}
+	handFaultToSink(embedding, reason.str(), true);
+}
+#endif
+
+#if !RTS_ENGINE_CONTEXT
 // GeneralsX @feature cemlyn007 28/09/2026 Embedded mode (see FatalEngineError.h)
 // GeneralsX @bugfix cemlyn007 03/10/2026 Pre-C++11/VC6 builds have no std::atomic<bool> (see the
 // <atomic> guard above); a plain volatile Bool is the same fallback WWLib/mutex.h uses for its
@@ -788,7 +1026,6 @@ static std::atomic<bool> theEngineEmbeddedMode(false);
 static volatile bool theEngineEmbeddedMode = false;
 #endif
 
-#if !RTS_ENGINE_CONTEXT
 #if !(defined(_MSC_VER) && _MSC_VER < 1300)
 static std::atomic<bool> theFatalErrorThrown(false);
 static std::atomic<bool> theFatalErrorReturned(false);
@@ -796,18 +1033,12 @@ static std::atomic<bool> theFatalErrorReturned(false);
 static volatile bool theFatalErrorThrown = false;
 static volatile bool theFatalErrorReturned = false;
 #endif
-#endif
 
 // GeneralsX @bugfix cemlyn007 03/10/2026 See TakeEngineFatalErrorThrown (FatalEngineError.h)
 FatalEngineError::FatalEngineError(const std::string& reason)
 	: std::runtime_error(reason)
 {
-#if RTS_ENGINE_CONTEXT
-	// g_noEngine stays pristine.
-	rts::EngineContext* context = rts::ctx();
-	if (context != &rts::g_noEngine)
-		context->fatalErrorThrown = true;
-#elif !(defined(_MSC_VER) && _MSC_VER < 1300)
+#if !(defined(_MSC_VER) && _MSC_VER < 1300)
 	theFatalErrorThrown.store(true);
 #else
 	theFatalErrorThrown = true;
@@ -820,14 +1051,7 @@ FatalEngineError::~FatalEngineError() {}
 
 bool TakeEngineFatalErrorThrown()
 {
-#if RTS_ENGINE_CONTEXT
-	rts::EngineContext* context = rts::ctx();
-	if (context == &rts::g_noEngine)
-		return false;
-	const bool thrown = context->fatalErrorThrown;
-	context->fatalErrorThrown = false;
-	return thrown;
-#elif !(defined(_MSC_VER) && _MSC_VER < 1300)
+#if !(defined(_MSC_VER) && _MSC_VER < 1300)
 	return theFatalErrorThrown.exchange(false);
 #else
 	const bool thrown = theFatalErrorThrown;
@@ -838,15 +1062,7 @@ bool TakeEngineFatalErrorThrown()
 
 bool TakeEngineFatalErrorRaised()
 {
-#if RTS_ENGINE_CONTEXT
-	rts::EngineContext* context = rts::ctx();
-	if (context == &rts::g_noEngine)
-		return false;
-	const bool raised = context->fatalErrorThrown || context->fatalErrorReturned;
-	context->fatalErrorThrown = false;
-	context->fatalErrorReturned = false;
-	return raised;
-#elif !(defined(_MSC_VER) && _MSC_VER < 1300)
+#if !(defined(_MSC_VER) && _MSC_VER < 1300)
 	const bool thrown = theFatalErrorThrown.exchange(false);
 	const bool returned = theFatalErrorReturned.exchange(false);
 	return thrown || returned;
@@ -904,21 +1120,6 @@ void ClearEngineFault()
 }
 
 // GeneralsX @bugfix cemlyn007 28/09/2026 The teardown window (see FatalEngineError.h)
-#if RTS_ENGINE_CONTEXT
-void SetEngineTearingDown(bool tearingDown)
-{
-	// g_noEngine stays pristine: no engine is being torn down there.
-	rts::EngineContext* context = rts::ctx();
-	if (context != &rts::g_noEngine)
-		context->engineTearingDown = tearingDown;
-}
-
-bool IsEngineTearingDown()
-{
-	// Outside every engine (rts::g_noEngine) no engine is being torn down: false.
-	return rts::ctx()->engineTearingDown;
-}
-#else
 static bool theEngineTearingDown = false;
 
 void SetEngineTearingDown(bool tearingDown)
@@ -930,7 +1131,6 @@ bool IsEngineTearingDown()
 {
 	return theEngineTearingDown;
 }
-#endif
 
 // GeneralsX @feature cemlyn007 02/10/2026 Sets the fault latch (see FatalEngineError.h). A fatal error that
 // returns instead of throwing (the teardown window, another exception propagating) constructs no
@@ -945,12 +1145,7 @@ static void latchEngineFault(bool returns)
 #endif
 	if (!returns)
 		return;
-#if RTS_ENGINE_CONTEXT
-	// g_noEngine stays pristine.
-	rts::EngineContext* context = rts::ctx();
-	if (context != &rts::g_noEngine)
-		context->fatalErrorReturned = true;
-#elif !(defined(_MSC_VER) && _MSC_VER < 1300)
+#if !(defined(_MSC_VER) && _MSC_VER < 1300)
 	theFatalErrorReturned.store(true);
 #else
 	theFatalErrorReturned = true;
@@ -971,22 +1166,6 @@ static bool throwWithoutGlobalData(const char *reason)
 	latchEngineFault(returns);
 	if (returns)
 		return false;
-#if RTS_ENGINE_CONTEXT
-	// GeneralsX @bugfix cemlyn007 28/09/2026 Outside every engine context (rts::g_noEngine, where
-	// TheGlobalData is always null) the caller is either a host call that entered no engine or a static
-	// destructor or exit handler, and there is no telling which: a static built at any time (a
-	// function-local one first reached during play, say) is destroyed at exit, in no engine's scope.
-	// A throw out of a destructor ends the process through std::terminate, so it returns there, as
-	// upstream does once TheGlobalData is gone, but says so on stderr rather than swallow the error.
-	if (rts::ctx() == &rts::g_noEngine)
-	{
-		// ReleaseCrashNoReturn reports it itself, and raises it after all in embedded mode.
-		if (!theInReleaseCrashNoReturn)
-			fprintf(stderr, "GeneralsX: fatal engine error outside every engine context, not raised%s%s\n",
-				reason ? ": " : "", reason ? reason : "");
-		return false;
-	}
-#endif
 	return true;
 }
 
@@ -1263,3 +1442,4 @@ void ReleaseCrashLocalized(const AsciiString& p, const AsciiString& m)
 
 	_exit(1);
 }
+#endif

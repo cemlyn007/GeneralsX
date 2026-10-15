@@ -12,15 +12,13 @@
 //                                                   set by the engine and freed and nulled at its teardown
 //   RTS_ENGINE_CONTEXT_VALUE(Type, name, init)   -- `Type name = init`
 
-// Set while this engine is being torn down (GameEngine's destructor onwards), cleared when a GameEngine is
-// constructed in it. Fatal errors raised in that window do not throw (see FatalEngineError.h).
+// GeneralsX @refactor cemlyn007 15/10/2026 Set from the start of GameEngine's destructor onwards: the teardown
+// window, in which a crash path does not unwind (Common/EngineFault.h).
 RTS_ENGINE_CONTEXT_VALUE(bool, engineTearingDown, false)
 
-// Set when a FatalEngineError is constructed in this engine (cleared by TakeEngineFatalErrorThrown or
-// TakeEngineFatalErrorRaised), and when a fatal error returns instead of throwing (the teardown window, or
-// another exception propagating; cleared by TakeEngineFatalErrorRaised only). See FatalEngineError.h.
-RTS_ENGINE_CONTEXT_VALUE(bool, fatalErrorThrown, false)
-RTS_ENGINE_CONTEXT_VALUE(bool, fatalErrorReturned, false)
+// GeneralsX @refactor cemlyn007 15/10/2026 Set once a crash path has raised this engine's fault through its
+// FaultSink, never cleared: the engine is abandoned (Common/EngineFault.h).
+RTS_ENGINE_CONTEXT_VALUE(bool, faultRaised, false)
 
 // PathfindCellInfo::s_infoArray/s_firstFree: the pathfinder's cell-info pool and its free list
 // (AIPathfind.cpp), made and freed by this engine's Pathfinder.

@@ -63,6 +63,7 @@
 // GeneralsX @bugfix cemlyn007 28/09/2026 strtok_r for the per-INI tokeniser (declared by WWLib where libc lacks it)
 #include "strtok_r.h"
 #include "Common/FatalEngineError.h"
+#include "Common/EngineFault.h"
 
 #if __cplusplus >= 201611L && !defined(__APPLE__)
 #define USE_STD_FROM_CHARS_PARSING 1
@@ -451,9 +452,16 @@ UnsignedInt INI::load( AsciiString filename, INILoadType loadType, Xfer *pXfer )
 					// GeneralsX @bugfix Copilot 20/09/2026 Preserve the innermost INI field diagnostic.
 					} catch (const INIException&) {
 						throw;
-					} catch (const FatalEngineError&) { // GeneralsX @bugfix cemlyn007 28/09/2026 Let an embedded-mode fatal error reach the host.
+					}
+#if !RTS_ENGINE_CONTEXT
+					catch (const FatalEngineError&) { // GeneralsX @bugfix cemlyn007 28/09/2026 Let an embedded-mode fatal error reach the host.
 						throw;
-					} catch (...) {
+					}
+#endif
+					catch (...) {
+#if RTS_ENGINE_CONTEXT
+						rts::rethrowIfFaultRaised(); // GeneralsX @refactor cemlyn007 15/10/2026 The sink's unwind leaves with its own reason (Common/EngineFault.h)
+#endif
 						DEBUG_CRASH(("Error parsing block '%s' in INI file '%s'", token, m_filename.str()) );
 						char buff[1024];
 						snprintf(buff, ARRAY_SIZE(buff), "Error parsing INI file '%s' (Line: '%s')\n",
@@ -1601,9 +1609,16 @@ void INI::initFromINIMulti( void *what, const MultiIniFieldParse& parseTableList
 						// GeneralsX @bugfix Copilot 20/09/2026 Do not replace nested field errors with an enclosing module.
 						} catch (const INIException&) {
 							throw;
-						} catch (const FatalEngineError&) { // GeneralsX @bugfix cemlyn007 28/09/2026 Let an embedded-mode fatal error reach the host.
+						}
+#if !RTS_ENGINE_CONTEXT
+						catch (const FatalEngineError&) { // GeneralsX @bugfix cemlyn007 28/09/2026 Let an embedded-mode fatal error reach the host.
 							throw;
-						} catch (...) {
+						}
+#endif
+						catch (...) {
+#if RTS_ENGINE_CONTEXT
+							rts::rethrowIfFaultRaised(); // GeneralsX @refactor cemlyn007 15/10/2026 The sink's unwind leaves with its own reason (Common/EngineFault.h)
+#endif
 							DEBUG_CRASH( ("[LINE: %d - FILE: '%s'] Error reading field '%s' of block '%s'",
 																 INI::getLineNum(), INI::getFilename().str(), field, m_curBlockStart) );
 

@@ -463,7 +463,11 @@ static DX8FrameStatistics LastFrameStatistics;
 
 // GeneralsX @feature cemlyn007 28/09/2026 Atomic (the process's assert switch): every headless engine's command line writes it and any engine's
 // assert path reads it, so engines on separate threads would race on a plain bool (PLAN-023 Phase 5b).
+// GeneralsX @refactor cemlyn007 15/10/2026 With RTS_ENGINE_CONTEXT the crash paths end in the FaultSink, and the assertion
+// dialog asks the engine's render mode, so the process-wide switch goes.
+#if !RTS_ENGINE_CONTEXT
 std::atomic<bool> DX8Wrapper_IsWindowed(true);
+#endif
 #if !RTS_ENGINE_CONTEXT
 bool DX8Wrapper_HeadlessRender = false;  // rlgenerals: see dx8wrapper.h
 
@@ -715,7 +719,9 @@ bool DX8Wrapper::Init(void * hwnd, bool lite)
 	Render2DClass::Set_Screen_Resolution( RectClass( 0, 0, ResolutionWidth, ResolutionHeight ) );
 	BitDepth = DEFAULT_BIT_DEPTH;
 	IsWindowed = false;
+#if !RTS_ENGINE_CONTEXT
 	DX8Wrapper_IsWindowed = false;
+#endif
 
 	for (int light=0;light<4;++light) CurrentDX8LightEnables[light]=false;
 
@@ -1530,7 +1536,9 @@ bool DX8Wrapper::Set_Render_Device(int dev, int width, int height, int bits, int
 
 	if (bits != -1)		BitDepth = bits;
 	if (windowed != -1)	IsWindowed = (windowed != 0);
+#if !RTS_ENGINE_CONTEXT
 	DX8Wrapper_IsWindowed = IsWindowed;
+#endif
 
 	WWDEBUG_SAY(("Attempting Set_Render_Device: name: %s (%s:%s), width: %d, height: %d, windowed: %d",
 		_RenderDeviceNameTable[CurRenderDevice].str(),_RenderDeviceDescriptionTable[CurRenderDevice].Get_Driver_Name(),
