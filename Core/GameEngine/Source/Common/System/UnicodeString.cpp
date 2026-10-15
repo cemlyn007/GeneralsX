@@ -49,7 +49,12 @@
 
 // -----------------------------------------------------
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 A constant in read-only storage (docs/EMBEDDING.md).
+constexpr UnicodeString UnicodeString::TheEmptyString;
+#else
 /*static*/ const UnicodeString UnicodeString::TheEmptyString;
+#endif
 
 #ifndef _WIN32
 // GeneralsX @bugfix fbraz 03/06/2026 Use POSIX locale for vswprintf to allow non-ASCII

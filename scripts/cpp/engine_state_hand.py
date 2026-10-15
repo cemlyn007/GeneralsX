@@ -127,8 +127,6 @@ HAND = [
     (GLOBAL, "", "re:__argc|__argv", "the process's argv (the executable's, set by rlgenerals' launcher; PLAN-023 Phase 5 BootConfig replaces it): boot/shutdown only, serialized by the host (only CommandLine's boot-time parse reads it)"),
     (GLOBAL, "", "re:critSec[1-5]|FilterSoftwareVulkanICDs\\(\\)::hw_icds", "the game executable's own (SDL3Main), unused by an embedding host"),
     (GLOBAL, "", "re:rts::WorkingDirectory::\\w+", "the startup working directory (one per process): boot/shutdown only, serialized by the host (CommandLine's boot-time parse writes and reads it)"),
-    (GLOBAL, "", "s_assetFallbackPath", "the install's asset fallback root: every engine's boot (StdBIGFileSystem::init) sets it, but setAssetRootPath writes only a change, and with RTS_ENGINE_CONTEXT only by the first boot, which settles it even when it resolves no root (another root from a later boot is refused with a stderr message and a DEBUG_CRASH): the engines of a process share one install, so only the first boot writes while later engines' file lookups read it (PLAN-023 Phase 5b)"),
-    (GLOBAL, "", "StdLocalFileSystem::setAssetRootPath(AsciiString const&)::s_assetRootSettled", "std::atomic flag: set by the first boot's setAssetRootPath (even with no root), after which a different root is refused (PLAN-023 Phase 5b)"),
     (GLOBAL, "", "re:s_thread|s_done|s_hasUpdate|s_latestTag", "update checker (menus), one per process"),
     (GLOBAL, "", "re:thread_id_map(_mutex)?|next_thread_id", "pthread-to-Win32 thread id map (CompatLib), process-wide by nature"),
     (GLOBAL, "", "NGMP_OnlineServicesManager::getInstance()::instance", "the process's GeneralsOnline session, logged into from the online menus of the one UI engine: with RTS_ENGINE_CONTEXT only a non-headless engine calls getInstance() (GameEngine::init, every update, its menus and ~GameEngine; headless engines skip it), and there is at most one such engine per process, so no other engine touches the instance (PLAN-023 Phase 5b)"),
@@ -178,7 +176,6 @@ HAND = [
     # `engine_state_symbols.py check --render` prints the render-per-engine and render-scratch rows by phase.
     # The runtime probe (engine_state_probe.py) checks this list against the writes a render engine makes.
     (RPROC, "", "DX8Wrapper_FinalReleaseHook", "the embedding host's check before a render device's or Direct3D interface's last release (RR1): set once, before any render device"),
-    (RPROC, "", "re:ApplicationWindow_(TryLock|Unlock)EventPump", "the embedding host's lock around its window's SDL calls (the event pump, the pillarbox resize check; RR4): an atomic set once, before the window's engine boots, and only read after that"),
     # RR2a-1 moved DX8Wrapper's device state (its class statics, dx8wrapper.cpp's file statics and globals) and
     # Debug_Statistics' counters (statistics.cpp) into W3DRenderState, one per render engine (EngineContext::w3dRender,
     # heap-allocated by DX8Wrapper::Init, freed by Destroy_Render_State at the end of WW3D::Shutdown from RR2a-2); the host's two render switches are EngineContext fields.

@@ -20,7 +20,10 @@ one engine's state:
 
 Code reaches the current context through one `thread_local` pointer,
 `rts::t_engine`, read by `rts::ctx()`. An `rts::Scope` makes a context current
-for the duration of a call and restores the previous one.
+for the duration of a call and restores the previous one. Outside every engine
+the current context is `rts::g_noEngine`, whose singletons are all null: a
+constant in read-only storage, never destroyed, so nothing can write it. A
+per-engine static used there is refused.
 
 ## The accessors
 
@@ -77,6 +80,12 @@ Each engine holds its own reference to the D3D8 library: `DX8Wrapper::Init`
 loads it and `DX8Wrapper::Shutdown` frees it. The host holds a reference of its
 own while any render engine lives, so DXVK stays loaded between engines.
 
+A hook the host installs is per engine as well, so the host installs it in
+each engine it makes: the event-pump lock
+(`ApplicationWindow_TryLockEventPump` and `ApplicationWindow_UnlockEventPump`),
+which an engine with a window takes around its SDL calls. Nothing initialises
+once per process, which is what lets engines be made again after a shutdown.
+
 ## Name keys
 
 Each engine interns names in a `NameKeyGenerator` of its own, made by
@@ -93,7 +102,9 @@ Data no engine writes is constant, so it is read-only and shared: tables are
 `GameMakeColor` is `constexpr`, so they are constant-initialised. A function
 that only reads a table takes it as `const char * const *`, so the table can
 be constant. The empty `StringClass` and `WideStringClass`
-buffers are constants that no constructor writes. A string constant is a
+buffers are constants that no constructor writes, and the empty strings
+`AsciiString::TheEmptyString` and `UnicodeString::TheEmptyString` are
+`constexpr` constants. A string constant is a
 `constexpr` literal, not a `std::string`, which static initialisation builds
 in writable storage, and a pointer to a string literal is itself `const`. An
 object that only marks something by its address, such as the grid water's
