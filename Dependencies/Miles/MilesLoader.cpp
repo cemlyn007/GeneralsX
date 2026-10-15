@@ -216,11 +216,11 @@ AIL_set_stream_volume_pan_t AIL_set_stream_volume_panPtr = nullptr;
 AIL_stream_volume_pan_t AIL_stream_volume_panPtr = nullptr;
 AIL_get_timer_highest_delay_t AIL_get_timer_highest_delayPtr = nullptr;
 
+#if MILES_LOADER_SUPPORTED
 int ReferenceCount = 0;
 bool Failed = false;
 unsigned long LastError = 0;
 
-#if MILES_LOADER_SUPPORTED
 HMODULE Module = HMODULE(nullptr);
 
 // Resolves one export into its matching function pointer. The exported names are decorated, so
@@ -440,6 +440,11 @@ bool MilesLoader::isLoaded()
 }
 
 
+// GeneralsX @refactor cemlyn007 15/10/2026 Where mss32.dll cannot exist (every build but the 32 bit
+// Windows one), the loader keeps no state: every load fails with no system error, and there is
+// nothing to count or unload. Its reference count and failure flags were process-wide mutable
+// state that no engine needs, as no audio manager these builds compile uses Miles.
+#if MILES_LOADER_SUPPORTED
 bool MilesLoader::isFailed()
 {
 	return Failed;
@@ -465,7 +470,6 @@ bool MilesLoader::load()
 	if (ReferenceCount > 1)
 		return true;
 
-#if MILES_LOADER_SUPPORTED
 	// Load mss32.dll by name, so that the usual module search order applies.
 	Module = ::LoadLibraryA("mss32.dll");
 	if (Module == HMODULE(nullptr)) {
@@ -476,10 +480,6 @@ bool MilesLoader::load()
 
 	resolveAll();
 	return true;
-#else
-	Failed = true;
-	return false;
-#endif
 }
 
 
@@ -491,12 +491,33 @@ void MilesLoader::unload()
 	if (ReferenceCount > 0)
 		return;
 
-#if MILES_LOADER_SUPPORTED
 	freeResources();
-#endif
 	Failed = false;
 	LastError = 0;
 }
+#else
+bool MilesLoader::isFailed()
+{
+	return true;
+}
+
+
+unsigned long MilesLoader::getLastError()
+{
+	return 0;
+}
+
+
+bool MilesLoader::load()
+{
+	return false;
+}
+
+
+void MilesLoader::unload()
+{
+}
+#endif
 
 
 // The Miles functions below stand in for the imports of mss32.dll. An unresolved function returns

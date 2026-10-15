@@ -1544,6 +1544,12 @@ void OpenALAudioManager::openDevice(void)
 
 	enumerateDevices();
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 15/10/2026 The ledger is found before the device is opened, so
+	// that an engine with no embedding opens nothing.
+	m_ledger = rts::currentEmbedding("the audio device's ledger").resourceLedger;
+#endif
+
 	m_alcDevice = alcOpenDevice(NULL);
 	if (m_alcDevice == nullptr) {
 		DEBUG_LOG(("Failed to open ALC device"));
@@ -1552,8 +1558,40 @@ void OpenALAudioManager::openDevice(void)
 		return;
 	}
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 15/10/2026 Record the device; its release closes it. OpenAL Soft's
+	// alcCloseDevice also releases any context still on the device, but a context that is still
+	// current stays referenced, so the context has its own record (below), released first.
+	try {
+		m_alcDeviceRecord = m_ledger->record("audio device", reinterpret_cast<std::uintptr_t>(m_alcDevice),
+			[](std::uintptr_t handle) { alcCloseDevice(reinterpret_cast<ALCdevice*>(handle)); });
+	} catch (...) {
+		alcCloseDevice(m_alcDevice);
+		m_alcDevice = nullptr;
+		throw;
+	}
+#endif
+
 	ALCint attributes[] = { ALC_FREQUENCY, audioSettings->m_outputRate, 0 /* end-of-list */ };
 	m_alcContext = alcCreateContext(m_alcDevice, attributes);
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 15/10/2026 Record the context; its release clears it as the current
+	// context if it is current, then destroys it.
+	if (m_alcContext != nullptr) {
+		try {
+			m_alcContextRecord = m_ledger->record("audio context", reinterpret_cast<std::uintptr_t>(m_alcContext),
+				[](std::uintptr_t handle) {
+					ALCcontext* const context = reinterpret_cast<ALCcontext*>(handle);
+					if (alcGetCurrentContext() == context)
+						alcMakeContextCurrent(nullptr);
+					alcDestroyContext(context);
+				});
+		} catch (...) {
+			closeDevice();
+			throw;
+		}
+	}
+#endif
 	if (m_alcContext == nullptr) {
 		DEBUG_LOG(("Failed to create ALC context"));
 		setOn(false, AudioAffect_All);
@@ -1605,7 +1643,15 @@ void OpenALAudioManager::closeDevice(void)
 	// engine's context in the same process, and made AL calls when no device was ever opened
 	// (-noaudio, or a device that failed to open). The handles are nulled so a second
 	// closeDevice (the destructor calls it too) is a no-op.
+	// GeneralsX @feature cemlyn007 15/10/2026 Each handle's ledger record is forgotten as this manager
+	// releases the handle itself.
 	if (m_alcContext) {
+#if RTS_ENGINE_CONTEXT
+		if (m_alcContextRecord) {
+			m_ledger->forget(*m_alcContextRecord);
+			m_alcContextRecord.reset();
+		}
+#endif
 		if (alcGetCurrentContext() == m_alcContext)
 			alcMakeContextCurrent(nullptr);
 		alcDestroyContext(m_alcContext);
@@ -1613,6 +1659,12 @@ void OpenALAudioManager::closeDevice(void)
 	}
 
 	if (m_alcDevice) {
+#if RTS_ENGINE_CONTEXT
+		if (m_alcDeviceRecord) {
+			m_ledger->forget(*m_alcDeviceRecord);
+			m_alcDeviceRecord.reset();
+		}
+#endif
 		alcCloseDevice(m_alcDevice);
 		m_alcDevice = nullptr;
 	}
