@@ -107,7 +107,11 @@ protected:
 };
 
 // GeneralsX @bugfix fbraz3 12/03/2026 Restore inline definitions lost during upstream merge conflict resolution
+// GeneralsX @feature cemlyn007 15/10/2026 With RTS_ENGINE_CONTEXT, setQuitting is defined in GameEngine.cpp: a request
+// to quit is reported to the host's QuitListener.
+#if !RTS_ENGINE_CONTEXT
 inline void GameEngine::setQuitting( Bool quitting ) { m_quitting = quitting; }
+#endif
 inline Bool GameEngine::getQuitting() { return m_quitting; }
 
 	// the game engine singleton

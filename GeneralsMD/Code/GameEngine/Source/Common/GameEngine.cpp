@@ -33,6 +33,9 @@
 #include "Common/ActionManager.h"
 // GeneralsX @refactor cemlyn007 30/09/2026 The window handles (PLAN-023 Phase 8, stage RR2a-2).
 #include "Common/ApplicationWindow.h"
+#if RTS_ENGINE_CONTEXT
+#include "Common/EmbeddingContract.h"
+#endif
 #include "Common/AudioAffect.h"
 #include "Common/BuildAssistant.h"
 #include "Common/CRCDebug.h"
@@ -291,6 +294,29 @@ GameEngine::GameEngine()
 	_Module.Init(nullptr, ApplicationHInstance, nullptr);
 #endif
 }
+
+#if RTS_ENGINE_CONTEXT
+//-------------------------------------------------------------------------------------------------
+// GeneralsX @feature cemlyn007 15/10/2026 Report the game's own requests to quit to the host's QuitListener
+// Every place the game asks to quit sets this flag, which ends execute()'s main loop. Embedded, the engine's host runs
+// its frames instead, so it is told through the QuitListener of the current engine's EmbeddingConfig when the engine
+// starts quitting, and stops running frames (docs/EMBEDDING.md). GeneralsX never ends the process for a quit. The
+// flag is still set, so the game's own code that checks getQuitting() behaves as upstream within the frame that
+// asked, and the game executable's main loop ends as upstream. The listener is told once per change from not
+// quitting to quitting; clearing the flag (a restart from the quit menu) and asking again tells it again.
+// With no embedded engine current, a request to quit throws std::logic_error and leaves the flag as it was.
+void GameEngine::setQuitting( Bool quitting )
+{
+	if (!quitting || m_quitting)
+	{
+		m_quitting = quitting;
+		return;
+	}
+	rts::QuitListener* const listener = rts::currentEmbedding("the quit listener").quitListener;
+	m_quitting = TRUE;
+	listener->quitRequested();
+}
+#endif
 
 //-------------------------------------------------------------------------------------------------
 GameEngine::~GameEngine()
@@ -914,7 +940,12 @@ void GameEngine::init()
 		{
 			// just quit, since the map cache has already updated
 			//populateMapListbox(nullptr, true, true);
+#if RTS_ENGINE_CONTEXT
+			// GeneralsX @feature cemlyn007 15/10/2026 Through setQuitting, which tells the host's QuitListener
+			setQuitting(TRUE);
+#else
 			m_quitting = TRUE;
+#endif
 		}
 
 		// load the initial shell screen
