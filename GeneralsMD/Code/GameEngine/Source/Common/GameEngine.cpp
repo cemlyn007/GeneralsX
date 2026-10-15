@@ -78,6 +78,9 @@
 #include "Common/FatalEngineError.h"
 #include "Common/Registry.h"
 #include "Common/GameCommon.h"	// FOR THE ALLOW_DEBUG_CHEATS_IN_RELEASE #define
+#if RTS_ENGINE_CONTEXT
+#include "Common/EngineThread.h" // GeneralsX @feature cemlyn007 15/10/2026 rts::stopEngineThreads
+#endif
 
 #include "GameLogic/Armor.h"
 #include "GameLogic/AI.h"
@@ -324,6 +327,12 @@ GameEngine::~GameEngine()
 	// GeneralsX @bugfix cemlyn007 28/09/2026 From here on an embedded-mode fatal error does not
 	// throw (see FatalEngineError.h)
 	SetEngineTearingDown(true);
+
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 15/10/2026 The threads this engine started stop before the state they use is freed
+	// (Common/EngineThread.h); its host joins them
+	rts::stopEngineThreads();
+#endif
 
 	//extern std::vector<std::string>	preloadTextureNamesGlobalHack;
 	//preloadTextureNamesGlobalHack.clear();

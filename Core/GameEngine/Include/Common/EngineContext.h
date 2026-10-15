@@ -48,6 +48,9 @@
 //   Such a thread must end before its engine's EngineContext is destroyed, just as it must not outlive
 //   the singletons it reads. A new thread start that reads engine state needs the same wrapper; without
 //   it the thread sees g_noEngine and its first singleton access dereferences null.
+//   GeneralsX @refactor cemlyn007 15/10/2026 Every thread the Bazel-built engine runs is now started through its host's
+//   ThreadStarter, which makes the context current on it (Common/EngineThread.h). withCurrentEngine stays for the
+//   std::threads of code that build does not compile (GeneralsOnline, the NGMP menus).
 // - Process-global state (the critical sections, the memory manager, the NameKey generator, TheVersion,
 //   debug globals, constant tables) stays in ordinary globals; see EngineSingletons.inl.
 #pragma once

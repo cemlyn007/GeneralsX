@@ -54,6 +54,9 @@
 
 #include "WWDownload/Registry.h"
 #include "WWDownload/urlBuilder.h"
+#if RTS_ENGINE_CONTEXT
+#include "Common/EngineThread.h" // GeneralsX @feature cemlyn007 15/10/2026 rts::startEngineThread
+#endif
 
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -134,7 +137,8 @@ RTS_ENGINE_GLOBAL(Bool, s_asyncDNSLookupInProgress, FALSE);
 static Bool s_asyncDNSLookupInProgress = FALSE;
 #endif
 #if RTS_ENGINE_CONTEXT
-RTS_ENGINE_GLOBAL(HANDLE, s_asyncDNSThreadHandle, nullptr);
+// GeneralsX @feature cemlyn007 15/10/2026 The lookup thread, started through the engine's ThreadStarter
+RTS_ENGINE_GLOBAL(std::shared_ptr<rts::EngineThread>, s_asyncDNSThreadHandle);
 #define s_asyncDNSThreadHandle RTS_ENGINE_GLOBAL_REF(s_asyncDNSThreadHandle)
 #else
 static HANDLE s_asyncDNSThreadHandle = nullptr;
@@ -778,6 +782,22 @@ void CheckNumPlayersOnline()
 
 ///////////////////////////////////////////////////////////////////////////////////////
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 15/10/2026 The lookup runs on a thread started through the engine's ThreadStarter
+// (Common/EngineThread.h), with its own copy of the host name (the caller's is a local array). gethostbyname cannot
+// be interrupted, so a stop request takes effect when it returns: the thread then leaves the results alone.
+static void asyncGethostbynameThreadBody( const std::string& name, const std::stop_token& stop )
+{
+	HOSTENT *he = gethostbyname( name.c_str() );
+	if (stop.stop_requested())
+	{
+		return;
+	}
+
+	s_asyncDNSThreadSucceeded = (he != nullptr) ? TRUE : FALSE;
+	s_asyncDNSThreadDone = TRUE;
+}
+#else
 DWORD WINAPI asyncGethostbynameThreadFunc( void * szName )
 {
 	HOSTENT *he = gethostbyname( (const char *)szName );
@@ -794,6 +814,7 @@ DWORD WINAPI asyncGethostbynameThreadFunc( void * szName )
 	s_asyncDNSThreadDone = TRUE;
 	return 0;
 }
+#endif
 
 ///////////////////////////////////////////////////////////////////////////////////////
 
@@ -804,9 +825,7 @@ int asyncGethostbyname(char * szName)
 #else
 	static int            stat = 0;
 #endif
-#if RTS_ENGINE_CONTEXT
-	RTS_ENGINE_STATIC(unsigned long, threadid);
-#else
+#if !RTS_ENGINE_CONTEXT
 	static unsigned long  threadid;
 #endif
 
@@ -814,7 +833,14 @@ int asyncGethostbyname(char * szName)
 	{
 		/* Kick off gethostname thread */
 		s_asyncDNSThreadDone = FALSE;
+#if RTS_ENGINE_CONTEXT
+		s_asyncDNSThreadHandle = rts::startEngineThread( "async DNS lookup", [name = std::string(szName)]( std::stop_token stop )
+		{
+			asyncGethostbynameThreadBody( name, stop );
+		} );
+#else
 		s_asyncDNSThreadHandle = CreateThread( nullptr, 0, asyncGethostbynameThreadFunc, szName, 0, &threadid );
+#endif
 
 		if( s_asyncDNSThreadHandle == nullptr )
 		{
@@ -888,9 +914,15 @@ void StopAsyncDNSCheck()
 {
 	if (s_asyncDNSThreadHandle)
 	{
+#if RTS_ENGINE_CONTEXT
+		// GeneralsX @feature cemlyn007 15/10/2026 A thread is never terminated: it is asked to stop, and leaves the
+		// lookup's results alone when its lookup returns
+		s_asyncDNSThreadHandle->requestStop();
+#else
 		MAYBE_UNUSED Int res = TerminateThread(s_asyncDNSThreadHandle, 0);
 		(void)res;
 		DEBUG_ASSERTCRASH(res, ("Could not terminate the Async DNS Lookup thread!"));	// Thread still not killed!
+#endif
 	}
 	s_asyncDNSThreadHandle = nullptr;
 	s_asyncDNSLookupInProgress = FALSE;

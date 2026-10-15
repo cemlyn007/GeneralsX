@@ -56,6 +56,10 @@
 //#include "wlib/wstring.h"
 
 #include "DownloadDebug.h"
+#if RTS_ENGINE_CONTEXT
+#include "Common/EngineThread.h" // GeneralsX @feature cemlyn007 15/10/2026 rts::startEngineThread
+#include <string>
+#endif
 
 // umm... what?? BGC 3/27/03
 //#ifndef RTS_DEBUG
@@ -270,6 +274,24 @@ void Cftp::ZeroStuff()
 }
 
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 15/10/2026 The lookup runs on a thread started through the engine's ThreadStarter
+// (Common/EngineThread.h), with its own copy of the host name. gethostbyname cannot be interrupted, so a stop request
+// takes effect when it returns: the thread then leaves the results alone.
+static void gethostbynameThreadBody( const std::string& name, const std::stop_token& stop )
+{
+	HOSTENT *he = gethostbyname( name.c_str() );
+	if (stop.stop_requested())
+		return;
+
+	if (he)
+		memcpy((char *)&(gThreadAddress.sin_addr), he->h_addr, he->h_length );
+	else
+		memcpy((char *)&(gThreadAddress.sin_addr),"",strlen("")+1);
+
+	gThreadFlag = 1;
+}
+#else
 DWORD WINAPI gethostbynameA( void * szName )
 {
 	HOSTENT *he = gethostbyname( (const char *)szName );
@@ -284,6 +306,7 @@ DWORD WINAPI gethostbynameA( void * szName )
 	gThreadFlag = 1;
 	return 0;
 }
+#endif
 
 
 int Cftp::AsyncGetHostByName(char * szName, struct sockaddr_in &address )
@@ -293,9 +316,7 @@ int Cftp::AsyncGetHostByName(char * szName, struct sockaddr_in &address )
 #else
 	static int            stat = 0;
 #endif
-#if RTS_ENGINE_CONTEXT
-	RTS_ENGINE_STATIC(unsigned long, threadid);
-#else
+#if !RTS_ENGINE_CONTEXT
 	static unsigned long  threadid;
 #endif
 
@@ -305,10 +326,17 @@ int Cftp::AsyncGetHostByName(char * szName, struct sockaddr_in &address )
 		gThreadFlag = 0;
       memset(&gThreadAddress,0,sizeof(gThreadAddress));
 
+#if RTS_ENGINE_CONTEXT
+		rts::startEngineThread( "FTP host lookup", [name = std::string(szName)]( std::stop_token stop )
+		{
+			gethostbynameThreadBody( name, stop );
+		} );
+#else
 		if( CreateThread( nullptr, 0, gethostbynameA, szName, 0, &threadid ) == nullptr )
 		{
 			return( FTP_FAILED );
 		}
+#endif
 		stat = 1;
 	}
 	if( stat == 1 )

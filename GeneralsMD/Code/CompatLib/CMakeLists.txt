@@ -117,6 +117,13 @@ add_library(CompatLib STATIC ${SOURCE_COMPAT})
 set_property(TARGET CompatLib PROPERTY CXX_STANDARD 17)
 set_property(TARGET d3dx8 PROPERTY CXX_STANDARD 17)
 
+# GeneralsX @feature cemlyn007 15/10/2026 CompatLib does not link core_config, so it is told of RTS_ENGINE_CONTEXT here:
+# with it, thread_compat.cpp creates no thread (every thread an engine runs comes from its host's ThreadStarter) and
+# keeps no thread-id table
+if(RTS_ENGINE_CONTEXT)
+    target_compile_definitions(CompatLib PRIVATE RTS_ENGINE_CONTEXT=1)
+endif()
+
 # GeneralsX @bugfix BenderAI 02/03/2026 - Enforce DXVK source availability before CompatLib compiles
 # On macOS, DXVK is built via ExternalProject (Meson) which clones the source during the BUILD phase,
 # not during configure. This means _deps/dxvk-src/include/native/windows/windows_base.h does not

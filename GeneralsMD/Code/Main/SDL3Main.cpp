@@ -408,6 +408,12 @@ int main(int argc, char* argv[])
 		exitcode = 1;
 	}
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 15/10/2026 The engine's threads stop and are joined while what they use is still
+	// up (ExecutableThreadStarter.cpp)
+	rts::stopExecutableThreads();
+#endif
+
 	// Cleanup SDL3 resources
 	if (TheSDL3Window) {
 		SDL_DestroyWindow(TheSDL3Window);

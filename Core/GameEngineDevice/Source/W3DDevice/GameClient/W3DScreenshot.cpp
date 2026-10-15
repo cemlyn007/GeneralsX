@@ -25,8 +25,13 @@
 #include "WWLib/mpsc_intrusive_queue.h"
 #include <stb_image_write.h>
 
+#if RTS_ENGINE_CONTEXT
+#include "Common/EngineThread.h" // GeneralsX @feature cemlyn007 15/10/2026 rts::startEngineThread
+#endif
 #ifndef _WIN32
+#if !RTS_ENGINE_CONTEXT
 #include <thread>
+#endif
 #include <filesystem>
 #endif
 
@@ -70,7 +75,14 @@ RTS_ENGINE_GLOBAL(MPSCIntrusiveQueue<ScreenshotWrittenMessage>, s_screenshotWrit
 static MPSCIntrusiveQueue<ScreenshotWrittenMessage> s_screenshotWrittenQueue;
 #endif
 
-#ifdef _WIN32
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 15/10/2026 Started through the engine's ThreadStarter (Common/EngineThread.h), which owns
+// `data`. The work is short and waits for nothing, so the thread checks for a stop request before each part of it.
+static void screenshotThreadFunc(ScreenshotThreadData* data, const std::stop_token& stop)
+{
+	if (stop.stop_requested())
+		return;
+#elif defined(_WIN32)
 static DWORD WINAPI screenshotThreadFunc(LPVOID param)
 {
 	ScreenshotThreadData* data = static_cast<ScreenshotThreadData*>(param);
@@ -132,6 +144,13 @@ static void screenshotThreadFunc(ScreenshotThreadData* data)
 	}
 
 	int success = 0;
+#if RTS_ENGINE_CONTEXT
+	if (stop.stop_requested())
+	{
+		delete[] image;
+		return;
+	}
+#endif
 	switch (data->format)
 	{
 		case SCREENSHOT_JPEG:
@@ -154,9 +173,11 @@ static void screenshotThreadFunc(ScreenshotThreadData* data)
 	}
 
 	delete[] image;
+#if !RTS_ENGINE_CONTEXT
 	delete data;
+#endif
 
-#ifdef _WIN32
+#if defined(_WIN32) && !RTS_ENGINE_CONTEXT
 	return success;
 #endif
 }
@@ -247,7 +268,12 @@ void W3D_TakeCompressedScreenshot(ScreenshotFormat format, Int jpegQuality)
 	surfaceCopy->Release_Ref();
 	surfaceCopy = nullptr;
 
-#ifdef _WIN32
+#if RTS_ENGINE_CONTEXT
+	const std::shared_ptr<ScreenshotThreadData> ownedThreadData(threadData);
+	rts::startEngineThread("screenshot", [ownedThreadData](std::stop_token stop) {
+		screenshotThreadFunc(ownedThreadData.get(), stop);
+	});
+#elif defined(_WIN32)
 	const HANDLE hThread = CreateThread(nullptr, 0, screenshotThreadFunc, threadData, 0, nullptr);
 	if (hThread)
 	{
