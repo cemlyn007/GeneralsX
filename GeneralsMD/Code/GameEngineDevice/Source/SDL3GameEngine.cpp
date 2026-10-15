@@ -310,12 +310,21 @@ void SDL3GameEngine::pollSDL3Events(void)
 	SDL_Event event;
 	while (SDL_PollEvent(&event)) {
 		switch (event.type) {
+			// GeneralsX @feature cemlyn007 15/10/2026 Through setQuitting, which tells the host's QuitListener
 			case SDL_EVENT_QUIT:
+#if RTS_ENGINE_CONTEXT
+				setQuitting(TRUE);
+#else
 				m_quitting = true;
+#endif
 				break;
 
 			case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
+#if RTS_ENGINE_CONTEXT
+				setQuitting(TRUE);
+#else
 				m_quitting = true;
+#endif
 				break;
 
 			case SDL_EVENT_WINDOW_FOCUS_GAINED:

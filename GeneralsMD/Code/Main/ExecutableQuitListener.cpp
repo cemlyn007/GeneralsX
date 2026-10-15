@@ -16,8 +16,12 @@
 **	along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 // FILE: ExecutableQuitListener.cpp
-// GeneralsX @feature cemlyn007 15/10/2026 The game executable's QuitListener (see ExecutableEmbedding.h): none until task 5.7 of
-// baseline-engine-specs makes GeneralsX use one.
+// GeneralsX @feature cemlyn007 15/10/2026 The game executable's QuitListener (see ExecutableEmbedding.h)
+//
+// The game asks to quit through GameEngine::setQuitting, which sets the engine's quitting flag and then tells this
+// listener. The flag ends GameEngine::execute()'s main loop, so GameMain returns and the executable exits as upstream
+// does; the executable runs its engine's frames itself, so it has nothing more to do. The listener holds no state:
+// it is constant initialised, so it lives in read-only storage.
 
 #if RTS_ENGINE_CONTEXT
 
@@ -26,9 +30,26 @@
 namespace rts
 {
 
+namespace
+{
+
+class ExecutableQuitListener final : public QuitListener
+{
+public:
+	constexpr ExecutableQuitListener() = default;
+
+	void quitRequested() override
+	{
+	}
+};
+
+constinit ExecutableQuitListener TheExecutableQuitListener;
+
+} // namespace
+
 QuitListener* executableQuitListener()
 {
-	return nullptr;
+	return &TheExecutableQuitListener;
 }
 
 } // namespace rts

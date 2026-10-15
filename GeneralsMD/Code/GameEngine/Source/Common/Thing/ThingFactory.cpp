@@ -454,6 +454,10 @@ AsciiString TheThingTemplateBeingParsedName;
 #ifdef CHECK_THING_NAMES
 
 #include "Common/STLTypedefs.h"
+// GeneralsX @feature cemlyn007 15/10/2026 For the request to quit below
+#if RTS_ENGINE_CONTEXT
+#include "Common/GameEngine.h"
+#endif
 
 const char *outFilenameINI				= "thing.txt";
 const char *outFilenameStringFile	= "thingString.txt";
@@ -560,6 +564,11 @@ void ThingFactory::postProcessLoad()
 
 #ifdef CHECK_THING_NAMES
 	dumpMissingStringNames();
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 15/10/2026 Ask to quit instead of ending the process, which the engine's host owns
+	TheGameEngine->setQuitting(TRUE);
+#else
 	exit(0);
+#endif
 #endif
 }
