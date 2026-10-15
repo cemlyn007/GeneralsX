@@ -16,6 +16,7 @@ one engine's state:
 - every singleton (`Common/EngineSingletons.inl`), as a field;
 - the direct fields of `Common/EngineContextFields.inl` and the random seeds;
 - the engine's copy of every per-engine static (below);
+- the engine's memory manager (below);
 - the host's `EmbeddingConfig`, for a context made for an embedded engine.
 
 Code reaches the current context through one `thread_local` pointer,
@@ -124,6 +125,19 @@ compile time, so the defaults lie in read-only storage: `.rodata`, or
 `.data.rel.ro` where they hold a vtable pointer, which the loader makes
 read-only before any code runs. Nothing can write them.
 
+## The memory manager
+
+The engine's memory manager, `TheDynamicMemoryAllocator` and
+`TheMemoryPoolFactory`, is per engine: `initMemoryManager` makes it in the
+current context and `shutdownMemoryManager` destroys it. With no engine current
+there is none. Every engine allocates from the system heap, so a block one
+engine's allocator gave can be freed in any context, or none
+(`DynamicMemoryAllocator::freeBytes` is static).
+
+An engine's ordinary teardown frees what it allocated. An engine that faulted
+is abandoned instead: its state is left as the fault found it, so none of its
+destructors run, and its memory stays allocated until the process exits.
+
 ## The interfaces
 
 `Core/GameEngine/Include/Common/EmbeddingContract.h` declares what the host
@@ -161,7 +175,8 @@ Writable storage outside every context holds only:
 Nothing else is shared between engines, and nothing initialises once per
 process. A host can check this on the built library: every symbol in writable
 static storage (`.data`, `.bss`, `.tdata`, `.tbss`) must be one of those
-above. Until the host's services take over the memory manager, the working
-directory, thread creation, the crash paths, the audio loader and the D3D8
-device's last release, the state those mechanisms still hold is the one
-exception, and the host's check names each piece.
+above. Until operator new forwards to the process's allocator without a cache, and the
+host's services take over the working directory, thread creation, the crash
+paths, the audio loader and the D3D8 device's last release, the state those
+mechanisms still hold is the one exception, and the host's check names each
+piece.

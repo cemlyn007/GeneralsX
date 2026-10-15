@@ -62,8 +62,14 @@ public:
 	void debugIgnoreLeaksForThisBlock(void* pBlockPtr);
 #endif
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 15/10/2026 Every engine's allocator frees to the system heap, so freeing needs no
+	// allocator: a block one engine's allocator gave can be freed in any context, or none.
+	static void freeBytes(void* pMem) noexcept;
+#else
 	/// free the bytes. (assumes allocated by this dma.)
 	void freeBytes(void* pMem) noexcept;
+#endif
 
 	/**
 		return the actual number of bytes that would be allocated
@@ -157,8 +163,10 @@ extern Bool isMemoryManagerOfficiallyInited();
 */
 extern void shutdownMemoryManager();
 
+#if !RTS_ENGINE_CONTEXT
 extern MemoryPoolFactory *TheMemoryPoolFactory;
 extern DynamicMemoryAllocator *TheDynamicMemoryAllocator;
+#endif
 
 
 // TheSuperHackers @info

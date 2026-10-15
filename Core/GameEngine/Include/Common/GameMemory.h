@@ -191,6 +191,12 @@
 #include "GameMemoryNull.h"
 #else
 
+// GeneralsX @feature cemlyn007 15/10/2026 An engine context's memory manager is the null one: these pools are
+// process-wide.
+#if RTS_ENGINE_CONTEXT
+#error "RTS_ENGINE_CONTEXT needs DISABLE_GAMEMEMORY (RTS_GAMEMEMORY_ENABLE OFF)"
+#endif
+
 #ifdef MEMORYPOOL_DEBUG
 
 	#define DECLARE_LITERALSTRING_ARG1										const char * debugLiteralTagString
@@ -825,8 +831,10 @@ extern Bool isMemoryManagerOfficiallyInited();
 */
 extern void shutdownMemoryManager();
 
+#if !RTS_ENGINE_CONTEXT
 extern MemoryPoolFactory *TheMemoryPoolFactory;
 extern DynamicMemoryAllocator *TheDynamicMemoryAllocator;
+#endif
 
 /**
 	This function is declared in this header, but is not defined anywhere -- you must provide

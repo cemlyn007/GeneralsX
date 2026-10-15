@@ -10,6 +10,13 @@ if(RTS_BUILD_OPTION_ASAN OR RTS_SANITIZE STREQUAL "address")
     set(RTS_GAMEMEMORY_ENABLE OFF)
 endif()
 
+# GeneralsX @feature cemlyn007 15/10/2026 With RTS_ENGINE_CONTEXT each engine has its own memory manager, the null one,
+# so the pools, which are process-wide, are off.
+if(RTS_ENGINE_CONTEXT AND RTS_GAMEMEMORY_ENABLE)
+    message(STATUS "RTS_ENGINE_CONTEXT: game memory pools off (they are process-wide; each engine has its own null memory manager)")
+    set(RTS_GAMEMEMORY_ENABLE OFF)
+endif()
+
 # Memory pool features
 option(RTS_MEMORYPOOL_OVERRIDE_MALLOC "Enables the Dynamic Memory Allocator for malloc calls." OFF)
 option(RTS_MEMORYPOOL_MPSB_DLINK "Adds a backlink to MemoryPoolSingleBlock. Makes it faster to free raw DMA blocks, but increases memory consumption." ON)
