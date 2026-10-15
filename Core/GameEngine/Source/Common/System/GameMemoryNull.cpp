@@ -19,7 +19,7 @@
 #include "PreRTS.h"
 
 #if RTS_ENGINE_CONTEXT
-#include <mutex>
+#include <stdexcept>
 #endif
 
 // GeneralsX @bugfix BenderAI 24/02/2026 Phase 5 - malloc.h not on macOS
@@ -39,14 +39,18 @@
 
 #include "Common/GameMemoryNull.h"
 
+#if !RTS_ENGINE_CONTEXT
 static Bool theMainInitFlag = false;
+#endif
 
 // ----------------------------------------------------------------------------
 // PUBLIC DATA
 // ----------------------------------------------------------------------------
 
+#if !RTS_ENGINE_CONTEXT
 MemoryPoolFactory *TheMemoryPoolFactory = nullptr;
 DynamicMemoryAllocator *TheDynamicMemoryAllocator = nullptr;
+#endif
 
 //-----------------------------------------------------------------------------
 // METHODS for DynamicMemoryAllocator
@@ -120,23 +124,76 @@ void MemoryPoolFactory::debugSetInitFillerIndex(Int index)
 //-----------------------------------------------------------------------------
 
 #if RTS_ENGINE_CONTEXT
-// GeneralsX @feature cemlyn007 28/09/2026 The memory manager is process-wide and every engine in the
-// process uses it, so initMemoryManager/shutdownMemoryManager are refcounted: only the last shutdown
-// destroys it (PLAN-023 Phase 1).
-static std::mutex theMemoryManagerUsersMutex;
-static Int theMemoryManagerUsers = 0;
-#endif
+// GeneralsX @refactor cemlyn007 15/10/2026 Each engine has its own memory manager, made and destroyed with the engine in
+// its context, so nothing counts the engines that use one (docs/EMBEDDING.md). Every one allocates from the system heap.
+
+/**
+	Initialize the current engine's memory manager, and create its TheMemoryPoolFactory and TheDynamicMemoryAllocator.
+*/
+void initMemoryManager()
+{
+	if (!rts::hasCurrentEngine())
+	{
+		DEBUG_CRASH(("the memory manager is made with no engine current"));
+		throw std::logic_error("the memory manager is made with no engine current");
+	}
+	if (TheMemoryPoolFactory != nullptr || TheDynamicMemoryAllocator != nullptr)
+	{
+		DEBUG_CRASH(("Null Memory Manager is already initialized"));
+		return;
+	}
+
+	void* const factory = malloc(sizeof(MemoryPoolFactory));
+	void* const allocator = malloc(sizeof(DynamicMemoryAllocator));
+	if (factory == nullptr || allocator == nullptr)
+	{
+		free(factory);
+		free(allocator);
+		throw ERROR_OUT_OF_MEMORY;
+	}
+	TheMemoryPoolFactory = new (factory) MemoryPoolFactory;
+	TheDynamicMemoryAllocator = new (allocator) DynamicMemoryAllocator;
+
+	DEBUG_INIT(DEBUG_FLAGS_DEFAULT);
+	DEBUG_LOG(("*** Initialized the Null Memory Manager"));
+}
+
+//-----------------------------------------------------------------------------
+Bool isMemoryManagerOfficiallyInited()
+{
+	return TheDynamicMemoryAllocator != nullptr;
+}
+
+//-----------------------------------------------------------------------------
+/**
+	shutdown the current engine's memory manager. Blocks it allocated stay allocated until they are freed.
+*/
+void shutdownMemoryManager()
+{
+	if (TheDynamicMemoryAllocator != nullptr)
+	{
+		TheDynamicMemoryAllocator->~DynamicMemoryAllocator();
+		free((void *)TheDynamicMemoryAllocator);
+		TheDynamicMemoryAllocator = nullptr;
+	}
+
+	if (TheMemoryPoolFactory != nullptr)
+	{
+		TheMemoryPoolFactory->~MemoryPoolFactory();
+		free((void *)TheMemoryPoolFactory);
+		TheMemoryPoolFactory = nullptr;
+	}
+
+	DEBUG_SHUTDOWN();
+}
+
+#else
 
 /**
 	Initialize the memory manager, and create TheMemoryPoolFactory and TheDynamicMemoryAllocator.
 */
 void initMemoryManager()
 {
-#if RTS_ENGINE_CONTEXT
-	std::lock_guard<std::mutex> users(theMemoryManagerUsersMutex);
-	if (theMemoryManagerUsers++ > 0)
-		return;
-#endif
 	if (TheMemoryPoolFactory == nullptr && TheDynamicMemoryAllocator == nullptr)
 	{
 		TheMemoryPoolFactory = new (malloc(sizeof(MemoryPoolFactory))) MemoryPoolFactory;
@@ -166,11 +223,6 @@ Bool isMemoryManagerOfficiallyInited()
 */
 void shutdownMemoryManager()
 {
-#if RTS_ENGINE_CONTEXT
-	std::lock_guard<std::mutex> users(theMemoryManagerUsersMutex);
-	if (theMemoryManagerUsers == 0 || --theMemoryManagerUsers > 0)
-		return;
-#endif
 	if (TheDynamicMemoryAllocator != nullptr)
 	{
 		TheDynamicMemoryAllocator->~DynamicMemoryAllocator();
@@ -189,6 +241,8 @@ void shutdownMemoryManager()
 
 	DEBUG_SHUTDOWN();
 }
+
+#endif // RTS_ENGINE_CONTEXT
 
 
 #ifndef DISABLE_GAMEMEMORY_NEW_OPERATORS
