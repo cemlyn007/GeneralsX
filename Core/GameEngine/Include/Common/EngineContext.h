@@ -219,7 +219,9 @@ private:
 };
 
 // The context of "no engine": all singletons null. The current context outside every Scope.
-extern RTS_ENGINE_CONTEXT_API EngineContext g_noEngine;
+// GeneralsX @refactor cemlyn007 15/10/2026 A constant in read-only storage, never destroyed, so nothing can write it
+// (EngineContext.cpp, docs/EMBEDDING.md).
+extern RTS_ENGINE_CONTEXT_API EngineContext& g_noEngine;
 
 // The current context. Never null: &g_noEngine outside every Scope. constinit, so no access pays a
 // thread_local initialisation check.

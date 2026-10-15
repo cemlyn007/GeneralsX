@@ -77,8 +77,16 @@ extern HWND ApplicationHWnd;  ///< our application window handle
 // pump, the resize check waits for the next frame). Unlock follows every TryLock that returned true. Null (the
 // game's own main(): one engine on one thread) runs them unlocked. The host stores Unlock, then TryLock (release),
 // once, before the window's engine boots; EventPumpLock loads TryLock once (acquire) and Unlock after it.
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 Per engine: the host installs its lock in each engine it makes (docs/EMBEDDING.md).
+RTS_ENGINE_EXTERN_GLOBAL(std::atomic<bool (*)()>, ApplicationWindow_TryLockEventPump);
+#define ApplicationWindow_TryLockEventPump RTS_ENGINE_GLOBAL_REF(ApplicationWindow_TryLockEventPump)
+RTS_ENGINE_EXTERN_GLOBAL(std::atomic<void (*)()>, ApplicationWindow_UnlockEventPump);
+#define ApplicationWindow_UnlockEventPump RTS_ENGINE_GLOBAL_REF(ApplicationWindow_UnlockEventPump)
+#else
 extern std::atomic<bool (*)()> ApplicationWindow_TryLockEventPump;
 extern std::atomic<void (*)()> ApplicationWindow_UnlockEventPump;
+#endif
 
 // GeneralsX @feature cemlyn007 01/10/2026 Holds the host's lock (above), if it has one, for its scope (PLAN-023
 // Phase 8, stage RR4). acquired() is false when the host's lock is busy: the caller then skips its SDL calls.

@@ -54,7 +54,22 @@ void setFPMode();
 namespace rts
 {
 
-EngineContext g_noEngine;
+namespace
+{
+// GeneralsX @refactor cemlyn007 15/10/2026 The no-engine context is a constant: constant-initialised in read-only
+// storage and never destroyed (a union member, whose destructor the union never runs), so nothing can write it. The
+// char makes the union a literal type, which EngineContext, with its non-constexpr destructor, is not.
+union NoEngineContext
+{
+	char literalMember;
+	EngineContext context;
+	constexpr NoEngineContext() : context() { }
+	constexpr ~NoEngineContext() { }
+};
+constexpr NoEngineContext theNoEngineContext{};
+} // namespace
+
+EngineContext& g_noEngine = const_cast<EngineContext&>(theNoEngineContext.context);
 
 constinit thread_local EngineContext* t_engine RTS_TLS_IE = &g_noEngine;
 

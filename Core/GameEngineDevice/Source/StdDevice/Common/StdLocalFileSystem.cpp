@@ -42,7 +42,13 @@
 // On Linux/macOS the game binary's cwd and the data directory (asset root, CNC_GENERALS_ZH_PATH) are separate.
 // The StdBIGFileSystem sets this after resolving the primary asset directory so that relative paths like
 // "Data\Scripts\SkirmishScripts.scb" can be found in the asset root when the cwd lookup fails.
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(std::filesystem::path, s_assetFallbackPath);
+#define s_assetFallbackPath RTS_ENGINE_GLOBAL_REF(s_assetFallbackPath)
+#else
 static std::filesystem::path s_assetFallbackPath;
+#endif
 #endif
 
 StdLocalFileSystem::StdLocalFileSystem() : LocalFileSystem()
@@ -490,15 +496,17 @@ void StdLocalFileSystem::setAssetRootPath(const AsciiString& path)
 	// GeneralsX @bugfix cemlyn007 28/09/2026 Settled by the first boot, whether it names a root or none (an empty one
 	// is passed too): a later boot naming another root is refused rather than changing the path under the engines
 	// already reading it (the host boots every engine on one install).
-	static std::atomic<bool> s_assetRootSettled{false};
+	// GeneralsX @refactor cemlyn007 15/10/2026 With RTS_ENGINE_CONTEXT the path and this guard are the engine's, so each
+	// engine settles its own (docs/EMBEDDING.md).
+	RTS_ENGINE_STATIC(std::atomic<bool>, s_assetRootSettled, {false});
 	if (s_assetRootSettled.exchange(true))
 	{
 		if (s_assetFallbackPath != assetRootPath)
 		{
-			std::fprintf(stderr, "StdLocalFileSystem::setAssetRootPath - the asset fallback path is process-wide ('%s'): '%s' refused\n",
+			std::fprintf(stderr, "StdLocalFileSystem::setAssetRootPath - the asset fallback path is settled ('%s'): '%s' refused\n",
 				s_assetFallbackPath.string().c_str(), assetRootPath.string().c_str());
 			std::fflush(stderr);
-			DEBUG_CRASH(("StdLocalFileSystem::setAssetRootPath - the asset fallback path is process-wide ('%s'): '%s' refused",
+			DEBUG_CRASH(("StdLocalFileSystem::setAssetRootPath - the asset fallback path is settled ('%s'): '%s' refused",
 				s_assetFallbackPath.string().c_str(), assetRootPath.string().c_str()));
 		}
 		return;
