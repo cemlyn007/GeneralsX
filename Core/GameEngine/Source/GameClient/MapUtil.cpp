@@ -76,6 +76,7 @@ static std::set<std::string> s_failedMapLookups;
 #include "GameNetwork/NetworkDefs.h"
 #include "Common/FatalEngineError.h"
 #include "Common/EngineFault.h"
+#include "Common/InvalidInputData.h"
 #if RTS_ENGINE_CONTEXT
 // GeneralsX @feature cemlyn007 15/10/2026 Its map cache files are opened and closed through the engine's file layer (Common/EngineFiles.h)
 #include "Common/EngineFiles.h"
@@ -526,7 +527,20 @@ void MapCache::updateCache()
 	// Load user map cache first.
 	if (m_doLoadUserMapCacheINI)
 	{
+#if RTS_ENGINE_CONTEXT
+		// GeneralsX @feature cemlyn007 15/10/2026 The user map cache is GeneralsX's own file, not the host's input, so bad
+		// data in it is a fault (Common/InvalidInputData.h). The standard one below is a game file.
+		try
+		{
+			loadMapsFromMapCacheINI(userMapDir);
+		}
+		catch (const rts::InvalidInputData& error)
+		{
+			RELEASE_CRASH(error.what());
+		}
+#else
 		loadMapsFromMapCacheINI(userMapDir);
+#endif
 		m_doLoadUserMapCacheINI = FALSE;
 	}
 

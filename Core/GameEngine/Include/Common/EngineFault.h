@@ -63,7 +63,8 @@ void beginEngineTeardown();
 bool faultCannotUnwind();
 
 // Inside a handler only, as a catch-all at the top of a frame, start-up, load or teardown. Rethrows the sink's
-// unwind (the engine's fault is raised), and otherwise raises a fault for the exception being handled, with
+// unwind (the engine's fault is raised) and an InvalidInputData (Common/InvalidInputData.h), which is the host's
+// bad input and no fault, and otherwise raises a fault for the exception being handled, with
 // `uncaughtReason` as its reason: the message of an INIException that has one in its place, and an error code or
 // a std::exception's message appended to it. Returns only in the teardown window.
 void faultFromCaughtException(const char* uncaughtReason);

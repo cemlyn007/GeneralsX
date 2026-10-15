@@ -40,6 +40,7 @@
 #include "GameClient/MapUtil.h"
 #include "GameLogic/AI.h"
 #include "GameLogic/AIPathfind.h"
+#include "Common/InvalidInputData.h"	// GeneralsX @feature cemlyn007 15/10/2026 A corrupt map is the host's bad input
 
 
 //-------------------------------------------------------------------------------------------------
@@ -127,7 +128,22 @@ Bool W3DTerrainLogic::loadMap( AsciiString filename , Bool query )
 
 	// allocate new height map data to read from file
 	// this will be a dummy object only containing logical map data
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 15/10/2026 A map whose data the height map's reader refuses is the host's bad input
+	// (Common/InvalidInputData.h), not a fault.
+	try
+	{
+		terrainHeightMap = NEW WorldHeightMap(pStrm, true);
+	}
+	catch (ErrorCode code)
+	{
+		if (code != ERROR_CORRUPT_FILE_FORMAT)
+			throw;
+		throw rts::InvalidInputData(filename.str(), "the map's data is corrupt");
+	}
+#else
 	terrainHeightMap = NEW WorldHeightMap(pStrm, true);
+#endif
 
 	if (terrainHeightMap)
 	{	//copy loaded data

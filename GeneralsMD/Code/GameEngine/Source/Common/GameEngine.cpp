@@ -77,6 +77,7 @@
 #include "Common/GameLOD.h"
 #include "Common/FatalEngineError.h"
 #include "Common/EngineFault.h"	// GeneralsX @feature cemlyn007 15/10/2026 The catch-alls end in the FaultSink
+#include "Common/InvalidInputData.h"	// GeneralsX @feature cemlyn007 15/10/2026 The host's bad input, no fault
 #include "Common/Registry.h"
 #include "Common/GameCommon.h"	// FOR THE ALLOW_DEBUG_CHEATS_IN_RELEASE #define
 #if RTS_ENGINE_CONTEXT
@@ -727,7 +728,20 @@ void GameEngine::init()
 				delete[] buffer;
 			}
 
+#if RTS_ENGINE_CONTEXT
+			// GeneralsX @feature cemlyn007 15/10/2026 SagePatch.ini is GeneralsX's own file, not the host's input, so bad
+			// data in it is a fault (Common/InvalidInputData.h).
+			try
+			{
+				ini.load(sagePatchPath, INI_LOAD_OVERWRITE, nullptr);
+			}
+			catch (const rts::InvalidInputData& error)
+			{
+				RELEASE_CRASH(error.what());
+			}
+#else
 			ini.load(sagePatchPath, INI_LOAD_OVERWRITE, nullptr);
+#endif
 
 			// GeneralsX @bugfix kumait 13/08/2026 SagePatch defaults must not clobber a user-authored
 			// Data/INI/GameData.ini. That loose file shadows the BIG-archived one when the engine loads
@@ -1060,7 +1074,12 @@ void GameEngine::init()
 #if RTS_ENGINE_CONTEXT
 	// GeneralsX @feature cemlyn007 15/10/2026 The catch-all at the top of start-up: every error code and uncaught
 	// exception is a fault (Common/EngineFault.h), where upstream carried on after every code but ERROR_INVALID_D3D.
-	// An engine that stopped partway therefore never carries on.
+	// An engine that stopped partway therefore never carries on. A game file with bad data is the host's input, and
+	// leaves as it is (Common/InvalidInputData.h).
+	catch (const rts::InvalidInputData&)
+	{
+		throw;
+	}
 	catch (ErrorCode ec)
 	{
 		if (ec == ERROR_INVALID_D3D)
@@ -1363,7 +1382,13 @@ void GameEngine::guardedUpdate()
 		// compute a frame
 		update();
 	}
-#if !RTS_ENGINE_CONTEXT
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 15/10/2026 The host's bad input (a corrupt map, say) leaves as it is
+	catch (const rts::InvalidInputData&)
+	{
+		throw;
+	}
+#else
 	catch (INIException e)
 	{
 		// Release CRASH doesn't return, so don't worry about executing additional code.
