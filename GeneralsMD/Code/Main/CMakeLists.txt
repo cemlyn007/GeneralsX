@@ -70,6 +70,13 @@ target_sources(z_generals PRIVATE
     $<$<BOOL:${WIN32}>:WinMain.h>
     # Linux SDL3 entry point (Phase 1.5 - TheSuperHackers @build 10/02/2026)
     $<$<NOT:$<BOOL:${WIN32}>>:SDL3Main.cpp>
+    # GeneralsX @feature cemlyn007 15/10/2026 The executable as the host of its one engine (ExecutableEmbedding.h)
+    $<$<NOT:$<BOOL:${WIN32}>>:ExecutableEmbedding.cpp>
+    $<$<NOT:$<BOOL:${WIN32}>>:ExecutableFaultSink.cpp>
+    $<$<NOT:$<BOOL:${WIN32}>>:ExecutableQuitListener.cpp>
+    $<$<NOT:$<BOOL:${WIN32}>>:ExecutableResourceLedger.cpp>
+    $<$<NOT:$<BOOL:${WIN32}>>:ExecutableRoots.cpp>
+    $<$<NOT:$<BOOL:${WIN32}>>:ExecutableThreadStarter.cpp>
     # Linux stubs for P2-P3 platform functions (P2-P3 - TheSuperHackers @build 13/02/2026 BenderAI Session 37)
     $<$<NOT:$<BOOL:${WIN32}>>:LinuxStubs.cpp>
 )

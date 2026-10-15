@@ -239,6 +239,11 @@ inline bool hasCurrentEngine() noexcept
 	return t_engine != &g_noEngine;
 }
 
+// GeneralsX @feature cemlyn007 15/10/2026 The current engine's EmbeddingConfig, through which GeneralsX reaches the host's
+// services (Common/EmbeddingContract.h). Throws std::logic_error naming `service` when no engine is current or the
+// current one was made without an EmbeddingConfig.
+RTS_ENGINE_CONTEXT_API const EmbeddingConfig& currentEmbedding(const char* service);
+
 // True when g_noEngine still has every singleton and direct field at its initial value and no slot object
 // (nothing assigned one, or used a PerEngineStatic, outside a Scope).
 RTS_ENGINE_CONTEXT_API bool noEngineIsPristine();
