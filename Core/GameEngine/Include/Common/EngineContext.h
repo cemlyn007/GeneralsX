@@ -192,6 +192,34 @@ struct RTS_ENGINE_CONTEXT_API EngineContext
 	// GeneralsX @feature cemlyn007 14/10/2026 How the host embeds this engine, or null for a context made without one.
 	const EmbeddingConfig* embedding() const noexcept { return m_embedding; }
 
+	// GeneralsX @feature cemlyn007 15/10/2026 Thread bindings: per-thread state of this engine's that every thread
+	// running inside the engine must have, and no other thread, such as the audio device's ALC context (installed
+	// with alcSetThreadContext). A Scope that makes this engine current on a thread runs each binding's install
+	// with its resource; one that makes another engine (or none) current in its place runs each one's remove. So a
+	// thread that enters, leaves or switches engines, however it does so through a Scope, carries exactly the
+	// current engine's bindings. `install` may be passed null while a binding is being made or removed, and must
+	// then leave the thread with nothing installed. Neither may throw or touch the engine's state, since a host
+	// leaving a faulted engine still runs `remove`.
+	struct ThreadBinding
+	{
+		void (*install)(void* resource) noexcept;
+		void (*remove)() noexcept;
+	};
+	static constexpr std::size_t maxThreadBindings = 4;
+	// Binds `resource` through `binding` (which must outlive every thread that may still enter this engine, as a
+	// constant does) to each thread that makes this engine current from now on, and installs it on the calling
+	// thread if this engine is current there. Throws std::logic_error if `binding` is already bound here or every
+	// slot is taken. A thread already inside the engine gets it at its next entry.
+	void bindThreads(const ThreadBinding& binding, void* resource);
+	// Stops binding `binding`, and removes it from the calling thread if this engine is current there. False if it
+	// was not bound.
+	bool unbindThreads(const ThreadBinding& binding) noexcept;
+	// Whether any binding is bound: Scope's one check on entry and exit when there is none.
+	bool hasThreadBindings() const noexcept { return m_threadBindingCount.load(std::memory_order_acquire) != 0; }
+	// Runs every bound binding's install, or remove, on the calling thread (Scope calls these).
+	void installThreadBindings() const noexcept;
+	void removeThreadBindings() const noexcept;
+
 	// This engine's copy of the per-engine static `key`, or null if it has not made one.
 	void* findStatic(const EngineStaticKey& key) const noexcept;
 	// Makes this engine's copy of the per-engine static `key` with `type` and `closure`, or returns the one another
@@ -217,6 +245,14 @@ private:
 	// Owned, and deleted by the destructor: a pointer, so that this header need not define EmbeddingConfig.
 	EmbeddingConfig* m_embedding = nullptr;
 	std::atomic<EngineStatics*> m_statics{nullptr};
+	struct ThreadBindingSlot
+	{
+		std::atomic<const ThreadBinding*> binding{nullptr};
+		std::atomic<void*> resource{nullptr};
+	};
+	ThreadBindingSlot m_threadBindings[maxThreadBindings];
+	std::atomic<std::size_t> m_threadBindingCount{0};
+	std::atomic<bool> m_threadBindingWriter{false};
 
 	EngineStatics& statics();
 };
@@ -311,6 +347,9 @@ public:
 		EngineContext* const next = context != nullptr ? context : &g_noEngine;
 		m_entered = next != m_previous && next != &g_noEngine;
 		t_engine = next;
+		// GeneralsX @feature cemlyn007 15/10/2026 Swap the thread's bindings when the current engine changes.
+		if (next != m_previous)
+			switchThreadBindings(m_previous, next);
 #if RTS_ENGINE_SCOPE_ENVIRONMENT
 		if (m_entered)
 			enterEngineThreadInvariants(m_saved);
@@ -322,13 +361,24 @@ public:
 		if (m_entered)
 			leaveEngineThreadInvariants(m_saved);
 #endif
+		EngineContext* const current = t_engine;
 		t_engine = m_previous;
+		if (current != m_previous)
+			switchThreadBindings(current, m_previous);
 	}
 
 	Scope(const Scope&) = delete;
 	Scope& operator=(const Scope&) = delete;
 
 private:
+	static void switchThreadBindings(const EngineContext* from, const EngineContext* to) noexcept
+	{
+		if (from->hasThreadBindings())
+			from->removeThreadBindings();
+		if (to->hasThreadBindings())
+			to->installThreadBindings();
+	}
+
 	EngineContext* m_previous;
 	bool m_entered;
 #if RTS_ENGINE_SCOPE_ENVIRONMENT
