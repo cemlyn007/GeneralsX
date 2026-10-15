@@ -141,7 +141,6 @@ HAND = [
     # NetworkUtil.cpp are reached without a network, so their statics are classified by name.
     (GLOBAL, "", "file:/GameNetwork/(GameSpy/|GeneralsOnline/|WOLBrowser/|GameSpy\\w*\\.cpp|LANAPI\\w*\\.cpp|NAT\\.cpp|FirewallHelper\\.cpp|Connection(Manager)?\\.cpp|DisconnectManager\\.cpp|Network\\.cpp|GUIUtil\\.cpp|Transport\\.cpp|udp\\.cpp|FileTransfer\\.cpp|DownloadManager\\.cpp|IPEnumeration\\.cpp|NetPacket\\w*\\.cpp|NetCommand\\w*\\.cpp|NetMessageStream\\.cpp|FrameData\\w*\\.cpp|FrameMetrics\\.cpp|User\\.cpp)", NET),
     (CONST, "", "re:rts::WorkingDirectory::saveStartupWorkingDirectory\\(\\)::len", "captures the process's own startup cwd (::GetCurrentDirectory): the same OS-level value for every engine in the process, written once"),
-    (GLOBAL, "", "OpenALAudioManager::isOnScreen(Coord3D const*) const::dummy", "write-only out-parameter, never read"),
     (GLOBAL, "", "s_screenshotWrittenQueue", "screenshot writer queue (render mode; its thread reads no engine state)"),
     (GLOBAL, "", "OPENSSL_ia32cap_P", "OpenSSL CPU capability word (third-party)"),
     (GLOBAL, "", "re:stbi__flip_vertically_on_write|stbi_write_(force_png_filter|png_compression_level|tga_with_rle)", "stb_image_write configuration, never changed"),
@@ -235,7 +234,6 @@ HAND = [
     (RPROC, "", "_TextureLoadThread", "the background texture loader thread, which never runs on Unix (ThreadClass::Execute returns at once): nothing is loaded off the engine's thread"),
     (RCONST, "", "ThumbnailManagerClass::CreateThumbnailIfNotFound", "never written: Create_Thumbnail_If_Not_Found has no caller"),
     (RCONST, "", "SortingRendererClass::_EnableTriangleDraw", "never written: _Enable_Triangle_Draw has no caller"),
-    (RPROC, "", "re:AnimatedSoundMgrClass::\\w+", "W3D animated sounds (WWAudio), never initialized by the game (not used by its audio)"),
     # The terrain, tree, bib, bridge, road, status-circle, water and player-colour shaders (detailOpaqueShader,
     # detailAlphaShader, zFillAlphaShader, PlayerColorShader; one per TU) left the writable data at RR2a-2: they
     # are `static const`, and ShaderClass's constructor from bits is constexpr, so they are constant-initialised

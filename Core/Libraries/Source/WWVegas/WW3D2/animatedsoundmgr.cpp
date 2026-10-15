@@ -56,9 +56,25 @@
 //////////////////////////////////////////////////////////////////////
 //	Static member initialization
 //////////////////////////////////////////////////////////////////////
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_CLASS_STATIC_DEFINE(AnimatedSoundMgrClass::AnimationNameHash_rtsEngineType, AnimatedSoundMgrClass, AnimationNameHash);
+#define AnimationNameHash RTS_ENGINE_GLOBAL_REF(AnimationNameHash)
+#else
 HashTemplateClass<StringClass, AnimatedSoundMgrClass::ANIM_SOUND_LIST *>	AnimatedSoundMgrClass::AnimationNameHash;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_CLASS_STATIC_DEFINE(DynamicVectorClass<AnimatedSoundMgrClass::ANIM_SOUND_LIST*>, AnimatedSoundMgrClass, AnimSoundLists);
+#define AnimSoundLists RTS_ENGINE_GLOBAL_REF(AnimSoundLists)
+#else
 DynamicVectorClass<AnimatedSoundMgrClass::ANIM_SOUND_LIST *>					AnimatedSoundMgrClass::AnimSoundLists;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_CLASS_STATIC_DEFINE(SoundLibraryBridgeClass*, AnimatedSoundMgrClass, SoundLibrary, nullptr);
+#define SoundLibrary RTS_ENGINE_GLOBAL_REF(SoundLibrary)
+#else
 SoundLibraryBridgeClass*																	AnimatedSoundMgrClass::SoundLibrary = nullptr;
+#endif
 
 //////////////////////////////////////////////////////////////////////
 //	Local inlines
