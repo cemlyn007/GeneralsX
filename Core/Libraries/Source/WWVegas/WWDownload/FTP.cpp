@@ -59,6 +59,13 @@
 #if RTS_ENGINE_CONTEXT
 #include "Common/EngineThread.h" // GeneralsX @feature cemlyn007 15/10/2026 rts::startEngineThread
 #include <string>
+// GeneralsX @feature cemlyn007 15/10/2026 Its download files are opened, closed, moved and removed through the engine's file layer, so that it writes only under the engine's user data root (Common/EngineFiles.h)
+#include "Common/EngineFiles.h"
+#define FTP_OPEN(name, mode) rts::openEngineFile(name, mode)
+#define FTP_CLOSE(file) rts::closeEngineFile(file)
+#else
+#define FTP_OPEN(name, mode) fopen(name, mode)
+#define FTP_CLOSE(file) fclose(file)
 #endif
 
 // umm... what?? BGC 3/27/03
@@ -229,7 +236,7 @@ Cftp::~Cftp()
 
 	if (m_pfLocalFile)
 	{
-		fclose(m_pfLocalFile);
+		FTP_CLOSE(m_pfLocalFile);
 		m_pfLocalFile = nullptr;
 	}
 }
@@ -1487,14 +1494,14 @@ HRESULT  Cftp::GetNextFileBlock( LPCSTR szLocalFileName, int * piTotalRead )
 	{
 		if( m_iFilePos == 0 )
 		{
-			if( ( m_pfLocalFile = fopen( downloadfilename, "wb" ) ) == nullptr )
+			if( ( m_pfLocalFile = FTP_OPEN( downloadfilename, "wb" ) ) == nullptr )
 			{
 				return( FTP_FAILED );
 			}
 		}
 		else
 		{
-			if( ( m_pfLocalFile = fopen( downloadfilename, "ab" ) ) == nullptr )
+			if( ( m_pfLocalFile = FTP_OPEN( downloadfilename, "ab" ) ) == nullptr )
 			{
 				return( FTP_FAILED );
 			}
@@ -1573,8 +1580,8 @@ HRESULT  Cftp::GetNextFileBlock( LPCSTR szLocalFileName, int * piTotalRead )
 		if ((res == FTP_FAILED) || (iReply == 502))  // unsupported command
 		{
 			m_iFilePos=0;
-			fclose(m_pfLocalFile);
-			m_pfLocalFile = fopen( downloadfilename, "wb" );
+			FTP_CLOSE(m_pfLocalFile);
+			m_pfLocalFile = FTP_OPEN( downloadfilename, "wb" );
 		}
 		else if( ( res != FTP_SUCCEEDED ) ||
 			( iReply != FTPREPLY_RESTARTOK ) )
@@ -1681,7 +1688,7 @@ HRESULT  Cftp::GetNextFileBlock( LPCSTR szLocalFileName, int * piTotalRead )
 	// everything is handled above.
 	if( m_iStatus == FTPSTAT_FILEDATACLOSED )	{
 		CloseDataConnection();
-		fclose( m_pfLocalFile );
+		FTP_CLOSE( m_pfLocalFile );
 		m_pfLocalFile = nullptr;
 
 		/*
@@ -1692,6 +1699,23 @@ HRESULT  Cftp::GetNextFileBlock( LPCSTR szLocalFileName, int * piTotalRead )
 		char downloadfilename[256];
 		GetDownloadFilename(m_szLocalFileName, downloadfilename, ARRAY_SIZE(downloadfilename));
 
+#if RTS_ENGINE_CONTEXT
+		{
+			const std::filesystem::path from = rts::resolveEnginePath(downloadfilename);
+			const std::filesystem::path to = rts::resolveEnginePath(m_szLocalFileName);
+			if (!rts::isEngineWritablePath(from) || !rts::isEngineWritablePath(to))
+				return( FTP_FAILED );
+			std::error_code error;
+			std::filesystem::create_directories(to.parent_path(), error);
+			std::filesystem::rename(from, to, error);
+			if (error) {
+				std::filesystem::remove(to, error);
+				std::filesystem::rename(from, to, error);
+				if (error)
+					return( FTP_FAILED );
+			}
+		}
+#else
 		// Make sure the path exists for the new file
 		char curdir[256];
 		_getcwd(curdir,256);
@@ -1711,6 +1735,7 @@ HRESULT  Cftp::GetNextFileBlock( LPCSTR szLocalFileName, int * piTotalRead )
 				return( FTP_FAILED );
 			}
 		}
+#endif
 
 		// Send a bogus command.  If the firewall has closed our ftp command channel connection this
 		// will allow us to detect it.  (Obviously the data channel is closed or we wouldn't be here)
@@ -1773,7 +1798,7 @@ HRESULT  Cftp::FileRecoveryPosition( LPCSTR szLocalFileName, LPCSTR szRegistryRo
 	char downloadfilename[256];
 	GetDownloadFilename(szLocalFileName, downloadfilename, ARRAY_SIZE(downloadfilename));
 
-	FILE *testfp = fopen( downloadfilename, "rb" );
+	FILE *testfp = FTP_OPEN( downloadfilename, "rb" );
 	if( testfp == nullptr )
 	{
 		m_iFilePos = 0;
@@ -1782,7 +1807,7 @@ HRESULT  Cftp::FileRecoveryPosition( LPCSTR szLocalFileName, LPCSTR szRegistryRo
 
 	fseek( testfp, 0, SEEK_END );
 	m_iFilePos = ftell( testfp );
-	fclose( testfp );
+	FTP_CLOSE( testfp );
 
 	return( m_iFilePos );
 }
@@ -1841,7 +1866,7 @@ HRESULT  Cftp::FileRecoveryPosition( LPCSTR szLocalFileName, LPCSTR szRegistryRo
 	if( strcmp( szLocalFileName, (const char *)regfilename ) == 0 )
 	{
 		// File previously downloaded
-		testfp = fopen( FTP_TEMPFILENAME, "rb" );
+		testfp = FTP_OPEN( FTP_TEMPFILENAME, "rb" );
 
 		if( testfp == nullptr )
 		{
@@ -1854,7 +1879,7 @@ HRESULT  Cftp::FileRecoveryPosition( LPCSTR szLocalFileName, LPCSTR szRegistryRo
 
 		m_iFilePos = ftell( testfp );
 
-		fclose( testfp );
+		FTP_CLOSE( testfp );
 
 		RegCloseKey(hkey);
 		return( m_iFilePos );

@@ -45,6 +45,10 @@
 
 #include "W3DDevice/GameClient/HeightMap.h"
 #include "W3DDevice/GameClient/W3DWaterTracks.h"
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 15/10/2026 Its tracks file is opened and closed through the engine's file layer (Common/EngineFiles.h)
+#include "Common/EngineFiles.h"
+#endif
 #include "W3DDevice/GameClient/W3DShaderManager.h"
 #include "W3DDevice/GameClient/W3DShroud.h"
 #include "GameClient/InGameUI.h"
@@ -1001,7 +1005,11 @@ void WaterTracksRenderSystem::saveTracks()
 	WaterTracksObj *umod;
 	Int trackCount=0;
 
+#if RTS_ENGINE_CONTEXT
+	FILE *fp=rts::openEngineFile(fileName.str(), "wb");
+#else
 	FILE *fp=fopen(fileName.str(), "wb");
+#endif
 
 	if (fp)
 	{
@@ -1018,7 +1026,11 @@ void WaterTracksRenderSystem::saveTracks()
 			umod=umod->m_nextSystem;
 		}
 		fwrite(&trackCount,sizeof(trackCount),1,fp);
+#if RTS_ENGINE_CONTEXT
+		rts::closeEngineFile(fp);
+#else
 		fclose(fp);
+#endif
 	}
 }
 

@@ -24,6 +24,11 @@
 #include "WW3D2/surfaceclass.h"
 #include "WWLib/mpsc_intrusive_queue.h"
 #include <stb_image_write.h>
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 15/10/2026 A screenshot is written into a file opened through the engine's file layer
+// (Common/EngineFiles.h).
+#include "Common/EngineFiles.h"
+#endif
 
 #if RTS_ENGINE_CONTEXT
 #include "Common/EngineThread.h" // GeneralsX @feature cemlyn007 15/10/2026 rts::startEngineThread
@@ -150,7 +155,26 @@ static void screenshotThreadFunc(ScreenshotThreadData* data)
 		delete[] image;
 		return;
 	}
-#endif
+	if (FILE* const file = rts::openEngineFile(pathname, "wb"))
+	{
+		const auto writeToFile = [](void* context, void* bytes, int size) {
+			fwrite(bytes, 1, static_cast<size_t>(size), static_cast<FILE*>(context));
+		};
+		switch (data->format)
+		{
+			case SCREENSHOT_JPEG:
+				success = stbi_write_jpg_to_func(writeToFile, file, width, height, 3, image, data->quality);
+				break;
+			case SCREENSHOT_PNG:
+				success = stbi_write_png_to_func(writeToFile, file, width, height, 3, image, width * 3);
+				break;
+		}
+		if (ferror(file))
+			success = 0;
+		if (rts::closeEngineFile(file) != 0)
+			success = 0;
+	}
+#else
 	switch (data->format)
 	{
 		case SCREENSHOT_JPEG:
@@ -160,6 +184,7 @@ static void screenshotThreadFunc(ScreenshotThreadData* data)
 			success = stbi_write_png(pathname, width, height, 3, image, width * 3);
 			break;
 	}
+#endif
 
 	if (success)
 	{

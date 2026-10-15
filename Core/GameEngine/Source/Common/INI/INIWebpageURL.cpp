@@ -33,6 +33,9 @@
 #include "Common/INI.h"
 #include "Common/Registry.h"
 #include "GameNetwork/WOLBrowser/WebBrowser.h"
+#if RTS_ENGINE_CONTEXT
+#include "Common/EngineFiles.h"
+#endif
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -112,8 +115,15 @@ void INI::parseWebpageURLDefinition( INI* ini )
 
 	if (url->m_url.startsWith("file://"))
 	{
+#if RTS_ENGINE_CONTEXT
+		// GeneralsX @feature cemlyn007 15/10/2026 The page is in the engine's asset root, not the working directory
+		// (Common/EngineFiles.h).
+		char cwd[_MAX_PATH] = "\\";
+		strlcpy(cwd, rts::engineAssetRoot().string().c_str(), _MAX_PATH);
+#else
 		char cwd[_MAX_PATH] = "\\";
 		getcwd(cwd, _MAX_PATH);
+#endif
 
 		url->m_url.format("file://%s\\Data\\%s\\%s", encodeURL(cwd).str(), GetRegistryLanguage().str(), url->m_url.str()+7);
 		DEBUG_LOG(("INI::parseWebpageURLDefinition() - converted URL to [%s]", url->m_url.str()));

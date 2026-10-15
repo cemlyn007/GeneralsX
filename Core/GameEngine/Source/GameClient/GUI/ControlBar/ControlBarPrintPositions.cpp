@@ -53,6 +53,10 @@
 //-----------------------------------------------------------------------------
 #include "GameClient/GameWindowManager.h"
 #include "GameClient/WindowLayout.h"
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 15/10/2026 Its file is written in the engine's user data root, through the engine's file layer (Common/EngineFiles.h)
+#include "Common/EngineFiles.h"
+#endif
 //-----------------------------------------------------------------------------
 // DEFINES ////////////////////////////////////////////////////////////////////
 //-----------------------------------------------------------------------------
@@ -86,13 +90,21 @@ void PrintOffsetsFromControlBarParent()
 	WindowLayout *layout = TheWindowManager->winCreateLayout("controlBarHidden.wnd");
 	if(!layout)
 		return;
+#if RTS_ENGINE_CONTEXT
+	FILE *fp = rts::openEngineFile((rts::engineUserDataRoot() / "ControlBarEasier.txt").c_str(), "w");
+#else
 	FILE *fp = fopen("ControlBarEasier.txt", "w");
+#endif
 	if(!fp)
 		return;
 
 	PrintInfoRecursive(layout->getFirstWindow(), fp);
 
+#if RTS_ENGINE_CONTEXT
+	rts::closeEngineFile(fp);
+#else
 	fclose(fp);
+#endif
 	layout->destroyWindows();
 	deleteInstance(layout);
 }

@@ -38,6 +38,7 @@
 #include "Common/Debug.h"
 #include "Common/INI.h"
 #include "Common/GlobalData.h"
+#include "Common/LocalFileSystem.h"
 #include "GameClient/Image.h"
 #include "Common/NameKeyGenerator.h"
 
@@ -260,6 +261,16 @@ void ImageCollection::load( Int textureSize )
 		if(FindFirstFile(userDataPath.str(), &findData) !=INVALID_HANDLE_VALUE)
 		{
 			userDataPath.format("%sINI\\MappedImages",TheGlobalData->getPath_UserData().str());
+			ini.loadDirectory(userDataPath, INI_LOAD_OVERWRITE, nullptr );
+		}
+#elif RTS_ENGINE_CONTEXT
+		// GeneralsX @feature cemlyn007 15/10/2026 Listed through the engine's file layer, which leaves no directory open,
+		// rather than with FindFirstFile, whose search handle was never closed (Common/EngineFiles.h).
+		userDataPath.format("%sINI/MappedImages",TheGlobalData->getPath_UserData().str());
+		FilenameList userImageFiles;
+		TheLocalFileSystem->getFileListInDirectory(AsciiString::TheEmptyString, userDataPath, "*.ini", userImageFiles, FALSE);
+		if(!userImageFiles.empty())
+		{
 			ini.loadDirectory(userDataPath, INI_LOAD_OVERWRITE, nullptr );
 		}
 #else

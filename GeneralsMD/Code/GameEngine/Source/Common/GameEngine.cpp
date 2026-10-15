@@ -123,6 +123,15 @@
 #include "GameNetwork/WOLBrowser/WebBrowser.h"
 #include "GameNetwork/LANAPI.h"
 #include "GameNetwork/GameSpy/GameResultsThread.h"
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 15/10/2026 Its SagePatch.ini is opened and closed through the engine's file layer (Common/EngineFiles.h)
+#include "Common/EngineFiles.h"
+#define SAGEPATCH_OPEN(name, mode) rts::openEngineFile(name, mode)
+#define SAGEPATCH_CLOSE(file) rts::closeEngineFile(file)
+#else
+#define SAGEPATCH_OPEN(name, mode) fopen(name, mode)
+#define SAGEPATCH_CLOSE(file) fclose(file)
+#endif
 
 #include "Common/version.h"
 
@@ -604,7 +613,7 @@ void GameEngine::init()
 
 		if (!TheLocalFileSystem->doesFileExist(sagePatchPath.str()))
 		{
-			FILE *f = fopen(sagePatchPath.str(), "w");
+			FILE *f = SAGEPATCH_OPEN(sagePatchPath.str(), "w");
 			if (f)
 			{
 				fprintf(f,
@@ -632,14 +641,14 @@ void GameEngine::init()
 					"  FramesPerSecondLimit = 60\n"
 					"End\n"
 				);
-				fclose(f);
+				SAGEPATCH_CLOSE(f);
 			}
 		}
 
 		if (TheLocalFileSystem->doesFileExist(sagePatchPath.str()))
 		{
 			// Check and migrate existing SagePatch.ini for 60 FPS
-			FILE *f = fopen(sagePatchPath.str(), "rb");
+			FILE *f = SAGEPATCH_OPEN(sagePatchPath.str(), "rb");
 			if (f)
 			{
 				fseek(f, 0, SEEK_END);
@@ -648,7 +657,7 @@ void GameEngine::init()
 				char *buffer = new char[size + 1];
 				fread(buffer, 1, size, f);
 				buffer[size] = 0;
-				fclose(f);
+				SAGEPATCH_CLOSE(f);
 
 				if (!strstr(buffer, "FramesPerSecondLimit"))
 				{
@@ -656,11 +665,11 @@ void GameEngine::init()
 					if (endPos != nullptr)
 					{
 						*endPos = '\0';
-						FILE *fw = fopen(sagePatchPath.str(), "wb");
+						FILE *fw = SAGEPATCH_OPEN(sagePatchPath.str(), "wb");
 						if (fw)
 						{
 							fprintf(fw, "%s  ; Migrated 60 FPS defaults\n  UseFPSLimit = Yes\n  FramesPerSecondLimit = 60\nEnd\n", buffer);
-							fclose(fw);
+							SAGEPATCH_CLOSE(fw);
 						}
 					}
 				}
