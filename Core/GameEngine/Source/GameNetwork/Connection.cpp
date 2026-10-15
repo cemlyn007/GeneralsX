@@ -363,7 +363,12 @@ void Connection::setFrameGrouping(time_t frameGrouping) {
 }
 
 void Connection::doRetryMetrics() {
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+	RTS_ENGINE_STATIC(Int, numSeconds, 0);
+#else
 	static Int numSeconds = 0;
+#endif
 	time_t curTime = timeGetTime();
 
 	if ((curTime - m_retryMetricsTime) > 10000) {

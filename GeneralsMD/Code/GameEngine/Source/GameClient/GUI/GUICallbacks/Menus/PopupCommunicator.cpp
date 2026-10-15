@@ -50,9 +50,25 @@
 #include "GameClient/GameWindowManager.h"
 
 // PRIVATE DATA ///////////////////////////////////////////////////////////////////////////////////
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(NameKeyType, buttonOkID, NAMEKEY_INVALID);
+#define buttonOkID RTS_ENGINE_GLOBAL_REF(buttonOkID)
+#else
 static NameKeyType buttonOkID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, buttonOk, nullptr);
+#define buttonOk RTS_ENGINE_GLOBAL_REF(buttonOk)
+#else
 static GameWindow *buttonOk = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, parent, nullptr);
+#define parent RTS_ENGINE_GLOBAL_REF(parent)
+#else
 static GameWindow *parent = nullptr;
+#endif
 
 // PUBLIC FUNCTIONS ///////////////////////////////////////////////////////////////////////////////
 

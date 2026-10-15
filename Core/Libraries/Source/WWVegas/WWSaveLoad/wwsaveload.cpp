@@ -40,8 +40,18 @@
 #include "definitionmgr.h"
 
 
+#if RTS_ENGINE_CONTEXT
+void WWSaveLoad_Register_Twiddler_Factories();
+#endif
+
 void WWSaveLoad::Init()
 {
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @refactor cemlyn007 14/10/2026 This engine's factories and definition manager, which upstream made, and so
+	// registered, at static initialisation (docs/EMBEDDING.md)
+	WWSaveLoad_Register_Twiddler_Factories();
+	_TheDefinitionMgr;
+#endif
 }
 
 void WWSaveLoad::Shutdown()

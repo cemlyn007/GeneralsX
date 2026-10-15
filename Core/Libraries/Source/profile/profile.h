@@ -40,6 +40,28 @@
 /**
   \brief Functions common to both profilers.
 */
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+#define firstPatternEntry RTS_ENGINE_GLOBAL_REF(firstPatternEntry)
+#endif
+#if RTS_ENGINE_CONTEXT
+#define lastPatternEntry RTS_ENGINE_GLOBAL_REF(lastPatternEntry)
+#endif
+#if RTS_ENGINE_CONTEXT
+#define m_clockCycles RTS_ENGINE_GLOBAL_REF(m_clockCycles)
+#endif
+#if RTS_ENGINE_CONTEXT
+#define m_frameNames RTS_ENGINE_GLOBAL_REF(m_frameNames)
+#endif
+#if RTS_ENGINE_CONTEXT
+#define m_names RTS_ENGINE_GLOBAL_REF(m_names)
+#endif
+#if RTS_ENGINE_CONTEXT
+#define m_rec RTS_ENGINE_GLOBAL_REF(m_rec)
+#endif
+#if RTS_ENGINE_CONTEXT
+#define m_recNames RTS_ENGINE_GLOBAL_REF(m_recNames)
+#endif
 class Profile
 {
   friend class ProfileCmdInterface;
@@ -185,23 +207,60 @@ private:
     okay for this because checking patterns is a costly
     operation anyway and is therefore cached.
   */
+#if RTS_ENGINE_CONTEXT
+  RTS_ENGINE_CLASS_STATIC(PatternListEntry*, firstPatternEntry);
+#else
   static PatternListEntry *firstPatternEntry;
+#endif
 
   /// \internal last pattern list entry for fast additions to list at end
+#if RTS_ENGINE_CONTEXT
+  RTS_ENGINE_CLASS_STATIC(PatternListEntry*, lastPatternEntry);
+#else
   static PatternListEntry *lastPatternEntry;
+#endif
 
   /// number of recorded frames
+#if RTS_ENGINE_CONTEXT
+  RTS_ENGINE_CLASS_STATIC(unsigned, m_rec);
+#else
   static unsigned m_rec;
+#endif
 
   /// names of recorded frames
+#if RTS_ENGINE_CONTEXT
+  RTS_ENGINE_CLASS_STATIC(char**, m_recNames);
+#else
   static char **m_recNames;
+#endif
 
   /// number of known frame names
+#if RTS_ENGINE_CONTEXT
+  RTS_ENGINE_CLASS_STATIC(unsigned, m_names);
+#else
   static unsigned m_names;
+#endif
 
   /// list of known frame names
+#if RTS_ENGINE_CONTEXT
+  RTS_ENGINE_CLASS_STATIC(FrameName*, m_frameNames);
+#else
   static FrameName *m_frameNames;
+#endif
 
   /// CPU clock cycles/second
+#if RTS_ENGINE_CONTEXT
+  RTS_ENGINE_CLASS_STATIC(_int64, m_clockCycles);
+#else
   static _int64 m_clockCycles;
+#endif
 };
+#if RTS_ENGINE_CONTEXT
+#undef m_recNames
+#undef m_rec
+#undef m_names
+#undef m_frameNames
+#undef m_clockCycles
+#undef lastPatternEntry
+#undef firstPatternEntry
+#endif

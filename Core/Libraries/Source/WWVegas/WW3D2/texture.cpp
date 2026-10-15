@@ -67,7 +67,7 @@ const unsigned DEFAULT_INACTIVATION_TIME=20000;
 #if RTS_ENGINE_CONTEXT
 // GeneralsX @feature cemlyn007 28/09/2026 Per engine: the texture ID counter, so an engine numbers its textures as
 // it does alone (PLAN-023 Phase 3).
-static rts::PerEngineStatic<unsigned> unused_texture_id_perEngine;
+static constexpr rts::PerEngineStatic<unsigned> unused_texture_id_perEngine{};
 #define unused_texture_id (unused_texture_id_perEngine.get())
 #else
 static unsigned unused_texture_id;

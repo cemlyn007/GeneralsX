@@ -100,7 +100,7 @@ struct BuildPlanPerEngine
 	Object *planSubject[ MAX_PATH_SUBJECTS ];
 	int planSubjectCount;
 };
-rts::PerEngineStatic<BuildPlanPerEngine> s_buildPlanPerEngine;
+constexpr rts::PerEngineStatic<BuildPlanPerEngine> s_buildPlanPerEngine{};
 }
 #define theBuildPlan (s_buildPlanPerEngine.get().buildPlan)
 #define thePlanSubject (s_buildPlanPerEngine.get().planSubject)
@@ -180,7 +180,7 @@ static void doSetRallyPoint( Object *obj, const Coord3D& pos )
 			// play the no can do sound
 #if RTS_ENGINE_CONTEXT
 			// GeneralsX @feature cemlyn007 28/09/2026 Per engine: the event keeps this engine's event info and sound rotation (PLAN-023 Phase 4).
-			static rts::PerEngineStatic<AudioEventRTS> rallyNotSet_perEngine([](AudioEventRTS& event) { event.setEventName("UnableToSetRallyPoint"); });
+			static constexpr rts::PerEngineStatic<AudioEventRTS> rallyNotSet_perEngine([](AudioEventRTS& event) { event.setEventName("UnableToSetRallyPoint"); });
 			AudioEventRTS& rallyNotSet = rallyNotSet_perEngine.get();
 #else
 			static AudioEventRTS rallyNotSet("UnableToSetRallyPoint");
@@ -208,7 +208,7 @@ static void doSetRallyPoint( Object *obj, const Coord3D& pos )
 		// play a sound for setting the rally point
 #if RTS_ENGINE_CONTEXT
 		// GeneralsX @feature cemlyn007 28/09/2026 Per engine: the event keeps this engine's event info and sound rotation (PLAN-023 Phase 4).
-		static rts::PerEngineStatic<AudioEventRTS> rallyPointSet_perEngine([](AudioEventRTS& event) { event.setEventName("RallyPointSet"); });
+		static constexpr rts::PerEngineStatic<AudioEventRTS> rallyPointSet_perEngine([](AudioEventRTS& event) { event.setEventName("RallyPointSet"); });
 		AudioEventRTS& rallyPointSet = rallyPointSet_perEngine.get();
 #else
 		static AudioEventRTS rallyPointSet("RallyPointSet");
@@ -1988,7 +1988,7 @@ bool GameLogic::onDozerConstruct(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &curr
 
 #if RTS_ENGINE_CONTEXT
 	// GeneralsX @feature cemlyn007 28/09/2026 Per engine: the event keeps this engine's event info and sound rotation (PLAN-023 Phase 4).
-	static rts::PerEngineStatic<AudioEventRTS> placeBuilding_perEngine([](AudioEventRTS& event) { event.setEventName("PlaceBuilding"); });
+	static constexpr rts::PerEngineStatic<AudioEventRTS> placeBuilding_perEngine([](AudioEventRTS& event) { event.setEventName("PlaceBuilding"); });
 	AudioEventRTS& placeBuilding = placeBuilding_perEngine.get();
 #else
 	static AudioEventRTS placeBuilding("PlaceBuilding");
@@ -2173,7 +2173,7 @@ bool GameLogic::onPlaceBeacon(MAYBE_UNUSED GameMessage *msg)
 				// play a sound
 #if RTS_ENGINE_CONTEXT
 				// GeneralsX @feature cemlyn007 28/09/2026 Per engine: the event keeps this engine's event info and sound rotation (PLAN-023 Phase 4).
-				static rts::PerEngineStatic<AudioEventRTS> aSound_perEngine([](AudioEventRTS& event) { event.setEventName("BeaconPlacementFailed"); });
+				static constexpr rts::PerEngineStatic<AudioEventRTS> aSound_perEngine([](AudioEventRTS& event) { event.setEventName("BeaconPlacementFailed"); });
 				AudioEventRTS& aSound = aSound_perEngine.get();
 #else
 				static AudioEventRTS aSound("BeaconPlacementFailed");
@@ -2199,7 +2199,7 @@ bool GameLogic::onPlaceBeacon(MAYBE_UNUSED GameMessage *msg)
 			// play a sound
 #if RTS_ENGINE_CONTEXT
 			// GeneralsX @feature cemlyn007 28/09/2026 Per engine: the event keeps this engine's event info and sound rotation (PLAN-023 Phase 4).
-			static rts::PerEngineStatic<AudioEventRTS> aSound_perEngine([](AudioEventRTS& event) { event.setEventName("BeaconPlaced"); });
+			static constexpr rts::PerEngineStatic<AudioEventRTS> aSound_perEngine([](AudioEventRTS& event) { event.setEventName("BeaconPlaced"); });
 			AudioEventRTS& aSound = aSound_perEngine.get();
 #else
 			static AudioEventRTS aSound("BeaconPlaced");
@@ -2220,7 +2220,12 @@ bool GameLogic::onPlaceBeacon(MAYBE_UNUSED GameMessage *msg)
 		{
 
 			Int updateCount = 0;
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+			RTS_ENGINE_STATIC(NameKeyType, nameKeyClientUpdate, NAMEKEY("BeaconClientUpdate"));
+#else
 			static NameKeyType nameKeyClientUpdate = NAMEKEY("BeaconClientUpdate");
+#endif
 			ClientUpdateModule ** clientModules = object->getDrawable()->getClientUpdateModules();
 			if (clientModules)
 			{
@@ -2247,7 +2252,7 @@ bool GameLogic::onPlaceBeacon(MAYBE_UNUSED GameMessage *msg)
 		// play a sound
 #if RTS_ENGINE_CONTEXT
 		// GeneralsX @feature cemlyn007 28/09/2026 Per engine: the event keeps this engine's event info and sound rotation (PLAN-023 Phase 4).
-		static rts::PerEngineStatic<AudioEventRTS> aSound_perEngine([](AudioEventRTS& event) { event.setEventName("BeaconPlacementFailed"); });
+		static constexpr rts::PerEngineStatic<AudioEventRTS> aSound_perEngine([](AudioEventRTS& event) { event.setEventName("BeaconPlacementFailed"); });
 		AudioEventRTS& aSound = aSound_perEngine.get();
 #else
 		static AudioEventRTS aSound("BeaconPlacementFailed");
@@ -2297,7 +2302,11 @@ bool GameLogic::onRemoveBeacon(MAYBE_UNUSED GameMessage *msg)
 						if (beaconDrawable)
 						{
 
+#if RTS_ENGINE_CONTEXT
+							RTS_ENGINE_STATIC(NameKeyType, nameKeyClientUpdate, NAMEKEY("BeaconClientUpdate"));
+#else
 							static NameKeyType nameKeyClientUpdate = NAMEKEY("BeaconClientUpdate");
+#endif
 							ClientUpdateModule ** clientModules = beaconDrawable->getClientUpdateModules();
 							if (clientModules)
 							{

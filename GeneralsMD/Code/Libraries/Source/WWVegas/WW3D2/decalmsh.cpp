@@ -185,7 +185,7 @@ struct DecalClipState
 	DecalPolyClass _DecalPoly0;
 	DecalPolyClass _DecalPoly1;
 };
-rts::PerEngineStatic<DecalClipState> DecalClipState_perEngine;
+constexpr rts::PerEngineStatic<DecalClipState> DecalClipState_perEngine{};
 } // namespace
 #define _DecalPoly0 (DecalClipState_perEngine.get()._DecalPoly0)
 #define _DecalPoly1 (DecalClipState_perEngine.get()._DecalPoly1)
@@ -719,8 +719,8 @@ bool RigidDecalMeshClass::Delete_Decal(uint32 id)
 #if RTS_ENGINE_CONTEXT
 // GeneralsX @feature cemlyn007 28/09/2026 Per engine, so that engines on separate threads do not share them
 // (PLAN-023 Phase 5b).
-static rts::PerEngineStatic<SimpleVecClass<Vector3> > _TempVertexBuffer_perEngine;
-static rts::PerEngineStatic<SimpleVecClass<Vector3> > _TempNormalBuffer_perEngine;
+static constexpr rts::PerEngineStatic<SimpleVecClass<Vector3> > _TempVertexBuffer_perEngine;
+static constexpr rts::PerEngineStatic<SimpleVecClass<Vector3> > _TempNormalBuffer_perEngine;
 #define _TempVertexBuffer (_TempVertexBuffer_perEngine.get())
 #define _TempNormalBuffer (_TempNormalBuffer_perEngine.get())
 #else

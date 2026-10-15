@@ -85,4 +85,5 @@ const char* const ObjectStatusMaskType::s_bitNameList[] =
 };
 static_assert(ARRAY_SIZE(ObjectStatusMaskType::s_bitNameList) == ObjectStatusMaskType::NumBits + 1, "Incorrect array size");
 
-ObjectStatusMaskType OBJECT_STATUS_MASK_NONE;	// inits to all zeroes
+// GeneralsX @refactor cemlyn007 14/10/2026 Constant, so read-only: engines share no writable state (docs/EMBEDDING.md).
+const ObjectStatusMaskType OBJECT_STATUS_MASK_NONE;	// inits to all zeroes

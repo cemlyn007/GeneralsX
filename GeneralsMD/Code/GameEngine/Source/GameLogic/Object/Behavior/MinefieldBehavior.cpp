@@ -243,7 +243,12 @@ UpdateSleepTime MinefieldBehavior::update()
 				{
 					m_regenerates = false;
 					m_draining = true;
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+					RTS_ENGINE_STATIC(const NameKeyType, key_AutoHealBehavior, NAMEKEY("AutoHealBehavior"));
+#else
 					static const NameKeyType key_AutoHealBehavior = NAMEKEY("AutoHealBehavior");
+#endif
 					AutoHealBehavior* ahb = (AutoHealBehavior*)obj->findUpdateModule( key_AutoHealBehavior );
 					if (ahb)
 						ahb->stopHealing();

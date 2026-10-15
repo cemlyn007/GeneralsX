@@ -463,6 +463,12 @@ private:
 /*
 ** Instance of the loader which the asset manager installs
 */
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_EXTERN_GLOBAL(SphereLoaderClass, _SphereLoader);
+#define _SphereLoader RTS_ENGINE_GLOBAL_REF(_SphereLoader)
+#else
 extern SphereLoaderClass			_SphereLoader;
+#endif
 
 // EOF - sphereobj,h

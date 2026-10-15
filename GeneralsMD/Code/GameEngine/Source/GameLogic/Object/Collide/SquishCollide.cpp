@@ -73,7 +73,12 @@ void SquishCollide::onCollide( Object *other, const Coord3D *loc, const Coord3D 
 		//special circumstances:
 
 		//Hijacking!
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+		RTS_ENGINE_STATIC(NameKeyType, key_HijackerUpdate, NAMEKEY( "HijackerUpdate" ));
+#else
 		static NameKeyType key_HijackerUpdate = NAMEKEY( "HijackerUpdate" );
+#endif
 		HijackerUpdate *hijackUpdate = (HijackerUpdate*)self->findUpdateModule( key_HijackerUpdate );
 		if( hijackUpdate )
 		{

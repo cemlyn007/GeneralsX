@@ -103,7 +103,13 @@ class SysTimeClass
 
 };
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_EXTERN_GLOBAL(SysTimeClass, SystemTime);
+#define SystemTime RTS_ENGINE_GLOBAL_REF(SystemTime)
+#else
 extern SysTimeClass SystemTime;
+#endif
 
 
 /***********************************************************************************************
@@ -126,7 +132,11 @@ WWINLINE unsigned int SysTimeClass::Get()
 	** This has to be static here since we don't know if we will get called in a global constructor of another object before our
 	** constructor gets called. In fact, we don't even have a constructor because it's pointless.
 	*/
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(bool, is_init, false);
+#else
 	static bool is_init = false;
+#endif
 
 	if (!is_init) {
 		Reset();

@@ -23,9 +23,17 @@
 class SortingNodeStruct;
 class SphereClass;
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+#define _EnableTriangleDraw RTS_ENGINE_GLOBAL_REF(_EnableTriangleDraw)
+#endif
 class SortingRendererClass
 {
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_CLASS_STATIC(bool, _EnableTriangleDraw);
+#else
 	static bool _EnableTriangleDraw;
+#endif
 
 	static void Flush_Sorting_Pool();
 	static void Insert_To_Sorted_List(SortingNodeStruct* state);
@@ -53,3 +61,6 @@ public:
 	static void _Enable_Triangle_Draw(bool enable) { _EnableTriangleDraw=enable; }
 	static bool _Is_Triangle_Draw_Enabled() { return _EnableTriangleDraw; }
 };
+#if RTS_ENGINE_CONTEXT
+#undef _EnableTriangleDraw
+#endif

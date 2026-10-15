@@ -477,10 +477,19 @@ private:
 	static Triangle*	generateTriangleList				(const Vector3i* tris, int N);
 	static Vector3i		getTriangleNodeConnectivityWeights	(const TriangleQueue& queue, const Triangle& tri);
 	static int			getMod3								(int i) { WWASSERT(i>=0 && i<6); return s_mod[i]; }
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @refactor cemlyn007 15/10/2026 Data no engine writes is constant (docs/EMBEDDING.md).
+	static const int	s_mod[6];						// small lookup table for mod3 operation (see getMod3())
+#else
 	static int			s_mod[6];						// small lookup table for mod3 operation (see getMod3())
+#endif
 };
 
+#if RTS_ENGINE_CONTEXT
+const int Stripify::s_mod[6] = {0,1,2,0,1,2};
+#else
 int Stripify::s_mod[6] = {0,1,2,0,1,2};
+#endif
 }
 
 

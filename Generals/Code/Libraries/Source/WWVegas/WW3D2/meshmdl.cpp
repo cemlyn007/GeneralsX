@@ -63,7 +63,7 @@ struct MeshModelScratch
 {
 	DynamicVectorClass<Vector4> _TempTransformedVertexBuffer;
 };
-rts::PerEngineStatic<MeshModelScratch> MeshModelScratch_perEngine;
+constexpr rts::PerEngineStatic<MeshModelScratch> MeshModelScratch_perEngine{};
 } // namespace
 #define _TempTransformedVertexBuffer (MeshModelScratch_perEngine.get()._TempTransformedVertexBuffer)
 #else
@@ -581,7 +581,7 @@ struct MeshModelHashes
 	HashTemplateClass<Vector3, unsigned> DuplicateLocationHash;
 	HashTemplateClass<TriangleSide, SideIndexInfo> SideHash;
 };
-rts::PerEngineStatic<MeshModelHashes> MeshModelHashes_perEngine;
+constexpr rts::PerEngineStatic<MeshModelHashes> MeshModelHashes_perEngine{};
 } // namespace
 #define LocationHash (MeshModelHashes_perEngine.get().LocationHash)
 #define DuplicateLocationHash (MeshModelHashes_perEngine.get().DuplicateLocationHash)

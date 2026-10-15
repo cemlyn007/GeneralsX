@@ -261,10 +261,27 @@ WindowMsgHandledType ExtendedMessageBoxSystem( GameWindow *window, UnsignedInt m
 		{
 			GameWindow *control = (GameWindow *)mData1;
 			Int controlID = control->winGetWindowId();
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+			RTS_ENGINE_STATIC(NameKeyType, buttonOkID, TheNameKeyGenerator->nameToKey( "MessageBox.wnd:ButtonOk" ));
+#else
 			static NameKeyType buttonOkID = TheNameKeyGenerator->nameToKey( "MessageBox.wnd:ButtonOk" );
+#endif
+#if RTS_ENGINE_CONTEXT
+			RTS_ENGINE_STATIC(NameKeyType, buttonYesID, TheNameKeyGenerator->nameToKey( "MessageBox.wnd:ButtonYes" ));
+#else
 			static NameKeyType buttonYesID = TheNameKeyGenerator->nameToKey( "MessageBox.wnd:ButtonYes" );
+#endif
+#if RTS_ENGINE_CONTEXT
+			RTS_ENGINE_STATIC(NameKeyType, buttonNoID, TheNameKeyGenerator->nameToKey( "MessageBox.wnd:ButtonNo" ));
+#else
 			static NameKeyType buttonNoID = TheNameKeyGenerator->nameToKey( "MessageBox.wnd:ButtonNo" );
+#endif
+#if RTS_ENGINE_CONTEXT
+			RTS_ENGINE_STATIC(NameKeyType, buttonCancelID, TheNameKeyGenerator->nameToKey( "MessageBox.wnd:ButtonCancel" ));
+#else
 			static NameKeyType buttonCancelID = TheNameKeyGenerator->nameToKey( "MessageBox.wnd:ButtonCancel" );
+#endif
 			WindowExMessageBoxData *MsgBoxCallbacks = (WindowExMessageBoxData *)window->winGetUserData();
 
 			MessageBoxReturnType ret = MB_RETURN_CLOSE;

@@ -83,7 +83,13 @@ extern void W3DGeneralsXCreditDraw( GameWindow *window, WinInstanceData *instDat
 //-----------------------------------------------------------------------------
 
 void drawText( GameWindow *window, WinInstanceData *instData );
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+// GeneralsX @refactor cemlyn007 15/10/2026 Data no engine writes is constant (docs/EMBEDDING.md).
+static const Color BrownishColor = GameMakeColor(167,134,94,255);
+#else
 static Color BrownishColor = GameMakeColor(167,134,94,255);
+#endif
 static IRegion2D clipRegion;
 //-----------------------------------------------------------------------------
 // PUBLIC FUNCTIONS ///////////////////////////////////////////////////////////
@@ -98,7 +104,11 @@ static void advancePosition(GameWindow *window, const Image *image, UnsignedInt 
 	if(!image)
 		return;
 
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(Bool, goingForward, TRUE);
+#else
 	static Bool goingForward = TRUE;
+#endif
 
 	ICoord2D pos, size;
 	if(!window)
@@ -113,12 +123,28 @@ static void advancePosition(GameWindow *window, const Image *image, UnsignedInt 
 		window->winGetScreenPosition(&pos.x, &pos.y);
 		window->winGetSize(&size.x,&size.y);
 	}
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(Int, Width, size.x + image->getImageWidth());
+#else
 	static Int Width = size.x + image->getImageWidth();
+#endif
 
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(Int, x, -DEFAULT_DISPLAY_WIDTH);
+#else
 	static Int x = -DEFAULT_DISPLAY_WIDTH;
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(Int, y, pos.y - (image->getImageHeight()/2));
+#else
 	static Int y = pos.y - (image->getImageHeight()/2);
+#endif
 
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(UnsignedInt, m_startTime, timeGetTime());
+#else
 	static UnsignedInt m_startTime = timeGetTime();
+#endif
 	Int time = timeGetTime() - m_startTime;
 	Real percentDone = INT_TO_REAL(time) / 10000;
 
@@ -169,7 +195,11 @@ void W3DMainMenuDraw( GameWindow *window, WinInstanceData *instData )
 
 	//R:83 G:78 B:52
 
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(UnsignedInt, color, static_cast<UnsignedInt>(BrownishColor));
+#else
 	static UnsignedInt color = BrownishColor;
+#endif
 	static UnsignedInt colorDrop = GameMakeColor(38,30,21,255);
 	ICoord2D pos, size;
 	Int height = TheDisplay->getHeight();
@@ -236,7 +266,11 @@ void W3DMainMenuFourDraw( GameWindow *window, WinInstanceData *instData )
 
 	//R:83 G:78 B:52
 
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(UnsignedInt, color, static_cast<UnsignedInt>(BrownishColor));
+#else
 	static UnsignedInt color = BrownishColor;
+#endif
 	static UnsignedInt colorDrop = GameMakeColor(38,30,21,255);
 	ICoord2D pos, size;
 	Int height = TheDisplay->getHeight();

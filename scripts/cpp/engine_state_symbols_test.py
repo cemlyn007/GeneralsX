@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # GeneralsX @feature cemlyn007 02/10/2026 Tests for engine_state_symbols.py's classification logic (PLAN-023)
 #
-# Table-driven coverage for the regex/branch defects a code review of this script found: rule:const and
-# rule:namekey over-matching reassignable pointers/containers (SAFE_FOR_NEW must never pass those), the
+# Table-driven coverage for the regex/branch defects a code review of this script found: rule:const
+# over-matching reassignable pointers/containers (SAFE_FOR_NEW must never pass those), the
 # owner-definition search taking a qualified call for a real definition, find_all dropping sites in a
 # different branch, resolve_sources picking an unresolved candidate for a count-1 name, and the new-defining-
 # file policy in `compare`. Run with `python3 -m unittest scripts/cpp/engine_state_symbols_test.py` (or
@@ -33,19 +33,15 @@ class FakeLookup:
     """A minimal stand-in for `FunctionLookup` (callable for `is_function_name`, plus `is_macro_name`),
     for tests that need to control the macro answer without building a real `SourceIndex`."""
 
-    def __init__(self, functions=(), macros=(), written=()):
+    def __init__(self, functions=(), macros=()):
         self._functions = set(functions)
         self._macros = set(macros)
-        self._written = set(written)
 
     def __call__(self, name):
         return name in self._functions
 
     def is_macro_name(self, name):
         return name in self._macros
-
-    def is_written(self, sym):
-        return sym.key in self._written
 
 
 class RulePerEngineStaticTest(unittest.TestCase):
@@ -988,71 +984,6 @@ class RuleConstObjectTest(unittest.TestCase):
         )
 
 
-class RuleNamekeyTest(unittest.TestCase):
-    """rule:namekey is SAFE_FOR_NEW: the variable itself must be a NameKeyType/StaticNameKey cache, not a
-    container or struct that merely mentions one."""
-
-    def assert_namekey(self, decl, expect, msg=None):
-        got = m.rule_namekey(make_symbol("s", [decl])) is not None
-        self.assertEqual(got, expect, msg or decl)
-
-    def test_namekey_from_macro_is_safe(self):
-        self.assert_namekey('static NameKeyType s_key = NAMEKEY("Foo");', True)
-
-    def test_namekey_with_no_initializer_is_not_safe(self):
-        # Nothing here sees what fills it: a const one's value comes from an out-of-line definition no
-        # rule has read, a non-const one's from any later assignment.
-        self.assert_namekey("static const NameKeyType s_key", False)
-        self.assert_namekey("static NameKeyType s_key", False)
-
-    def test_namekey_from_generator_call_is_safe(self):
-        self.assert_namekey('static NameKeyType s_key = TheNameKeyGenerator->nameToKey("Foo");', True)
-
-    def test_mutable_namekey_reassigned_to_a_constant_is_not_safe(self):
-        self.assert_namekey("static NameKeyType s_lastSelected = NAMEKEY_INVALID;", False)
-
-    def test_mutable_namekey_that_is_written_after_its_declaration_is_not_safe(self):
-        decl = 'static NameKeyType s_key = NAMEKEY("Foo");'
-        sym = make_symbol("s", [decl])
-        self.assertIsNotNone(m.rule_namekey(sym, None, FakeLookup()))
-        self.assertIsNone(m.rule_namekey(sym, None, FakeLookup(written=["s"])))
-
-    def test_const_namekey_is_not_checked_for_writes(self):
-        sym = make_symbol("s", ['static const NameKeyType s_key = NAMEKEY("Foo");'])
-        self.assertIsNotNone(m.rule_namekey(sym, None, FakeLookup(written=["s"])))
-
-    def test_container_of_namekeys_is_not_safe(self):
-        self.assert_namekey("static std::map<NameKeyType, Object*> s_byKey;", False)
-
-    def test_struct_mentioning_namekey_is_not_safe(self):
-        self.assert_namekey("static StructWithANameKeyType s_thing;", False)
-
-    def test_namekey_from_macro_on_an_engine_dependent_read_is_not_safe(self):
-        # Decision 2 shares the generator, not the string fed to it: two engines with different
-        # TheGlobalData/map data would compute, and cache, two different keys.
-        self.assert_namekey("static NameKeyType k = NAMEKEY(TheGlobalData->m_mapName);", False)
-
-    def test_namekey_from_macro_on_a_plain_member_name_is_not_safe(self):
-        self.assert_namekey("static NameKeyType k = NAMEKEY(m_templateName);", False)
-
-    def test_namekey_from_generator_call_on_an_engine_dependent_read_is_not_safe(self):
-        self.assert_namekey(
-            "static NameKeyType k = TheNameKeyGenerator->nameToKey(TheGlobalData->m_mapName);", False
-        )
-
-    def test_const_namekey_copied_from_another_cache_is_not_safe(self):
-        self.assert_namekey("static const NameKeyType k = s_lastKey;", False)
-
-    def test_const_namekey_from_an_engine_dependent_read_is_not_safe(self):
-        self.assert_namekey("static const NameKeyType k = TheGlobalData->m_someKey;", False)
-
-    def test_const_namekey_reassigned_to_a_constant_is_not_safe(self):
-        self.assert_namekey("static const NameKeyType k = NAMEKEY_INVALID;", False)
-
-    def test_namekey_with_a_trailing_operation_is_not_safe(self):
-        self.assert_namekey('static NameKeyType k = NAMEKEY("x") + s_offset;', False)
-
-
 class RuleFieldParseTest(unittest.TestCase):
     """rule:fieldparse decides by declared type, not by the variable's name alone."""
 
@@ -1352,7 +1283,7 @@ class SourceIndexDefinitionTest(unittest.TestCase):
 
     def test_class_static_declaration_whose_definition_is_out_of_sight_is_not_a_definition(self):
         # The in-class line `static const T name;` carries no initialiser, so reading it as the definition
-        # would make rule:const and rule:namekey accept whatever the real, out-of-line definition computes.
+        # would make rule:const accept whatever the real, out-of-line definition computes.
         # Each of these definitions is one the qualified search cannot see: a template's, one in a header,
         # one whose type is on the line before `Cls::name`.
         self.write(
@@ -1389,49 +1320,6 @@ class SourceIndexDefinitionTest(unittest.TestCase):
             sym = m.Symbol(f"Inl::{var}")
             m.resolve_sources(self.root, {sym.key: sym}, {})
             self.assertEqual(sym.source, f"Core/inl.h:{line}" if line else "?", var)
-
-    def test_namekey_static_written_after_its_declaration_is_not_a_safe_cache(self):
-        # A literal initialiser does not make a non-const static a constant key: any later assignment
-        # (or increment, or address taken for a write through a pointer) makes it per-engine state.
-        self.write(
-            "tabs.cpp",
-            "void a() {\n"
-            '    static NameKeyType s_lastTab = NAMEKEY("TabOne");\n'
-            "    if (s_lastTab == NAMEKEY(\"x\")) {}\n"
-            "    s_lastTab = TheNameKeyGenerator->nameToKey(m_tabName);\n"
-            "}\n"
-            "void b() {\n"
-            '    static NameKeyType s_calls = NAMEKEY("Calls");\n'
-            "    ++s_calls;\n"
-            "}\n"
-            "void c() {\n"
-            '    static NameKeyType s_ptr = NAMEKEY("Ptr");\n'
-            "    Poke(&s_ptr);\n"
-            "}\n"
-            "void d() {\n"
-            '    static NameKeyType s_ok = NAMEKEY("Ok");\n'
-            "    use(s_ok, s_ok == s_ok, obj.s_ok = 1, p->s_ok = 2);\n"
-            "}\n"
-            "void e() {\n"
-            "    s_ok = 3;\n"  # another function's own name: out of scope of d's static
-            "}\n"
-            "namespace {\n"
-            'static NameKeyType s_file = NAMEKEY("File");\n'
-            'static NameKeyType s_fileOk = NAMEKEY("FileOk");\n'
-            "}\n"
-            "void f() { s_file += 1; }\n",
-        )
-        self.write("other.cpp", "extern NameKeyType s_file;\nvoid g() { s_fileOk = 5; }\n")
-        expect = {
-            "a()::s_lastTab": m.UNREVIEWED,
-            "b()::s_calls": m.UNREVIEWED,
-            "c()::s_ptr": m.UNREVIEWED,
-            "d()::s_ok": m.GLOBAL,
-            "s_file": m.UNREVIEWED,
-            "s_fileOk": m.UNREVIEWED,
-        }
-        for key, cls in expect.items():
-            self.assertEqual(self.classify_static(key).cls, cls, key)
 
     def test_fieldparse_row_reading_a_context_macro_is_not_a_safe_table(self):
         # The singleton is an object-like macro over the engine context, so no symbol names it: only the

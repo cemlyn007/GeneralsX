@@ -372,7 +372,7 @@ Drawable *ThingFactory::newDrawable(const ThingTemplate *tmplate, DrawableStatus
 // GeneralsX @fix cemlyn007 03/10/2026 Per engine: every engine's parseObjectDefinition() assigns it (map.ini loads
 // included), and two threads must not write one AsciiString object (the atomic refcount only covers buffers
 // shared between copies).
-rts::PerEngineStatic<AsciiString> TheThingTemplateBeingParsedName_perEngine;
+extern constexpr rts::PerEngineStatic<AsciiString> TheThingTemplateBeingParsedName_perEngine{};
 #define TheThingTemplateBeingParsedName (TheThingTemplateBeingParsedName_perEngine.get())
 #else
 AsciiString TheThingTemplateBeingParsedName;

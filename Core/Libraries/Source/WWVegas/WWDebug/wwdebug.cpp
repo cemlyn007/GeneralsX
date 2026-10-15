@@ -57,11 +57,37 @@
 #include <errno.h>
 #endif
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(PrintFunc, _CurMessageHandler, nullptr);
+#define _CurMessageHandler RTS_ENGINE_GLOBAL_REF(_CurMessageHandler)
+#else
 static PrintFunc			_CurMessageHandler = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(AssertPrintFunc, _CurAssertHandler, nullptr);
+#define _CurAssertHandler RTS_ENGINE_GLOBAL_REF(_CurAssertHandler)
+#else
 static AssertPrintFunc	_CurAssertHandler = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(TriggerFunc, _CurTriggerHandler, nullptr);
+#define _CurTriggerHandler RTS_ENGINE_GLOBAL_REF(_CurTriggerHandler)
+#else
 static TriggerFunc		_CurTriggerHandler = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(ProfileFunc, _CurProfileStartHandler, nullptr);
+#define _CurProfileStartHandler RTS_ENGINE_GLOBAL_REF(_CurProfileStartHandler)
+#else
 static ProfileFunc		_CurProfileStartHandler = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(ProfileFunc, _CurProfileStopHandler, nullptr);
+#define _CurProfileStopHandler RTS_ENGINE_GLOBAL_REF(_CurProfileStopHandler)
+#else
 static ProfileFunc		_CurProfileStopHandler = nullptr;
+#endif
 
 // Convert the latest system error into a string and return a pointer to
 // a static buffer containing the error string.

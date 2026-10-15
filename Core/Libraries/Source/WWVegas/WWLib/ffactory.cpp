@@ -46,12 +46,38 @@
 ** NOTE: If _TheFileFactory is ever changed to point to an object of a different class which does
 ** not derive from SimpleFileFactoryClass, _TheSimpleFileFactory should be set to null.
 */
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(SimpleFileFactoryClass, _DefaultFileFactory);
+#define _DefaultFileFactory RTS_ENGINE_GLOBAL_REF(_DefaultFileFactory)
+#else
 SimpleFileFactoryClass		_DefaultFileFactory;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(FileFactoryClass*, _TheFileFactory, &_DefaultFileFactory);
+#define _TheFileFactory RTS_ENGINE_GLOBAL_REF(_TheFileFactory)
+#else
 FileFactoryClass *			_TheFileFactory = &_DefaultFileFactory;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(SimpleFileFactoryClass*, _TheSimpleFileFactory, &_DefaultFileFactory);
+#define _TheSimpleFileFactory RTS_ENGINE_GLOBAL_REF(_TheSimpleFileFactory)
+#else
 SimpleFileFactoryClass *			_TheSimpleFileFactory = &_DefaultFileFactory;
+#endif
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(RawFileFactoryClass, _DefaultWritingFileFactory);
+#define _DefaultWritingFileFactory RTS_ENGINE_GLOBAL_REF(_DefaultWritingFileFactory)
+#else
 RawFileFactoryClass		_DefaultWritingFileFactory;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(RawFileFactoryClass*, _TheWritingFileFactory, &_DefaultWritingFileFactory);
+#define _TheWritingFileFactory RTS_ENGINE_GLOBAL_REF(_TheWritingFileFactory)
+#else
 RawFileFactoryClass *			_TheWritingFileFactory = &_DefaultWritingFileFactory;
+#endif
 
 /*
 **

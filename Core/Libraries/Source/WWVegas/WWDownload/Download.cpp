@@ -169,7 +169,12 @@ HRESULT CDownload::PumpMessages()
 	int iResult = 0;
 	int timetaken = 0;
 	int averagetimepredicted = -1;
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+	RTS_ENGINE_STATIC(int, reenter, 0);
+#else
 	static int reenter = 0;
+#endif
 
 	/* Avoid reentrancy. */
 

@@ -116,7 +116,12 @@ void SpyVisionSpecialPower::doSpecialPower( UnsignedInt commandOptions )
 			duration = modData->m_maxDurationInFrames;
 	}
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+	RTS_ENGINE_STATIC(const NameKeyType, key_SpyVisionUpdate, NAMEKEY( "SpyVisionUpdate" ));
+#else
 	static const NameKeyType key_SpyVisionUpdate = NAMEKEY( "SpyVisionUpdate" );
+#endif
 	SpyVisionUpdate *update = (SpyVisionUpdate*)source->findUpdateModule( key_SpyVisionUpdate );
 	if( !update )
 	{

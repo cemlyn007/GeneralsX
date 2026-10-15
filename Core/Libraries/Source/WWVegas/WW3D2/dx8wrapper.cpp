@@ -102,10 +102,6 @@
 #include <cstdint>
 #include <cstdlib>
 #include <mutex>
-#ifndef _WIN32
-#include <sys/mman.h>
-#include <unistd.h>
-#endif
 
 // GeneralsX @feature cemlyn007 30/09/2026 DX8Wrapper's state names as the current engine's W3DRenderState fields,
 // in this file too (PLAN-023 Phase 8, stage RR2a-1; see w3drenderstate.h). After every #include.
@@ -124,7 +120,9 @@ static_assert(W3DRenderState::DefaultBitDepth == DEFAULT_BIT_DEPTH, "W3DRenderSt
 static_assert(W3DRenderState::DefaultTextureBitDepth == DEFAULT_TEXTURE_BIT_DEPTH, "W3DRenderState's default texture bit depth");
 static_assert(DEFAULT_MSAA == D3DMULTISAMPLE_NONE, "W3DRenderState's default MSAA mode");
 
-W3DRenderState W3DRenderState::Defaults;
+// GeneralsX @refactor cemlyn007 15/10/2026 constexpr, so the defaults are a constant in read-only storage, which no
+// engine can write (docs/EMBEDDING.md).
+constexpr W3DRenderState W3DRenderState::Defaults{};
 
 void DX8Wrapper::Create_Render_State(bool ownedByWW3D)
 {
@@ -139,83 +137,6 @@ void DX8Wrapper::Create_Render_State(bool ownedByWW3D)
 	// RR2a-2).
 	if (context->ww3dState == nullptr)
 		context->ww3dState = new WW3DState();
-}
-
-// GeneralsX @feature cemlyn007 30/09/2026 The defaults' guard (PLAN-023 Phase 8, stage RR2a-2; see w3drenderstate.h).
-static bool Protect_Pages(void* object, std::size_t size, bool readOnly)
-{
-#ifdef _WIN32
-	(void)object;
-	(void)size;
-	(void)readOnly;
-	return false;
-#else
-	// GeneralsX @bugfix cemlyn007 30/09/2026 A page larger than rts::renderStateAlignment cannot hold the defaults
-	// alone: say so (PLAN-023 Phase 8, stage RR2b).
-	const long pageSize = sysconf(_SC_PAGESIZE);
-	if (pageSize <= 0 || static_cast<std::size_t>(pageSize) > ::rts::renderStateAlignment)
-	{
-		WWDEBUG_SAY(("W3D_Protect_Render_Defaults: page size %ld is larger than the render state alignment %u", pageSize,
-			(unsigned)::rts::renderStateAlignment));
-		return false;
-	}
-	if (reinterpret_cast<std::uintptr_t>(object) % static_cast<std::uintptr_t>(pageSize) != 0 ||
-		size % static_cast<std::size_t>(pageSize) != 0)
-		return false;
-	return mprotect(object, size, readOnly ? PROT_READ : PROT_READ | PROT_WRITE) == 0;
-#endif
-}
-
-static void Unprotect_Render_Defaults_At_Exit()
-{
-	W3D_Protect_Render_Defaults(false);
-}
-
-bool W3D_Protect_Render_Defaults(bool readOnly)
-{
-	static_assert(alignof(W3DRenderState) == ::rts::renderStateAlignment, "W3DRenderState fills whole pages");
-	static_assert(alignof(WW3DState) == ::rts::renderStateAlignment, "WW3DState fills whole pages");
-	if (readOnly)
-	{
-		static std::once_flag s_exitHandlerOnce;
-		std::call_once(s_exitHandlerOnce, [] { std::atexit(Unprotect_Render_Defaults_At_Exit); });
-	}
-	// GeneralsX @bugfix cemlyn007 30/09/2026 A failed protect changes neither: it puts back only the pages this
-	// call made read-only. Making them writable goes on past a failure (leaving a page read-only is what the exit
-	// handler is there to undo), so a failed unprotect may leave one page writable (PLAN-023 Phase 8, stage RR2b).
-	void* const objects[2] = {&W3DRenderState::Defaults, &WW3DState::Defaults};
-	const std::size_t sizes[2] = {sizeof(W3DRenderState), sizeof(WW3DState)};
-	static bool s_readOnly[2] = {false, false};
-	if (!readOnly)
-	{
-		bool allWritable = true;
-		for (int i = 0; i < 2; ++i)
-		{
-			if (Protect_Pages(objects[i], sizes[i], false))
-				s_readOnly[i] = false;
-			else
-				allWritable = false;
-		}
-		return allWritable;
-	}
-	bool changed[2] = {false, false};
-	for (int i = 0; i < 2; ++i)
-	{
-		if (s_readOnly[i])
-			continue;
-		if (!Protect_Pages(objects[i], sizes[i], true))
-		{
-			for (int j = 0; j < i; ++j)
-			{
-				if (changed[j] && Protect_Pages(objects[j], sizes[j], false))
-					s_readOnly[j] = false;
-			}
-			return false;
-		}
-		s_readOnly[i] = true;
-		changed[i] = true;
-	}
-	return true;
 }
 
 void DX8Wrapper::Destroy_Render_State()
@@ -635,8 +556,25 @@ static DynamicVectorClass<RenderDeviceDescClass>	_RenderDeviceDescriptionTable;
 
 
 typedef IDirect3D8* (WINAPI *Direct3DCreate8Type) (UINT SDKVersion);
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 Each engine holds its own reference to the D3D8 library: Init takes it and
+// Shutdown drops it. The host's own reference keeps DXVK loaded while any engine draws (docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(Direct3DCreate8Type, Direct3DCreate8Ptr, nullptr);
+#define Direct3DCreate8Ptr RTS_ENGINE_GLOBAL_REF(Direct3DCreate8Ptr)
+RTS_ENGINE_GLOBAL(HINSTANCE, D3D8Lib, nullptr);
+#define D3D8Lib RTS_ENGINE_GLOBAL_REF(D3D8Lib)
+
+static void Release_D3D8_Library()
+{
+	if (D3D8Lib != nullptr)
+		FreeLibrary(D3D8Lib);
+	D3D8Lib = nullptr;
+	Direct3DCreate8Ptr = nullptr;
+}
+#else
 Direct3DCreate8Type	Direct3DCreate8Ptr = nullptr;
 HINSTANCE D3D8Lib = nullptr;
+#endif
 
 #if !RTS_ENGINE_CONTEXT
 DX8_CleanupHook	 *DX8Wrapper::m_pCleanupHook=nullptr;
@@ -802,10 +740,16 @@ bool DX8Wrapper::Init(void * hwnd, bool lite)
 		// up, and render engines may come and go while others run: unloading DXVK in one engine's Shutdown would
 		// pull its code from under the next device (and from the host's own IDirect3D8), so no FreeLibrary.
 		// A failed load is retried by the next Init, so a transient failure does not stick for the process.
+		// GeneralsX @refactor cemlyn007 15/10/2026 With RTS_ENGINE_CONTEXT each engine loads its own reference
+		// (see Release_D3D8_Library), so there is nothing to lock.
+#if !RTS_ENGINE_CONTEXT
 		static std::mutex s_d3d8LibMutex;
+#endif
 		bool d3d8Loaded;
 		{
+#if !RTS_ENGINE_CONTEXT
 		std::lock_guard<std::mutex> d3d8LibLock(s_d3d8LibMutex);
+#endif
 		if (D3D8Lib == nullptr || Direct3DCreate8Ptr == nullptr) [] {
 			// GeneralsX @build BenderAI 10/02/2026 - Platform-specific DLL/SO/DYLIB loading (Phase 5: macOS)
 #ifdef _WIN32
@@ -846,6 +790,7 @@ bool DX8Wrapper::Init(void * hwnd, bool lite)
 #if RTS_ENGINE_CONTEXT
 			// GeneralsX @bugfix cemlyn007 02/10/2026 Create_Render_State() above already allocated this
 			// engine's state; nothing else frees it on this failure return.
+			Release_D3D8_Library();
 			Free_Render_State();
 #endif
 			return false;	// Return false at this point if init failed
@@ -870,6 +815,7 @@ bool DX8Wrapper::Init(void * hwnd, bool lite)
 #if RTS_ENGINE_CONTEXT
 			// GeneralsX @bugfix cemlyn007 02/10/2026 Same as the D3D8Lib failure above: free what
 			// Create_Render_State() allocated before this engine gives up on a device.
+			Release_D3D8_Library();
 			Free_Render_State();
 #endif
 			return(false);
@@ -922,12 +868,16 @@ void DX8Wrapper::Shutdown()
 	}
 
 	// GeneralsX @bugfix cemlyn007 30/09/2026 D3D8Lib stays loaded for the process (see Init).
+	// GeneralsX @refactor cemlyn007 15/10/2026 With RTS_ENGINE_CONTEXT this engine drops its own reference below.
 
 	_RenderDeviceNameTable.Clear();		 // note - Delete_All() resizes the vector, causing a reallocation.  Clear is better. jba.
 	_RenderDeviceShortNameTable.Clear();
 	_RenderDeviceDescriptionTable.Clear();
 
 	DX8Caps::Shutdown();
+#if RTS_ENGINE_CONTEXT
+	Release_D3D8_Library();
+#endif
 	IsInitted = false;		// 010803 srj
 	// GeneralsX @feature cemlyn007 30/09/2026 With RTS_ENGINE_CONTEXT the engine's render state outlives its device
 	// until the end of WW3D::Shutdown, which writes WW3D's own after this (PLAN-023 Phase 8, stages RR2a-1 and

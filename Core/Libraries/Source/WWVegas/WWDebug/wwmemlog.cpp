@@ -38,6 +38,7 @@
  *   WWMemoryLogClass::Release_Memory -- frees memory                                          *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
+#include <atomic>
 #include "WWLib/always.h"
 #include "wwmemlog.h"
 #include "wwdebug.h"
@@ -85,7 +86,13 @@
 #if (DISABLE_MEMLOG == 0)
 bool WWMemoryLogClass::IsMemoryLogEnabled=true;
 #else
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_CLASS_STATIC_DEFINE(bool, WWMemoryLogClass, IsMemoryLogEnabled, false);
+#define IsMemoryLogEnabled RTS_ENGINE_GLOBAL_REF(IsMemoryLogEnabled)
+#else
 bool WWMemoryLogClass::IsMemoryLogEnabled=false;
+#endif
 #endif
 
 // GeneralsX @bugfix cemlyn007 01/10/2026 The allocation and free counts WW3D::Begin_Render reads and resets
@@ -94,8 +101,17 @@ bool WWMemoryLogClass::IsMemoryLogEnabled=false;
 // one process-wide pair from every engine drawing at once on its own thread: a data race (ThreadSanitizer),
 // however harmless the value. Per thread, should anything count again, each engine's frame statistics also
 // count only the allocations of the thread it is drawn on.
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 Per engine (Common/EngineStatic.h), and atomic, since any of an engine's threads
+// may count.
+RTS_ENGINE_GLOBAL(std::atomic<unsigned>, AllocateCount);
+#define AllocateCount RTS_ENGINE_GLOBAL_REF(AllocateCount)
+RTS_ENGINE_GLOBAL(std::atomic<unsigned>, FreeCount);
+#define FreeCount RTS_ENGINE_GLOBAL_REF(FreeCount)
+#else
 static thread_local unsigned AllocateCount;
 static thread_local unsigned FreeCount;
+#endif
 
 /*
 ** Name for each memory category.  I'm padding the array with some "undefined" strings in case
@@ -254,7 +270,12 @@ private:
 ** _MemLogMutex - handle to the mutex used to arbtirate access to the logging data structures
 ** _MemLogLockCounter - count of the active mutex locks.
 */
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(MemLogClass*, _TheMemLog, nullptr);
+#define _TheMemLog RTS_ENGINE_GLOBAL_REF(_TheMemLog)
+#else
 static MemLogClass *				_TheMemLog = nullptr;
+#endif
 static bool							_MemLogAllocated = false;
 
 #if MEMLOG_USE_MUTEX

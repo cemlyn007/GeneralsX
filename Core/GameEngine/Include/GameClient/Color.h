@@ -63,7 +63,12 @@ typedef Int Color;
 
 // EXTERNALS //////////////////////////////////////////////////////////////////
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 constexpr, so a table of colours no engine writes is constant (docs/EMBEDDING.md).
+constexpr Color GameMakeColor( UnsignedByte red, UnsignedByte green, UnsignedByte blue, UnsignedByte alpha )
+#else
 inline Color GameMakeColor( UnsignedByte red, UnsignedByte green, UnsignedByte blue, UnsignedByte alpha )
+#endif
 {
 	return (alpha << 24) | (red << 16) | (green << 8) | (blue);
 }

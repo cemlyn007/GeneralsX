@@ -82,7 +82,12 @@ static int vertex_compare(const void *elem1, const void *elem2);
 
 typedef int (*COMPARE_FUNC_TYPE)(const void * elem1,const void * elem2);
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 Data no engine writes is constant (docs/EMBEDDING.md).
+const COMPARE_FUNC_TYPE Texture_Compare_Funcs[MeshBuilderClass::MAX_PASSES][MeshBuilderClass::MAX_STAGES] =
+#else
 COMPARE_FUNC_TYPE Texture_Compare_Funcs[MeshBuilderClass::MAX_PASSES][MeshBuilderClass::MAX_STAGES] =
+#endif
 {
 	{ pass0_stage0_compare, pass0_stage1_compare },
 	{ pass1_stage0_compare, pass1_stage1_compare },

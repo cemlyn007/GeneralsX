@@ -59,8 +59,14 @@ constexpr const UnsignedInt replayBufferBytes = 8192;
 Int REPLAY_CRC_INTERVAL = 100;
 #endif
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 Strings no engine writes are constant (docs/EMBEDDING.md).
+const char * const replayExtention = ".rep";
+const char * const lastReplayFileName = "00000000";	// a name the user is unlikely to ever type, but won't cause panic & confusion
+#else
 const char *replayExtention = ".rep";
 const char *lastReplayFileName = "00000000";	// a name the user is unlikely to ever type, but won't cause panic & confusion
+#endif
 
 // TheSuperHackers @tweak helmutbuhler 25/04/2025
 // The replay header contains two time fields; startTime and endTime of type time_t.
@@ -75,7 +81,7 @@ typedef uint16_t replay_wide_char_t;
 #if RTS_ENGINE_CONTEXT
 // GeneralsX @feature cemlyn007 28/09/2026 Per engine: the start time of this engine's recording
 // (PLAN-023 Phase 2). The macro ends before readReplayHeader, whose ReplayHeader has a field of this name.
-static rts::PerEngineStatic<time_t> startTime_perEngine;
+static constexpr rts::PerEngineStatic<time_t> startTime_perEngine{};
 #define startTime (startTime_perEngine.get())
 #else
 static time_t startTime;

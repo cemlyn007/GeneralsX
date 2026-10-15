@@ -37,7 +37,7 @@
 #if RTS_ENGINE_CONTEXT
 // GeneralsX @feature cemlyn007 28/09/2026 The negative lookup cache is per engine, cleared with its
 // MapCache's update (PLAN-023 Phase 2).
-static rts::PerEngineStatic<std::set<std::string> > s_failedMapLookups_perEngine;
+static constexpr rts::PerEngineStatic<std::set<std::string> > s_failedMapLookups_perEngine;
 #define s_failedMapLookups (s_failedMapLookups_perEngine.get())
 #else
 static std::set<std::string> s_failedMapLookups;
@@ -136,7 +136,7 @@ struct MapParseScratch
 };
 
 #if RTS_ENGINE_CONTEXT
-static rts::PerEngineStatic<MapParseScratch> s_mapParseScratch_perEngine;
+static constexpr rts::PerEngineStatic<MapParseScratch> s_mapParseScratch_perEngine{};
 static MapParseScratch& mapParseScratch()
 {
 	return s_mapParseScratch_perEngine.get();

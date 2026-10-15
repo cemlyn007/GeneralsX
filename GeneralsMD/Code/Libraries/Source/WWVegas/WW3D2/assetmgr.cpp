@@ -134,7 +134,13 @@ WW3DAssetManager *		WW3DAssetManager::TheInstance = nullptr;
 ** Static instance of the Null prototype.  This render object is special cased
 ** to always be available...
 */
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(NullPrototypeClass, _NullPrototype);
+#define _NullPrototype RTS_ENGINE_GLOBAL_REF(_NullPrototype)
+#else
 static NullPrototypeClass _NullPrototype;
+#endif
 
 /*
 ** Iterator for the Render Objects in the asset manager
@@ -822,7 +828,11 @@ RenderObjClass * WW3DAssetManager::Create_Render_Obj(const char * name)
 
 	if (proto == nullptr) {
 		// GeneralsX @bugfix cemlyn007 30/09/2026 Atomic: any engine's thread may count a missing asset (PLAN-023 Phase 5b).
+#if RTS_ENGINE_CONTEXT
+		RTS_ENGINE_STATIC(std::atomic<int>, warning_count, std::atomic<int>(0));
+#else
 		static std::atomic<int> warning_count(0);
+#endif
 		// Note - objects named "#..." are scaled cached objects, so don't warn...
 		if (name[0] != '#') {
 			if (++warning_count <= 20) {

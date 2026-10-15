@@ -42,9 +42,16 @@ class ProfileId;
 /**
   \brief The high level profiler.
 */
+#if RTS_ENGINE_CONTEXT
+#define Instance RTS_ENGINE_GLOBAL_REF(Instance)
+#endif
 class ProfileHighLevel
 {
   friend class Profile;
+#if RTS_ENGINE_CONTEXT
+  // GeneralsX @refactor cemlyn007 14/10/2026 Its per-engine Instance is made by its holder (Common/EngineStatic.h)
+  friend struct rts::EngineStaticHolder<ProfileHighLevel>;
+#endif
 
   // no, no copying allowed!
   ProfileHighLevel(const ProfileHighLevel&);
@@ -239,5 +246,12 @@ private:
   /**
     \brief The only high level profiler instance.
   */
+#if RTS_ENGINE_CONTEXT
+  RTS_ENGINE_CLASS_STATIC(ProfileHighLevel, Instance);
+#else
   static ProfileHighLevel Instance;
+#endif
 };
+#if RTS_ENGINE_CONTEXT
+#undef Instance
+#endif

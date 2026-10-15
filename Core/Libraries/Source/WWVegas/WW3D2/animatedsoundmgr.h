@@ -57,6 +57,12 @@ class SoundLibraryBridgeClass;
 //	AnimatedSoundMgrClass
 //
 //////////////////////////////////////////////////////////////////////
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+#define AnimSoundLists RTS_ENGINE_GLOBAL_REF(AnimSoundLists)
+#define AnimationNameHash RTS_ENGINE_GLOBAL_REF(AnimationNameHash)
+#define SoundLibrary RTS_ENGINE_GLOBAL_REF(SoundLibrary)
+#endif
 class AnimatedSoundMgrClass
 {
 public:
@@ -116,13 +122,31 @@ private:
 	///////////////////////////////////////////////////////////////////
 	//	Private member data
 	///////////////////////////////////////////////////////////////////
+#if RTS_ENGINE_CONTEXT
+	using AnimationNameHash_rtsEngineType = HashTemplateClass<StringClass, ANIM_SOUND_LIST*>;
+	RTS_ENGINE_CLASS_STATIC(AnimationNameHash_rtsEngineType, AnimationNameHash);
+#else
 	static HashTemplateClass<StringClass, ANIM_SOUND_LIST *> AnimationNameHash;
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_CLASS_STATIC(DynamicVectorClass<ANIM_SOUND_LIST*>, AnimSoundLists);
+#else
 	static DynamicVectorClass<ANIM_SOUND_LIST *>					AnimSoundLists;
+#endif
 
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_CLASS_STATIC(SoundLibraryBridgeClass*, SoundLibrary);
+#else
 	static SoundLibraryBridgeClass*									SoundLibrary;
+#endif
 
 	///////////////////////////////////////////////////////////////////
 	//	Private methods
 	///////////////////////////////////////////////////////////////////
 	static ANIM_SOUND_LIST *	Find_Sound_List (HAnimClass *anim);
 };
+#if RTS_ENGINE_CONTEXT
+#undef AnimSoundLists
+#undef AnimationNameHash
+#undef SoundLibrary
+#endif

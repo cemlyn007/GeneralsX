@@ -69,7 +69,7 @@ struct TextureFilterState
 	unsigned _MagTextureFilters[MAX_TEXTURE_STAGES][TextureFilterClass::FILTER_TYPE_COUNT];
 	unsigned _MipMapFilters[MAX_TEXTURE_STAGES][TextureFilterClass::FILTER_TYPE_COUNT];
 };
-rts::PerEngineStatic<TextureFilterState> TextureFilterState_perEngine;
+constexpr rts::PerEngineStatic<TextureFilterState> TextureFilterState_perEngine{};
 } // namespace
 #define _MinTextureFilters (TextureFilterState_perEngine.get()._MinTextureFilters)
 #define _MagTextureFilters (TextureFilterState_perEngine.get()._MagTextureFilters)

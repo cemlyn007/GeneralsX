@@ -195,7 +195,8 @@ __forceinline float fast_float_trunc(float f)
 // same here, fast floor function
 __forceinline float fast_float_floor(float f)
 {
-  static unsigned almost1=(126<<23)|0x7fffff;
+  // GeneralsX @refactor cemlyn007 14/10/2026 Constant, so read-only: engines share no writable state.
+  static const unsigned almost1=(126<<23)|0x7fffff;
   if (*(unsigned *)&f &0x80000000)
     f-=*(float *)&almost1;
   return fast_float_trunc(f);
@@ -204,7 +205,7 @@ __forceinline float fast_float_floor(float f)
 // same here, fast ceil function
 __forceinline float fast_float_ceil(float f)
 {
-  static unsigned almost1=(126<<23)|0x7fffff;
+  static const unsigned almost1=(126<<23)|0x7fffff;
   if ( (*(unsigned *)&f &0x80000000)==0)
     f+=*(float *)&almost1;
   return fast_float_trunc(f);

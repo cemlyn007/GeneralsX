@@ -52,13 +52,32 @@ class DefinitionClass;
 //////////////////////////////////////////////////////////////////////////////////
 //	Global declarations
 //////////////////////////////////////////////////////////////////////////////////
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+class DefinitionMgrClass;
+RTS_ENGINE_EXTERN_GLOBAL(DefinitionMgrClass, _TheDefinitionMgr);
+#define _TheDefinitionMgr RTS_ENGINE_GLOBAL_REF(_TheDefinitionMgr)
+#else
 extern class DefinitionMgrClass	_TheDefinitionMgr;
+#endif
 
 //////////////////////////////////////////////////////////////////////////////////
 //
 //	DefinitionMgrClass
 //
 //////////////////////////////////////////////////////////////////////////////////
+#if RTS_ENGINE_CONTEXT
+#define DefinitionHash RTS_ENGINE_GLOBAL_REF(DefinitionHash)
+#endif
+#if RTS_ENGINE_CONTEXT
+#define _DefinitionCount RTS_ENGINE_GLOBAL_REF(_DefinitionCount)
+#endif
+#if RTS_ENGINE_CONTEXT
+#define _MaxDefinitionCount RTS_ENGINE_GLOBAL_REF(_MaxDefinitionCount)
+#endif
+#if RTS_ENGINE_CONTEXT
+#define _SortedDefinitionArray RTS_ENGINE_GLOBAL_REF(_SortedDefinitionArray)
+#endif
 class DefinitionMgrClass : public SaveLoadSubSystemClass
 {
 public:
@@ -123,7 +142,12 @@ protected:
 	bool								Load_Variables (ChunkLoadClass &cload);
 
 private:
+#if RTS_ENGINE_CONTEXT
+	using DefinitionHash_rtsEngineType = HashTemplateClass<StringClass, DynamicVectorClass<DefinitionClass*>*>*;
+	RTS_ENGINE_CLASS_STATIC(DefinitionHash_rtsEngineType, DefinitionHash);
+#else
 	static HashTemplateClass<StringClass, DynamicVectorClass<DefinitionClass*>*>* DefinitionHash;
+#endif
 
 	/////////////////////////////////////////////////////////////////////
 	//	Private methods
@@ -134,9 +158,21 @@ private:
 	/////////////////////////////////////////////////////////////////////
 	//	Static member data
 	/////////////////////////////////////////////////////////////////////
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_CLASS_STATIC(DefinitionClass**, _SortedDefinitionArray);
+#else
 	static DefinitionClass **	_SortedDefinitionArray;
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_CLASS_STATIC(int, _MaxDefinitionCount);
+#else
 	static int						_MaxDefinitionCount;
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_CLASS_STATIC(int, _DefinitionCount);
+#else
 	static int						_DefinitionCount;
+#endif
 
 	/////////////////////////////////////////////////////////////////////
 	//	Friend classes
@@ -175,3 +211,9 @@ DefinitionMgrClass::Get_First ()
 
 	return definition;
 }
+#if RTS_ENGINE_CONTEXT
+#undef _SortedDefinitionArray
+#undef _MaxDefinitionCount
+#undef _DefinitionCount
+#undef DefinitionHash
+#endif

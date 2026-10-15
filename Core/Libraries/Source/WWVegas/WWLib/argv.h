@@ -49,6 +49,13 @@
 //		2. Each line is a separate parameter.  This enables white space to be embeded.
 //	In typical Argv implementation, the first argument is the name of the application.  This
 // is not the case with this.
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+#define Argc RTS_ENGINE_GLOBAL_REF(Argc)
+#endif
+#if RTS_ENGINE_CONTEXT
+#define Argv RTS_ENGINE_GLOBAL_REF(Argv)
+#endif
 class ArgvClass
 {
 	public:
@@ -143,9 +150,21 @@ class ArgvClass
 		};
 
 		// Number of args.
+#if RTS_ENGINE_CONTEXT
+		RTS_ENGINE_CLASS_STATIC(int, Argc);
+#else
 		static int   Argc;
+#endif
 
 		// The actual data.
 		enum {MAX_ARGC = 256};
+#if RTS_ENGINE_CONTEXT
+		RTS_ENGINE_CLASS_STATIC(char*[MAX_ARGC], Argv);
+#else
 		static char  *Argv[MAX_ARGC];
+#endif
 };
+#if RTS_ENGINE_CONTEXT
+#undef Argv
+#undef Argc
+#endif

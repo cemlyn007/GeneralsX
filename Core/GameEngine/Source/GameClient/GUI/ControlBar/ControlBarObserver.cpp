@@ -69,10 +69,19 @@
 // DEFINES ////////////////////////////////////////////////////////////////////
 //-----------------------------------------------------------------------------
 enum { MAX_BUTTONS = 8};
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(NameKeyType[MAX_BUTTONS], buttonPlayerID, { NAMEKEY_INVALID,NAMEKEY_INVALID,
+																										NAMEKEY_INVALID,NAMEKEY_INVALID,
+																										NAMEKEY_INVALID,NAMEKEY_INVALID,
+																										NAMEKEY_INVALID,NAMEKEY_INVALID });
+#define buttonPlayerID RTS_ENGINE_GLOBAL_REF(buttonPlayerID)
+#else
 static NameKeyType buttonPlayerID[MAX_BUTTONS] = { NAMEKEY_INVALID,NAMEKEY_INVALID,
 																										NAMEKEY_INVALID,NAMEKEY_INVALID,
 																										NAMEKEY_INVALID,NAMEKEY_INVALID,
 																										NAMEKEY_INVALID,NAMEKEY_INVALID };
+#endif
 static NameKeyType staticTextPlayerID[MAX_BUTTONS] = { NAMEKEY_INVALID,NAMEKEY_INVALID,
 																										NAMEKEY_INVALID,NAMEKEY_INVALID,
 																										NAMEKEY_INVALID,NAMEKEY_INVALID,
@@ -96,7 +105,7 @@ struct ObserverControls
 	GameWindow *staticTextNumberOfUnitsLost;
 	GameWindow *staticTextPlayerName;
 };
-static rts::PerEngineStatic<ObserverControls> s_observerControls_perEngine;
+static constexpr rts::PerEngineStatic<ObserverControls> s_observerControls_perEngine{};
 #define ObserverPlayerInfoWindow (s_observerControls_perEngine.get().observerPlayerInfoWindow)
 #define ObserverPlayerListWindow (s_observerControls_perEngine.get().observerPlayerListWindow)
 #define buttonPlayer (s_observerControls_perEngine.get().buttonPlayer)
@@ -110,7 +119,12 @@ static rts::PerEngineStatic<ObserverControls> s_observerControls_perEngine;
 #define staticTextNumberOfUnitsLost (s_observerControls_perEngine.get().staticTextNumberOfUnitsLost)
 #define staticTextPlayerName (s_observerControls_perEngine.get().staticTextPlayerName)
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonCancelID, NAMEKEY_INVALID);
+#define buttonCancelID RTS_ENGINE_GLOBAL_REF(buttonCancelID)
+#else
 static NameKeyType buttonCancelID = NAMEKEY_INVALID;
+#endif
 #else
 static GameWindow *ObserverPlayerInfoWindow = nullptr;
 static GameWindow *ObserverPlayerListWindow = nullptr;
@@ -132,7 +146,12 @@ static GameWindow *staticTextNumberOfUnitsLost = nullptr;
 static GameWindow *staticTextPlayerName = nullptr;
 #endif
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, s_replayObserverNameKey, NAMEKEY_INVALID);
+#define s_replayObserverNameKey RTS_ENGINE_GLOBAL_REF(s_replayObserverNameKey)
+#else
 static NameKeyType s_replayObserverNameKey = NAMEKEY_INVALID;
+#endif
 
 //-----------------------------------------------------------------------------
 // PUBLIC FUNCTIONS ///////////////////////////////////////////////////////////

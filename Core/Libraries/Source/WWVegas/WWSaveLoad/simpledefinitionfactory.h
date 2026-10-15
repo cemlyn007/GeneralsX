@@ -27,7 +27,7 @@
 //	Template class to automate the creation of simple definition factories.
 //
 //////////////////////////////////////////////////////////////////////////////////
-template<class T, int class_id, char *name>
+template<class T, int class_id, const char *name>
 class SimpleDefinitionFactoryClass : public DefinitionFactoryClass
 {
 public:
@@ -54,27 +54,28 @@ protected:
 	bool		IsDisplayed;
 };
 
-template<class T, int class_id, char *name>
+template<class T, int class_id, const char *name>
 inline DefinitionClass *
 SimpleDefinitionFactoryClass<T, class_id, name>::Create () const
 {
 	return W3DNEW T;
 }
 
-template<class T, int class_id, char *name>
+template<class T, int class_id, const char *name>
 inline const char *
 SimpleDefinitionFactoryClass<T, class_id, name>::Get_Name () const
 {
 	return name;
 }
 
-template<class T, int class_id, char *name>
+template<class T, int class_id, const char *name>
 inline uint32
 SimpleDefinitionFactoryClass<T, class_id, name>::Get_Class_ID () const
 {
 	return class_id;
 }
 
+// GeneralsX @refactor cemlyn007 14/10/2026 The name is a constant, so read-only: engines share no writable state.
 #define DECLARE_DEFINITION_FACTORY(_class, _id, _name)		\
-char _class ## Name[] = _name;										\
+const char _class ## Name[] = _name;										\
 SimpleDefinitionFactoryClass<_class, _id, _class ## Name>

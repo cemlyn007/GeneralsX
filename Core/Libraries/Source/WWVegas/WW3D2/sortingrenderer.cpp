@@ -52,7 +52,13 @@
 #include <list>
 
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_CLASS_STATIC_DEFINE(bool, SortingRendererClass, _EnableTriangleDraw, true);
+#define _EnableTriangleDraw RTS_ENGINE_GLOBAL_REF(_EnableTriangleDraw)
+#else
 bool SortingRendererClass::_EnableTriangleDraw=true;
+#endif
 #if RTS_ENGINE_CONTEXT
 // GeneralsX @feature cemlyn007 30/09/2026 Per engine: the sorting buffer sizes, which a render boot with
 // -incrementalAGPBuf shrinks (SetMinVertexBufferSize; PLAN-023 Phase 8, stage RR2b).
@@ -63,7 +69,7 @@ struct SortingRendererSizes
 	unsigned DEFAULT_SORTING_POLY_COUNT = 16384; // (count * 3) must be less than 65536
 	unsigned DEFAULT_SORTING_VERTEX_COUNT = 32768; // count must be less than 65536
 };
-rts::PerEngineStatic<SortingRendererSizes> SortingRendererSizes_perEngine;
+constexpr rts::PerEngineStatic<SortingRendererSizes> SortingRendererSizes_perEngine{};
 } // namespace
 #define DEFAULT_SORTING_POLY_COUNT (SortingRendererSizes_perEngine.get().DEFAULT_SORTING_POLY_COUNT)
 #define DEFAULT_SORTING_VERTEX_COUNT (SortingRendererSizes_perEngine.get().DEFAULT_SORTING_VERTEX_COUNT)
@@ -204,7 +210,7 @@ struct SortingRendererState
 	unsigned overlapping_vertex_count = 0;
 	SortingNodeStruct* overlapping_nodes[MAX_OVERLAPPING_NODES] = {};
 };
-rts::PerEngineStatic<SortingRendererState> SortingRendererState_perEngine;
+constexpr rts::PerEngineStatic<SortingRendererState> SortingRendererState_perEngine{};
 } // namespace
 #define sorted_list (SortingRendererState_perEngine.get().sorted_list)
 #define unsorted_list (SortingRendererState_perEngine.get().unsorted_list)

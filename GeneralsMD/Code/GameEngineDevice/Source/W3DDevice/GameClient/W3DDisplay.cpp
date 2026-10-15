@@ -666,8 +666,19 @@ static void SDL3_ApplyWindowModeForRenderConfig(Bool windowed, Int renderWidth, 
 
 // Filtered resolution cache — built once, clamps widths to 4:3..16:9 and deduplicates.
 struct FilteredRes { Int w, h, bits; };
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(std::vector<FilteredRes>, s_filteredResolutions);
+#define s_filteredResolutions RTS_ENGINE_GLOBAL_REF(s_filteredResolutions)
+#else
 static std::vector<FilteredRes> s_filteredResolutions;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(bool, s_filteredDirty, true);
+#define s_filteredDirty RTS_ENGINE_GLOBAL_REF(s_filteredDirty)
+#else
 static bool s_filteredDirty = true;
+#endif
 
 static void buildFilteredResolutions()
 {

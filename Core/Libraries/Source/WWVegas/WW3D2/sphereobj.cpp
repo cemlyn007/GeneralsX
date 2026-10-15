@@ -103,7 +103,7 @@ struct SphereMeshState
 	SphereMeshClass SphereMeshArray[SPHERE_NUM_LOD];
 	float SphereLODCosts[SPHERE_NUM_LOD + 1] = {}; // SPHERE_NUM_LOD doesn't include the null LOD
 };
-rts::PerEngineStatic<SphereMeshState> SphereMeshState_perEngine;
+constexpr rts::PerEngineStatic<SphereMeshState> SphereMeshState_perEngine{};
 } // namespace
 #define Sphere_Array_Valid (SphereMeshState_perEngine.get().Sphere_Array_Valid)
 #define SphereMeshArray (SphereMeshState_perEngine.get().SphereMeshArray)
@@ -1346,7 +1346,13 @@ RenderObjClass * SpherePrototypeClass::Create()
 /*
 ** Global instance of the box loader
 */
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(SphereLoaderClass, _SphereLoader);
+#define _SphereLoader RTS_ENGINE_GLOBAL_REF(_SphereLoader)
+#else
 SphereLoaderClass _SphereLoader;
+#endif
 
 
 //

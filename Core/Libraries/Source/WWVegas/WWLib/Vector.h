@@ -84,9 +84,10 @@ class VectorClass
 {
 	public:
 		WWINLINE VectorClass(NoInitClass const &) {};
-		VectorClass(int size=0, T const * array=0);
+		// GeneralsX @refactor cemlyn007 15/10/2026 constexpr construction and destruction, so an empty one is a constant (the render defaults, w3drenderstate.h).
+		constexpr VectorClass(int size=0, T const * array=0);
 		VectorClass(VectorClass<T> const &);		// Copy constructor.
-		virtual ~VectorClass();
+		constexpr virtual ~VectorClass();
 
 		WWINLINE T & operator[](int index) {  assert(unsigned(index) < unsigned(VectorMax));return(Vector[index]); }
 		WWINLINE T const & operator[](int index) const { assert(unsigned(index) < unsigned(VectorMax));return(Vector[index]);  }
@@ -96,7 +97,7 @@ class VectorClass
 		virtual bool operator == (VectorClass<T> const &) const;	// Equality operator.
 
 		virtual bool Resize(int newsize, T const * array=0);
-		virtual void Clear();
+		constexpr virtual void Clear();
 		WWINLINE int Length() const {return VectorMax;};
 		virtual int ID(T const * ptr);	// Pointer based identification.
 		virtual int ID(T const & ptr);	// Value based identification.
@@ -152,11 +153,15 @@ class VectorClass
  *   03/10/1995 JLB : Created.                                                                 *
  *=============================================================================================*/
 template<class T>
-VectorClass<T>::VectorClass(int size, T const * array) :
+constexpr VectorClass<T>::VectorClass(int size, T const * array) :
 	Vector(nullptr),
 	VectorMax(size),
 	IsValid(true),
 	IsAllocated(false)
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @refactor cemlyn007 15/10/2026 The padding too, so an empty vector is a constant (every byte initialised).
+	, VectorClassPad{}
+#endif
 {
 	/*
 	**	Allocate the vector. The default constructor will be called for every
@@ -189,7 +194,7 @@ VectorClass<T>::VectorClass(int size, T const * array) :
  *   03/10/1995 JLB : Created.                                                                 *
  *=============================================================================================*/
 template<class T>
-VectorClass<T>::~VectorClass()
+constexpr VectorClass<T>::~VectorClass()
 {
 	VectorClass<T>::Clear();
 }
@@ -363,7 +368,7 @@ int VectorClass<T>::ID(T const & object)
  *   03/10/1995 JLB : Created.                                                                 *
  *=============================================================================================*/
 template<class T>
-void VectorClass<T>::Clear()
+constexpr void VectorClass<T>::Clear()
 {
 	if (IsAllocated) {
 		delete[] Vector;
@@ -489,7 +494,8 @@ class DynamicVectorClass : public VectorClass<T>
 		using VectorClass<T>::Length;
 
 	public:
-		DynamicVectorClass(unsigned size=0, T const * array=nullptr);
+		// GeneralsX @refactor cemlyn007 15/10/2026 constexpr construction and destruction, so an empty one is a constant (the render defaults, w3drenderstate.h).
+		constexpr DynamicVectorClass(unsigned size=0, T const * array=nullptr);
 
 		// Stubbed equality operators so you can have dynamic vectors of dynamic vectors
 		bool operator== (const DynamicVectorClass &src)	{ return false; }
@@ -586,7 +592,7 @@ class DynamicVectorClass : public VectorClass<T>
  *   03/10/1995 JLB : Created.                                                                 *
  *=============================================================================================*/
 template<class T>
-DynamicVectorClass<T>::DynamicVectorClass(unsigned size, T const * array)
+constexpr DynamicVectorClass<T>::DynamicVectorClass(unsigned size, T const * array)
 	: VectorClass<T>(size, array)
 {
 	GrowthStep = 10;

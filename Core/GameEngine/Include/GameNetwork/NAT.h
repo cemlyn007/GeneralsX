@@ -59,6 +59,28 @@ struct ConnectionNodeType {
 	UnsignedInt m_slotIndex; ///< the player list index of this node.
 };
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+#define m_connectionPairs RTS_ENGINE_GLOBAL_REF(m_connectionPairs)
+#endif
+#if RTS_ENGINE_CONTEXT
+#define m_keepaliveInterval RTS_ENGINE_GLOBAL_REF(m_keepaliveInterval)
+#endif
+#if RTS_ENGINE_CONTEXT
+#define m_manglerRetryTimeInterval RTS_ENGINE_GLOBAL_REF(m_manglerRetryTimeInterval)
+#endif
+#if RTS_ENGINE_CONTEXT
+#define m_maxAllowedManglerRetries RTS_ENGINE_GLOBAL_REF(m_maxAllowedManglerRetries)
+#endif
+#if RTS_ENGINE_CONTEXT
+#define m_timeBetweenRetries RTS_ENGINE_GLOBAL_REF(m_timeBetweenRetries)
+#endif
+#if RTS_ENGINE_CONTEXT
+#define m_timeForRoundTimeout RTS_ENGINE_GLOBAL_REF(m_timeForRoundTimeout)
+#endif
+#if RTS_ENGINE_CONTEXT
+#define m_timeToWaitForPort RTS_ENGINE_GLOBAL_REF(m_timeToWaitForPort)
+#endif
 class NAT {
 public:
 	NAT();
@@ -131,7 +153,11 @@ protected:
 	Bool m_myConnections[MAX_SLOTS]; ///< keeps track of all the nodes I've connected to. For keepalive.
 	time_t m_nextKeepaliveTime; ///< the next time we will send out our keepalive packets.
 
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_CLASS_STATIC(Int[MAX_SLOTS-1][MAX_SLOTS-1][MAX_SLOTS], m_connectionPairs);
+#else
 	static Int m_connectionPairs[MAX_SLOTS-1][MAX_SLOTS-1][MAX_SLOTS];
+#endif
 	Int m_connectionPairIndex;
 
 	UnsignedShort m_startingPortNumber; ///< the starting port number for this game. The slots all get port numbers with their port numbers based on this number.
@@ -144,15 +170,60 @@ protected:
 	time_t m_timeoutTime; ///< the time at which we will time out waiting for the other player's port number.
 	time_t m_roundTimeout;	///< the time at which we will time out this connection round.
 
+#if RTS_ENGINE_CONTEXT
+ RTS_ENGINE_CLASS_STATIC(Int, m_timeBetweenRetries);
+#else
  static Int m_timeBetweenRetries; // 1 second between retries sounds good to me.
+#endif
+#if RTS_ENGINE_CONTEXT
+ RTS_ENGINE_CLASS_STATIC(time_t, m_manglerRetryTimeInterval);
+#else
  static time_t m_manglerRetryTimeInterval; // sounds good to me.
+#endif
+#if RTS_ENGINE_CONTEXT
+ RTS_ENGINE_CLASS_STATIC(Int, m_maxAllowedManglerRetries);
+#else
  static Int m_maxAllowedManglerRetries; // works for me.
+#endif
+#if RTS_ENGINE_CONTEXT
+ RTS_ENGINE_CLASS_STATIC(time_t, m_keepaliveInterval);
+#else
  static time_t m_keepaliveInterval; // 15 seconds between keepalive packets seems good.
+#endif
+#if RTS_ENGINE_CONTEXT
+ RTS_ENGINE_CLASS_STATIC(time_t, m_timeToWaitForPort);
+#else
  static time_t m_timeToWaitForPort; // wait for ten seconds for the other player's port number.
+#endif
+#if RTS_ENGINE_CONTEXT
+ RTS_ENGINE_CLASS_STATIC(time_t, m_timeForRoundTimeout);
+#else
  static time_t m_timeForRoundTimeout; // wait for at most ten seconds for each connection round to finish.
+#endif
 
 };
 
 #if !RTS_ENGINE_CONTEXT
 extern NAT *TheNAT;
+#if RTS_ENGINE_CONTEXT
+#undef m_connectionPairs
+#endif
+#if RTS_ENGINE_CONTEXT
+#undef m_keepaliveInterval
+#endif
+#if RTS_ENGINE_CONTEXT
+#undef m_manglerRetryTimeInterval
+#endif
+#if RTS_ENGINE_CONTEXT
+#undef m_maxAllowedManglerRetries
+#endif
+#if RTS_ENGINE_CONTEXT
+#undef m_timeBetweenRetries
+#endif
+#if RTS_ENGINE_CONTEXT
+#undef m_timeForRoundTimeout
+#endif
+#if RTS_ENGINE_CONTEXT
+#undef m_timeToWaitForPort
+#endif
 #endif

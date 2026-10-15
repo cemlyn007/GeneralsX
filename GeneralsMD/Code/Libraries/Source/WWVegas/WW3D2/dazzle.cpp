@@ -70,96 +70,234 @@
 
 
 // All dazzle types appear under Dazzles_List in the dazzle.ini file.
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+// GeneralsX @refactor cemlyn007 15/10/2026 Data no engine writes is constant (docs/EMBEDDING.md).
+const char * const DAZZLE_LIST_STRING="Dazzles_List";
+#else
 const char* DAZZLE_LIST_STRING="Dazzles_List";
+#endif
 
 // After the dot product between the camera direction and the camera space location of the light source,
 // we do a power to Halopow for the halo size and power to DazzlePow for the dazzle size. Halo/DazzleArea
 // defines the angle where the values are valid, so any angle beyond HaloArea/DazzleArea results the halo or
 // dazzle being scaled to zero. The angles are re-scaled from normalized angle scale of (-1.0...1.0)
 // only HaloArea/DazzleArea defined part is used.
+#if RTS_ENGINE_CONTEXT
+const char * const DAZZLE_INTENSITY_POW_STRING = "DazzleIntensityPow";
+#else
 const char* DAZZLE_INTENSITY_POW_STRING = "DazzleIntensityPow";
+#endif
+#if RTS_ENGINE_CONTEXT
+const char * const DAZZLE_SIZE_POW_STRING = "DazzleSizePow";
+#else
 const char* DAZZLE_SIZE_POW_STRING = "DazzleSizePow";
+#endif
+#if RTS_ENGINE_CONTEXT
+const char * const DAZZLE_AREA_STRING =		"DazzleArea";		// Something like 0.05 is a good starting point for a dazzle...
+#else
 const char* DAZZLE_AREA_STRING =		"DazzleArea";		// Something like 0.05 is a good starting point for a dazzle...
+#endif
+#if RTS_ENGINE_CONTEXT
+const char * const HALO_INTENSITY_POW = "HaloIntensityPow";
+#else
 const char* HALO_INTENSITY_POW = "HaloIntensityPow";
+#endif
 
 // Halo and dazzle are scaled by these values
+#if RTS_ENGINE_CONTEXT
+const char * const HALO_SCALE_X_STRING =	"HaloScaleX";
+#else
 const char* HALO_SCALE_X_STRING =	"HaloScaleX";
+#endif
+#if RTS_ENGINE_CONTEXT
+const char * const HALO_SCALE_Y_STRING =	"HaloScaleY";
+#else
 const char* HALO_SCALE_Y_STRING =	"HaloScaleY";
+#endif
+#if RTS_ENGINE_CONTEXT
+const char * const DAZZLE_SCALE_X_STRING =	"DazzleScaleX";
+#else
 const char* DAZZLE_SCALE_X_STRING =	"DazzleScaleX";
+#endif
+#if RTS_ENGINE_CONTEXT
+const char * const DAZZLE_SCALE_Y_STRING =	"DazzleScaleY";
+#else
 const char* DAZZLE_SCALE_Y_STRING =	"DazzleScaleY";
+#endif
 
 // Dazzle and halo intensity control the base intensities.
+#if RTS_ENGINE_CONTEXT
+const char * const HALO_INTENSITY_STRING =	"HaloIntensity";
+#else
 const char* HALO_INTENSITY_STRING =	"HaloIntensity";
+#endif
+#if RTS_ENGINE_CONTEXT
+const char * const DAZZLE_INTENSITY_STRING =	"DazzleIntensity";
+#else
 const char* DAZZLE_INTENSITY_STRING =	"DazzleIntensity";
+#endif
 
 // Direction area defines the maximum difference between the light direction and the eyespace location,
 // so the dazzle can only be seen if the camera is inside the light cone. Value 0.0 means dazzle is not
 // directional, it can be seen from any direction. Halo is not affected. Dazzle direction defines the light
 // direction vector.
+#if RTS_ENGINE_CONTEXT
+const char * const DAZZLE_DIRECTION_AREA_STRING = "DazzleDirectionArea"; // Something like 0.5 might be a good test value
+#else
 const char* DAZZLE_DIRECTION_AREA_STRING = "DazzleDirectionArea"; // Something like 0.5 might be a good test value
+#endif
+#if RTS_ENGINE_CONTEXT
+const char * const DAZZLE_DIRECTION_STRING	= "DazzleDirection";
+#else
 const char* DAZZLE_DIRECTION_STRING	= "DazzleDirection";
+#endif
 
 // Dazzle and halo start to afde out after FadeoutStart meters and are completely gone by FadeoutEnd meters.
+#if RTS_ENGINE_CONTEXT
+const char * const FADEOUT_START_STRING =	"FadeoutStart";
+#else
 const char* FADEOUT_START_STRING =	"FadeoutStart";
+#endif
+#if RTS_ENGINE_CONTEXT
+const char * const FADEOUT_END_STRING =		"FadeoutEnd";
+#else
 const char* FADEOUT_END_STRING =		"FadeoutEnd";
+#endif
 
 // To be done: This parameter needs to be redefined.
+#if RTS_ENGINE_CONTEXT
+const char * const SIZE_OPTIMIZATION_LIMIT_STRING = "SizeOptimizationLimit";
+#else
 const char* SIZE_OPTIMIZATION_LIMIT_STRING = "SizeOptimizationLimit";
+#endif
 
 // The weight of history for the intensities. The history weight is per millisecond, so if you want to have
 // any real history, values higher than 0.95 are recommended (don't use value of 1.0 or anything higher!)
+#if RTS_ENGINE_CONTEXT
+const char * const HISTORY_WEIGHT_STRING =	"HistoryWeight";
+#else
 const char* HISTORY_WEIGHT_STRING =	"HistoryWeight";
+#endif
 
 // Textures to be used.
+#if RTS_ENGINE_CONTEXT
+const char * const DAZZLE_TEXTURE_STRING = "DazzleTextureName";
+#else
 const char* DAZZLE_TEXTURE_STRING = "DazzleTextureName";
+#endif
+#if RTS_ENGINE_CONTEXT
+const char * const HALO_TEXTURE_STRING = "HaloTextureName";
+#else
 const char* HALO_TEXTURE_STRING = "HaloTextureName";
+#endif
 
 // If false, camera matrix's translation term isn't used. If translation isn't used the dazzle is treated as
 // always visible, scene graph visibility is not used.
+#if RTS_ENGINE_CONTEXT
+const char * const USE_CAMERA_TRANSLATION = "UseCameraTranslation";
+#else
 const char* USE_CAMERA_TRANSLATION = "UseCameraTranslation";
+#endif
 
 // Halo and dazzle colors, RGB, (1.0, 1.0, 1.0) is white and (0.0, 0.0, 0.0) is black
+#if RTS_ENGINE_CONTEXT
+const char * const HALO_COLOR_STRING = "HaloColor";
+#else
 const char* HALO_COLOR_STRING = "HaloColor";
+#endif
+#if RTS_ENGINE_CONTEXT
+const char * const DAZZLE_COLOR_STRING = "DazzleColor";
+#else
 const char* DAZZLE_COLOR_STRING = "DazzleColor";
+#endif
 
 // Dazzle test color could be white in many cases but if the level has a lot of white then another color can be defined.
+#if RTS_ENGINE_CONTEXT
+const char * const DAZZLE_TEST_COLOR_STRING = "DazzleTestColor";
+#else
 const char* DAZZLE_TEST_COLOR_STRING = "DazzleTestColor";
+#endif
 
 // Dazzles can blink on and off.  The blink period defines the time for one cycle, the blink "on time" defines
 // the amount of time within that period that the dazzle is "on"
+#if RTS_ENGINE_CONTEXT
+const char * const BLINK_PERIOD_STRING = "BlinkPeriod";
+#else
 const char* BLINK_PERIOD_STRING = "BlinkPeriod";
+#endif
+#if RTS_ENGINE_CONTEXT
+const char * const BLINK_ON_TIME_STRING = "BlinkOnTime";
+#else
 const char* BLINK_ON_TIME_STRING = "BlinkOnTime";
+#endif
 
 // Dazzle can use a lensflare by defining a name of lensflare in the ini
+#if RTS_ENGINE_CONTEXT
+const char * const DAZZLE_LENSFLARE_STRING = "LensflareName";
+#else
 const char* DAZZLE_LENSFLARE_STRING = "LensflareName";
+#endif
 
 // Lensflare definitions
+#if RTS_ENGINE_CONTEXT
+const char * const LENSFLARE_LIST_STRING = "Lensflares_List";
+#else
 const char* LENSFLARE_LIST_STRING = "Lensflares_List";
+#endif
 
 // Texture to be used by the lensflare
+#if RTS_ENGINE_CONTEXT
+const char * const LENSFLARE_TEXTURE_STRING = "TextureName";
+#else
 const char* LENSFLARE_TEXTURE_STRING = "TextureName";
+#endif
 
 // The number of flare sprites in lensflare. The FlareLocation, FlareSize and FlareColor paremeters are procedural, the
 // names are produced based on this parameter. If FlareCount is 3, there exists FlareLocation1, FlareLocation2 and
 // FlareLocation3... And so on.
+#if RTS_ENGINE_CONTEXT
+const char * const FLARE_COUNT_STRING = "FlareCount";
+#else
 const char* FLARE_COUNT_STRING = "FlareCount";
+#endif
 
 // 1D-locations of the flares. 0.0 means the location of the center of the screen and 1.0 means the location of the
 // lightsource. The values can be smaller than zero and larger than 1.0.
+#if RTS_ENGINE_CONTEXT
+const char * const FLARE_LOCATION_STRING = "FlareLocation";
+#else
 const char* FLARE_LOCATION_STRING = "FlareLocation";
+#endif
 
 // Normalized flare sizes
+#if RTS_ENGINE_CONTEXT
+const char * const FLARE_SIZE_STRING = "FlareSize";
+#else
 const char* FLARE_SIZE_STRING = "FlareSize";
+#endif
 
 // Colors for each flare sprite
+#if RTS_ENGINE_CONTEXT
+const char * const FLARE_COLOR_STRING = "FlareColor";
+#else
 const char* FLARE_COLOR_STRING = "FlareColor";
+#endif
 
 // Uv coordinates (as there can be only one texture used, but one may want multiple images). The values is a 4-float
 // vector: start_u, start_v, end_u, end_v.
+#if RTS_ENGINE_CONTEXT
+const char * const FLARE_UV_STRING = "FlareUV";
+#else
 const char* FLARE_UV_STRING = "FlareUV";
+#endif
 
 // Radius of dazzle used for raycast tests
+#if RTS_ENGINE_CONTEXT
+const char * const RADIUS_STRING = "Radius";
+#else
 const char * RADIUS_STRING = "Radius";
+#endif
 
 
 /*
@@ -224,16 +362,26 @@ LensflareName=DEFAULT_LENSFLARE
 */
 
 // Global instance of a dazzle loader
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(DazzleLoaderClass, _DazzleLoader);
+#define _DazzleLoader RTS_ENGINE_GLOBAL_REF(_DazzleLoader)
+#else
 DazzleLoaderClass		_DazzleLoader;
+#endif
 
 #if RTS_ENGINE_CONTEXT
 // GeneralsX @feature cemlyn007 30/09/2026 Per engine (PLAN-023 Phase 8, stage RR2b): the dazzle types and lens flares
 // the render engine's WW3D::Init loads from dazzle.ini and its WW3D::Shutdown frees (Deinit), the layer its scene
-// draws into, its visibility handler and its switch. The unused temp_ptrs is left out, and the shaders are built
-// once, at static initialisation (Init_Shaders, below).
+// draws into, its visibility handler and its switch. The unused temp_ptrs is left out, and the shaders are
+// constants, built at compile time (below).
 
 // static instance of a default dazzle visibility handler (defined further down upstream)
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(DazzleVisibilityClass, _DefaultVisibilityHandler);
+#define _DefaultVisibilityHandler RTS_ENGINE_GLOBAL_REF(_DefaultVisibilityHandler)
+#else
 static DazzleVisibilityClass		_DefaultVisibilityHandler;
+#endif
 
 namespace
 {
@@ -247,7 +395,7 @@ struct DazzleState
 	const DazzleVisibilityClass* _VisibilityHandler = &_DefaultVisibilityHandler;
 	bool _dazzle_rendering_enabled = true;
 };
-rts::PerEngineStatic<DazzleState> DazzleState_perEngine;
+constexpr rts::PerEngineStatic<DazzleState> DazzleState_perEngine{};
 } // namespace
 #define types (DazzleState_perEngine.get().types)
 #define type_count (DazzleState_perEngine.get().type_count)
@@ -310,10 +458,74 @@ static LensflareTypeClass** lensflares;
 static unsigned lensflare_count;
 #endif
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 The shaders are the same for every engine and only read: constants,
+// built at compile time by the setters Init_Shaders calls (docs/EMBEDDING.md).
+static constexpr ShaderClass default_dazzle_shader = []
+{
+	ShaderClass shader;
+	shader.Set_Cull_Mode( ShaderClass::CULL_MODE_DISABLE );
+	shader.Set_Depth_Mask( ShaderClass::DEPTH_WRITE_DISABLE );
+	shader.Set_Depth_Compare( ShaderClass::PASS_ALWAYS );
+	shader.Set_Dst_Blend_Func( ShaderClass::DSTBLEND_ONE );
+	shader.Set_Src_Blend_Func( ShaderClass::SRCBLEND_ONE );
+	shader.Set_Fog_Func( ShaderClass::FOG_DISABLE );
+	shader.Set_Primary_Gradient( ShaderClass::GRADIENT_MODULATE );
+	shader.Set_Texturing( ShaderClass::TEXTURING_ENABLE );
+	return shader;
+}();
+#else
 static ShaderClass default_dazzle_shader;
+#endif
+#if RTS_ENGINE_CONTEXT
+static constexpr ShaderClass default_halo_shader = []
+{
+	ShaderClass shader;
+	shader.Set_Cull_Mode( ShaderClass::CULL_MODE_DISABLE );
+	shader.Set_Depth_Mask( ShaderClass::DEPTH_WRITE_DISABLE );
+	shader.Set_Depth_Compare( ShaderClass::PASS_LEQUAL );
+	shader.Set_Dst_Blend_Func( ShaderClass::DSTBLEND_ONE );
+	shader.Set_Src_Blend_Func( ShaderClass::SRCBLEND_ONE );
+	shader.Set_Fog_Func( ShaderClass::FOG_DISABLE );
+	shader.Set_Primary_Gradient( ShaderClass::GRADIENT_MODULATE );
+	shader.Set_Texturing( ShaderClass::TEXTURING_ENABLE );
+	return shader;
+}();
+#else
 static ShaderClass default_halo_shader;
+#endif
+#if RTS_ENGINE_CONTEXT
+static constexpr ShaderClass vis_shader = []
+{
+	ShaderClass shader;
+	shader.Set_Cull_Mode( ShaderClass::CULL_MODE_DISABLE );
+	shader.Set_Depth_Mask( ShaderClass::DEPTH_WRITE_DISABLE );
+	shader.Set_Dst_Blend_Func( ShaderClass::DSTBLEND_ZERO );
+	shader.Set_Src_Blend_Func( ShaderClass::SRCBLEND_ONE );
+	shader.Set_Fog_Func( ShaderClass::FOG_DISABLE );
+	shader.Set_Primary_Gradient( ShaderClass::GRADIENT_MODULATE );
+	shader.Set_Texturing( ShaderClass::TEXTURING_DISABLE );
+	return shader;
+}();
+#else
 static ShaderClass vis_shader;
+#endif
+#if RTS_ENGINE_CONTEXT
+static constexpr ShaderClass debug_shader = []
+{
+	ShaderClass shader;
+	shader.Set_Cull_Mode( ShaderClass::CULL_MODE_DISABLE );
+	shader.Set_Depth_Mask( ShaderClass::DEPTH_WRITE_DISABLE );
+	shader.Set_Dst_Blend_Func( ShaderClass::DSTBLEND_SRC_ALPHA );
+	shader.Set_Src_Blend_Func( ShaderClass::SRCBLEND_ONE );
+	shader.Set_Fog_Func( ShaderClass::FOG_DISABLE );
+	shader.Set_Primary_Gradient( ShaderClass::GRADIENT_MODULATE );
+	shader.Set_Texturing( ShaderClass::TEXTURING_DISABLE );
+	return shader;
+}();
+#else
 static ShaderClass debug_shader;
+#endif
 
 #if !RTS_ENGINE_CONTEXT
 // static instance of a default dazzle visibility handler
@@ -324,6 +536,7 @@ bool	DazzleRenderObjClass::_dazzle_rendering_enabled = true;
 #endif
 
 
+#if !RTS_ENGINE_CONTEXT
 static void Init_Shaders()
 {
 	default_dazzle_shader.Set_Cull_Mode( ShaderClass::CULL_MODE_DISABLE );
@@ -361,13 +574,13 @@ static void Init_Shaders()
 	debug_shader.Set_Texturing( ShaderClass::TEXTURING_DISABLE );
 
 }
+#endif
 
 #if RTS_ENGINE_CONTEXT
-// GeneralsX @feature cemlyn007 30/09/2026 The shaders are the same for every engine: built once, at static
-// initialisation, and only read after, instead of rewritten at every load of dazzle.ini (PLAN-023 Phase 8, stage
-// RR2b).
-static const bool _DazzleShadersBuilt = (Init_Shaders(), true);
-#define Init_Shaders() ((void)_DazzleShadersBuilt)
+// GeneralsX @feature cemlyn007 30/09/2026 The shaders are the same for every engine: built once, and only read after,
+// instead of rewritten at every load of dazzle.ini (PLAN-023 Phase 8, stage RR2b).
+// GeneralsX @refactor cemlyn007 15/10/2026 Built at compile time (above), so there is nothing to build here.
+#define Init_Shaders() ((void)0)
 #endif
 
 /*
@@ -1524,7 +1737,17 @@ class DazzlePersistFactoryClass : public PersistFactoryClass
 	};
 };
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 Per engine (Common/EngineStatic.h), made and so registered by WW3D::Init (docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(DazzlePersistFactoryClass, _DazzleFactory);
+#define _DazzleFactory RTS_ENGINE_GLOBAL_REF(_DazzleFactory)
+void WW3D_Register_Dazzle_Factory()
+{
+	_DazzleFactory;
+}
+#else
 static DazzlePersistFactoryClass _DazzleFactory;
+#endif
 
 uint32 DazzlePersistFactoryClass::Chunk_ID() const
 {

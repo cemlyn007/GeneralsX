@@ -115,7 +115,7 @@ class CRCEngine {
 class CRC {
 
 	// CRC for poly 0x04C11DB7
-	static unsigned long _Table[256];
+	static const unsigned long _Table[256];
 
 public:
 

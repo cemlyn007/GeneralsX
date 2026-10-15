@@ -36,15 +36,41 @@ class WindowLayout;
 Bool GameSpySendChat(UnicodeString message, Bool isEmote, GameWindow *playerListbox = nullptr);
 void GameSpyAddText( UnicodeString message, GameSpyColors color = GSCOLOR_DEFAULT );
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_EXTERN_GLOBAL(GameWindow*, progressTextWindow);
+#define progressTextWindow RTS_ENGINE_GLOBAL_REF(progressTextWindow)
+#else
 extern GameWindow *progressTextWindow;				///< Text box on the progress screen
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL(GameWindow*, quickmatchTextWindow);
+#define quickmatchTextWindow RTS_ENGINE_GLOBAL_REF(quickmatchTextWindow)
+#else
 extern GameWindow *quickmatchTextWindow;			///< Text box on the quickmatch screen
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL(GameWindow*, quickmatchTextWindow);
+#define quickmatchTextWindow RTS_ENGINE_GLOBAL_REF(quickmatchTextWindow)
+#else
 extern GameWindow *quickmatchTextWindow;			///< Text box on the quickmatch screen
+#endif
 extern GameWindow *listboxLobbyChat;					///< Chat box on the custom lobby screen
 extern GameWindow *listboxLobbyPlayers;				///< Player box on the custom lobby screen
 extern GameWindow *listboxLobbyGames;					///< Game box on the custom lobby screen
 extern GameWindow *listboxLobbyChatChannels;	///< Chat channel box on the custom lobby screen
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL(GameWindow*, listboxGameSetupChat);
+#define listboxGameSetupChat RTS_ENGINE_GLOBAL_REF(listboxGameSetupChat)
+#else
 extern GameWindow *listboxGameSetupChat;			///< Chat box on the custom game setup screen
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL(WindowLayout*, WOLMapSelectLayout);
+#define WOLMapSelectLayout RTS_ENGINE_GLOBAL_REF(WOLMapSelectLayout)
+#else
 extern WindowLayout *WOLMapSelectLayout;			///< Map selection overlay
+#endif
 
 void RoomMessageCallback(PEER peer, RoomType roomType,
 												 const char * nick, const char * message,

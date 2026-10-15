@@ -194,7 +194,7 @@ void GarrisonContain::putObjectAtGarrisonPoint( Object *obj,
 	//
 #if RTS_ENGINE_CONTEXT
 	// GeneralsX @feature cemlyn007 28/09/2026 Per engine: the cached template is this engine's (PLAN-023 Phase 4).
-	static rts::PerEngineStatic<const ThingTemplate *> muzzle_perEngine;
+	static constexpr rts::PerEngineStatic<const ThingTemplate *> muzzle_perEngine{};
 	const ThingTemplate *muzzle = muzzle_perEngine.get([&](const ThingTemplate *&value) { value = TheThingFactory->findTemplate( "GarrisonGun" ); });
 #else
 	static const ThingTemplate *muzzle = TheThingFactory->findTemplate( "GarrisonGun" );

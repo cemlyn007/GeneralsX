@@ -57,25 +57,96 @@
 
 // PRIVATE DATA ///////////////////////////////////////////////////////////////////////////////////
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL(Bool, LANbuttonPushed);
+#define LANbuttonPushed RTS_ENGINE_GLOBAL_REF(LANbuttonPushed)
+#else
 extern Bool LANbuttonPushed;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL(Bool, LANisShuttingDown);
+#define LANisShuttingDown RTS_ENGINE_GLOBAL_REF(LANisShuttingDown)
+#else
 extern Bool LANisShuttingDown;
+#endif
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Bool, isShuttingDown, false);
+#define isShuttingDown RTS_ENGINE_GLOBAL_REF(isShuttingDown)
+#else
 static Bool isShuttingDown = false;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Bool, buttonPushed, false);
+#define buttonPushed RTS_ENGINE_GLOBAL_REF(buttonPushed)
+#else
 static Bool buttonPushed = false;
+#endif
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(NameKeyType, buttonBackID, NAMEKEY_INVALID);
+#define buttonBackID RTS_ENGINE_GLOBAL_REF(buttonBackID)
+#else
 static NameKeyType buttonBackID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonHostID, NAMEKEY_INVALID);
+#define buttonHostID RTS_ENGINE_GLOBAL_REF(buttonHostID)
+#else
 static NameKeyType buttonHostID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonJoinID, NAMEKEY_INVALID);
+#define buttonJoinID RTS_ENGINE_GLOBAL_REF(buttonJoinID)
+#else
 static NameKeyType buttonJoinID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, editPlayerNameID, NAMEKEY_INVALID);
+#define editPlayerNameID RTS_ENGINE_GLOBAL_REF(editPlayerNameID)
+#else
 static NameKeyType editPlayerNameID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, comboboxRemoteIPID, NAMEKEY_INVALID);
+#define comboboxRemoteIPID RTS_ENGINE_GLOBAL_REF(comboboxRemoteIPID)
+#else
 static NameKeyType comboboxRemoteIPID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, staticLocalIPID, NAMEKEY_INVALID);
+#define staticLocalIPID RTS_ENGINE_GLOBAL_REF(staticLocalIPID)
+#else
 static NameKeyType staticLocalIPID = NAMEKEY_INVALID;
+#endif
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, buttonBack, nullptr);
+#define buttonBack RTS_ENGINE_GLOBAL_REF(buttonBack)
+#else
 static GameWindow *buttonBack = nullptr;
+#endif
 static GameWindow *buttonHost = nullptr;
 static GameWindow *buttonJoin = nullptr;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, editPlayerName, nullptr);
+#define editPlayerName RTS_ENGINE_GLOBAL_REF(editPlayerName)
+#else
 static GameWindow *editPlayerName = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, comboboxRemoteIP, nullptr);
+#define comboboxRemoteIP RTS_ENGINE_GLOBAL_REF(comboboxRemoteIP)
+#else
 static GameWindow *comboboxRemoteIP = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, staticLocalIP, nullptr);
+#define staticLocalIP RTS_ENGINE_GLOBAL_REF(staticLocalIP)
+#else
 static GameWindow *staticLocalIP = nullptr;
+#endif
 
 void PopulateRemoteIPComboBox()
 {

@@ -639,7 +639,13 @@ void DumpExceptionInfo( unsigned int u, EXCEPTION_POINTERS* e_info )
 #else
 
 // Non-Windows or non-debug stubs
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(AsciiString, g_LastErrorDump);
+#define g_LastErrorDump RTS_ENGINE_GLOBAL_REF(g_LastErrorDump)
+#else
 AsciiString g_LastErrorDump;
+#endif
 void StackDumpFromAddresses(void** addresses, unsigned int count, void (*callback)(const char*)) {}
 void FillStackAddresses(void** addresses, unsigned int count, unsigned int skip) {}
 void DumpExceptionInfo(unsigned int u, EXCEPTION_POINTERS* e_info) {}

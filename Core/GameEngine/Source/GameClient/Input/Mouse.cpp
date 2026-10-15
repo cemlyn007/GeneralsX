@@ -153,7 +153,12 @@ void Mouse::moveMouse( Int x, Int y, Int relOrAbs )
 //-------------------------------------------------------------------------------------------------
 void Mouse::updateMouseData()
 {
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+	RTS_ENGINE_STATIC(Bool, busy, FALSE);
+#else
 	static Bool busy = FALSE;
+#endif
 	Int index = 0;
 	UnsignedByte result;
 

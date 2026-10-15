@@ -71,7 +71,7 @@ Bool MoneyCrateCollide::executeCrateBehavior( Object *other )
 #if RTS_ENGINE_CONTEXT
 // GeneralsX @bugfix cemlyn007 01/10/2026 The cached upgrade template's slot, at file scope so that its slot index is
 // taken at static initialisation, not at the first call, as AutoDepositUpdate's (PLAN-023 Phase 8, stage RR3).
-static rts::PerEngineStatic<const UpgradeTemplate *> upgradeTemplate_perEngine;
+static constexpr rts::PerEngineStatic<const UpgradeTemplate *> upgradeTemplate_perEngine{};
 #endif
 
 //------------------------------------------------------------------------------------------------

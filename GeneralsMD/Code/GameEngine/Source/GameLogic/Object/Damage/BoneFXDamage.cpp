@@ -54,7 +54,12 @@ BoneFXDamage::~BoneFXDamage()
 //-------------------------------------------------------------------------------------------------
 void BoneFXDamage::onObjectCreated()
 {
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+	RTS_ENGINE_STATIC(NameKeyType, key_BoneFXUpdate, NAMEKEY("BoneFXUpdate"));
+#else
 	static NameKeyType key_BoneFXUpdate = NAMEKEY("BoneFXUpdate");
+#endif
 	BoneFXUpdate* bfxu = (BoneFXUpdate*)getObject()->findUpdateModule(key_BoneFXUpdate);
 	if (bfxu == nullptr)
 	{
@@ -70,7 +75,11 @@ void BoneFXDamage::onBodyDamageStateChange( const DamageInfo *damageInfo,
 																						BodyDamageType oldState,
 																						BodyDamageType newState )
 {
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(NameKeyType, key_BoneFXUpdate, NAMEKEY("BoneFXUpdate"));
+#else
 	static NameKeyType key_BoneFXUpdate = NAMEKEY("BoneFXUpdate");
+#endif
 	BoneFXUpdate* bfxu = (BoneFXUpdate*)getObject()->findUpdateModule(key_BoneFXUpdate);
 	if (bfxu)
 		bfxu->changeBodyDamageState(oldState, newState);

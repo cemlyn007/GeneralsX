@@ -30,6 +30,22 @@
 #pragma once
 
 /// an internal high level profile ID
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+#define first RTS_ENGINE_GLOBAL_REF(first)
+#endif
+#if RTS_ENGINE_CONTEXT
+#define curFrame RTS_ENGINE_GLOBAL_REF(curFrame)
+#endif
+#if RTS_ENGINE_CONTEXT
+#define frameRecordMask RTS_ENGINE_GLOBAL_REF(frameRecordMask)
+#endif
+#if RTS_ENGINE_CONTEXT
+#define stringBuf RTS_ENGINE_GLOBAL_REF(stringBuf)
+#endif
+#if RTS_ENGINE_CONTEXT
+#define stringBufUnused RTS_ENGINE_GLOBAL_REF(stringBufUnused)
+#endif
 class ProfileId
 {
   ProfileId(const ProfileId&);
@@ -190,7 +206,11 @@ private:
   };
 
   /// first profile ID
+#if RTS_ENGINE_CONTEXT
+  RTS_ENGINE_CLASS_STATIC(ProfileId*, first);
+#else
   static ProfileId *first;
+#endif
 
   /// next profile ID
   ProfileId *m_next;
@@ -229,14 +249,37 @@ private:
   ValueMode m_valueMode;
 
   /// current frame
+#if RTS_ENGINE_CONTEXT
+  RTS_ENGINE_CLASS_STATIC(int, curFrame);
+#else
   static int curFrame;
+#endif
 
   /// bit mask, currently recording which cur[] entries?
+#if RTS_ENGINE_CONTEXT
+  RTS_ENGINE_CLASS_STATIC(unsigned, frameRecordMask);
+#else
   static unsigned frameRecordMask;
+#endif
 
   /// internal string buffer
+#if RTS_ENGINE_CONTEXT
+  RTS_ENGINE_CLASS_STATIC(char[STRING_BUFFER_SIZE], stringBuf);
+#else
   static char stringBuf[STRING_BUFFER_SIZE];
+#endif
 
   /// next unused char in string buffer
+#if RTS_ENGINE_CONTEXT
+  RTS_ENGINE_CLASS_STATIC(unsigned, stringBufUnused);
+#else
   static unsigned stringBufUnused;
+#endif
 };
+#if RTS_ENGINE_CONTEXT
+#undef stringBufUnused
+#undef stringBuf
+#undef frameRecordMask
+#undef curFrame
+#undef first
+#endif

@@ -52,17 +52,9 @@ PROBED_SECTIONS = {".data", ".bss"}
 WORKLIST_CLASSES = {"render-per-engine", "render-scratch"}
 GUARD = "guard variable for "
 # The phased render-const rows that a render boot rewrites with the same value, until RR2b builds them once for
-# the process. Every other phased render-const row is never written, so a write to it is a bug.
-REWRITTEN = {
-    "D3DFormatToWW3DFormatConversionArray",
-    "D3DFormatToWW3DZFormatConversionArray",
-    "BoxRenderObjClass::DisplayMask",
-    "_BoxShader",
-    "default_dazzle_shader",
-    "default_halo_shader",
-    "vis_shader",
-    "debug_shader",
-}
+# the process. Every other phased render-const row is never written, so a write to it is a bug. None remain: each
+# is per engine or a constant (GeneralsX @refactor cemlyn007 15/10/2026).
+REWRITTEN = set()
 
 # Written on purpose, and safe to share between engines: each by exact key (the TSV's symbol column), with its
 # reason. A class is never enough: a process-global symbol that a render step writes is listed here once
@@ -70,30 +62,15 @@ REWRITTEN = {
 ALLOWLIST = {
     # Written once per process, by the first render boot (the probe's first snapshot follows a headless
     # priming boot, so the render engine's is the process's first device).
-    "D3D8Lib": "the D3D8 library, loaded per process under a mutex and never freed",
-    "Direct3DCreate8Ptr": "the D3D8 library's Direct3DCreate8, looked up once per process with it",
     "DX8Wrapper_FinalReleaseHook": "the host's final-release check, set by its first render boot",
     "ApplicationWindow_TryLockEventPump": "the host's window event pump lock, set once by its first render boot",
     "ApplicationWindow_UnlockEventPump": "the host's window event pump lock, set once by its first render boot",
-    "W3DVolumetricShadow::Update()::originCompareVector": "a constant vector, built at first use under the static-init guard",
-    "Drawable::drawBombed(IRegion2D const*)::key_StickyBombUpdate": "a NameKey cache (PLAN-023 Decision 2), set at first use (a draw path) under the static-init guard",
-    "FiringTracker::getModuleNameKey() const::nk": "a NameKey cache (PLAN-023 Decision 2), set at first use under the static-init guard",
-    "ObjectWeaponStatusHelper::getModuleNameKey() const::nk": "a NameKey cache (PLAN-023 Decision 2), set at first use under the static-init guard",
-    "TempWeaponBonusHelper::getModuleNameKey() const::nk": "a NameKey cache (PLAN-023 Decision 2), set at first use under the static-init guard",
     # Process-wide by design, written by every engine.
-    "WideStringClass::m_TempStrings": "WWLib string temp-buffer pool, under its own mutex",
-    "StringClass::m_TempStrings": "WWLib string temp-buffer pool, under its own mutex",
-    "AssetStatusClass::Instance": "the process's missing-asset report, under its lock",
-    "AutoPoolClass<PolyRenderTaskClass, 256>::Allocator()::allocator": "WWLib's object pool for the mesh renderer's tasks, process-wide like malloc (made at its first use)",
     "theEngineEmbeddedMode": "the host's fatal-error mode, a std::atomic every boot sets and the shutdown of the last live engine clears (so the priming engine's closing turned it off)",
     "DX8Wrapper_IsWindowed": "the process's assert switch, a std::atomic every boot's command line writes",
-    "LookupTableMgrClass::Tables": "WWMath's lookup tables, made by the first counted WWMath::Init and freed by the last Shutdown",
-    "WWMathInitCount": "the process-wide WWMath::Init/Shutdown count, under its mutex",
     "theMemoryManagerUsers": "the refcounted memory manager's user count, under its mutex",
-    "s_totalOpen": "a std::atomic open-file counter for a debug assert",
     "std::__detail::__waiter_pool_base::_S_for(void const*)::__w": "libstdc++'s wait pool for std::atomic::wait, process-wide by design",
     # GeneralsX @feature cemlyn007 01/10/2026 (PLAN-023 Phase 8, stage RR3)
-    "rts::(anonymous namespace)::theNextSlotIndex": "the PER_ENGINE_STATIC slot index counter (atomic): a function-local PER_ENGINE_STATIC takes its index at its first use",
     "fcrandbuf": "fontconfig's random state (third-party; its cache file names): whether it is safe with renderers on several threads is ThreadSanitizer's to find (RR4)",
     "statebuf": "fontconfig's random state (third-party; its cache file names): whether it is safe with renderers on several threads is ThreadSanitizer's to find (RR4)",
 }
@@ -144,6 +121,26 @@ class Probe:
         for (_mangled, value, size), name in zip(rows, names):
             symbols[ess.SUFFIX_RE.sub("", name)].append((value, size))
         return dict(symbols)
+
+    def find(self, key):
+        """[(address offset, size, section)] of every sized instance of `key`, in any section: for a constant
+        outside the probed sections, such as the render defaults (GeneralsX @feature cemlyn007 15/10/2026)."""
+        rows = []
+        for line in ess.run(["nm", "-f", "sysv", self.lib_path]).splitlines():
+            fields = [f.strip() for f in line.split("|")]
+            if len(fields) < 7 or not fields[0] or fields[2] in ("U", "w", "v") or not fields[1] or not fields[4]:
+                continue
+            rows.append((fields[0], int(fields[1], 16), int(fields[4], 16), fields[6]))
+        names = ess.demangle([r[0] for r in rows])
+        return [
+            (value, size, section)
+            for (_mangled, value, size, section), name in zip(rows, names)
+            if size and ess.SUFFIX_RE.sub("", name) == key
+        ]
+
+    def read(self, spans):
+        """The bytes now at `spans` ([(address offset, size, ...)], as find returns)."""
+        return b"".join(ctypes.string_at(self.base + span[0], span[1]) for span in spans)
 
     def snapshot(self):
         """key -> the bytes of every instance, now."""

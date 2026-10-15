@@ -88,8 +88,10 @@ const char* const DamageTypeFlags::s_bitNameList[] =
 };
 static_assert(ARRAY_SIZE(DamageTypeFlags::s_bitNameList) == DamageTypeFlags::NumBits + 1, "Incorrect array size");
 
-DamageTypeFlags DAMAGE_TYPE_FLAGS_NONE; 	// inits to all zeroes
-DamageTypeFlags DAMAGE_TYPE_FLAGS_ALL(DamageTypeFlags::kInitSetAll);
+// GeneralsX @refactor cemlyn007 14/10/2026 Constant, so read-only: engines share no writable state (docs/EMBEDDING.md).
+const DamageTypeFlags DAMAGE_TYPE_FLAGS_NONE; 	// inits to all zeroes
+const DamageTypeFlags DAMAGE_TYPE_FLAGS_ALL(DamageTypeFlags::kInitSetAll);
+static_assert(DAMAGE_NUM_TYPES <= 64, "DAMAGE_TYPE_FLAGS_ALL is constant-initialised only for a mask of up to 64 bits (BitFlags.h)");
 
 // ------------------------------------------------------------------------------------------------
 /** Xfer method

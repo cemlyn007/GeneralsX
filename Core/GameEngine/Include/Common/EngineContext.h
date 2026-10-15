@@ -29,6 +29,11 @@
 // or force-include it, into every TU that touches an engine header). With RTS_ENGINE_CONTEXT off (the
 // default, upstream-shaped build) it only declares rts::withCurrentEngine, which then returns its argument.
 //
+// GeneralsX @feature cemlyn007 14/10/2026 The embedding contract (docs/EMBEDDING.md): a context made for an embedded
+// engine keeps the host's EmbeddingConfig (Common/EmbeddingContract.h), its roots, modes and services. Statics that
+// hold engine state are per-engine statics (Common/EngineStatic.h): each context holds its own copy of each, made
+// on first use and destroyed with the context.
+//
 // Rules:
 // - A host owns one EngineContext per engine and enters it with an rts::Scope around every call into that
 //   engine (boot, update, shutdown and every read of engine state). Scopes nest and restore the previous
@@ -53,9 +58,11 @@
 #error "RTS_ENGINE_CONTEXT requires C++20 (constinit)"
 #endif
 
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <new>
 #include <type_traits>
 #include <utility>
 
@@ -102,34 +109,44 @@ struct SDL_Window;
 namespace rts
 {
 
-// GeneralsX @feature cemlyn007 30/09/2026 The alignment, and so the size granule, of the render states an engine's
-// w3dRender and ww3dState point to (W3DRenderState, WW3DState): the largest memory page size the target can run with
-// (16 KiB on Apple silicon; 4 KiB on x86 and x86-64; 64 KiB on every other target, whose kernels may be built with
-// 4, 16 or 64 KiB pages), so that their defaults fill whole pages of their own, which a host can make
-// read-only (W3D_Protect_Render_Defaults; PLAN-023 Phase 8, stage RR2a-2).
-// GeneralsX @bugfix cemlyn007 30/09/2026 64 KiB wherever a larger page is possible, where 4 KiB made every protect
-// fail on a 16 or 64 KiB page kernel (PLAN-023 Phase 8, stage RR2b).
-#if defined(__APPLE__)
-inline constexpr std::size_t renderStateAlignment = 16384;
-#elif defined(__x86_64__) || defined(__i386__) || defined(_M_X64) || defined(_M_IX86)
-inline constexpr std::size_t renderStateAlignment = 4096;
-#else
-inline constexpr std::size_t renderStateAlignment = 65536;
-#endif
+// GeneralsX @feature cemlyn007 14/10/2026 The identity of one per-engine static (Common/EngineStatic.h,
+// PerEngineStatic): only its address is used, as the key of the static in each EngineContext's table. A key is
+// `constexpr`, so it is read-only and holds no engine state. It points to itself so that no two keys can have the same
+// contents, which a linker folding identical read-only data could otherwise merge.
+struct EngineStaticKey
+{
+	const EngineStaticKey* self;
+	const char* name;
+};
 
-// Destroys one per-engine slot object (see EngineContext::setSlot).
-typedef void (*EngineSlotDestroyFn)(void* object);
+// The storage of one engine's copy of a per-engine static, so that an array type and a braced initializer both work.
+template <typename T>
+struct EngineStaticHolder
+{
+	T value;
+};
 
-// Hands out a process-wide index for one per-engine slot (a function-local or file static that must be
-// per engine, PLAN-023 Phase 4's PER_ENGINE_STATIC). Thread-safe; an index is never reused.
-RTS_ENGINE_CONTEXT_API std::size_t allocateEngineSlotIndex();
+// How to make and destroy one engine's copy of a per-engine static: `construct` constructs it in `size` bytes of
+// zero-filled storage aligned to `alignment`, using `closure`, and `destroy` destroys it in place. A static destroyed
+// last (`destroyLast`, an allocator other statics' objects come from) is destroyed after every other one.
+struct EngineStaticType
+{
+	std::size_t size;
+	std::size_t alignment;
+	void (*construct)(void* storage, void* closure);
+	void (*destroy)(void* storage) noexcept;
+	bool destroyLast;
+};
 
-struct EngineSlotTable;
+struct EngineStatics;
+struct EmbeddingConfig;
 
 struct RTS_ENGINE_CONTEXT_API EngineContext
 {
 	EngineContext() = default;
-	// Destroys the slot objects in the reverse order of their creation, inside a Scope for this context.
+	// GeneralsX @feature cemlyn007 14/10/2026 A context for an engine embedded by a host, which keeps `embedding`.
+	explicit EngineContext(EmbeddingConfig embedding);
+	// Destroys the per-engine statics in the reverse order of their creation, inside a Scope for this context.
 	// It does not touch the singletons: the engine's own shutdown deletes and nulls those, inside a
 	// Scope for this context, before the context is destroyed. Debug builds assert that it did (every
 	// singleton null) and that nothing wrote g_noEngine. A context whose engine faulted is never
@@ -169,15 +186,22 @@ struct RTS_ENGINE_CONTEXT_API EngineContext
 	std::uint32_t gameLogicSeed[6] = RTS_RANDOM_SEED_INITIAL_VALUES;
 	std::uint32_t gameLogicBaseSeed = 0;
 
-	// Per-engine slot objects, by allocateEngineSlotIndex() index; null until set.
-	void* getSlot(std::size_t index) const;
-	// Stores a slot object that this context owns and destroys with `destroy`. The index must not be set.
-	void setSlot(std::size_t index, void* object, EngineSlotDestroyFn destroy);
-	// Destroys every slot object now, newest first, inside a Scope for this context (the engine's teardown
-	// calls it; the destructor does it for any made since). A later get() makes a fresh object.
-	void destroySlots();
-	// Whether this context holds any slot object (for the lifecycle checks: g_noEngine must hold none).
-	bool hasSlotObjects() const;
+	// GeneralsX @feature cemlyn007 14/10/2026 How the host embeds this engine, or null for a context made without one.
+	const EmbeddingConfig* embedding() const noexcept { return m_embedding; }
+
+	// This engine's copy of the per-engine static `key`, or null if it has not made one.
+	void* findStatic(const EngineStaticKey& key) const noexcept;
+	// Makes this engine's copy of the per-engine static `key` with `type` and `closure`, or returns the one another
+	// thread of this engine made first. A copy whose construction throws is not kept, and the next use tries again.
+	void* makeStatic(const EngineStaticKey& key, const EngineStaticType& type, void* closure);
+	// Destroys every per-engine static now, inside a Scope for this context: newest first, those destroyed last after
+	// every other (the engine's teardown calls it; the destructor does it for any made since). A later use makes a
+	// fresh one.
+	void destroyStatics();
+	// The number of per-engine statics this context holds (for the lifecycle checks: g_noEngine must hold none).
+	std::size_t countStatics() const;
+	// Calls `visit` with the name of every per-engine static this context holds, oldest first.
+	void forEachStatic(void (*visit)(const char* name, void* user), void* user) const;
 
 	// The number of singleton fields and direct pointer fields (pathfindCellInfoArray, ...) that are not
 	// null (for the lifecycle checks).
@@ -187,11 +211,17 @@ struct RTS_ENGINE_CONTEXT_API EngineContext
 	std::size_t forEachLiveSingleton(void (*visit)(const char* name, void* user), void* user) const;
 
 private:
-	EngineSlotTable* m_slots = nullptr;
+	// Owned, and deleted by the destructor: a pointer, so that this header need not define EmbeddingConfig.
+	EmbeddingConfig* m_embedding = nullptr;
+	std::atomic<EngineStatics*> m_statics{nullptr};
+
+	EngineStatics& statics();
 };
 
 // The context of "no engine": all singletons null. The current context outside every Scope.
-extern RTS_ENGINE_CONTEXT_API EngineContext g_noEngine;
+// GeneralsX @refactor cemlyn007 15/10/2026 A constant in read-only storage, never destroyed, so nothing can write it
+// (EngineContext.cpp, docs/EMBEDDING.md).
+extern RTS_ENGINE_CONTEXT_API EngineContext& g_noEngine;
 
 // The current context. Never null: &g_noEngine outside every Scope. constinit, so no access pays a
 // thread_local initialisation check.
@@ -202,10 +232,22 @@ inline EngineContext* ctx() noexcept
 	return t_engine;
 }
 
+// GeneralsX @feature cemlyn007 14/10/2026 Whether an engine's context is current: code that may also run outside every
+// engine (a static's destructor at exit) leaves per-engine statics alone when none is.
+inline bool hasCurrentEngine() noexcept
+{
+	return t_engine != &g_noEngine;
+}
+
 // True when g_noEngine still has every singleton and direct field at its initial value and no slot object
 // (nothing assigned one, or used a PerEngineStatic, outside a Scope).
 RTS_ENGINE_CONTEXT_API bool noEngineIsPristine();
 
+// GeneralsX @refactor cemlyn007 14/10/2026 RTS_ENGINE_SCOPE_ENVIRONMENT: the Scope also installs the engine's
+// floating-point mode and "C" LC_NUMERIC, for the CMake build's hosts (the game executable and rlgenerals' old
+// launcher), which install nothing themselves. An embedding host installs that environment in its own entry gate
+// (docs/EMBEDDING.md), so without it a Scope only makes its context current, and keeps no cache of its own.
+#if RTS_ENGINE_SCOPE_ENVIRONMENT
 // GeneralsX @feature cemlyn007 28/09/2026 The per-thread state an engine relies on (PLAN-023 Phase 5b): the calling
 // thread's floating-point environment (with the x87 control word) and its locale, saved by a Scope that enters
 // an engine. Opaque here, so that this force-included header pulls in neither <cfenv> nor <locale.h>;
@@ -241,6 +283,7 @@ struct ThreadInvariants
 RTS_ENGINE_CONTEXT_API void enterEngineThreadInvariants(ThreadInvariants& saved) noexcept;
 // Restores what enterEngineThreadInvariants saved.
 RTS_ENGINE_CONTEXT_API void leaveEngineThreadInvariants(const ThreadInvariants& saved) noexcept;
+#endif
 
 // Makes `context` the current context for its lifetime, then restores the previous one. Scopes nest.
 // A null context means g_noEngine.
@@ -260,13 +303,17 @@ public:
 		EngineContext* const next = context != nullptr ? context : &g_noEngine;
 		m_entered = next != m_previous && next != &g_noEngine;
 		t_engine = next;
+#if RTS_ENGINE_SCOPE_ENVIRONMENT
 		if (m_entered)
 			enterEngineThreadInvariants(m_saved);
+#endif
 	}
 	~Scope()
 	{
+#if RTS_ENGINE_SCOPE_ENVIRONMENT
 		if (m_entered)
 			leaveEngineThreadInvariants(m_saved);
+#endif
 		t_engine = m_previous;
 	}
 
@@ -276,24 +323,51 @@ public:
 private:
 	EngineContext* m_previous;
 	bool m_entered;
+#if RTS_ENGINE_SCOPE_ENVIRONMENT
 	ThreadInvariants m_saved; // set only when m_entered
+#endif
 };
 
+// GeneralsX @feature cemlyn007 14/10/2026 The current engine's copy of the per-engine static `key`, made on its first
+// use in this engine: zero-filled, then constructed by `construct(storage)`, which placement-constructs an
+// EngineStaticHolder<T>. It is destroyed with the engine's context. See Common/EngineStatic.h.
+template <typename T, bool DestroyLast = false, typename Construct>
+T& engineStatic(const EngineStaticKey& key, Construct&& construct)
+{
+	EngineContext& context = *ctx();
+	void* storage = context.findStatic(key);
+	if (storage == nullptr)
+	{
+		static constexpr EngineStaticType type = {
+			sizeof(EngineStaticHolder<T>),
+			alignof(EngineStaticHolder<T>),
+			[](void* where, void* closure) { (*static_cast<std::remove_reference_t<Construct>*>(closure))(where); },
+			[](void* where) noexcept { static_cast<EngineStaticHolder<T>*>(where)->~EngineStaticHolder<T>(); },
+			DestroyLast,
+		};
+		storage = context.makeStatic(key, type, static_cast<void*>(&construct));
+	}
+	return static_cast<EngineStaticHolder<T>*>(storage)->value;
+}
+
 // GeneralsX @feature cemlyn007 28/09/2026 PER_ENGINE_STATIC (PLAN-023 Phases 2-4)
-// One object per engine in place of a file, class or function-local static: the object lives in a slot of
-// the current EngineContext, made on first use in that context (value-initialised, then passed to
-// `initialize` if one is given) and destroyed with it, newest first. The static itself only holds the slot
-// index, process-wide: taken at static initialisation for a file or class static, or at the first call (under
-// the static-init guard) for a function-local one. A TU-local (or header) `#define`
-// of the old name to `(name_perEngine.get())` keeps the uses unchanged. An access costs a slot lookup (a
-// call), so hot state belongs in direct EngineContext fields instead. It must not be used outside every
-// Scope (g_noEngine owns no slots).
+// One object per engine in place of a file, class or function-local static, declared `constexpr`:
+// `static constexpr rts::PerEngineStatic<T> name_perEngine{};`. The object lives in the current EngineContext,
+// made on its first use in that context (value-initialised, then passed to `initialize` if one is given) and
+// destroyed with it, newest first. A TU-local (or header) `#define` of the old name to `(name_perEngine.get())`
+// keeps the uses unchanged. It must not be used outside every Scope (g_noEngine holds no statics).
+// GeneralsX @refactor cemlyn007 14/10/2026 The PerEngineStatic is itself the key of its object in each engine's table
+// (EngineStaticKey), so it is `constexpr` and read-only: it no longer holds a process-wide slot index, which made it
+// writable state that every engine shared. Common/EngineStatic.h's macros declare the same kind of static in place.
 template <typename T>
 class PerEngineStatic
 {
 public:
-	PerEngineStatic() : m_index(allocateEngineSlotIndex()), m_initialize(nullptr) {}
-	explicit PerEngineStatic(void (*initialize)(T& object)) : m_index(allocateEngineSlotIndex()), m_initialize(initialize) {}
+	constexpr PerEngineStatic() noexcept : m_key{&m_key, "PerEngineStatic"}, m_initialize(nullptr) {}
+	constexpr explicit PerEngineStatic(void (*initialize)(T& object)) noexcept
+		: m_key{&m_key, "PerEngineStatic"}, m_initialize(initialize)
+	{
+	}
 
 	PerEngineStatic(const PerEngineStatic&) = delete;
 	PerEngineStatic& operator=(const PerEngineStatic&) = delete;
@@ -309,45 +383,28 @@ public:
 	// GeneralsX @feature cemlyn007 28/09/2026 As get(), but the object is made with `initialize(object)`, which
 	// may capture (PLAN-023 Phase 4): for a function-local static whose initialiser reads the function's
 	// locals, `static const X* x = find(info.name);` becomes
-	// `static rts::PerEngineStatic<const X*> x_perEngine;` and
+	// `static constexpr rts::PerEngineStatic<const X*> x_perEngine{};` and
 	// `const X* x = x_perEngine.get([&](const X*& value) { value = find(info.name); });`, so each engine
 	// runs the initialiser once, on its first call, as a solo run does.
 	template <typename Initialize>
 	T& get(Initialize&& initialize) const
 	{
-		EngineContext* context = ctx();
-		void* object = context->getSlot(m_index);
-		if (object == nullptr)
-		{
-			Holder* holder = new Holder();
+		return engineStatic<T>(m_key, [&](void* storage) {
+			EngineStaticHolder<T>* const holder = ::new (storage) EngineStaticHolder<T>{};
 			try
 			{
 				initialize(holder->value);
 			}
 			catch (...)
 			{
-				delete holder;
+				holder->~EngineStaticHolder<T>();
 				throw;
 			}
-			context->setSlot(m_index, holder, &destroy);
-			object = holder;
-		}
-		return static_cast<Holder*>(object)->value;
+		});
 	}
 
 private:
-	// A struct, so that T may be an array.
-	struct Holder
-	{
-		T value{};
-	};
-
-	static void destroy(void* object)
-	{
-		delete static_cast<Holder*>(object);
-	}
-
-	std::size_t m_index;
+	EngineStaticKey m_key;
 	void (*m_initialize)(T& object);
 };
 
@@ -433,11 +490,13 @@ struct ContextField : ContextFieldOps<ContextField<T, Field>, T>
 // GeneralsX @feature cemlyn007 30/09/2026 ContextField's indirect variant (PLAN-023 Phase 8, stage RR2a-1): state
 // that a direct EngineContext field points to (`S* EngineContext::*Pointer`, allocated only for some engines),
 // read through that pointer, or through `Defaults` (an S with every field at its default) while it is null.
-template <typename S, S* EngineContext::*Pointer, S& Defaults>
+// GeneralsX @refactor cemlyn007 15/10/2026 `Defaults` is a constexpr constant in read-only storage, which only reads
+// reach: a write through the reference this returns for it would fault (docs/EMBEDDING.md).
+template <typename S, S* EngineContext::*Pointer, const S& Defaults>
 inline S& indirectContext() noexcept
 {
 	S* const state = ctx()->*Pointer;
-	return state != nullptr ? *state : Defaults;
+	return state != nullptr ? *state : const_cast<S&>(Defaults);
 }
 
 // A stand-in for a class's static data member that moved into such a struct (member `Field`), declared as
@@ -446,7 +505,7 @@ inline S& indirectContext() noexcept
 // `std::addressof` give the stand-in's size and address, not the field's (scripts/cpp/engine_context_standins.py
 // fails on those), so a name used that way, or with `.`, needs a reference-returning macro instead. An array field also
 // takes `[]` and decays to a pointer to its first element.
-template <typename S, S* EngineContext::*Pointer, S& Defaults, typename T, T S::*Field>
+template <typename S, S* EngineContext::*Pointer, const S& Defaults, typename T, T S::*Field>
 struct IndirectContextField
 	: ContextFieldOps<IndirectContextField<S, Pointer, Defaults, T, Field>, T>
 {
@@ -459,7 +518,7 @@ struct IndirectContextField
 	}
 };
 
-template <typename S, S* EngineContext::*Pointer, S& Defaults, typename E, std::size_t N, E (S::*Field)[N]>
+template <typename S, S* EngineContext::*Pointer, const S& Defaults, typename E, std::size_t N, E (S::*Field)[N]>
 struct IndirectContextField<S, Pointer, Defaults, E[N], Field>
 {
 	// Same deleted copy/operator& backstop as ContextFieldOps (this specialisation does not derive from
@@ -532,6 +591,9 @@ BoundToEngine<std::decay_t<Function>> withCurrentEngine(Function&& function)
 
 // `#define TheXxx (::rts::ctx()->TheXxx_)` for every entry, generated from EngineSingletons.inl.
 #include "EngineSingletonMacros.h"
+
+// RTS_ENGINE_STATIC and RTS_ENGINE_GLOBAL, the per-engine statics' declarations.
+#include "EngineStatic.h"
 
 #else // !(__cplusplus && RTS_ENGINE_CONTEXT)
 

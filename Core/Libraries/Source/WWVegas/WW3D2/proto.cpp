@@ -49,8 +49,19 @@
 /*
 ** Global instances of the default loaders for the asset manager to install
 */
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(MeshLoaderClass, _MeshLoader);
+#define _MeshLoader RTS_ENGINE_GLOBAL_REF(_MeshLoader)
+#else
 MeshLoaderClass		_MeshLoader;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(HModelLoaderClass, _HModelLoader);
+#define _HModelLoader RTS_ENGINE_GLOBAL_REF(_HModelLoader)
+#else
 HModelLoaderClass		_HModelLoader;
+#endif
 
 
 /*

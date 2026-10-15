@@ -218,8 +218,18 @@ void SynchronizedTextureLoadTaskListClass::Remove(TextureLoadTaskClass *task)
 // they are defined below. No ordering is necessary for the task list locks,
 // since one thread can never hold two at once.
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(FastCriticalSectionClass, _ForegroundCriticalSection);
+#define _ForegroundCriticalSection RTS_ENGINE_GLOBAL_REF(_ForegroundCriticalSection)
+#else
 static FastCriticalSectionClass					_ForegroundCriticalSection;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(FastCriticalSectionClass, _BackgroundCriticalSection);
+#define _BackgroundCriticalSection RTS_ENGINE_GLOBAL_REF(_BackgroundCriticalSection)
+#else
 static FastCriticalSectionClass					_BackgroundCriticalSection;
+#endif
 
 // Lists
 
@@ -341,7 +351,7 @@ struct TextureLoaderState
 		}
 	}
 };
-rts::PerEngineStatic<TextureLoaderState> TextureLoaderState_perEngine;
+constexpr rts::PerEngineStatic<TextureLoaderState> TextureLoaderState_perEngine{};
 } // namespace
 #define _ForegroundQueue (TextureLoaderState_perEngine.get()._ForegroundQueue)
 #define _BackgroundQueue (TextureLoaderState_perEngine.get()._BackgroundQueue)
@@ -361,7 +371,12 @@ static TextureLoadTaskListClass					_VolTexLoadFreeList;
 
 
 // The background texture loading thread.
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+class LoaderThreadClass : public ThreadClass
+#else
 static class LoaderThreadClass : public ThreadClass
+#endif
 {
 public:
 #ifdef Exception_Handler
@@ -371,7 +386,13 @@ public:
 #endif
 
 	virtual void Thread_Function() override;
+#if RTS_ENGINE_CONTEXT
+};
+RTS_ENGINE_GLOBAL(LoaderThreadClass, _TextureLoadThread);
+#define _TextureLoadThread RTS_ENGINE_GLOBAL_REF(_TextureLoadThread)
+#else
 } _TextureLoadThread;
+#endif
 
 
 // TODO: Legacy - remove this call!

@@ -145,7 +145,7 @@ InGameUI *TheInGameUI = nullptr;
 // clearGameData, ScriptActions, GameEngine::init, InGameUI::init's createControlBar) hide it; shared, one engine
 // would hide another's window, or one its own window manager has freed (PLAN-023 Phase 4). The macro keeps the
 // uses unchanged.
-static rts::PerEngineStatic<GameWindow *> s_replayWindow_perEngine;
+static constexpr rts::PerEngineStatic<GameWindow *> s_replayWindow_perEngine{};
 #define m_replayWindow (s_replayWindow_perEngine.get())
 #else
 GameWindow *m_replayWindow = nullptr;
@@ -2031,7 +2031,7 @@ void InGameUI::update()
 					// lets make a sound
 #if RTS_ENGINE_CONTEXT
 					// GeneralsX @feature cemlyn007 28/09/2026 Per engine: the event keeps this engine's event info and sound rotation (PLAN-023 Phase 4).
-					static rts::PerEngineStatic<AudioEventRTS> click_perEngine([](AudioEventRTS& event) { event.setEventName("MilitarySubtitlesTyping"); });
+					static constexpr rts::PerEngineStatic<AudioEventRTS> click_perEngine([](AudioEventRTS& event) { event.setEventName("MilitarySubtitlesTyping"); });
 					AudioEventRTS& click = click_perEngine.get();
 #else
 					static AudioEventRTS click("MilitarySubtitlesTyping");
@@ -2073,16 +2073,25 @@ void InGameUI::update()
 #if RTS_ENGINE_CONTEXT
 	// GeneralsX @feature cemlyn007 28/09/2026 Per engine: this engine's last shown money and income (InGameUI::update
 	// runs headless too; PLAN-023 Phase 4).
-	static rts::PerEngineStatic<UnsignedInt> lastMoney_perEngine([](UnsignedInt& value) { value = ~0u; });
+	static constexpr rts::PerEngineStatic<UnsignedInt> lastMoney_perEngine([](UnsignedInt& value) { value = ~0u; });
 	UnsignedInt& lastMoney = lastMoney_perEngine.get();
-	static rts::PerEngineStatic<UnsignedInt> lastIncome_perEngine([](UnsignedInt& value) { value = ~0u; });
+	static constexpr rts::PerEngineStatic<UnsignedInt> lastIncome_perEngine([](UnsignedInt& value) { value = ~0u; });
 	UnsignedInt& lastIncome = lastIncome_perEngine.get();
 #else
 	static UnsignedInt lastMoney = ~0u;
 	static UnsignedInt lastIncome = ~0u;
 #endif
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+	RTS_ENGINE_STATIC(NameKeyType, moneyWindowKey, TheNameKeyGenerator->nameToKey( "ControlBar.wnd:MoneyDisplay" ));
+#else
 	static NameKeyType moneyWindowKey = TheNameKeyGenerator->nameToKey( "ControlBar.wnd:MoneyDisplay" );
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(NameKeyType, powerWindowKey, TheNameKeyGenerator->nameToKey( "ControlBar.wnd:PowerWindow" ));
+#else
 	static NameKeyType powerWindowKey = TheNameKeyGenerator->nameToKey( "ControlBar.wnd:PowerWindow" );
+#endif
 
 	GameWindow *moneyWin = TheWindowManager->winGetWindowFromId( nullptr, moneyWindowKey );
 	GameWindow *powerWin = TheWindowManager->winGetWindowFromId( nullptr, powerWindowKey );
@@ -2627,7 +2636,11 @@ void InGameUI::createMouseoverHint( const GameMessage *msg )
 			//(e.g. AngryMob), Lets fool the UI into creating the hint for the NEXUS instead...
  			if (obj->isKindOf( KINDOF_IGNORED_IN_GUI ))
  			{
+#if RTS_ENGINE_CONTEXT
+ 				RTS_ENGINE_STATIC(NameKeyType, key_MobMemberSlavedUpdate, NAMEKEY( "MobMemberSlavedUpdate" ));
+#else
  				static NameKeyType key_MobMemberSlavedUpdate = NAMEKEY( "MobMemberSlavedUpdate" );
+#endif
  				MobMemberSlavedUpdate *MMSUpdate = (MobMemberSlavedUpdate*)obj->findUpdateModule( key_MobMemberSlavedUpdate );
  				if( MMSUpdate )
  				{
@@ -2748,7 +2761,11 @@ void InGameUI::createMouseoverHint( const GameMessage *msg )
 #endif
 			UnicodeString warehouseFeedback;
 			// Add on dollar amount of warehouse contents so people don't freak out until the art is hooked up
+#if RTS_ENGINE_CONTEXT
+			RTS_ENGINE_STATIC(const NameKeyType, warehouseModuleKey, TheNameKeyGenerator->nameToKey( "SupplyWarehouseDockUpdate" ));
+#else
 			static const NameKeyType warehouseModuleKey = TheNameKeyGenerator->nameToKey( "SupplyWarehouseDockUpdate" );
+#endif
 			SupplyWarehouseDockUpdate *warehouseModule = (SupplyWarehouseDockUpdate *)obj->findUpdateModule( warehouseModuleKey );
 			if( warehouseModule != nullptr )
 			{
@@ -5431,7 +5448,7 @@ void InGameUI::updateFloatingText()
 	Int amount;								// The amount we'll change the alpha
 #if RTS_ENGINE_CONTEXT
 	// GeneralsX @feature cemlyn007 28/09/2026 Per engine: this engine's last floating-text frame (PLAN-023 Phase 4).
-	static rts::PerEngineStatic<UnsignedInt> lastLogicFrameUpdate_perEngine;
+	static constexpr rts::PerEngineStatic<UnsignedInt> lastLogicFrameUpdate_perEngine{};
 	UnsignedInt& lastLogicFrameUpdate = lastLogicFrameUpdate_perEngine.get([&](UnsignedInt& value) { value = currLogicFrame; });
 #else
 	static UnsignedInt lastLogicFrameUpdate = currLogicFrame;		// We need to make sure our current frame is different then our last frame we updated.
@@ -6165,7 +6182,11 @@ WindowMsgHandledType IdleWorkerSystem( GameWindow *window, UnsignedInt msg,
 		case GBM_SELECTED:
 		{
 			GameWindow *control = (GameWindow *)mData1;
+#if RTS_ENGINE_CONTEXT
+			RTS_ENGINE_STATIC(NameKeyType, buttonSelectID, NAMEKEY( "IdleWorker.wnd:ButtonSelectNextIdleWorker" ));
+#else
 			static NameKeyType buttonSelectID = NAMEKEY( "IdleWorker.wnd:ButtonSelectNextIdleWorker" );
+#endif
 			if (control && control->winGetWindowId() == buttonSelectID)
 			{
 				TheInGameUI->selectNextIdleWorker();

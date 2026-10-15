@@ -431,7 +431,12 @@ WWINLINE unsigned FastAllocatorGeneral::Get_Total_Allocation_Count()
 WWINLINE void* FastAllocatorGeneral::Alloc(unsigned int n)
 {
    void* pMemory;
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+	RTS_ENGINE_STATIC(int, re_entrancy, 0);
+#else
 	static int re_entrancy=0;
+#endif
 	re_entrancy++;
 
    //We actually allocate n+4 bytes. We store the # allocated

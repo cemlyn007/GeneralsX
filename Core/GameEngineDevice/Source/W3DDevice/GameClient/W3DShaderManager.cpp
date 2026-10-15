@@ -2872,7 +2872,7 @@ struct W3DShaderManagerState
 	};
 };
 
-rts::PerEngineStatic<W3DShaderManagerState> W3DShaderManagerState_perEngine;
+constexpr rts::PerEngineStatic<W3DShaderManagerState> W3DShaderManagerState_perEngine{};
 
 W3DShaderManagerData& ShaderManagerData()
 {

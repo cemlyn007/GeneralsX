@@ -136,7 +136,12 @@ Bool SabotageSupplyDropzoneCrateCollide::executeCrateBehavior( Object *other )
 	//Reset the timer on the dropzone. Um... only the dropzone has an OCLUpdate and one, so
 	//we can "assume" it's going to be safe. Otherwise, we'll have to write code to search for
 	//a specific OCLUpdate.
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+	RTS_ENGINE_STATIC(NameKeyType, key_ocl, NAMEKEY( "OCLUpdate" ));
+#else
 	static NameKeyType key_ocl = NAMEKEY( "OCLUpdate" );
+#endif
 	OCLUpdate *update = (OCLUpdate*)other->findUpdateModule( key_ocl );
 	if( update )
 	{

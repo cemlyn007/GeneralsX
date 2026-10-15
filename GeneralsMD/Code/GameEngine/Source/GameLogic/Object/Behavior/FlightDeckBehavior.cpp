@@ -1028,7 +1028,12 @@ void FlightDeckBehavior::defectAllParkedUnits(Team* newTeam, UnsignedInt detecti
 				continue;
 
 			// srj sez: evil. fix better someday.
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+			RTS_ENGINE_STATIC(NameKeyType, jetKey, TheNameKeyGenerator->nameToKey("JetAIUpdate"));
+#else
 			static NameKeyType jetKey = TheNameKeyGenerator->nameToKey("JetAIUpdate");
+#endif
 			JetAIUpdate* ju = (JetAIUpdate *)obj->findUpdateModule(jetKey);
 			Bool takeoffOrLanding = ju ? ju->friend_isTakeoffOrLandingInProgress() : false;
 
@@ -1069,7 +1074,11 @@ void FlightDeckBehavior::killAllParkedUnits()
 				continue;
 
 			// srj sez: evil. fix better someday.
+#if RTS_ENGINE_CONTEXT
+			RTS_ENGINE_STATIC(NameKeyType, jetKey, TheNameKeyGenerator->nameToKey("JetAIUpdate"));
+#else
 			static NameKeyType jetKey = TheNameKeyGenerator->nameToKey("JetAIUpdate");
+#endif
 			JetAIUpdate* ju = (JetAIUpdate *)obj->findUpdateModule(jetKey);
 			Bool takeoffOrLanding = ju ? ju->friend_isTakeoffOrLandingInProgress() : false;
 
@@ -1342,7 +1351,11 @@ void FlightDeckBehavior::exitObjectViaDoor( Object *newObj, ExitDoorType exitDoo
 	//validateAssignments();
 
 	/// @todo srj -- this is evil. fix.
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(NameKeyType, jetKey, TheNameKeyGenerator->nameToKey( "JetAIUpdate" ));
+#else
 	static NameKeyType jetKey = TheNameKeyGenerator->nameToKey( "JetAIUpdate" );
+#endif
 	JetAIUpdate* ju = (JetAIUpdate *)newObj->findUpdateModule( jetKey );
 	Real parkingOffset = ju ? ju->friend_getParkingOffset() : 0.0f;
 

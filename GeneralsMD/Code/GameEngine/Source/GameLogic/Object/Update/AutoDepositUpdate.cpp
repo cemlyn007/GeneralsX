@@ -205,7 +205,7 @@ UpdateSleepTime AutoDepositUpdate::update()
 // GeneralsX @bugfix cemlyn007 01/10/2026 The cached upgrade template's slot, at file scope so that its slot index is
 // taken at static initialisation, not at the first call: the runtime write probe saw a render engine's step write the
 // slot counter (PLAN-023 Phase 8, stage RR3).
-static rts::PerEngineStatic<const UpgradeTemplate *> upgradeTemplate_perEngine;
+static constexpr rts::PerEngineStatic<const UpgradeTemplate *> upgradeTemplate_perEngine{};
 #endif
 
 //------------------------------------------------------------------------------------------------

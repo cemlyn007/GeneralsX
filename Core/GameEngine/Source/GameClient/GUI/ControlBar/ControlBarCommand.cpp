@@ -69,12 +69,17 @@
 
 // PRIVATE DATA ///////////////////////////////////////////////////////////////////////////////////
 static GameWindow *commandWindows[ MAX_COMMANDS_PER_SET ];
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(Bool, commandWindowsInitialized, FALSE);
+#define commandWindowsInitialized RTS_ENGINE_GLOBAL_REF(commandWindowsInitialized)
+#else
 Bool commandWindowsInitialized = FALSE;
+#endif
 static Color BuildClockColor = GameMakeColor(0,0,0,100);
 // STATIC DATA STORAGE ////////////////////////////////////////////////////////////////////////////
 #if RTS_ENGINE_CONTEXT
 // GeneralsX @feature cemlyn007 28/09/2026 Per engine (PLAN-023 Phase 4; see ControlBar.h).
-rts::PerEngineStatic<ControlBar::ContainData> ControlBar::s_containData_perEngine;
+constexpr rts::PerEngineStatic<ControlBar::ContainData> ControlBar::s_containData_perEngine{};
 #define m_containData (s_containData_perEngine.get().entries)
 #else
 ControlBar::ContainEntry ControlBar::m_containData[ MAX_COMMANDS_PER_SET ];
@@ -559,11 +564,25 @@ void ControlBar::resetBuildQueueData()
 void ControlBar::populateBuildQueue( Object *producer )
 {
 /// @todo srj -- remove hard-coding here, please
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(const CommandButton*, cancelUnitCommand, findCommandButton( "Command_CancelUnitCreate" ));
+#else
 	static const CommandButton *cancelUnitCommand = findCommandButton( "Command_CancelUnitCreate" );
+#endif
 /// @todo srj -- remove hard-coding here, please
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(const CommandButton*, cancelUpgradeCommand, findCommandButton( "Command_CancelUpgradeCreate" ));
+#else
 	static const CommandButton *cancelUpgradeCommand = findCommandButton( "Command_CancelUpgradeCreate" );
+#endif
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+	RTS_ENGINE_STATIC(NameKeyType[ MAX_BUILD_QUEUE_BUTTONS ], buildQueueIDs);
+	RTS_ENGINE_STATIC(Bool, idsInitialized, FALSE);
+#else
 	static NameKeyType buildQueueIDs[ MAX_BUILD_QUEUE_BUTTONS ];
 	static Bool idsInitialized = FALSE;
+#endif
 	Int i;
 
 	// reset the build queue data
@@ -796,7 +815,11 @@ void ControlBar::updateContextCommand()
 			const ProductionEntry *produce = pu->firstProduction();
 			if( produce )
 			{
+#if RTS_ENGINE_CONTEXT
+				RTS_ENGINE_STATIC(NameKeyType, winID, TheNameKeyGenerator->nameToKey( "ControlBar.wnd:ButtonQueue01" ));
+#else
 				static NameKeyType winID = TheNameKeyGenerator->nameToKey( "ControlBar.wnd:ButtonQueue01" );
+#endif
 				GameWindow *win = TheWindowManager->winGetWindowFromId( m_contextParent[ CP_BUILD_QUEUE ], winID );
 
 				DEBUG_ASSERTCRASH( win, ("updateContextCommand: Unable to find first build queue button") );
@@ -1442,7 +1465,11 @@ CommandAvailability ControlBar::getCommandAvailability( const CommandButton *com
 			}
 			else if( mod->getSpecialPowerTemplate()->getSpecialPowerType() == SPECIAL_CHANGE_BATTLE_PLANS )
 			{
+#if RTS_ENGINE_CONTEXT
+				RTS_ENGINE_STATIC(NameKeyType, key_BattlePlanUpdate, NAMEKEY( "BattlePlanUpdate" ));
+#else
 				static NameKeyType key_BattlePlanUpdate = NAMEKEY( "BattlePlanUpdate" );
+#endif
 				BattlePlanUpdate *update = (BattlePlanUpdate*)obj->findUpdateModule( key_BattlePlanUpdate );
 				if( update && update->getCommandOption() & command->getOptions() )
 				{
@@ -1520,7 +1547,11 @@ CommandAvailability ControlBar::getCommandAvailability( const CommandButton *com
 
 			//We're dealing with a strategy center stop button. Only show the button
 			//if we're in bombardment mode (to stop the artillery cannon).
+#if RTS_ENGINE_CONTEXT
+			RTS_ENGINE_STATIC(NameKeyType, key_BattlePlanUpdate, NAMEKEY( "BattlePlanUpdate" ));
+#else
 			static NameKeyType key_BattlePlanUpdate = NAMEKEY( "BattlePlanUpdate" );
+#endif
 			BattlePlanUpdate *bpUpdate = (BattlePlanUpdate*)obj->findUpdateModule( key_BattlePlanUpdate );
 			if( bpUpdate && bpUpdate->getActiveBattlePlan() != PLANSTATUS_BOMBARDMENT )
 			{

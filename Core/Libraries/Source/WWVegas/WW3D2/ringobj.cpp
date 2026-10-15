@@ -157,7 +157,7 @@ struct RingMeshState
 	RingMeshClass RingMeshArray[RING_NUM_LOD];
 	float RingLODCosts[RING_NUM_LOD + 1] = {}; // RING_NUM_LOD doesn't include the null LOD
 };
-rts::PerEngineStatic<RingMeshState> RingMeshState_perEngine;
+constexpr rts::PerEngineStatic<RingMeshState> RingMeshState_perEngine{};
 } // namespace
 #define Ring_Array_Valid (RingMeshState_perEngine.get().Ring_Array_Valid)
 #define RingMeshArray (RingMeshState_perEngine.get().RingMeshArray)
@@ -1395,7 +1395,13 @@ RenderObjClass * RingPrototypeClass::Create()
 /*
 ** Global instance of the box loader
 */
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(RingLoaderClass, _RingLoader);
+#define _RingLoader RTS_ENGINE_GLOBAL_REF(_RingLoader)
+#else
 RingLoaderClass _RingLoader;
+#endif
 
 
 //

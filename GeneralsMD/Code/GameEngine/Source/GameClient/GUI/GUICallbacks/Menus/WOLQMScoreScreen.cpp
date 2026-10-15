@@ -46,13 +46,39 @@
 
 // PRIVATE DATA ///////////////////////////////////////////////////////////////////////////////////
 // window ids ------------------------------------------------------------------------------
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(NameKeyType, parentWOLQMScoreID, NAMEKEY_INVALID);
+#define parentWOLQMScoreID RTS_ENGINE_GLOBAL_REF(parentWOLQMScoreID)
+#else
 static NameKeyType parentWOLQMScoreID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonDisconnectID, NAMEKEY_INVALID);
+#define buttonDisconnectID RTS_ENGINE_GLOBAL_REF(buttonDisconnectID)
+#else
 static NameKeyType buttonDisconnectID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonQuickmatchID, NAMEKEY_INVALID);
+#define buttonQuickmatchID RTS_ENGINE_GLOBAL_REF(buttonQuickmatchID)
+#else
 static NameKeyType buttonQuickmatchID = NAMEKEY_INVALID;
+#endif
 
 // Window Pointers ------------------------------------------------------------------------
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, parentWOLQMScore, nullptr);
+#define parentWOLQMScore RTS_ENGINE_GLOBAL_REF(parentWOLQMScore)
+#else
 static GameWindow *parentWOLQMScore = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, buttonDisconnect, nullptr);
+#define buttonDisconnect RTS_ENGINE_GLOBAL_REF(buttonDisconnect)
+#else
 static GameWindow *buttonDisconnect = nullptr;
+#endif
 static GameWindow *buttonQuickmatch = nullptr;
 
 //-------------------------------------------------------------------------------------------------

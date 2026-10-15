@@ -80,6 +80,10 @@ struct NewParticleStruct
 ** typically be inserted into a hierarchy object or some such) will remain
 ** separate.
 */
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+#define LODMaxScreenSizes RTS_ENGINE_GLOBAL_REF(LODMaxScreenSizes)
+#endif
 class ParticleBufferClass : public RenderObjClass
 {
 	public:
@@ -438,7 +442,11 @@ class ParticleBufferClass : public RenderObjClass
 		// Static array of screen-size clamps for the 17 possible LOD levels a
 		// particle buffer can have. We can change these from being global to
 		// being per-buffer later if we wish. Default is NO_MAX_SCREEN_SIZE.
+#if RTS_ENGINE_CONTEXT
+		RTS_ENGINE_CLASS_STATIC(float[17], LODMaxScreenSizes);
+#else
 		static float						LODMaxScreenSizes[17];
+#endif
 
 		enum TailDiffuseTypeEnum {
 			BLACK,
@@ -453,3 +461,6 @@ class ParticleBufferClass : public RenderObjClass
 
 		unsigned char						CurrentGroupID;
 };
+#if RTS_ENGINE_CONTEXT
+#undef LODMaxScreenSizes
+#endif

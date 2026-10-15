@@ -63,6 +63,10 @@ const float COLLISION_EPSILON = 0.001f;
 ** CollisionMath
 ** This is a collection of the low-level math functions for collision detection.
 */
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+#define Stats RTS_ENGINE_GLOBAL_REF(Stats)
+#endif
 class CollisionMath
 {
 public:
@@ -225,7 +229,11 @@ private:
 
 	static const float COINCIDENCE_EPSILON;
 
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_CLASS_STATIC(ColmathStatsStruct, Stats);
+#else
 	static ColmathStatsStruct				Stats;
+#endif
 };
 
 
@@ -294,4 +302,7 @@ inline CollisionMath::OverlapType CollisionMath::eval_overlap_collision(const Ca
 #define TRACK_COLLISION_OBBOX_AABOX_HIT
 #define TRACK_COLLISION_OBBOX_OBBOX
 #define TRACK_COLLISION_OBBOX_OBBOX_HIT
+#if RTS_ENGINE_CONTEXT
+#undef Stats
+#endif
 #endif

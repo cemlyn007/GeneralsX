@@ -379,8 +379,19 @@ void LANAPI::checkMOTD()
 #endif
 }
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_EXTERN_GLOBAL(Bool, LANbuttonPushed);
+#define LANbuttonPushed RTS_ENGINE_GLOBAL_REF(LANbuttonPushed)
+#else
 extern Bool LANbuttonPushed;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL(Bool, LANSocketErrorDetected);
+#define LANSocketErrorDetected RTS_ENGINE_GLOBAL_REF(LANSocketErrorDetected)
+#else
 extern Bool LANSocketErrorDetected;
+#endif
 void LANAPI::update()
 {
 	if(LANbuttonPushed)
@@ -696,7 +707,11 @@ void LANAPI::update()
 	}
 
 	// Check for an MOTD every few seconds
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(UnsignedInt, lastMOTDCheck, 0);
+#else
 	static UnsignedInt lastMOTDCheck = 0;
+#endif
 	static const UnsignedInt motdInterval = 30000;
 	if (now > lastMOTDCheck + motdInterval)
 	{

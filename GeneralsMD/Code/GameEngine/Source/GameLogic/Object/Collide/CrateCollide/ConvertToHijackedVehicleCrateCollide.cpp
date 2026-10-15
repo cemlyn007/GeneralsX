@@ -212,7 +212,12 @@ Bool ConvertToHijackedVehicleCrateCollide::executeCrateBehavior( Object *other )
 
 	// I we have made it this far, we are going to ride in this vehicle for a while
 	// get the name of the hijackerupdate
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+	RTS_ENGINE_STATIC(NameKeyType, key_HijackerUpdate, NAMEKEY( "HijackerUpdate" ));
+#else
 	static NameKeyType key_HijackerUpdate = NAMEKEY( "HijackerUpdate" );
+#endif
 	HijackerUpdate *hijackerUpdate = (HijackerUpdate*)obj->findUpdateModule( key_HijackerUpdate );
 	if( hijackerUpdate )
 	{

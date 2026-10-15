@@ -147,7 +147,13 @@ public:
 	/**
 		Default constructor -- construct a new, empty AsciiString.
 	*/
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @refactor cemlyn007 15/10/2026 constexpr construction and destruction of an empty string, so the empty
+	// string is a constant (TheEmptyString; docs/EMBEDDING.md). validate and releaseBuffer do nothing for one.
+	constexpr AsciiString();
+#else
 	AsciiString();
+#endif
 	/**
 		Copy constructor -- make this AsciiString identical to the
 		other AsciiString. (This is actually quite efficient, because
@@ -173,7 +179,11 @@ public:
 	/**
 		Destructor. Not too exciting... clean up the works and such.
 	*/
+#if RTS_ENGINE_CONTEXT
+	constexpr ~AsciiString();
+#else
 	~AsciiString();
+#endif
 
 	/**
 		Return the length, in characters, of the string up to the first zero or null terminator.
@@ -412,17 +422,34 @@ inline char* AsciiString::peek() const
 }
 
 // -----------------------------------------------------
+#if RTS_ENGINE_CONTEXT
+inline constexpr AsciiString::AsciiString() : m_data(nullptr)
+{
+}
+#else
 inline AsciiString::AsciiString() : m_data(0)
 {
 	validate();
 }
+#endif
 
 // -----------------------------------------------------
+#if RTS_ENGINE_CONTEXT
+inline constexpr AsciiString::~AsciiString()
+{
+	if (m_data != nullptr)
+	{
+		validate();
+		releaseBuffer();
+	}
+}
+#else
 inline AsciiString::~AsciiString()
 {
 	validate();
 	releaseBuffer();
 }
+#endif
 
 // -----------------------------------------------------
 inline int AsciiString::getLength() const

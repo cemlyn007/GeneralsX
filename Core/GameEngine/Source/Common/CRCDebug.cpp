@@ -111,7 +111,13 @@ void outputCRCDebugLines()
 
 Int lastCRCDebugFrame = 0;
 Int lastCRCDebugIndex = 0;
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 Per engine (GameLogic.cpp)
+RTS_ENGINE_EXTERN_GLOBAL(Bool, inCRCGen);
+#define inCRCGen RTS_ENGINE_GLOBAL_REF(inCRCGen)
+#else
 extern THREAD_LOCAL Bool inCRCGen;
+#endif
 
 void CRCDebugStartNewGame()
 {

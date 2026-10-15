@@ -2512,7 +2512,12 @@ void Weapon::newProjectileFired(const Object *sourceObj, const Object *projectil
 	}
 
 	//Check for projectile stream update
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+	RTS_ENGINE_STATIC(NameKeyType, key_ProjectileStreamUpdate, NAMEKEY("ProjectileStreamUpdate"));
+#else
 	static NameKeyType key_ProjectileStreamUpdate = NAMEKEY("ProjectileStreamUpdate");
+#endif
 	ProjectileStreamUpdate* update = (ProjectileStreamUpdate*)projectileStream->findUpdateModule(key_ProjectileStreamUpdate);
 	if( update )
 	{
@@ -2544,7 +2549,11 @@ void Weapon::createLaser( const Object *sourceObj, const Object *victimObj, cons
 	Drawable *draw = laser->getDrawable();
 	if( draw )
 	{
+#if RTS_ENGINE_CONTEXT
+		RTS_ENGINE_STATIC(NameKeyType, key_LaserUpdate, NAMEKEY( "LaserUpdate" ));
+#else
 		static NameKeyType key_LaserUpdate = NAMEKEY( "LaserUpdate" );
+#endif
 		LaserUpdate *update = (LaserUpdate*)draw->findClientUpdateModule( key_LaserUpdate );
 		if( update )
 		{
@@ -2991,7 +3000,11 @@ static void makeAssistanceRequest( Object *requestOf, void *userData )
 		return;
 
 	// and respond to requests
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(const NameKeyType, key_assistUpdate, NAMEKEY("AssistedTargetingUpdate"));
+#else
 	static const NameKeyType key_assistUpdate = NAMEKEY("AssistedTargetingUpdate");
+#endif
 	AssistedTargetingUpdate *assistModule = (AssistedTargetingUpdate*)requestOf->findUpdateModule(key_assistUpdate);
 	if( assistModule == nullptr )
 		return;

@@ -739,7 +739,12 @@ namespace {
 
 	RegistryPathMap &GetRegistryPaths()
 	{
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+		RTS_ENGINE_STATIC(RegistryPathMap, paths);
+#else
 		static RegistryPathMap paths;
+#endif
 		return paths;
 	}
 
@@ -756,7 +761,12 @@ namespace {
 }
 
 // Static member stub
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_CLASS_STATIC_DEFINE(bool, RegistryClass, IsLocked, false);
+#define IsLocked RTS_ENGINE_GLOBAL_REF(IsLocked)
+#else
 bool RegistryClass::IsLocked = false;
+#endif
 
 // Static methods
 // GeneralsX @feature GitHubCopilot 29/03/2026 Back RegistryClass string/int settings with registry.ini on non-Windows.

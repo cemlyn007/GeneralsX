@@ -30,10 +30,10 @@ extern const char GitShortSHA1[];
 extern const char GitCommitDate[];
 extern const char GitCommitAuthorName[];
 extern const char GitTag[];
-extern time_t GitCommitTimeStamp;
-extern bool GitUncommittedChanges;
-extern bool GitHaveInfo;
-extern int GitRevision;
+extern const time_t GitCommitTimeStamp;
+extern const bool GitUncommittedChanges;
+extern const bool GitHaveInfo;
+extern const int GitRevision;
 
 #ifdef __cplusplus
 } // extern "C"

@@ -126,7 +126,13 @@ class WebBrowser :
 		STDMETHOD(TestMethod)(Int num1);
 	};
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_EXTERN_GLOBAL(CComObject<WebBrowser>*, TheWebBrowser);
+#define TheWebBrowser RTS_ENGINE_GLOBAL_REF(TheWebBrowser)
+#else
 extern CComObject<WebBrowser> *TheWebBrowser;
+#endif
 
 #else
 // Linux stub - WOL (Westwood Online) servers offline since 2010
@@ -164,5 +170,10 @@ protected:
 	WebBrowserURL *m_urlList;
 };
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL(WebBrowser*, TheWebBrowser);
+#define TheWebBrowser RTS_ENGINE_GLOBAL_REF(TheWebBrowser)
+#else
 extern WebBrowser *TheWebBrowser;
+#endif
 #endif

@@ -471,7 +471,12 @@ UpdateSleepTime ParticleUplinkCannonUpdate::update()
 					if( beam )
 					{
 						//m_annihilationSound.setPosition( beam->getPosition() );
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+						RTS_ENGINE_STATIC(NameKeyType, nameKeyClientUpdate, NAMEKEY( "LaserUpdate" ));
+#else
 						static NameKeyType nameKeyClientUpdate = NAMEKEY( "LaserUpdate" );
+#endif
 						LaserUpdate *update = (LaserUpdate*)beam->findClientUpdateModule( nameKeyClientUpdate );
 						if( update )
 						{
@@ -641,7 +646,11 @@ UpdateSleepTime ParticleUplinkCannonUpdate::update()
 			Drawable *beam = TheGameClient->findDrawableByID( m_orbitToTargetBeamID );
 			if ( beam )
 			{
+#if RTS_ENGINE_CONTEXT
+				RTS_ENGINE_STATIC(NameKeyType, nameKeyClientUpdate, NAMEKEY( "LaserUpdate" ));
+#else
 				static NameKeyType nameKeyClientUpdate = NAMEKEY( "LaserUpdate" );
+#endif
 				LaserUpdate *update = (LaserUpdate*)beam->findClientUpdateModule( nameKeyClientUpdate );
 				if( update )
 				{
@@ -900,7 +909,11 @@ void ParticleUplinkCannonUpdate::createConnectorLasers( IntensityTypes intensity
 				{
 					m_laserBeamIDs[ i ] = beam->getID();
 
+#if RTS_ENGINE_CONTEXT
+					RTS_ENGINE_STATIC(NameKeyType, nameKeyClientUpdate, NAMEKEY( "LaserUpdate" ));
+#else
 					static NameKeyType nameKeyClientUpdate = NAMEKEY( "LaserUpdate" );
+#endif
 					LaserUpdate *update = (LaserUpdate*)beam->findClientUpdateModule( nameKeyClientUpdate );
 					if( update )
 					{
@@ -1005,7 +1018,11 @@ void ParticleUplinkCannonUpdate::createGroundToOrbitLaser( UnsignedInt growthFra
 			{
 				m_groundToOrbitBeamID = beam->getID();
 
+#if RTS_ENGINE_CONTEXT
+				RTS_ENGINE_STATIC(NameKeyType, nameKeyClientUpdate, NAMEKEY( "LaserUpdate" ));
+#else
 				static NameKeyType nameKeyClientUpdate = NAMEKEY( "LaserUpdate" );
+#endif
 				LaserUpdate *update = (LaserUpdate*)beam->findClientUpdateModule( nameKeyClientUpdate );
 				if( update )
 				{
@@ -1044,7 +1061,11 @@ void ParticleUplinkCannonUpdate::createOrbitToTargetLaser( UnsignedInt growthFra
 			if( beam )
 			{
 				m_orbitToTargetBeamID = beam->getID();
+#if RTS_ENGINE_CONTEXT
+				RTS_ENGINE_STATIC(NameKeyType, nameKeyClientUpdate, NAMEKEY( "LaserUpdate" ));
+#else
 				static NameKeyType nameKeyClientUpdate = NAMEKEY( "LaserUpdate" );
+#endif
 				LaserUpdate *update = (LaserUpdate*)beam->findClientUpdateModule( nameKeyClientUpdate );
 				if( update )
 				{
@@ -1359,7 +1380,11 @@ void ParticleUplinkCannonUpdate::setClientStatus( PUCStatus newStatus, Bool reve
 			Drawable *beam = TheGameClient->findDrawableByID( m_groundToOrbitBeamID );
 			if( beam )
 			{
+#if RTS_ENGINE_CONTEXT
+				RTS_ENGINE_STATIC(NameKeyType, nameKeyClientUpdate, NAMEKEY( "LaserUpdate" ));
+#else
 				static NameKeyType nameKeyClientUpdate = NAMEKEY( "LaserUpdate" );
+#endif
 				LaserUpdate *update = (LaserUpdate*)beam->findClientUpdateModule( nameKeyClientUpdate );
 				if( update )
 				{
@@ -1554,7 +1579,11 @@ void ParticleUplinkCannonUpdate::loadPostProcess()
 			Drawable* drawable = TheGameClient->findDrawableByID( m_orbitToTargetBeamID );
 			if( drawable != nullptr )
 			{
+#if RTS_ENGINE_CONTEXT
+				RTS_ENGINE_STATIC(NameKeyType, nameKeyClientUpdate, NAMEKEY( "LaserUpdate" ));
+#else
 				static NameKeyType nameKeyClientUpdate = NAMEKEY( "LaserUpdate" );
+#endif
 				LaserUpdate *update = (LaserUpdate*)drawable->findClientUpdateModule( nameKeyClientUpdate );
 				if( update != nullptr )
 				{

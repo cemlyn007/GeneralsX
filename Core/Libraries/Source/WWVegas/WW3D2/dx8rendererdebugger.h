@@ -46,9 +46,17 @@ class MeshClass;
 // Note! For the debugger to be usable, the application must call DX8RendererDebugger::Update() once
 // each frame.
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+#define Enabled RTS_ENGINE_GLOBAL_REF(Enabled)
+#endif
 class DX8RendererDebugger
 {
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_CLASS_STATIC(bool, Enabled);
+#else
 	static bool Enabled;
+#endif
 public:
 	static void Enable(bool enable);
 	WWINLINE static bool Is_Enabled() { return Enabled; }
@@ -65,3 +73,6 @@ public:
 	static void Disable_All();
 	static void Enable_All();
 };
+#if RTS_ENGINE_CONTEXT
+#undef Enabled
+#endif

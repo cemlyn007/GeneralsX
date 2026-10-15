@@ -68,8 +68,14 @@ extern GameWindowManager *TheWindowManager;
 
 // GeneralsX @feature cemlyn007 01/10/2026 The embedding host's event pump lock (Common/ApplicationWindow.h;
 // PLAN-023 Phase 8, stage RR4).
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 Per engine: the host installs its lock in each engine it makes (docs/EMBEDDING.md).
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(std::atomic<bool (*)()>, ApplicationWindow_TryLockEventPump, nullptr);
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(std::atomic<void (*)()>, ApplicationWindow_UnlockEventPump, nullptr);
+#else
 std::atomic<bool (*)()> ApplicationWindow_TryLockEventPump{nullptr};
 std::atomic<void (*)()> ApplicationWindow_UnlockEventPump{nullptr};
+#endif
 
 namespace {
 

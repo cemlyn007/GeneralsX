@@ -87,16 +87,12 @@ ScoreKeeper::~ScoreKeeper()
 // GeneralsX @feature cemlyn007 28/09/2026 Constants built once at static initialisation, where every ScoreKeeper::reset
 // used to set the same bits again: a process-wide write at every game start would race with engines already
 // scoring on other threads (PLAN-023 Phase 5b).
-static KindOfMaskType makeScoringMask(KindOfType a, KindOfType b)
-{
-	KindOfMaskType mask;
-	mask.set(a);
-	mask.set(b);
-	return mask;
-}
-static const KindOfMaskType scoringBuildingMask = makeScoringMask(KINDOF_STRUCTURE, KINDOF_SCORE);
-static const KindOfMaskType scoringBuildingDestroyMask = makeScoringMask(KINDOF_STRUCTURE, KINDOF_SCORE_DESTROY);
-static const KindOfMaskType scoringBuildingCreateMask = makeScoringMask(KINDOF_STRUCTURE, KINDOF_SCORE_CREATE);
+// GeneralsX @refactor cemlyn007 14/10/2026 Constant-initialised, so read-only: their bits lie below the 64th (BitFlags.h).
+static const KindOfMaskType scoringBuildingMask(KindOfMaskType::kInit, KINDOF_STRUCTURE, KINDOF_SCORE);
+static const KindOfMaskType scoringBuildingDestroyMask(KindOfMaskType::kInit, KINDOF_STRUCTURE, KINDOF_SCORE_DESTROY);
+static const KindOfMaskType scoringBuildingCreateMask(KindOfMaskType::kInit, KINDOF_STRUCTURE, KINDOF_SCORE_CREATE);
+static_assert(KINDOF_STRUCTURE < 64 && KINDOF_SCORE < 64 && KINDOF_SCORE_DESTROY < 64 && KINDOF_SCORE_CREATE < 64,
+	"the scoring masks are constant-initialised only while their bits lie below the 64th (BitFlags.h)");
 
 void ScoreKeeper::reset( Int playerIdx )
 {

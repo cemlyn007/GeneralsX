@@ -528,7 +528,7 @@ bool TexProjectClass::Is_Depth_Gradient_Enabled(bool onoff)
 // changes its shader before it copies it into the material pass, so they are scratch that carries over between calls,
 // as in a solo run. File statics, so that their slots are taken at static initialisation, not at the first call
 // (PLAN-023 Phase 8, stage RR2b).
-static rts::PerEngineStatic<ShaderClass> mult_shader_perEngine([](ShaderClass& shader) {
+static constexpr rts::PerEngineStatic<ShaderClass> mult_shader_perEngine([](ShaderClass& shader) {
 	shader = ShaderClass(SHADE_CNST(
 		ShaderClass::PASS_LEQUAL,						//depth_compare,
 		ShaderClass::DEPTH_WRITE_DISABLE,			//depth_mask,
@@ -544,7 +544,7 @@ static rts::PerEngineStatic<ShaderClass> mult_shader_perEngine([](ShaderClass& s
 		0,														//post_det_color,
 		0));
 });
-static rts::PerEngineStatic<ShaderClass> add_shader_perEngine([](ShaderClass& shader) {
+static constexpr rts::PerEngineStatic<ShaderClass> add_shader_perEngine([](ShaderClass& shader) {
 	shader = ShaderClass(SHADE_CNST(
 		ShaderClass::PASS_LEQUAL,						//depth_compare,
 		ShaderClass::DEPTH_WRITE_DISABLE,			//depth_mask,

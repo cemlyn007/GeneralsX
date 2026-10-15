@@ -25,9 +25,8 @@
 #
 # How a symbol is classified: HAND (below) first, an exact name or a regular expression with a class, a
 # phase and a note, written by someone who read the code; then RULES, name/declaration/file patterns that
-# are sound for a whole family (NameKeyType caches are process-global by PLAN-023 Decision 2, FieldParse
-# tables are constant, third-party library state is process-global, ...); guard variables follow their
-# static. Anything neither matches is `unreviewed`. The checked-in list is
+# are sound for a whole family (FieldParse tables are constant, third-party library state is process-global,
+# ...); guard variables follow their static. Anything neither matches is `unreviewed`. The checked-in list is
 # docs/WORKDIR/planning/PLAN-023_STATE_CLASSIFICATION.tsv, which `snapshot` writes.
 #
 # Usage (from the GeneralsX root, or with --root):
@@ -560,44 +559,6 @@ class SourceIndex:
         no `#include` graph to resolve which macro table a given initialiser actually sees."""
         return name in self._object_like_macros
 
-    def is_written(self, parsed, source):
-        """Whether the variable `parsed` names, defined at `source` (the symbol's `file:line` sites joined by
-        `;`), is ever written outside its own declaration: assigned (`=`, `+=`, `<<=`, ...), incremented or
-        decremented, or had its address taken. Only a textual scan for the bare name, so a same-named
-        variable elsewhere is (harmlessly) read as the same one, and a write through a reference or pointer
-        that was handed the variable some other way is not seen. A function-local static can only be named
-        from the rest of the block that declares it, so that is all that is scanned; a namespace- or
-        class-scope one is scanned everywhere in the tree it can be named (every file that mentions its
-        name). A site that cannot be read counts as written."""
-        write_re = re.compile(
-            rf"(?<![.\w])(?<!->){re.escape(parsed.var)}\b\s*(?:\[[^\]]*\]\s*)*"
-            r"(?:(?<![=!<>])=(?!=)|[-+*/%&|^]=|<<=|>>=|\+\+|--)"
-            rf"|(?:\+\+|--|(?<!&)&(?!&))\s*(?<![.\w])(?<!->){re.escape(parsed.var)}\b"
-        )
-        spans = {}
-        for site in source.split(SITE_SEP):
-            rel, _sep, line = site.rpartition(":")
-            text = self.files.get(rel)
-            if text is None or not line.isdigit():
-                return True
-            start = 0
-            for _ in range(int(line) - 1):
-                start = text.find("\n", start) + 1
-            end = text.find("\n", start)
-            decl_end = start + len(self._statement_text(text, start, text[start : end if end >= 0 else len(text)]))
-            if parsed.scope in ("function", "guard") and parsed.func:
-                depth, i = 0, decl_end
-                while i < len(text) and depth >= 0:
-                    depth += (text[i] == "{") - (text[i] == "}")
-                    i += 1
-                spans.setdefault(rel, []).append((decl_end, i))
-            else:
-                spans.setdefault(rel, []).extend([(0, start), (decl_end, len(text))])
-        if not (parsed.scope in ("function", "guard") and parsed.func):
-            for rel in self.candidates(parsed.var):
-                spans.setdefault(rel, [(0, len(self.files[rel]))])
-        return any(write_re.search(self.files[rel], a, b) for rel, ranges in spans.items() for a, b in ranges)
-
     def class_bodies(self, rel, cls):
         """(start, end) offsets of the body of every definition of class `cls` in `rel`, braces matched (outside
         comments and literals, which `code_only` has blanked)."""
@@ -1016,47 +977,6 @@ def declarations(sym):
     """The declaration of every definition site: a rule that reads the declaration must hold for all of
     the TUs one key covers, not only the first."""
     return sym.decls or [sym.decl]
-
-
-# The variable itself must be a NameKeyType/StaticNameKey (optionally const), not merely mention one
-# somewhere in its type: a container or struct keyed by NameKeyType is not a cache of one. Decision 2
-# shares the generator, not the strings fed to it, so the cached key is process-wide only when every
-# engine computes the same key: the declaration must carry an initialiser that is exactly a
-# NAMEKEY(...) or TheNameKeyGenerator->nameToKey(...) call on a string literal, never on an
-# engine-dependent expression (`NAMEKEY(TheGlobalData->m_mapName)`, `NAMEKEY(m_templateName)`), a bare
-# copy of another cache (`= s_lastKey`), or anything with a trailing operation (`NAMEKEY("x") + s_offset`).
-# A declaration with no initialiser at all (const or not) does not pass: nothing here sees what fills it.
-# A non-const one must also never be written after its declaration (`SourceIndex.is_written`): the
-# initialiser alone does not stop a later `k = NAMEKEY(m_name)`. That check needs a real source-tree lookup,
-# so, like the macro check in `rule_const_object`, it is skipped only when none is given (a direct unit test).
-NAMEKEY_DECL_RE = re.compile(r"^(?:static\s+)?(const\s+)?(?:NameKeyType|StaticNameKey)\s+\w+\s*(?:\[[^\]]*\])?\s*$")
-_NAMEKEY_STRING_LITERAL_RE = r'"(?:[^"\\]|\\.)*"'
-NAMEKEY_INIT_RE = re.compile(
-    r"^\s*(?:NAMEKEY\s*\(\s*" + _NAMEKEY_STRING_LITERAL_RE + r"\s*\)"
-    r"|TheNameKeyGenerator\s*->\s*nameToKey\s*\(\s*" + _NAMEKEY_STRING_LITERAL_RE + r"\s*\))\s*;?\s*$"
-)
-
-
-def rule_namekey(sym, symbols=None, is_function_name=None):
-    p = sym.parsed
-    if sym.key.startswith("TheKey_") or (p.var == "nk" and p.func == "getModuleNameKey"):
-        return GLOBAL, "", "cached NameKeyType: process-wide by PLAN-023 Decision 2 (shared immortal generator)"
-    mutable = False
-    for d in declarations(sym):
-        decl, sep, init = d.partition("=")
-        m = NAMEKEY_DECL_RE.match(decl.rstrip().rstrip(";").rstrip())
-        if not m:
-            return None
-        if not sep or not NAMEKEY_INIT_RE.match(init):
-            return None
-        mutable = mutable or not m.group(1)
-    if mutable and is_function_name is not None:
-        assert hasattr(is_function_name, "is_written"), (
-            "is_function_name must be None or expose is_written (FunctionLookup does)"
-        )
-        if is_function_name.is_written(sym):
-            return None
-    return GLOBAL, "", "cached NameKeyType (a name or window ID key): process-wide by PLAN-023 Decision 2"
 
 
 # The declarator itself (before `=`) must be exactly a const FieldParse array: `FieldParse` merely
@@ -1874,7 +1794,6 @@ RULES = [
     ("libstdc++", rule_libstdcxx),
     ("third-party", rule_third_party),
     ("read-only", rule_read_only),
-    ("namekey", rule_namekey),
     ("fieldparse", rule_field_parse),
     ("const", rule_const_object),
 ]
@@ -1955,9 +1874,6 @@ class FunctionLookup:
 
     def is_macro_name(self, name):
         return self._index.is_object_like_macro_name(name)
-
-    def is_written(self, sym):
-        return self._index.is_written(sym.parsed, sym.source)
 
 
 def load_library(root, lib, vcpkg_lib):

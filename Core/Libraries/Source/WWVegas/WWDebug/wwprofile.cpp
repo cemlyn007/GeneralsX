@@ -62,12 +62,39 @@
 #include "WWLib/hashtemplate.h"
 #include <Utility/intrin_compat.h>
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(SimpleDynVecClass<WWProfileHierarchyNodeClass*>, ProfileCollectVector);
+#define ProfileCollectVector RTS_ENGINE_GLOBAL_REF(ProfileCollectVector)
+#else
 static SimpleDynVecClass<WWProfileHierarchyNodeClass*> ProfileCollectVector;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(double, TotalFrameTimes);
+#define TotalFrameTimes RTS_ENGINE_GLOBAL_REF(TotalFrameTimes)
+#else
 static double TotalFrameTimes;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(bool, ProfileCollecting);
+#define ProfileCollecting RTS_ENGINE_GLOBAL_REF(ProfileCollecting)
+#else
 static bool ProfileCollecting;
+#endif
 
+#if RTS_ENGINE_CONTEXT
+using ProfileStringHash_rtsEngineType = HashTemplateClass<StringClass, unsigned>;
+RTS_ENGINE_GLOBAL(ProfileStringHash_rtsEngineType, ProfileStringHash);
+#define ProfileStringHash RTS_ENGINE_GLOBAL_REF(ProfileStringHash)
+#else
 static HashTemplateClass<StringClass, unsigned> ProfileStringHash;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(unsigned, ProfileStringCount);
+#define ProfileStringCount RTS_ENGINE_GLOBAL_REF(ProfileStringCount)
+#else
 static unsigned ProfileStringCount;
+#endif
 
 unsigned WWProfile_Get_System_Time()
 {
@@ -345,19 +372,54 @@ bool	WWProfileHierarchyNodeClass::Return()
 ** WWProfileManager Implementation
 **
 ***************************************************************************************************/
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_CLASS_STATIC_DEFINE(bool, WWProfileManager, IsProfileEnabled, false);
+#define IsProfileEnabled RTS_ENGINE_GLOBAL_REF(IsProfileEnabled)
+#else
 bool									WWProfileManager::IsProfileEnabled=false;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_CLASS_STATIC_DEFINE(WWProfileHierarchyNodeClass, WWProfileManager, Root, WWProfileHierarchyNodeClass( "Root", nullptr ));
+#define Root RTS_ENGINE_GLOBAL_REF(Root)
+#else
 WWProfileHierarchyNodeClass		WWProfileManager::Root( "Root", nullptr );
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_CLASS_STATIC_DEFINE(WWProfileHierarchyNodeClass*, WWProfileManager, CurrentNode, &WWProfileManager::Root);
+#define CurrentNode RTS_ENGINE_GLOBAL_REF(CurrentNode)
+#else
 WWProfileHierarchyNodeClass	*	WWProfileManager::CurrentNode = &WWProfileManager::Root;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_CLASS_STATIC_DEFINE(WWProfileHierarchyNodeClass*, WWProfileManager, CurrentRootNode, &WWProfileManager::Root);
+#define CurrentRootNode RTS_ENGINE_GLOBAL_REF(CurrentRootNode)
+#else
 WWProfileHierarchyNodeClass	*	WWProfileManager::CurrentRootNode = &WWProfileManager::Root;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_CLASS_STATIC_DEFINE(int, WWProfileManager, FrameCounter, 0);
+#define FrameCounter RTS_ENGINE_GLOBAL_REF(FrameCounter)
+#else
 int									WWProfileManager::FrameCounter = 0;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_CLASS_STATIC_DEFINE(__int64, WWProfileManager, ResetTime, 0);
+#define ResetTime RTS_ENGINE_GLOBAL_REF(ResetTime)
+#else
 __int64								WWProfileManager::ResetTime = 0;
+#endif
 
 // GeneralsX @bugfix BenderAI 24/02/2026 Phase 5 - ThreadID type must match THREAD_ID on all platforms
 #ifdef _WIN32
 static unsigned int				ThreadID = static_cast<unsigned int>(-1);
 #else
 #include "thread_compat.h"
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(THREAD_ID, ThreadID, {});  // Default-initialized thread ID (platform-specific)
+#define ThreadID RTS_ENGINE_GLOBAL_REF(ThreadID)
+#else
 static THREAD_ID				ThreadID = {};  // Default-initialized thread ID (platform-specific)
+#endif
 #endif
 
 
@@ -939,6 +1001,11 @@ void	WWProfileIterator::Enter_Parent()
 	CurrentChild = CurrentParent->Get_Child();
 }
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 WWProfileInOrderIterator has a CurrentNode of its own.
+#undef CurrentNode
+#endif
+
 /***************************************************************************************************
 **
 ** WWProfileInOrderIterator Implementation
@@ -1029,7 +1096,12 @@ WWMeasureItClass::~WWMeasureItClass()
 //
 // ----------------------------------------------------------------------------
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_CLASS_STATIC_DEFINE(unsigned, WWMemoryAndTimeLog, TabCount);
+#define TabCount RTS_ENGINE_GLOBAL_REF(TabCount)
+#else
 unsigned WWMemoryAndTimeLog::TabCount;
+#endif
 
 WWMemoryAndTimeLog::WWMemoryAndTimeLog(const char* name)
 	:

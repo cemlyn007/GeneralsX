@@ -184,5 +184,12 @@ static const Int fsList[] = {
 	KINDOF_FS_AIRFIELD,
 };
 
-KindOfMaskType KINDOFMASK_NONE;	// inits to all zeroes
+// GeneralsX @refactor cemlyn007 14/10/2026 Constant, so read-only: engines share no writable state (docs/EMBEDDING.md).
+const KindOfMaskType KINDOFMASK_NONE;	// inits to all zeroes
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 Per engine (Common/EngineStatic.h): its bits lie beyond what a constant
+// std::bitset can set in C++20.
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(KindOfMaskType, KINDOFMASK_FS, KindOfMaskType(KindOfMaskType::kInit, fsList, ARRAY_SIZE(fsList)));
+#else
 KindOfMaskType KINDOFMASK_FS(KindOfMaskType::kInit, fsList, ARRAY_SIZE(fsList));
+#endif

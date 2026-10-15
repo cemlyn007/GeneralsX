@@ -255,7 +255,12 @@ void W3DLaserDraw::doDrawModule(const Matrix3D* transformMtx)
 
 	//Get the updatemodule that drives it...
 	Drawable *draw = getDrawable();
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+	RTS_ENGINE_STATIC(NameKeyType, key_LaserUpdate, NAMEKEY( "LaserUpdate" ));
+#else
 	static NameKeyType key_LaserUpdate = NAMEKEY( "LaserUpdate" );
+#endif
 	LaserUpdate *update = (LaserUpdate*)draw->findClientUpdateModule( key_LaserUpdate );
 	if( !update )
 	{

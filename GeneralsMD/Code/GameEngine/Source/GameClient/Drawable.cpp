@@ -142,7 +142,12 @@ static GameFont *ResolveDrawableCaptionFont()
  */
 class DynamicAudioEventInfoStatic : public DynamicAudioEventInfo
 {};
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(DynamicAudioEventInfoStatic, s_noSoundMarker);
+#define s_noSoundMarker RTS_ENGINE_GLOBAL_REF(s_noSoundMarker)
+#else
 static DynamicAudioEventInfoStatic s_noSoundMarker;
+#endif
 
 static DynamicAudioEventInfo* getNoSoundMarker()
 {
@@ -285,7 +290,7 @@ struct DrawableStaticImages
 	const Image* emptyContainer;
 	Anim2DTemplate** animationTemplates;
 };
-static rts::PerEngineStatic<DrawableStaticImages> s_drawableStaticImages_perEngine;
+static constexpr rts::PerEngineStatic<DrawableStaticImages> s_drawableStaticImages_perEngine{};
 #define s_staticImagesInited (s_drawableStaticImages_perEngine.get().inited)
 #define s_veterancyImage (s_drawableStaticImages_perEngine.get().veterancyImage)
 #define s_fullAmmo (s_drawableStaticImages_perEngine.get().fullAmmo)
@@ -3497,7 +3502,12 @@ void Drawable::drawBombed(const IRegion2D* healthBarRegion)
 	//
 	// Bombed?
 	//
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+	RTS_ENGINE_STATIC(NameKeyType, key_StickyBombUpdate, NAMEKEY( "StickyBombUpdate" ));
+#else
 	static NameKeyType key_StickyBombUpdate = NAMEKEY( "StickyBombUpdate" );
+#endif
 	StickyBombUpdate *update = (StickyBombUpdate*)obj->findUpdateModule( key_StickyBombUpdate );
 	if( update )
 	{

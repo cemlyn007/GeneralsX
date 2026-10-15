@@ -57,32 +57,32 @@
 
 
 /* static axes */
-extern int	EulerOrderXYZs;
-extern int	EulerOrderXYXs;
-extern int	EulerOrderXZYs;
-extern int	EulerOrderXZXs;
-extern int	EulerOrderYZXs;
-extern int	EulerOrderYZYs;
-extern int	EulerOrderYXZs;
-extern int	EulerOrderYXYs;
-extern int	EulerOrderZXYs;
-extern int	EulerOrderZXZs;
-extern int	EulerOrderZYXs;
-extern int	EulerOrderZYZs;
+extern const int	EulerOrderXYZs;
+extern const int	EulerOrderXYXs;
+extern const int	EulerOrderXZYs;
+extern const int	EulerOrderXZXs;
+extern const int	EulerOrderYZXs;
+extern const int	EulerOrderYZYs;
+extern const int	EulerOrderYXZs;
+extern const int	EulerOrderYXYs;
+extern const int	EulerOrderZXYs;
+extern const int	EulerOrderZXZs;
+extern const int	EulerOrderZYXs;
+extern const int	EulerOrderZYZs;
 
 /* rotating axes */
-extern int	EulerOrderXYZr;
-extern int	EulerOrderXYXr;
-extern int	EulerOrderXZYr;
-extern int	EulerOrderXZXr;
-extern int	EulerOrderYZXr;
-extern int	EulerOrderYZYr;
-extern int	EulerOrderYXZr;
-extern int	EulerOrderYXYr;
-extern int	EulerOrderZXYr;
-extern int	EulerOrderZXZr;
-extern int	EulerOrderZYXr;
-extern int	EulerOrderZYZr;
+extern const int	EulerOrderXYZr;
+extern const int	EulerOrderXYXr;
+extern const int	EulerOrderXZYr;
+extern const int	EulerOrderXZXr;
+extern const int	EulerOrderYZXr;
+extern const int	EulerOrderYZYr;
+extern const int	EulerOrderYXZr;
+extern const int	EulerOrderYXYr;
+extern const int	EulerOrderZXYr;
+extern const int	EulerOrderZXZr;
+extern const int	EulerOrderZYXr;
+extern const int	EulerOrderZYZr;
 
 
 /*********************************************************************

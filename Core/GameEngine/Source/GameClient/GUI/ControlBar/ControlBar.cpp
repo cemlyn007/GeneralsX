@@ -94,7 +94,7 @@ ControlBar *TheControlBar = nullptr;
 
 #if RTS_ENGINE_CONTEXT
 // GeneralsX @feature cemlyn007 28/09/2026 Per engine (PLAN-023 Phase 4; see ControlBar.h).
-rts::PerEngineStatic<ControlBar::RankIcons> ControlBar::s_rankIcons_perEngine;
+constexpr rts::PerEngineStatic<ControlBar::RankIcons> ControlBar::s_rankIcons_perEngine{};
 #define m_rankVeteranIcon (s_rankIcons_perEngine.get().veteran)
 #define m_rankEliteIcon (s_rankIcons_perEngine.get().elite)
 #define m_rankHeroicIcon (s_rankIcons_perEngine.get().heroic)
@@ -1558,7 +1558,12 @@ void ControlBar::update()
 		Int count;
 		const ThingTemplate *thing = TheThingFactory->findTemplate( ThePlayerList->getLocalPlayer()->getPlayerTemplate()->getBeaconTemplate() );
 		ThePlayerList->getLocalPlayer()->countObjectsByThingTemplate( 1, &thing, false, &count );
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+		RTS_ENGINE_STATIC(NameKeyType, beaconPlacementButtonID, NAMEKEY("ControlBar.wnd:ButtonPlaceBeacon"));
+#else
 		static NameKeyType beaconPlacementButtonID = NAMEKEY("ControlBar.wnd:ButtonPlaceBeacon");
+#endif
 		GameWindow *win = TheWindowManager->winGetWindowFromId(nullptr, beaconPlacementButtonID);
 		if (win)
 		{
@@ -1903,7 +1908,11 @@ void ControlBar::evaluateContextUI()
 		if( obj->getStatusBits().test( OBJECT_STATUS_SOLD ) )
 			return;
 
+#if RTS_ENGINE_CONTEXT
+		RTS_ENGINE_STATIC(const NameKeyType, key_OCLUpdate, NAMEKEY( "OCLUpdate" ));
+#else
 		static const NameKeyType key_OCLUpdate = NAMEKEY( "OCLUpdate" );
+#endif
 		OCLUpdate *update = (OCLUpdate*)obj->findUpdateModule( key_OCLUpdate );
 
 		//
@@ -2808,9 +2817,21 @@ void ControlBar::setControlBarSchemeByPlayer(Player *p)
 	if(m_controlBarSchemeManager)
 		m_controlBarSchemeManager->setControlBarSchemeByPlayer(p);
 
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(NameKeyType, buttonPlaceBeaconID, NAMEKEY( "ControlBar.wnd:ButtonPlaceBeacon" ));
+#else
 	static NameKeyType buttonPlaceBeaconID = NAMEKEY( "ControlBar.wnd:ButtonPlaceBeacon" );
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(NameKeyType, buttonIdleWorkerID, NAMEKEY("ControlBar.wnd:ButtonIdleWorker"));
+#else
 	static NameKeyType buttonIdleWorkerID = NAMEKEY("ControlBar.wnd:ButtonIdleWorker");
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(NameKeyType, buttonGeneralID, NAMEKEY("ControlBar.wnd:ButtonGeneral"));
+#else
 	static NameKeyType buttonGeneralID = NAMEKEY("ControlBar.wnd:ButtonGeneral");
+#endif
 	GameWindow *buttonPlaceBeacon = TheWindowManager->winGetWindowFromId( nullptr, buttonPlaceBeaconID );
 	GameWindow *buttonIdleWorker = TheWindowManager->winGetWindowFromId( nullptr, buttonIdleWorkerID );
 	GameWindow *buttonGeneral = TheWindowManager->winGetWindowFromId( nullptr, buttonGeneralID );
@@ -2853,9 +2874,21 @@ void ControlBar::setControlBarSchemeByPlayerTemplate( const PlayerTemplate *pt)
 	if(m_controlBarSchemeManager)
 		m_controlBarSchemeManager->setControlBarSchemeByPlayerTemplate(pt);
 
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(NameKeyType, buttonPlaceBeaconID, NAMEKEY( "ControlBar.wnd:ButtonPlaceBeacon" ));
+#else
 	static NameKeyType buttonPlaceBeaconID = NAMEKEY( "ControlBar.wnd:ButtonPlaceBeacon" );
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(NameKeyType, buttonIdleWorkerID, NAMEKEY("ControlBar.wnd:ButtonIdleWorker"));
+#else
 	static NameKeyType buttonIdleWorkerID = NAMEKEY("ControlBar.wnd:ButtonIdleWorker");
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(NameKeyType, buttonGeneralID, NAMEKEY("ControlBar.wnd:ButtonGeneral"));
+#else
 	static NameKeyType buttonGeneralID = NAMEKEY("ControlBar.wnd:ButtonGeneral");
+#endif
 	GameWindow *buttonPlaceBeacon = TheWindowManager->winGetWindowFromId( nullptr, buttonPlaceBeaconID );
 	GameWindow *buttonIdleWorker = TheWindowManager->winGetWindowFromId( nullptr, buttonIdleWorkerID );
 	GameWindow *buttonGeneral = TheWindowManager->winGetWindowFromId( nullptr, buttonGeneralID );
@@ -2914,8 +2947,13 @@ void ControlBar::updateBuildQueueDisabledImages( const Image *image )
 	if(!image)
 		return;
 	// We have to do this because the build queue data might have been reset
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(NameKeyType[ MAX_BUILD_QUEUE_BUTTONS ], buildQueueIDs);
+	RTS_ENGINE_STATIC(Bool, idsInitialized, FALSE);
+#else
 	static NameKeyType buildQueueIDs[ MAX_BUILD_QUEUE_BUTTONS ];
 	static Bool idsInitialized = FALSE;
+#endif
 	Int i;
 
 	// get name key ids for the build queue buttons

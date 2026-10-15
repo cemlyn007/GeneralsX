@@ -865,7 +865,13 @@ static void populateRandomSideAndColor( GameInfo *game )
 
 // ------------------------------------------------------------------------------------------------
 // ------------------------------------------------------------------------------------------------
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(const WaypointMap, s_emptyWaypoints, WaypointMap());
+#define s_emptyWaypoints RTS_ENGINE_GLOBAL_REF(s_emptyWaypoints)
+#else
 static const WaypointMap s_emptyWaypoints = WaypointMap();
+#endif
 
 static void populateRandomStartPosition( GameInfo *game )
 {
@@ -4360,7 +4366,14 @@ void GameLogic::destroyObject( Object *obj )
 // ------------------------------------------------------------------------------------------------
 // GeneralsX @feature cemlyn007 28/09/2026 thread_local: set only while this thread runs GameLogic::getCRC, so another thread's
 // engine does not see it (PLAN-023 Phase 2).
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 Per engine (Common/EngineStatic.h): an engine's logic runs on one thread at a
+// time, so its engine is what this thread's CRC generation is in.
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(Bool, inCRCGen, FALSE);
+#define inCRCGen RTS_ENGINE_GLOBAL_REF(inCRCGen)
+#else
 THREAD_LOCAL Bool inCRCGen = FALSE;
+#endif
 UnsignedInt GameLogic::getCRC( Int mode, AsciiString deepCRCFileName )
 {
 	if (mode != CRC_RECALC)

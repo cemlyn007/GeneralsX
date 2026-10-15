@@ -70,26 +70,97 @@ extern NGMPGame* TheNGMPGame;
 
 
 // window ids ------------------------------------------------------------------------------
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(NameKeyType, parentID, NAMEKEY_INVALID);
+#define parentID RTS_ENGINE_GLOBAL_REF(parentID)
+#else
 static NameKeyType parentID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonHideID, NAMEKEY_INVALID);
+#define buttonHideID RTS_ENGINE_GLOBAL_REF(buttonHideID)
+#else
 static NameKeyType buttonHideID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonAddBuddyID, NAMEKEY_INVALID);
+#define buttonAddBuddyID RTS_ENGINE_GLOBAL_REF(buttonAddBuddyID)
+#else
 static NameKeyType buttonAddBuddyID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonDeleteBuddyID, NAMEKEY_INVALID);
+#define buttonDeleteBuddyID RTS_ENGINE_GLOBAL_REF(buttonDeleteBuddyID)
+#else
 static NameKeyType buttonDeleteBuddyID = NAMEKEY_INVALID;
+#endif
 static NameKeyType textEntryID = NAMEKEY_INVALID;
 static NameKeyType listboxBuddyID = NAMEKEY_INVALID;
 static NameKeyType listboxChatID = NAMEKEY_INVALID;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonAcceptBuddyID, NAMEKEY_INVALID);
+#define buttonAcceptBuddyID RTS_ENGINE_GLOBAL_REF(buttonAcceptBuddyID)
+#else
 static NameKeyType buttonAcceptBuddyID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonDenyBuddyID, NAMEKEY_INVALID);
+#define buttonDenyBuddyID RTS_ENGINE_GLOBAL_REF(buttonDenyBuddyID)
+#else
 static NameKeyType buttonDenyBuddyID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, radioButtonBuddiesID, NAMEKEY_INVALID);
+#define radioButtonBuddiesID RTS_ENGINE_GLOBAL_REF(radioButtonBuddiesID)
+#else
 static NameKeyType radioButtonBuddiesID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, radioButtonIgnoreID, NAMEKEY_INVALID);
+#define radioButtonIgnoreID RTS_ENGINE_GLOBAL_REF(radioButtonIgnoreID)
+#else
 static NameKeyType radioButtonIgnoreID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, parentBuddiesID, NAMEKEY_INVALID);
+#define parentBuddiesID RTS_ENGINE_GLOBAL_REF(parentBuddiesID)
+#else
 static NameKeyType parentBuddiesID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, parentIgnoreID, NAMEKEY_INVALID);
+#define parentIgnoreID RTS_ENGINE_GLOBAL_REF(parentIgnoreID)
+#else
 static NameKeyType parentIgnoreID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, listboxIgnoreID, NAMEKEY_INVALID);
+#define listboxIgnoreID RTS_ENGINE_GLOBAL_REF(listboxIgnoreID)
+#else
 static NameKeyType listboxIgnoreID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonNotificationID, NAMEKEY_INVALID);
+#define buttonNotificationID RTS_ENGINE_GLOBAL_REF(buttonNotificationID)
+#else
 static NameKeyType buttonNotificationID = NAMEKEY_INVALID;
+#endif
 
 
 // Window Pointers ------------------------------------------------------------------------
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, parent, nullptr);
+#define parent RTS_ENGINE_GLOBAL_REF(parent)
+#else
 static GameWindow *parent = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, buttonHide, nullptr);
+#define buttonHide RTS_ENGINE_GLOBAL_REF(buttonHide)
+#else
 static GameWindow *buttonHide = nullptr;
+#endif
 static GameWindow *buttonAddBuddy = nullptr;
 static GameWindow *buttonDeleteBuddy = nullptr;
 static GameWindow *textEntry = nullptr;
@@ -97,18 +168,53 @@ static GameWindow *listboxBuddy = nullptr;
 static GameWindow *listboxChat = nullptr;
 static GameWindow *buttonAcceptBuddy = nullptr;
 static GameWindow *buttonDenyBuddy = nullptr;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, radioButtonBuddies, nullptr);
+#define radioButtonBuddies RTS_ENGINE_GLOBAL_REF(radioButtonBuddies)
+#else
 static GameWindow *radioButtonBuddies = nullptr;
+#endif
 static GameWindow *radioButtonIgnore = nullptr;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, parentBuddies, nullptr);
+#define parentBuddies RTS_ENGINE_GLOBAL_REF(parentBuddies)
+#else
 static GameWindow *parentBuddies = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, parentIgnore, nullptr);
+#define parentIgnore RTS_ENGINE_GLOBAL_REF(parentIgnore)
+#else
 static GameWindow *parentIgnore = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, listboxIgnore, nullptr);
+#define listboxIgnore RTS_ENGINE_GLOBAL_REF(listboxIgnore)
+#else
 static GameWindow *listboxIgnore = nullptr;
+#endif
 
 static Bool isOverlayActive = false;
 void insertChat( BuddyMessage msg );
 // RightClick pointers ---------------------------------------------------------------------
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, rcMenu, nullptr);
+#define rcMenu RTS_ENGINE_GLOBAL_REF(rcMenu)
+#else
 static GameWindow *rcMenu = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(WindowLayout*, noticeLayout, nullptr);
+#define noticeLayout RTS_ENGINE_GLOBAL_REF(noticeLayout)
+#else
 static WindowLayout *noticeLayout = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(UnsignedInt, noticeExpires, 0);
+#define noticeExpires RTS_ENGINE_GLOBAL_REF(noticeExpires)
+#else
 static UnsignedInt noticeExpires = 0;
+#endif
 #if defined(SAGE_USE_NGMP)
 	enum { NOTIFICATION_EXPIRES = 5000 };
 #else
@@ -119,8 +225,18 @@ void setUnignoreText( WindowLayout *layout, AsciiString nick, GPProfile id);
 void refreshIgnoreList();
 void showNotificationBox( AsciiString nick, UnicodeString message);
 void deleteNotificationBox();
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Bool, lastNotificationWasStatus, FALSE);
+#define lastNotificationWasStatus RTS_ENGINE_GLOBAL_REF(lastNotificationWasStatus)
+#else
 static Bool lastNotificationWasStatus = FALSE;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Int, numOnlineInNotification, 0);
+#define numOnlineInNotification RTS_ENGINE_GLOBAL_REF(numOnlineInNotification)
+#else
 static Int numOnlineInNotification = 0;
+#endif
 
 class BuddyControls
 {
@@ -137,7 +253,12 @@ public:
 	Bool isInit;
 };
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(BuddyControls, buddyControls);
+#define buddyControls RTS_ENGINE_GLOBAL_REF(buddyControls)
+#else
 static BuddyControls buddyControls;
+#endif
 BuddyControls::BuddyControls(	)
 {
 	listboxChat = nullptr;
@@ -1180,11 +1301,36 @@ WindowMsgHandledType PopupBuddyNotificationSystem( GameWindow *window, UnsignedI
 static NameKeyType buttonAcceptBuddyID = NAMEKEY_INVALID;
 static NameKeyType buttonDenyBuddyID = NAMEKEY_INVALID;
 */
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonAddID, NAMEKEY_INVALID);
+#define buttonAddID RTS_ENGINE_GLOBAL_REF(buttonAddID)
+#else
 static NameKeyType buttonAddID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonDeleteID, NAMEKEY_INVALID);
+#define buttonDeleteID RTS_ENGINE_GLOBAL_REF(buttonDeleteID)
+#else
 static NameKeyType buttonDeleteID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonPlayID, NAMEKEY_INVALID);
+#define buttonPlayID RTS_ENGINE_GLOBAL_REF(buttonPlayID)
+#else
 static NameKeyType buttonPlayID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonIgnoreID, NAMEKEY_INVALID);
+#define buttonIgnoreID RTS_ENGINE_GLOBAL_REF(buttonIgnoreID)
+#else
 static NameKeyType buttonIgnoreID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonStatsID, NAMEKEY_INVALID);
+#define buttonStatsID RTS_ENGINE_GLOBAL_REF(buttonStatsID)
+#else
 static NameKeyType buttonStatsID = NAMEKEY_INVALID;
+#endif
 // Window Pointers ------------------------------------------------------------------------
 //static GameWindow *rCparent = nullptr;
 

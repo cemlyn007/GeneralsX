@@ -186,7 +186,12 @@ public:
 	*/
 	bool							Do_Mappers_Need_Normals();
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @refactor cemlyn007 15/10/2026 Data no engine writes is constant (docs/EMBEDDING.md).
+	static const ShaderClass NullShader;	// Used to mark no shader data
+#else
 	static ShaderClass NullShader;	// Used to mark no shader data
+#endif
 
 protected:
 

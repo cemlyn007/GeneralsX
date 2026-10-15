@@ -447,15 +447,28 @@ void W3DGadgetPushButtonImageDrawOne( GameWindow *window,
 	if( BitIsSet( window->winGetStatus(), WIN_STATUS_FLASHING ) )
 	{
 		//Handle cameo flashing (let the flashing stack with overlay states)
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+		RTS_ENGINE_STATIC(const Image*, hilitedOverlayIcon, TheMappedImageCollection->findImageByName( "Cameo_push" ));
+#else
 		static const Image *hilitedOverlayIcon = TheMappedImageCollection->findImageByName( "Cameo_push" );
+#endif
 		TheDisplay->drawImage( hilitedOverlayIcon, start.x, start.y, start.x + size.x, start.y + size.y );
 	}
 
 	if( BitIsSet( window->winGetStatus(), WIN_STATUS_USE_OVERLAY_STATES ) )
 	{
 		image = nullptr;
+#if RTS_ENGINE_CONTEXT
+		RTS_ENGINE_STATIC(const Image*, pushedOverlayIcon, TheMappedImageCollection->findImageByName( "Cameo_push" ));
+#else
 		static const Image *pushedOverlayIcon	= TheMappedImageCollection->findImageByName( "Cameo_push" );
+#endif
+#if RTS_ENGINE_CONTEXT
+		RTS_ENGINE_STATIC(const Image*, hilitedOverlayIcon, TheMappedImageCollection->findImageByName( "Cameo_hilited" ));
+#else
 		static const Image *hilitedOverlayIcon = TheMappedImageCollection->findImageByName( "Cameo_hilited" );
+#endif
 		if( pushedOverlayIcon && hilitedOverlayIcon )
 		{
 			if(BitIsSet(window->winGetStatus(), WIN_STATUS_ENABLED))

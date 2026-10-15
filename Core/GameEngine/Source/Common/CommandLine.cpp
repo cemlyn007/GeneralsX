@@ -46,7 +46,12 @@
 
 
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(Bool, TheDebugIgnoreSyncErrors, FALSE);
+#define TheDebugIgnoreSyncErrors RTS_ENGINE_GLOBAL_REF(TheDebugIgnoreSyncErrors)
+#else
 Bool TheDebugIgnoreSyncErrors = FALSE;
+#endif
 #if RTS_ENGINE_CONTEXT
 // GeneralsX @feature cemlyn007 30/09/2026 The engine's own (WW3D2/dx8wrapper.h; PLAN-023 Phase 8, stage RR2a-1).
 #define DX8Wrapper_PreserveFPU (::rts::ctx()->dx8PreserveFPU)
@@ -60,7 +65,7 @@ UnsignedInt TheCRCLastFrameToLog = 0xffffffff;
 Bool g_keepCRCSaves = FALSE;
 Bool g_saveDebugCRCPerFrame = FALSE;
 #if RTS_ENGINE_CONTEXT
-rts::PerEngineStatic<AsciiString> g_saveDebugCRCPerFrameDir_perEngine;
+extern constexpr rts::PerEngineStatic<AsciiString> g_saveDebugCRCPerFrameDir_perEngine{};
 #else
 AsciiString g_saveDebugCRCPerFrameDir;
 #endif
@@ -1188,7 +1193,8 @@ Int parseClearDebugLevel(char *args[], int num)
 
 // Initial Params are parsed before Windows Creation.
 // Note that except for TheGlobalData, no other global objects exist yet when these are parsed.
-static CommandLineParam paramsForStartup[] =
+// GeneralsX @refactor cemlyn007 14/10/2026 Constant, so read-only: engines share no writable state (docs/EMBEDDING.md).
+static const CommandLineParam paramsForStartup[] =
 {
 	{ "-win", parseWin },
 	{ "-fullscreen", parseNoWin },
@@ -1217,7 +1223,7 @@ static CommandLineParam paramsForStartup[] =
 };
 
 // These Params are parsed during Engine Init before INI data is loaded
-static CommandLineParam paramsForEngineInit[] =
+static const CommandLineParam paramsForEngineInit[] =
 {
 	{ "-nologo", parseNoLogo }, // TheSuperHackers @tweak Is now available in Release builds.
 	{ "-noshellmap", parseNoShellMap },

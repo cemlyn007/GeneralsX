@@ -121,7 +121,7 @@ TransportStatus::~TransportStatus()
 #if RTS_ENGINE_CONTEXT
 // GeneralsX @feature cemlyn007 28/09/2026 Per engine: the transport-status cache is this engine's scripts'
 // (PLAN-023 Phase 2).
-static rts::PerEngineStatic<TransportStatus *> s_transportStatuses_perEngine;
+static constexpr rts::PerEngineStatic<TransportStatus *> s_transportStatuses_perEngine{};
 #define s_transportStatuses (s_transportStatuses_perEngine.get())
 #else
 static TransportStatus *s_transportStatuses;
@@ -2234,7 +2234,12 @@ Bool ScriptConditions::evaluateSkirmishSuppliesWithinDistancePerimeter(Parameter
 
 	Real maxValue = 0;
 	for (Object *them = iter->first(); them; them = iter->next()) {
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+		RTS_ENGINE_STATIC(const NameKeyType, key_warehouseUpdate, NAMEKEY("SupplyWarehouseDockUpdate"));
+#else
 		static const NameKeyType key_warehouseUpdate = NAMEKEY("SupplyWarehouseDockUpdate");
+#endif
 		SupplyWarehouseDockUpdate *warehouseModule = (SupplyWarehouseDockUpdate*) them->findUpdateModule( key_warehouseUpdate );
 		if (!warehouseModule) {
 			continue;

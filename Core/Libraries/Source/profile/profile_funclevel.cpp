@@ -798,7 +798,13 @@ ProfileFuncLevel::ProfileFuncLevel()
 
 #endif // !defined HAS_PROFILE
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_CLASS_STATIC_DEFINE(ProfileFuncLevel, ProfileFuncLevel, Instance);
+#define Instance RTS_ENGINE_GLOBAL_REF(Instance)
+#else
 ProfileFuncLevel ProfileFuncLevel::Instance;
+#endif
 // GeneralsX @build fbraz 03/02/2026 testEvent only exists on Windows (see internal.h)
 #ifdef _WIN32
 HANDLE ProfileFastCS::testEvent=::CreateEvent(nullptr,FALSE,FALSE,"");

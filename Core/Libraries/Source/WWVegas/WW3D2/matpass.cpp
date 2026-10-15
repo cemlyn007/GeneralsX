@@ -54,7 +54,13 @@
 #include "dx8wrapper.h"
 
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_CLASS_STATIC_DEFINE(bool, MaterialPassClass, EnablePerPolygonCulling, true);
+#define EnablePerPolygonCulling RTS_ENGINE_GLOBAL_REF(EnablePerPolygonCulling)
+#else
 bool MaterialPassClass::EnablePerPolygonCulling = true;
+#endif
 
 
 /***********************************************************************************************

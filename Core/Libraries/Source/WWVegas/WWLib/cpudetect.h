@@ -49,6 +49,108 @@ typedef signed long long sint64;
 
 class CPUDetectInitClass;
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 CPUDetectClass's detected fields, per engine (see the class). CompactLog is
+// #undef'd after the class: DX8Caps has a member of that name.
+#define RTS_CPU_DETECT_FIELDS(X) \
+	X(StringClass, ProcessorLog) \
+	X(StringClass, CompactLog) \
+	X(int, ProcessorType) \
+	X(int, ProcessorFamily) \
+	X(int, ProcessorModel) \
+	X(int, ProcessorRevision) \
+	X(int, ProcessorSpeed) \
+	X(sint64, ProcessorTicksPerSecond) \
+	X(double, InvProcessorTicksPerSecond) \
+	X(ProcessorManufacturerType, ProcessorManufacturer) \
+	X(IntelProcessorType, IntelProcessor) \
+	X(AMDProcessorType, AMDProcessor) \
+	X(VIAProcessorType, VIAProcessor) \
+	X(RiseProcessorType, RiseProcessor) \
+	X(unsigned, FeatureBits) \
+	X(unsigned, ExtendedFeatureBits) \
+	X(unsigned, L2CacheSize) \
+	X(unsigned, L2CacheLineSize) \
+	X(unsigned, L2CacheSetAssociative) \
+	X(unsigned, L1DataCacheSize) \
+	X(unsigned, L1DataCacheLineSize) \
+	X(unsigned, L1DataCacheSetAssociative) \
+	X(unsigned, L1InstructionCacheSize) \
+	X(unsigned, L1InstructionCacheLineSize) \
+	X(unsigned, L1InstructionCacheSetAssociative) \
+	X(unsigned, L1InstructionTraceCacheSize) \
+	X(unsigned, L1InstructionTraceCacheSetAssociative) \
+	X(MemValueType, TotalPhysicalMemory) \
+	X(MemValueType, AvailablePhysicalMemory) \
+	X(MemValueType, TotalPageMemory) \
+	X(MemValueType, AvailablePageMemory) \
+	X(MemValueType, TotalVirtualMemory) \
+	X(MemValueType, AvailableVirtualMemory) \
+	X(unsigned, OSVersionNumberMajor) \
+	X(unsigned, OSVersionNumberMinor) \
+	X(unsigned, OSVersionBuildNumber) \
+	X(unsigned, OSVersionPlatformId) \
+	X(StringClass, OSVersionExtraInfo) \
+	X(bool, HasCPUIDInstruction) \
+	X(bool, HasRDTSCInstruction) \
+	X(bool, HasSSESupport) \
+	X(bool, HasSSE2Support) \
+	X(bool, HasCMOVSupport) \
+	X(bool, HasMMXSupport) \
+	X(bool, Has3DNowSupport) \
+	X(bool, HasExtended3DNowSupport) \
+	X(char[20], VendorID) \
+	X(char[48], ProcessorString)
+#define ProcessorLog RTS_ENGINE_GLOBAL_REF(ProcessorLog)
+#define CompactLog RTS_ENGINE_GLOBAL_REF(CompactLog)
+#define ProcessorType RTS_ENGINE_GLOBAL_REF(ProcessorType)
+#define ProcessorFamily RTS_ENGINE_GLOBAL_REF(ProcessorFamily)
+#define ProcessorModel RTS_ENGINE_GLOBAL_REF(ProcessorModel)
+#define ProcessorRevision RTS_ENGINE_GLOBAL_REF(ProcessorRevision)
+#define ProcessorSpeed RTS_ENGINE_GLOBAL_REF(ProcessorSpeed)
+#define ProcessorTicksPerSecond RTS_ENGINE_GLOBAL_REF(ProcessorTicksPerSecond)
+#define InvProcessorTicksPerSecond RTS_ENGINE_GLOBAL_REF(InvProcessorTicksPerSecond)
+#define ProcessorManufacturer RTS_ENGINE_GLOBAL_REF(ProcessorManufacturer)
+#define IntelProcessor RTS_ENGINE_GLOBAL_REF(IntelProcessor)
+#define AMDProcessor RTS_ENGINE_GLOBAL_REF(AMDProcessor)
+#define VIAProcessor RTS_ENGINE_GLOBAL_REF(VIAProcessor)
+#define RiseProcessor RTS_ENGINE_GLOBAL_REF(RiseProcessor)
+#define FeatureBits RTS_ENGINE_GLOBAL_REF(FeatureBits)
+#define ExtendedFeatureBits RTS_ENGINE_GLOBAL_REF(ExtendedFeatureBits)
+#define L2CacheSize RTS_ENGINE_GLOBAL_REF(L2CacheSize)
+#define L2CacheLineSize RTS_ENGINE_GLOBAL_REF(L2CacheLineSize)
+#define L2CacheSetAssociative RTS_ENGINE_GLOBAL_REF(L2CacheSetAssociative)
+#define L1DataCacheSize RTS_ENGINE_GLOBAL_REF(L1DataCacheSize)
+#define L1DataCacheLineSize RTS_ENGINE_GLOBAL_REF(L1DataCacheLineSize)
+#define L1DataCacheSetAssociative RTS_ENGINE_GLOBAL_REF(L1DataCacheSetAssociative)
+#define L1InstructionCacheSize RTS_ENGINE_GLOBAL_REF(L1InstructionCacheSize)
+#define L1InstructionCacheLineSize RTS_ENGINE_GLOBAL_REF(L1InstructionCacheLineSize)
+#define L1InstructionCacheSetAssociative RTS_ENGINE_GLOBAL_REF(L1InstructionCacheSetAssociative)
+#define L1InstructionTraceCacheSize RTS_ENGINE_GLOBAL_REF(L1InstructionTraceCacheSize)
+#define L1InstructionTraceCacheSetAssociative RTS_ENGINE_GLOBAL_REF(L1InstructionTraceCacheSetAssociative)
+#define TotalPhysicalMemory RTS_ENGINE_GLOBAL_REF(TotalPhysicalMemory)
+#define AvailablePhysicalMemory RTS_ENGINE_GLOBAL_REF(AvailablePhysicalMemory)
+#define TotalPageMemory RTS_ENGINE_GLOBAL_REF(TotalPageMemory)
+#define AvailablePageMemory RTS_ENGINE_GLOBAL_REF(AvailablePageMemory)
+#define TotalVirtualMemory RTS_ENGINE_GLOBAL_REF(TotalVirtualMemory)
+#define AvailableVirtualMemory RTS_ENGINE_GLOBAL_REF(AvailableVirtualMemory)
+#define OSVersionNumberMajor RTS_ENGINE_GLOBAL_REF(OSVersionNumberMajor)
+#define OSVersionNumberMinor RTS_ENGINE_GLOBAL_REF(OSVersionNumberMinor)
+#define OSVersionBuildNumber RTS_ENGINE_GLOBAL_REF(OSVersionBuildNumber)
+#define OSVersionPlatformId RTS_ENGINE_GLOBAL_REF(OSVersionPlatformId)
+#define OSVersionExtraInfo RTS_ENGINE_GLOBAL_REF(OSVersionExtraInfo)
+#define HasCPUIDInstruction RTS_ENGINE_GLOBAL_REF(HasCPUIDInstruction)
+#define HasRDTSCInstruction RTS_ENGINE_GLOBAL_REF(HasRDTSCInstruction)
+#define HasSSESupport RTS_ENGINE_GLOBAL_REF(HasSSESupport)
+#define HasSSE2Support RTS_ENGINE_GLOBAL_REF(HasSSE2Support)
+#define HasCMOVSupport RTS_ENGINE_GLOBAL_REF(HasCMOVSupport)
+#define HasMMXSupport RTS_ENGINE_GLOBAL_REF(HasMMXSupport)
+#define Has3DNowSupport RTS_ENGINE_GLOBAL_REF(Has3DNowSupport)
+#define HasExtended3DNowSupport RTS_ENGINE_GLOBAL_REF(HasExtended3DNowSupport)
+#define VendorID RTS_ENGINE_GLOBAL_REF(VendorID)
+#define ProcessorString RTS_ENGINE_GLOBAL_REF(ProcessorString)
+#endif
+
 class CPUDetectClass
 {
 public:
@@ -237,6 +339,23 @@ private:
 
 	friend class CPUDetectInitClass;
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @refactor cemlyn007 14/10/2026 What CPUDetectClass detects is per engine: each engine detects it on its
+	// first use, into a per-engine static (docs/EMBEDDING.md). Each upstream name stands for its field, through its
+	// accessor (`ProcessorSpeed` is `ProcessorSpeed_rtsEngineGlobal()`, which detects first).
+	struct DetectedState
+	{
+#define RTS_CPU_DETECT_FIELD(Type, name) ::std::type_identity_t<Type> m_##name{};
+		RTS_CPU_DETECT_FIELDS(RTS_CPU_DETECT_FIELD)
+#undef RTS_CPU_DETECT_FIELD
+	};
+	static DetectedState& Detected();
+	static void Detect();
+#define RTS_CPU_DETECT_ACCESSOR(Type, name) \
+	static ::std::type_identity_t<Type>& name##_rtsEngineGlobal() { return Detected().m_##name; }
+	RTS_CPU_DETECT_FIELDS(RTS_CPU_DETECT_ACCESSOR)
+#undef RTS_CPU_DETECT_ACCESSOR
+#else
 	static StringClass ProcessorLog;
 	static StringClass CompactLog;
 
@@ -299,6 +418,7 @@ private:
 	static bool HasExtended3DNowSupport;
 	static char VendorID[20];
 	static char ProcessorString[48];
+#endif
 
 };
 
@@ -317,3 +437,6 @@ struct CPUIDStruct
 		CPUDetectClass::CPUID(Eax,Ebx,Ecx,Edx,cpuid_type);
 	}
 };
+#if RTS_ENGINE_CONTEXT
+#undef CompactLog
+#endif

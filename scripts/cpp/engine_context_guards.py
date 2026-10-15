@@ -47,16 +47,9 @@ GUARD_CLOSE = "#endif"
 # check fails on any `extern ... TheXxx;` that is neither in EngineSingletons.inl nor here.
 PROCESS_GLOBAL = {
     # Process-wide by design (PLAN-023 Phase 1).
-    "TheAsciiStringCriticalSection": "critical section, process-wide lock",
-    "TheUnicodeStringCriticalSection": "critical section, process-wide lock",
-    "TheDmaCriticalSection": "critical section, process-wide lock",
-    "TheMemoryPoolCriticalSection": "critical section, process-wide lock",
-    "TheDebugLogCriticalSection": "critical section, process-wide lock",
     "TheCritSecPerfGather": "critical-section profiling, process-wide",
     "TheMemoryPoolFactory": "memory manager, process-wide",
     "TheDynamicMemoryAllocator": "memory manager, process-wide",
-    "TheNameKeyGenerator": "shared immortal NameKey generator (PLAN-023 Decision 2)",
-    "TheVersion": "build version, identical for every engine",
     "TheSystemIsUnicode": "process-global const",
     # Debug-only globals.
     "TheCurrentIgnoreCrashPtr": "debug",

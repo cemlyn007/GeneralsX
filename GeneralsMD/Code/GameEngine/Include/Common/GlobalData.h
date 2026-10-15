@@ -643,12 +643,13 @@ private:
 	// writes, so the upstream code that uses m_theOriginal is unchanged. A process-wide one would outlive
 	// its engine: an engine whose init failed (and is leaked, never torn down) would leave it pointing at
 	// its instance, and the next engine's GlobalData::reset would never return.
+	// GeneralsX @refactor cemlyn007 14/10/2026 constexpr: the stand-in holds nothing, so it takes no writable storage.
 	struct OriginalInContext
 	{
 		operator GlobalData*() const;
-		OriginalInContext& operator=(GlobalData* original);
+		const OriginalInContext& operator=(GlobalData* original) const;
 	};
-	static OriginalInContext m_theOriginal;	///< the original global data instance (no overrides)
+	static constexpr OriginalInContext m_theOriginal{};	///< the original global data instance (no overrides)
 #else
 	static GlobalData *m_theOriginal;		///< the original global data instance (no overrides)
 #endif
