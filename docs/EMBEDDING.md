@@ -143,3 +143,25 @@ services:
 - the asset root and the user data root;
 - the render mode (`rts::RenderMode`) and the audio mode (`rts::AudioMode`);
 - the host's implementation of each interface above.
+
+## What may stay process-wide
+
+Only compile-time constants may stay process-wide: the constant tables,
+strings, masks and colours, the default render states, the empty strings and
+the no-engine context (above). They lie in read-only storage, so no engine can
+write them, and every engine reads the same values.
+
+Writable storage outside every context holds only:
+
+- the current-context pointer, `rts::t_engine`, one per thread;
+- third-party libraries' own state, which GeneralsX does not write: gli's
+  lookup tables, stb_image_write's settings and tables, and libstdc++'s wait
+  pool for `std::atomic::wait`.
+
+Nothing else is shared between engines, and nothing initialises once per
+process. A host can check this on the built library: every symbol in writable
+static storage (`.data`, `.bss`, `.tdata`, `.tbss`) must be one of those
+above. Until the host's services take over the memory manager, the working
+directory, thread creation, the crash paths, the audio loader and the D3D8
+device's last release, the state those mechanisms still hold is the one
+exception, and the host's check names each piece.
