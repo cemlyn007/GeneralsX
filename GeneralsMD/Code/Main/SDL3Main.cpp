@@ -228,6 +228,11 @@ GameEngine *CreateGameEngine(void)
 }
 
 #if RTS_ENGINE_CONTEXT
+#include "Common/EmbeddingContract.h"
+#include "ExecutableEmbedding.h"
+#endif
+
+#if RTS_ENGINE_CONTEXT
 // GeneralsX @bugfix cemlyn007 28/09/2026 The process-default engine context main() runs its engine in
 // (PLAN-023 Phase 1). It is destroyed only once the engine has been shut down (GameMain returned):
 // on an early return or an exception out of GameMain the engine's singletons are still set, and
@@ -237,7 +242,8 @@ namespace
 {
 struct ProcessEngineContext
 {
-	rts::EngineContext* context = new rts::EngineContext;
+	// GeneralsX @feature cemlyn007 15/10/2026 The engine is embedded in the executable (ExecutableEmbedding.h)
+	rts::EngineContext* context = new rts::EngineContext(rts::makeExecutableEmbedding());
 	bool engineShutDown = false;
 
 	ProcessEngineContext() = default;

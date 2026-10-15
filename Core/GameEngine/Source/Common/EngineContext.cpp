@@ -256,6 +256,18 @@ EngineContext::EngineContext(EmbeddingConfig embedding) : m_embedding(new Embedd
 {
 }
 
+const EmbeddingConfig& currentEmbedding(const char* service)
+{
+	const EmbeddingConfig* const embedding = ctx()->embedding();
+	if (embedding == nullptr)
+	{
+		const std::string reason = std::string(service) + " is used with no embedded engine current";
+		DEBUG_CRASH(("%s", reason.c_str()));
+		throw std::logic_error(reason);
+	}
+	return *embedding;
+}
+
 EngineStatics& EngineContext::statics()
 {
 	EngineStatics* existing = m_statics.load(std::memory_order_acquire);
