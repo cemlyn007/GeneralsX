@@ -47,6 +47,15 @@
 #include "GameClient/MapUtil.h"
 #include "GameLogic/GameLogic.h"
 #include "GameNetwork/GameInfo.h"
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 15/10/2026 Its map files are opened and closed through the engine's file layer (Common/EngineFiles.h)
+#include "Common/EngineFiles.h"
+#define GAMESTATEMAP_OPEN(name, mode) rts::openEngineFile(name, mode)
+#define GAMESTATEMAP_CLOSE(file) rts::closeEngineFile(file)
+#else
+#define GAMESTATEMAP_OPEN(name, mode) fopen(name, mode)
+#define GAMESTATEMAP_CLOSE(file) fclose(file)
+#endif
 
 // GLOBALS ////////////////////////////////////////////////////////////////////////////////////////
 #if !RTS_ENGINE_CONTEXT
@@ -148,7 +157,7 @@ static void embedPristineMap( AsciiString map, Xfer *xfer )
 // ------------------------------------------------------------------------------------------------
 static void embedInUseMap( AsciiString map, Xfer *xfer )
 {
-	FILE *fp = fopen( map.str(), "rb" );
+	FILE *fp = GAMESTATEMAP_OPEN( map.str(), "rb" );
 
 	// sanity
 	if( fp == nullptr )
@@ -205,13 +214,13 @@ static void embedInUseMap( AsciiString map, Xfer *xfer )
 	{
 
 		delete [] buffer;
-		fclose( fp );
+		GAMESTATEMAP_CLOSE( fp );
 		throw;
 
 	}
 
 	// close the file
-	fclose( fp );
+	GAMESTATEMAP_CLOSE( fp );
 
 	// delete buffer
 	delete [] buffer;
@@ -226,7 +235,7 @@ static void extractAndSaveMap( AsciiString mapToSave, Xfer *xfer )
 	UnsignedInt dataSize;
 
 	// open handle to output file
-	FILE *fp = fopen( mapToSave.str(), "w+b" );
+	FILE *fp = GAMESTATEMAP_OPEN( mapToSave.str(), "w+b" );
 	if( fp == nullptr )
 	{
 
@@ -282,13 +291,13 @@ static void extractAndSaveMap( AsciiString mapToSave, Xfer *xfer )
 	{
 
 		delete [] buffer;
-		fclose( fp );
+		GAMESTATEMAP_CLOSE( fp );
 		throw;
 
 	}
 
 	// close the new file
-	fclose( fp );
+	GAMESTATEMAP_CLOSE( fp );
 
 	// end of data block
 	xfer->endBlock();

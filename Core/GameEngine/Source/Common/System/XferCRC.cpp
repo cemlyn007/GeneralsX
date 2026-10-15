@@ -35,6 +35,10 @@
 #include "Common/crc.h"
 #include "Common/Snapshot.h"
 #include "Utility/endian_compat.h"
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 15/10/2026 Its file is opened and closed through the engine's file layer (Common/EngineFiles.h)
+#include "Common/EngineFiles.h"
+#endif
 
 #if DEEP_CRC_TO_MEMORY
 #include "GameLogic/GameLogic.h"
@@ -251,7 +255,11 @@ void XferDeepCRC::open( AsciiString identifier )
 	m_bufferIndex += length;
 #else
 	// open the file
+#if RTS_ENGINE_CONTEXT
+	m_fileFP = rts::openEngineFile( identifier.str(), "w+b" );
+#else
 	m_fileFP = fopen( identifier.str(), "w+b" );
+#endif
 	if( m_fileFP == nullptr )
 	{
 
@@ -297,7 +305,11 @@ void XferDeepCRC::close()
 	}
 
 	// close the file
+#if RTS_ENGINE_CONTEXT
+	rts::closeEngineFile( m_fileFP );
+#else
 	fclose( m_fileFP );
+#endif
 	m_fileFP = nullptr;
 #endif
 

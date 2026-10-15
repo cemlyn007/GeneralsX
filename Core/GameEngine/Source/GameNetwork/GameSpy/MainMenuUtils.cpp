@@ -56,6 +56,8 @@
 #include "WWDownload/urlBuilder.h"
 #if RTS_ENGINE_CONTEXT
 #include "Common/EngineThread.h" // GeneralsX @feature cemlyn007 15/10/2026 rts::startEngineThread
+// GeneralsX @feature cemlyn007 15/10/2026 Its files are opened and closed through the engine's file layer (Common/EngineFiles.h)
+#include "Common/EngineFiles.h"
 #endif
 
 
@@ -215,6 +217,11 @@ static void noPatchBeforeOnlineCallback()
 
 static Bool hasWriteAccess()
 {
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 15/10/2026 The probe asked whether the game directory, the working directory upstream, can be
+	// written for a patch. With RTS_ENGINE_CONTEXT that is the engine's asset root, which is read-only (Common/EngineFiles.h).
+	return false;
+#else
 	const char* filename = "PatchAccessTest.txt";
 
 	remove(filename);
@@ -240,6 +247,7 @@ static Bool hasWriteAccess()
 	}
 
 	return true;
+#endif
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -449,11 +457,19 @@ static GHTTPBool configCallback( GHTTPRequest request, GHTTPResult result,
 
 	AsciiString fname;
 	fname.format("%sGeneralsOnline/Config.txt", TheGlobalData->getPath_UserData().str());
+#if RTS_ENGINE_CONTEXT
+	FILE *fp = rts::openEngineFile(fname.str(), "wb");
+#else
 	FILE *fp = fopen(fname.str(), "wb");
+#endif
 	if (fp)
 	{
 		fwrite(configBuffer, bufferLen, 1, fp);
+#if RTS_ENGINE_CONTEXT
+		rts::closeEngineFile(fp);
+#else
 		fclose(fp);
+#endif
 	}
 
 	--checksLeftBeforeOnline;
@@ -504,12 +520,20 @@ static GHTTPBool configHeadCallback( GHTTPRequest request, GHTTPResult result,
 				Int fileLen = 0;
 				AsciiString fname;
 				fname.format("%sGeneralsOnline/Config.txt", TheGlobalData->getPath_UserData().str());
+#if RTS_ENGINE_CONTEXT
+				FILE *fp = rts::openEngineFile(fname.str(), "rb");
+#else
 				FILE *fp = fopen(fname.str(), "rb");
+#endif
 				if (fp)
 				{
 					fseek(fp, 0, SEEK_END);
 					fileLen = ftell(fp);
+#if RTS_ENGINE_CONTEXT
+					rts::closeEngineFile(fp);
+#else
 					fclose(fp);
+#endif
 				}
 
 				if (serverLen == fileLen)
@@ -528,13 +552,21 @@ static GHTTPBool configHeadCallback( GHTTPRequest request, GHTTPResult result,
 
 					AsciiString fname;
 					fname.format("%sGeneralsOnline/Config.txt", TheGlobalData->getPath_UserData().str());
+#if RTS_ENGINE_CONTEXT
+					FILE *fp = rts::openEngineFile(fname.str(), "rb");
+#else
 					FILE *fp = fopen(fname.str(), "rb");
+#endif
 					if (fp)
 					{
 						configBuffer = NEW char[fileLen];
 						fread(configBuffer, fileLen, 1, fp);
 						configBuffer[fileLen-1] = 0;
+#if RTS_ENGINE_CONTEXT
+						rts::closeEngineFile(fp);
+#else
 						fclose(fp);
+#endif
 
 						DEBUG_LOG(("Got Config before going online"));
 

@@ -62,6 +62,15 @@
 #include "GameClient/MapUtil.h"
 #include "GameNetwork/networkutil.h"
 #include "GameNetwork/LANAPICallbacks.h"
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 15/10/2026 Its stats files are written in the engine's user data root, through the engine's file layer (Common/EngineFiles.h)
+#include "Common/EngineFiles.h"
+#define STATS_OPEN(name, mode) rts::openEngineFile(name, mode)
+#define STATS_CLOSE(file) rts::closeEngineFile(file)
+#else
+#define STATS_OPEN(name, mode) fopen(name, mode)
+#define STATS_CLOSE(file) fclose(file)
+#endif
 //-----------------------------------------------------------------------------
 // DEFINES ////////////////////////////////////////////////////////////////////
 //-----------------------------------------------------------------------------
@@ -119,7 +128,15 @@ void StatsCollector::reset()
 		}
 	}
 #endif
+#if RTS_ENGINE_CONTEXT
+	{
+		AsciiString userStatsDir = TheGlobalData->getPath_UserData();
+		userStatsDir.concat(statsDir);
+		TheFileSystem->createDirectory(userStatsDir);
+	}
+#else
 	TheFileSystem->createDirectory(AsciiString(statsDir));
+#endif
 	createFileName();
 	writeInitialFileInfo();
 
@@ -219,7 +236,7 @@ void StatsCollector::incrementMoveCount()
 void StatsCollector::writeFileEnd()
 {
 	//open the file
-	FILE *f = fopen(m_statsFileName.str(), "a");
+	FILE *f = STATS_OPEN(m_statsFileName.str(), "a");
 	if(!f)
 	{
 		DEBUG_ASSERTCRASH(f, ("Unable to open file %s to write", m_statsFileName.str()));
@@ -261,7 +278,7 @@ void StatsCollector::writeFileEnd()
 	}
 #endif
 
-	fclose(f);
+	STATS_CLOSE(f);
 
 }
 
@@ -354,7 +371,11 @@ void StatsCollector::createFileName()
 	else
 #endif
 	{
+#if RTS_ENGINE_CONTEXT
+		m_statsFileName.format("%s%s%s%s.txt",TheGlobalData->getPath_UserData().str(), statsDir, name.str(),datestr);
+#else
 		m_statsFileName.format("%s%s%s.txt",statsDir, name.str(),datestr);
+#endif
 	}
 }
 
@@ -363,7 +384,7 @@ void StatsCollector::createFileName()
 void StatsCollector::writeInitialFileInfo()
 {
 	//open the file
-	FILE *f = fopen(m_statsFileName.str(), "w");
+	FILE *f = STATS_OPEN(m_statsFileName.str(), "w");
 	if(!f)
 	{
 		DEBUG_ASSERTCRASH(f, ("Unable to open file %s to write", m_statsFileName.str()));
@@ -393,7 +414,7 @@ void StatsCollector::writeInitialFileInfo()
 					m_playerUnits, m_AIUnits );
 	// initial stats
 	// we don't want a file pointer open for seconds on end... we'll open it each time.
-	fclose(f);
+	STATS_CLOSE(f);
 }
 
 // Write out the stats
@@ -401,7 +422,7 @@ void StatsCollector::writeInitialFileInfo()
 void StatsCollector::writeStatInfo()
 {
 	//open the file
-	FILE *f = fopen(m_statsFileName.str(), "a");
+	FILE *f = STATS_OPEN(m_statsFileName.str(), "a");
 	if(!f)
 	{
 		DEBUG_ASSERTCRASH(f, ("Unable to open file %s to write", m_statsFileName.str()));
@@ -414,6 +435,6 @@ void StatsCollector::writeStatInfo()
 					m_playerUnits, m_AIUnits  );
 
 
-	fclose(f);
+	STATS_CLOSE(f);
 
 }

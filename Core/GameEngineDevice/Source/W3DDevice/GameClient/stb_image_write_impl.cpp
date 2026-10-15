@@ -16,6 +16,11 @@
 **	along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 15/10/2026 No writer that opens its own file: screenshots are written through callbacks into a
+// file opened by the engine's file layer (W3DScreenshot.cpp, Common/EngineFiles.h).
+#define STBI_WRITE_NO_STDIO
+#endif
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include <stb_image_write.h>
 
