@@ -341,8 +341,13 @@ void WWDebug_Assert_Fail(const char * expr,const char * file, int line)
       int code = MessageBoxA(nullptr, assertbuf, "WWDebug_Assert_Fail", MB_ABORTRETRYIGNORE|MB_ICONHAND|MB_SETFOREGROUND|MB_TASKMODAL);
 
       if (code == IDABORT) {
+#if RTS_ENGINE_CONTEXT
+			// GeneralsX @feature cemlyn007 15/10/2026 Abort is the assertion crash, which ends in the FaultSink
+			AssertionCrash(assertbuf);
+#else
       	raise(SIGABRT);
       	_exit(3);
+#endif
       }
 
 		if (code == IDRETRY) {

@@ -438,8 +438,11 @@ Int parseHeadless(char *args[], int num)
 	// mode so that ignoringAsserts() works correctly throughout the entire process lifetime,
 	// including during shutdown after TheGlobalData has been destroyed.
 	// GeneralsX @feature cemlyn007 28/09/2026 Atomic (see dx8wrapper.cpp; PLAN-023 Phase 5b).
+	// GeneralsX @refactor cemlyn007 15/10/2026 With RTS_ENGINE_CONTEXT there is no such switch (see dx8wrapper.cpp).
+#if !RTS_ENGINE_CONTEXT
 	extern std::atomic<bool> DX8Wrapper_IsWindowed;
 	DX8Wrapper_IsWindowed = false;
+#endif
 
 	return 1;
 }

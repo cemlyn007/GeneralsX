@@ -60,6 +60,7 @@
 #include "WWMath/plane.h"
 #include "WWMath/tri.h"
 #include "Common/FatalEngineError.h"
+#include "Common/EngineFault.h"
 
 
 // GLOBALS ////////////////////////////////////////////////////////////////////////////////////////
@@ -1255,9 +1256,16 @@ Bool TerrainLogic::loadMap( AsciiString filename, Bool query )
 			}
 		}
 		theInputStream.close();
-	} catch (const FatalEngineError&) { // GeneralsX @bugfix cemlyn007 28/09/2026 Let an embedded-mode fatal error reach the host.
+	}
+#if !RTS_ENGINE_CONTEXT
+	catch (const FatalEngineError&) { // GeneralsX @bugfix cemlyn007 28/09/2026 Let an embedded-mode fatal error reach the host.
 		throw;
-	} catch (...) {
+	}
+#endif
+	catch (...) {
+#if RTS_ENGINE_CONTEXT
+		rts::rethrowIfFaultRaised(); // GeneralsX @refactor cemlyn007 15/10/2026 The sink's unwind leaves with its own reason (Common/EngineFault.h)
+#endif
 		// Eat the error - legacy files are not valid chunk format (and don't have waypoint info.)
 		DEBUG_LOG(("Unable to read waypoint info."));
 	}

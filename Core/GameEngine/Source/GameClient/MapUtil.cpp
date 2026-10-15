@@ -75,6 +75,7 @@ static std::set<std::string> s_failedMapLookups;
 #include "GameNetwork/GameInfo.h"
 #include "GameNetwork/NetworkDefs.h"
 #include "Common/FatalEngineError.h"
+#include "Common/EngineFault.h"
 #if RTS_ENGINE_CONTEXT
 // GeneralsX @feature cemlyn007 15/10/2026 Its map cache files are opened and closed through the engine's file layer (Common/EngineFiles.h)
 #include "Common/EngineFiles.h"
@@ -1439,13 +1440,18 @@ Image *getMapPreviewImage( AsciiString mapName )
 			copyFromBigToDir(tgaName, mapPreviewDir);
 			success = true;
 		}
+#if !RTS_ENGINE_CONTEXT
 		// GeneralsX @bugfix cemlyn007 28/09/2026 Let an embedded-mode fatal error reach the host.
 		catch (const FatalEngineError&)
 		{
 			throw;
 		}
+#endif
 		catch (...)
 		{
+#if RTS_ENGINE_CONTEXT
+			rts::rethrowIfFaultRaised(); // GeneralsX @refactor cemlyn007 15/10/2026 The sink's unwind leaves with its own reason (Common/EngineFault.h)
+#endif
 			success = false;	// no rethrow
 		}
 

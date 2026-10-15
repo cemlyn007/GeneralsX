@@ -67,6 +67,7 @@
 #include "GameLogic/TerrainLogic.h"
 #include "Lib/PathUtil.h"
 #include "Common/FatalEngineError.h"
+#include "Common/EngineFault.h"
 
 
 // PUBLIC DATA ////////////////////////////////////////////////////////////////////////////////////
@@ -595,9 +596,16 @@ SaveResult GameState::saveGame( AsciiString filename, UnicodeString desc,
 	XferSave xferSave;
 	try {
 		xferSave.open( filepath );
-	} catch (const FatalEngineError&) { // GeneralsX @bugfix cemlyn007 28/09/2026 Let an embedded-mode fatal error reach the host.
+	}
+#if !RTS_ENGINE_CONTEXT
+	catch (const FatalEngineError&) { // GeneralsX @bugfix cemlyn007 28/09/2026 Let an embedded-mode fatal error reach the host.
 		throw;
-	} catch(...) {
+	}
+#endif
+	catch(...) {
+#if RTS_ENGINE_CONTEXT
+		rts::rethrowIfFaultRaised(); // GeneralsX @refactor cemlyn007 15/10/2026 The sink's unwind leaves with its own reason (Common/EngineFault.h)
+#endif
 		DEBUG_LOG(( "Error opening file '%s'", filepath.str() ));
 		return SaveResult( SC_UNABLE_TO_OPEN_FILE, filename );
 	}
@@ -624,13 +632,18 @@ SaveResult GameState::saveGame( AsciiString filename, UnicodeString desc,
 		xferSaveData( &xferSave, which );
 
 	}
+#if !RTS_ENGINE_CONTEXT
 	// GeneralsX @bugfix cemlyn007 28/09/2026 Let an embedded-mode fatal error reach the host.
 	catch (const FatalEngineError&)
 	{
 		throw;
 	}
+#endif
 	catch( ... )
 	{
+#if RTS_ENGINE_CONTEXT
+		rts::rethrowIfFaultRaised(); // GeneralsX @refactor cemlyn007 15/10/2026 The sink's unwind leaves with its own reason (Common/EngineFault.h)
+#endif
 
 		// close the file and get out of here
 		xferSave.close();
@@ -666,6 +679,32 @@ SaveResult GameState::missionSave()
 	return saveGame( "", desc, SAVE_FILE_TYPE_MISSION );
 
 }
+
+#if RTS_ENGINE_CONTEXT
+// ------------------------------------------------------------------------------------------------
+/** GeneralsX @feature cemlyn007 15/10/2026 Inside a handler only: whether the exception being handled is one a save's
+	* readers throw on bad data, an xfer status or a save code. */
+// ------------------------------------------------------------------------------------------------
+static Bool caughtInvalidSaveData()
+{
+	try
+	{
+		throw;
+	}
+	catch (XferStatus)
+	{
+		return TRUE;
+	}
+	catch (SaveCode)
+	{
+		return TRUE;
+	}
+	catch (...)
+	{
+		return FALSE;
+	}
+}
+#endif
 
 // ------------------------------------------------------------------------------------------------
 /** Load the save game pointed to by filename */
@@ -721,20 +760,31 @@ SaveCode GameState::loadGame( AvailableGameInfo gameInfo )
 		// from one a later edit moved `catch (...)` ahead of. Gated on IsEngineEmbeddedMode(), not
 		// just the env var, so a retail or stock build (which never calls
 		// SetEngineEmbeddedMode(true)) can never reach this regardless of environment.
+		// GeneralsX @refactor cemlyn007 15/10/2026 With RTS_ENGINE_CONTEXT a host injects faults through its FaultSink.
+#if !RTS_ENGINE_CONTEXT
 		if (IsEngineEmbeddedMode() && std::getenv("GENERALSX_TEST_FAULT_IN_LOADGAME"))
 			RELEASE_CRASH("test fault inside GameState::loadGame (GENERALSX_TEST_FAULT_IN_LOADGAME)");
+#endif
 
 		// load file
 		xferSaveData( &xferLoad, SNAPSHOT_SAVELOAD );
 
 	}
+#if !RTS_ENGINE_CONTEXT
 	// GeneralsX @bugfix cemlyn007 28/09/2026 Let an embedded-mode fatal error reach the host.
 	catch (const FatalEngineError&)
 	{
 		throw;
 	}
+#endif
 	catch( ... )
 	{
+#if RTS_ENGINE_CONTEXT
+		// GeneralsX @feature cemlyn007 15/10/2026 The catch-all at the top of a load: what the save's readers throw on
+		// bad data is invalid data, and anything else a fault (Common/EngineFault.h).
+		if (!caughtInvalidSaveData())
+			rts::faultFromCaughtException("Uncaught Exception during GameState::loadGame");
+#endif
 		error = TRUE;
 	}
 
@@ -749,13 +799,21 @@ SaveCode GameState::loadGame( AvailableGameInfo gameInfo )
 		// do the post-process from a save game load
 		gameStatePostProcessLoad();
 	}
+#if !RTS_ENGINE_CONTEXT
 	// GeneralsX @bugfix cemlyn007 28/09/2026 Let an embedded-mode fatal error reach the host.
 	catch (const FatalEngineError&)
 	{
 		throw;
 	}
+#endif
 	catch (...)
 	{
+#if RTS_ENGINE_CONTEXT
+		// GeneralsX @feature cemlyn007 15/10/2026 The catch-all at the top of a load: what the save's readers throw on
+		// bad data is invalid data, and anything else a fault (Common/EngineFault.h).
+		if (!caughtInvalidSaveData())
+			rts::faultFromCaughtException("Uncaught Exception during GameState::loadGame");
+#endif
 		error = TRUE;
 	}
 
@@ -842,13 +900,18 @@ void GameState::loadQueuedSaveGame()
 	{
 		getSaveGameInfoFromFile( gameInfo.filename, &gameInfo.saveGameInfo );
 	}
+#if !RTS_ENGINE_CONTEXT
 	// GeneralsX @bugfix cemlyn007 28/09/2026 Let an embedded-mode fatal error reach the host.
 	catch (const FatalEngineError&)
 	{
 		throw;
 	}
+#endif
 	catch( ... )
 	{
+#if RTS_ENGINE_CONTEXT
+		rts::rethrowIfFaultRaised(); // GeneralsX @refactor cemlyn007 15/10/2026 The sink's unwind leaves with its own reason (Common/EngineFault.h)
+#endif
 		std::fprintf(stderr, "Save game '%s' could not be read\n", gameInfo.filename.str());
 		std::fflush(stderr);
 		showQueuedSaveGameLoadFailure();
@@ -1085,13 +1148,18 @@ Bool GameState::doesSaveGameExist( AsciiString filename )
 		xfer.open( filepath );
 
 	}
+#if !RTS_ENGINE_CONTEXT
 	// GeneralsX @bugfix cemlyn007 28/09/2026 Let an embedded-mode fatal error reach the host.
 	catch (const FatalEngineError&)
 	{
 		throw;
 	}
+#endif
 	catch( ... )
 	{
+#if RTS_ENGINE_CONTEXT
+		rts::rethrowIfFaultRaised(); // GeneralsX @refactor cemlyn007 15/10/2026 The sink's unwind leaves with its own reason (Common/EngineFault.h)
+#endif
 		// unable to open file, it must not be here
 		return FALSE;
 
@@ -1278,9 +1346,16 @@ static void addGameToAvailableList( AsciiString filename, void *userData )
 		}
 
 	}
-	} catch (const FatalEngineError&) { // GeneralsX @bugfix cemlyn007 28/09/2026 Let an embedded-mode fatal error reach the host.
+	}
+#if !RTS_ENGINE_CONTEXT
+	catch (const FatalEngineError&) { // GeneralsX @bugfix cemlyn007 28/09/2026 Let an embedded-mode fatal error reach the host.
 		throw;
-	} catch(...) {
+	}
+#endif
+	catch(...) {
+#if RTS_ENGINE_CONTEXT
+		rts::rethrowIfFaultRaised(); // GeneralsX @refactor cemlyn007 15/10/2026 The sink's unwind leaves with its own reason (Common/EngineFault.h)
+#endif
 		// ignore invalid save entries
 	}
 

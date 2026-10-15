@@ -39,6 +39,12 @@
 // The teardown flag is cleared only by the next GameEngine(): a host that boots again in the same
 // process (or context) must call SetEngineTearingDown(false) before its startup parse, or fatal
 // errors in that parse return as well.
+//
+// GeneralsX @refactor cemlyn007 15/10/2026 With RTS_ENGINE_CONTEXT none of the process-wide state below
+// exists: every crash path writes the crash report into the user data root of the context's
+// EmbeddingConfig and hands the reason to its FaultSink, whose latch replaces the embedded mode, the
+// sticky latch, the teardown flag and the Take* functions (Common/EngineFault.h, docs/EMBEDDING.md).
+// Only ReleaseCrashNoReturn stays.
 
 #pragma once
 
@@ -53,6 +59,7 @@
 #define FATAL_ENGINE_ERROR_API
 #endif
 
+#if !RTS_ENGINE_CONTEXT
 class FATAL_ENGINE_ERROR_API FatalEngineError : public std::runtime_error
 {
 public:
@@ -90,6 +97,7 @@ FATAL_ENGINE_ERROR_API bool TakeEngineFatalErrorRaised();
 //   teardown clears it first, SetEngineTearingDown(false), before anything that can raise a fatal error.
 FATAL_ENGINE_ERROR_API void SetEngineTearingDown(bool tearingDown);
 FATAL_ENGINE_ERROR_API bool IsEngineTearingDown();
+#endif
 
 // GeneralsX @bugfix cemlyn007 28/09/2026 A fatal error that never returns (PLAN-023 Phase 1). ReleaseCrash
 // returns when there is no TheGlobalData and it does not throw (not embedded, the teardown window, another
@@ -101,7 +109,13 @@ FATAL_ENGINE_ERROR_API bool IsEngineTearingDown();
 // Never call it from a destructor (or anything a destructor calls, an exit handler included): in
 // embedded mode it throws even where ReleaseCrash would not, and a throw out of a destructor ends the
 // process through std::terminate. Such callers keep ReleaseCrash, which returns there.
+//
+// GeneralsX @refactor cemlyn007 15/10/2026 With RTS_ENGINE_CONTEXT ReleaseCrash returns only in the teardown
+// window (Common/EngineFault.h); this one hands the fault to the FaultSink there too, so the sink's unwind
+// must not reach a destructor.
 [[noreturn]] FATAL_ENGINE_ERROR_API void ReleaseCrashNoReturn(const char *reason);
+
+#if !RTS_ENGINE_CONTEXT
 
 // GeneralsX @feature cemlyn007 02/10/2026 Sticky fault latch: fault delivery to the host otherwise
 // depends on every catch (...) between RELEASE_CRASH and the host having a
@@ -128,3 +142,4 @@ FATAL_ENGINE_ERROR_API bool IsEngineTearingDown();
 // process-wide one.
 FATAL_ENGINE_ERROR_API bool HasEngineFaulted();
 FATAL_ENGINE_ERROR_API void ClearEngineFault();
+#endif

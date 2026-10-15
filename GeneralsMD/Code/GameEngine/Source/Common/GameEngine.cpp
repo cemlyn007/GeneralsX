@@ -76,6 +76,7 @@
 #include "Common/XferCRC.h"
 #include "Common/GameLOD.h"
 #include "Common/FatalEngineError.h"
+#include "Common/EngineFault.h"	// GeneralsX @feature cemlyn007 15/10/2026 The catch-alls end in the FaultSink
 #include "Common/Registry.h"
 #include "Common/GameCommon.h"	// FOR THE ALLOW_DEBUG_CHEATS_IN_RELEASE #define
 #if RTS_ENGINE_CONTEXT
@@ -294,7 +295,11 @@ static void updateWindowTitle()
 GameEngine::GameEngine()
 {
 	// GeneralsX @bugfix cemlyn007 28/09/2026 A new engine is not being torn down (see FatalEngineError.h)
+	// GeneralsX @refactor cemlyn007 15/10/2026 With RTS_ENGINE_CONTEXT a new engine is a new context, whose teardown
+	// window is closed (Common/EngineFault.h).
+#if !RTS_ENGINE_CONTEXT
 	SetEngineTearingDown(false);
+#endif
 
 	// initialize to non garbage values
 	m_logicTimeAccumulator = 0.0f;
@@ -331,11 +336,27 @@ void GameEngine::setQuitting( Bool quitting )
 #endif
 
 //-------------------------------------------------------------------------------------------------
+// GeneralsX @feature cemlyn007 15/10/2026 With RTS_ENGINE_CONTEXT the teardown stops at the end of the step in which a
+// fault was raised (Common/EngineFault.h): none of a faulted engine's code runs after it.
+#if RTS_ENGINE_CONTEXT
+#define RTS_STOP_TEARDOWN_ON_FAULT() do { if (rts::faultRaised()) return; } while (0)
+#else
+#define RTS_STOP_TEARDOWN_ON_FAULT() ((void)0)
+#endif
+
 GameEngine::~GameEngine()
 {
 	// GeneralsX @bugfix cemlyn007 28/09/2026 From here on an embedded-mode fatal error does not
 	// throw (see FatalEngineError.h)
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 15/10/2026 The teardown window (Common/EngineFault.h), and the catch-all at the top
+	// of teardown, which makes a fault of an exception that a step lets out.
+	rts::beginEngineTeardown();
+	try
+	{
+#else
 	SetEngineTearingDown(true);
+#endif
 
 #if RTS_ENGINE_CONTEXT
 	// GeneralsX @feature cemlyn007 15/10/2026 The threads this engine started stop before the state they use is freed
@@ -348,11 +369,18 @@ GameEngine::~GameEngine()
 
 	delete TheMapCache;
 	TheMapCache = nullptr;
+	RTS_STOP_TEARDOWN_ON_FAULT();
 
 //	delete TheShell;
 //	TheShell = nullptr;
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @bugfix cemlyn007 15/10/2026 An engine whose start-up stopped partway (a refused game file, say) is
+	// still closed by its ordinary teardown, which skips what it never made.
+	if (TheGameResultsQueue != nullptr)
+#endif
 	TheGameResultsQueue->endThreads();
+	RTS_STOP_TEARDOWN_ON_FAULT();
 
 #ifdef SAGE_USE_NGMP
 #if RTS_ENGINE_CONTEXT
@@ -367,9 +395,17 @@ GameEngine::~GameEngine()
 
 	// TheSuperHackers @fix helmutbuhler 03/06/2025
 	// Reset all subsystems before deletion to prevent crashing due to cross dependencies.
+#if RTS_ENGINE_CONTEXT
+	if (TheGameLogic != nullptr && TheWindowManager != nullptr && TheSubsystemList != nullptr)
+#endif
 	reset();
+	RTS_STOP_TEARDOWN_ON_FAULT();
 
+#if RTS_ENGINE_CONTEXT
+	if (TheSubsystemList != nullptr)
+#endif
 	TheSubsystemList->shutdownAll();
+	RTS_STOP_TEARDOWN_ON_FAULT();
 	delete TheSubsystemList;
 	TheSubsystemList = nullptr;
 
@@ -399,23 +435,31 @@ GameEngine::~GameEngine()
 	}
 #endif
 
+	RTS_STOP_TEARDOWN_ON_FAULT();
+
 	delete TheNetwork;
 	TheNetwork = nullptr;
+	RTS_STOP_TEARDOWN_ON_FAULT();
 
 	delete TheCommandList;
 	TheCommandList = nullptr;
+	RTS_STOP_TEARDOWN_ON_FAULT();
 
 	// GeneralsX @refactor cemlyn007 14/10/2026 Each engine's own NameKey generator goes with it (docs/EMBEDDING.md)
 	delete TheNameKeyGenerator;
 	TheNameKeyGenerator = nullptr;
+	RTS_STOP_TEARDOWN_ON_FAULT();
 
 	delete TheFileSystem;
 	TheFileSystem = nullptr;
+	RTS_STOP_TEARDOWN_ON_FAULT();
 
 	delete TheGameLODManager;
 	TheGameLODManager = nullptr;
+	RTS_STOP_TEARDOWN_ON_FAULT();
 
 	Drawable::killStaticImages();
+	RTS_STOP_TEARDOWN_ON_FAULT();
 
 #if RTS_ENGINE_CONTEXT
 	// GeneralsX @feature cemlyn007 28/09/2026 The engine's PER_ENGINE_STATIC objects (map-parse scratch, the
@@ -424,6 +468,7 @@ GameEngine::~GameEngine()
 	// host may destroy after its last memory-manager reference is gone (PLAN-023 Phase 2).
 	// GeneralsX @refactor cemlyn007 14/10/2026 Every per-engine static (Common/EngineStatic.h), not only PerEngineStatic.
 	rts::ctx()->destroyStatics();
+	RTS_STOP_TEARDOWN_ON_FAULT();
 #endif
 
 // TheSuperHackers @build fighter19 11/02/2026 COM termination (Windows-only)
@@ -434,7 +479,16 @@ GameEngine::~GameEngine()
 #ifdef PERF_TIMERS
 	PerfGather::termPerfDump();
 #endif
+#if RTS_ENGINE_CONTEXT
+	}
+	catch (...)
+	{
+		rts::faultFromCaughtException("Uncaught Exception during teardown");
+	}
+#endif
 }
+
+#undef RTS_STOP_TEARDOWN_ON_FAULT
 
 //-------------------------------------------------------------------------------------------------
 Bool GameEngine::isTimeFrozen()
@@ -480,12 +534,6 @@ Bool GameEngine::isGameHalted()
  */
 void GameEngine::init()
 {
-#if RTS_ENGINE_CONTEXT
-	// GeneralsX @bugfix cemlyn007 28/09/2026 Whether the try block below ran to its end: the catch
-	// (ErrorCode) below swallows every code but ERROR_INVALID_D3D, and an embedded engine that stopped
-	// partway must fail rather than carry on
-	Bool initBodyCompleted = FALSE;
-#endif
 	try {
 		//create an INI object to use for loading stuff
 		INI ini;
@@ -499,8 +547,11 @@ void GameEngine::init()
 		// environment. Checked once per init() call, not cached, since it is an uncached getenv
 		// like any other and init() itself may run more than once per process (rlgenerals'
 		// the multi-engine consumers call create/destroy/create in one process).
+		// GeneralsX @refactor cemlyn007 15/10/2026 With RTS_ENGINE_CONTEXT a host injects faults through its FaultSink.
+#if !RTS_ENGINE_CONTEXT
 		if (IsEngineEmbeddedMode() && std::getenv("GENERALSX_TEST_FAULT_IN_INIT"))
 			RELEASE_CRASH("test fault inside GameEngine::init (GENERALSX_TEST_FAULT_IN_INIT)");
+#endif
 
 #ifdef DEBUG_LOGGING
 		if (TheVersion)
@@ -1005,11 +1056,24 @@ void GameEngine::init()
 				TheWritableGlobalData->m_shellMapOn = FALSE;
 			}
 		}
-
-#if RTS_ENGINE_CONTEXT
-		initBodyCompleted = TRUE;
-#endif
 	}
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 15/10/2026 The catch-all at the top of start-up: every error code and uncaught
+	// exception is a fault (Common/EngineFault.h), where upstream carried on after every code but ERROR_INVALID_D3D.
+	// An engine that stopped partway therefore never carries on.
+	catch (ErrorCode ec)
+	{
+		if (ec == ERROR_INVALID_D3D)
+		{
+			RELEASE_CRASHLOCALIZED("ERROR:D3DFailurePrompt", "ERROR:D3DFailureMessage");
+		}
+		rts::faultFromCaughtException("Uncaught Exception during initialization.");
+	}
+	catch (...)
+	{
+		rts::faultFromCaughtException("Uncaught Exception during initialization.");
+	}
+#else
 	catch (ErrorCode ec)
 	{
 		if (ec == ERROR_INVALID_D3D)
@@ -1035,17 +1099,6 @@ void GameEngine::init()
 	{
 		RELEASE_CRASH(("Uncaught Exception during initialization."));
 	}
-
-#if RTS_ENGINE_CONTEXT
-	// GeneralsX @bugfix cemlyn007 28/09/2026 The try block stopped partway and a catch above returned (the
-	// ErrorCode one swallows every code but ERROR_INVALID_D3D; RELEASE_CRASH returns with no TheGlobalData).
-	// Upstream carries on with a partly initialised engine; with several engines in a process that must be
-	// a clear failure instead.
-	// GeneralsX @bugfix cemlyn007 28/09/2026 Embedded hosts only: the game executable (one engine, not
-	// embedded) keeps upstream's behaviour and carries on, its latch left incomplete (it boots no other
-	// engine, so the poisoned process state is never consulted).
-	if (!initBodyCompleted && IsEngineEmbeddedMode())
-		ReleaseCrashNoReturn("GameEngine::init stopped partway (an error its catch blocks swallowed)");
 #endif
 
 	resetSubsystems();
@@ -1222,8 +1275,10 @@ void GameEngine::update()
 // Horrible reference, but we really, really need to know if we are windowed.
 // GeneralsX @feature cemlyn007 28/09/2026 Atomic: every headless engine's command line writes it and any engine's
 // assert path reads it, so engines on separate threads would race on a plain bool (PLAN-023 Phase 5b).
+#if !RTS_ENGINE_CONTEXT
 #include <atomic>
 extern std::atomic<bool> DX8Wrapper_IsWindowed;
+#endif
 
 /** -----------------------------------------------------------------------------------------------
  * The "main loop" of the game engine. It will not return until the game exits.
@@ -1269,39 +1324,8 @@ void GameEngine::execute()
 			}
 #endif
 
-			{
-				try
-				{
-					// compute a frame
-					update();
-				}
-				catch (INIException e)
-				{
-					// Release CRASH doesn't return, so don't worry about executing additional code.
-					if (e.mFailureMessage)
-						RELEASE_CRASH((e.mFailureMessage));
-					else
-						RELEASE_CRASH(("Uncaught Exception in GameEngine::update"));
-				}
-				// GeneralsX @bugfix cemlyn007 28/09/2026 Let an embedded-mode fatal error reach the host.
-				catch (const FatalEngineError&)
-				{
-					throw;
-				}
-				catch (...)
-				{
-					// try to save info off
-					try
-					{
-						if (TheRecorder && TheRecorder->getMode() == RECORDERMODETYPE_RECORD && TheRecorder->isMultiplayer())
-							TheRecorder->cleanUpReplayFile();
-					}
-					catch (...)
-					{
-					}
-					RELEASE_CRASH(("Uncaught Exception in GameEngine::update"));
-				}
-			}
+			// GeneralsX @refactor cemlyn007 15/10/2026 One frame and its catch-all, which a host runs frames through too
+			guardedUpdate();
 
 			// TheFramePacer->update() sleeps here to hold the render FPS cap (RenderFpsPreset /
 			// GlobalData::m_framesPerSecondLimit). Because input is serviced once per iteration of
@@ -1325,6 +1349,57 @@ void GameEngine::execute()
 		}
 #endif
 
+	}
+}
+
+/** -----------------------------------------------------------------------------------------------
+ * GeneralsX @refactor cemlyn007 15/10/2026 One frame as execute() runs it: update() inside the catch-all at the top
+ * of a frame. With RTS_ENGINE_CONTEXT an uncaught exception there is a fault (Common/EngineFault.h).
+ */
+void GameEngine::guardedUpdate()
+{
+	try
+	{
+		// compute a frame
+		update();
+	}
+#if !RTS_ENGINE_CONTEXT
+	catch (INIException e)
+	{
+		// Release CRASH doesn't return, so don't worry about executing additional code.
+		if (e.mFailureMessage)
+			RELEASE_CRASH((e.mFailureMessage));
+		else
+			RELEASE_CRASH(("Uncaught Exception in GameEngine::update"));
+	}
+	// GeneralsX @bugfix cemlyn007 28/09/2026 Let an embedded-mode fatal error reach the host.
+	catch (const FatalEngineError&)
+	{
+		throw;
+	}
+#endif
+	catch (...)
+	{
+#if RTS_ENGINE_CONTEXT
+		rts::rethrowIfFaultRaised();
+#endif
+		// try to save info off
+		try
+		{
+			if (TheRecorder && TheRecorder->getMode() == RECORDERMODETYPE_RECORD && TheRecorder->isMultiplayer())
+				TheRecorder->cleanUpReplayFile();
+		}
+		catch (...)
+		{
+#if RTS_ENGINE_CONTEXT
+			rts::rethrowIfFaultRaised();
+#endif
+		}
+#if RTS_ENGINE_CONTEXT
+		rts::faultFromCaughtException("Uncaught Exception in GameEngine::update");
+#else
+		RELEASE_CRASH(("Uncaught Exception in GameEngine::update"));
+#endif
 	}
 }
 

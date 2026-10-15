@@ -64,6 +64,8 @@ public:
 	virtual void reset() override;								///< reset system to starting state
 	virtual void update() override;							///< per frame update
 
+	// GeneralsX @refactor cemlyn007 15/10/2026 One frame as execute() runs it, inside the catch-all at the top of a frame
+	void guardedUpdate();
 	virtual void execute();											/**< The "main loop" of the game engine.
 																								 It will not return until the game exits. */
 
