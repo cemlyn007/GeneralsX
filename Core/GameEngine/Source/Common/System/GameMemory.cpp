@@ -517,8 +517,10 @@ public:
 // PUBLIC DATA
 // ----------------------------------------------------------------------------
 
+#if !RTS_ENGINE_CONTEXT
 MemoryPoolFactory *TheMemoryPoolFactory = nullptr;
 DynamicMemoryAllocator *TheDynamicMemoryAllocator = nullptr;
+#endif
 
 // ----------------------------------------------------------------------------
 // INLINES

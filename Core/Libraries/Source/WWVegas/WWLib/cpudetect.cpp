@@ -1148,8 +1148,15 @@ void CPUDetectClass::Init_Compact_Log()
    GetTimeZoneInformation(&time_zone);
    COMPACTLOG(("%d\t", time_zone.Bias));  // get diff between local time and UTC
 #elif defined(_UNIX)
+#if RTS_ENGINE_CONTEXT
+   // GeneralsX @bugfix cemlyn007 16/10/2026 localtime was called only to set `timezone`, but it also writes the C
+   // library's one process-wide result buffer, which engines starting on two threads at once would both write. tzset
+   // sets `timezone` alone.
+   tzset();
+#else
    time_t t = time(nullptr);
    localtime(&t);
+#endif
    COMPACTLOG(("%d\t", timezone));
 #endif
 

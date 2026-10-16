@@ -40,6 +40,17 @@
 
 #define DEFINE_PARTICLE_SYSTEM_NAMES
 #include "GameClient/ParticleSys.h"
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 15/10/2026 Its benchmark file is written in the engine's user data root, through the engine's file layer (Common/EngineFiles.h)
+#include "Common/EngineFiles.h"
+#define GAMELOD_OPEN(name, mode) rts::openEngineFile(name, mode)
+#define BENCHMARK_FILE_NAME (rts::engineUserDataRoot() / "Benchmark.txt").c_str()
+#define GAMELOD_CLOSE(file) rts::closeEngineFile(file)
+#else
+#define GAMELOD_OPEN(name, mode) fopen(name, mode)
+#define BENCHMARK_FILE_NAME "Benchmark.txt"
+#define GAMELOD_CLOSE(file) fclose(file)
+#endif
 
 
 #define PROFILE_ERROR_LIMIT	0.94f	//fraction of profiled result needed to get a match.  Allows some room for error/fluctuation.
@@ -351,11 +362,11 @@ void GameLODManager::init()
 
 			if (TheGlobalData->m_forceBenchmark)
 			{	//we want to see the numbers.  So dump them to a logfile.
-				FILE *fp=fopen("Benchmark.txt","w");
+				FILE *fp=GAMELOD_OPEN(BENCHMARK_FILE_NAME,"w");
 				if (fp)
 				{
 					fprintf(fp,"BenchProfile = %s %d %f %f %f", CPUNames[m_cpuType], m_cpuFreq, m_intBenchIndex, m_floatBenchIndex, m_memBenchIndex);
-					fclose(fp);
+					GAMELOD_CLOSE(fp);
 				}
 			}
 

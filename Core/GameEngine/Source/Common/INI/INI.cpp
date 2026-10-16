@@ -63,6 +63,11 @@
 // GeneralsX @bugfix cemlyn007 28/09/2026 strtok_r for the per-INI tokeniser (declared by WWLib where libc lacks it)
 #include "strtok_r.h"
 #include "Common/FatalEngineError.h"
+#include "Common/EngineFault.h"
+#if RTS_ENGINE_CONTEXT
+#include <string>
+#include "Common/InvalidInputData.h"
+#endif
 
 #if __cplusplus >= 201611L && !defined(__APPLE__)
 #define USE_STD_FROM_CHARS_PARSING 1
@@ -396,6 +401,49 @@ static INIFieldParseProc findFieldParse(const FieldParse* parseTable, const char
 	}
 }
 
+#if RTS_ENGINE_CONTEXT
+//-------------------------------------------------------------------------------------------------
+/** GeneralsX @feature cemlyn007 15/10/2026 Inside a handler only: throws an InvalidInputData naming `filename` for
+	* what the INI parser throws on bad data (an INIException, an INI error code or another error code but running
+	* out of memory), and returns for anything else, the sink's unwind included. */
+//-------------------------------------------------------------------------------------------------
+static void rethrowInvalidINIData( const AsciiString& filename, UnsignedInt lineNum )
+{
+	if (rts::faultRaised())
+		return;
+	std::string reason;
+	try
+	{
+		throw;
+	}
+	catch (const rts::InvalidInputData&)
+	{
+		return;
+	}
+	catch (const INIException& error)
+	{
+		reason = error.mFailureMessage != nullptr ? error.mFailureMessage : "invalid data";
+		while (!reason.empty() && (reason.back() == '\n' || reason.back() == '\r'))
+			reason.pop_back();
+	}
+	catch (ErrorCode code)
+	{
+		if (code == ERROR_OUT_OF_MEMORY)
+			return;
+		reason = "invalid data at line " + std::to_string(lineNum);
+	}
+	catch (decltype(INI_INVALID_DATA))
+	{
+		reason = "invalid data at line " + std::to_string(lineNum);
+	}
+	catch (...)
+	{
+		return;
+	}
+	throw rts::InvalidInputData(filename.str(), reason);
+}
+#endif
+
 //-------------------------------------------------------------------------------------------------
 /** Load and parse an INI file */
 //-------------------------------------------------------------------------------------------------
@@ -451,9 +499,16 @@ UnsignedInt INI::load( AsciiString filename, INILoadType loadType, Xfer *pXfer )
 					// GeneralsX @bugfix Copilot 20/09/2026 Preserve the innermost INI field diagnostic.
 					} catch (const INIException&) {
 						throw;
-					} catch (const FatalEngineError&) { // GeneralsX @bugfix cemlyn007 28/09/2026 Let an embedded-mode fatal error reach the host.
+					}
+#if !RTS_ENGINE_CONTEXT
+					catch (const FatalEngineError&) { // GeneralsX @bugfix cemlyn007 28/09/2026 Let an embedded-mode fatal error reach the host.
 						throw;
-					} catch (...) {
+					}
+#endif
+					catch (...) {
+#if RTS_ENGINE_CONTEXT
+						rts::rethrowIfFaultRaised(); // GeneralsX @refactor cemlyn007 15/10/2026 The sink's unwind leaves with its own reason (Common/EngineFault.h)
+#endif
 						DEBUG_CRASH(("Error parsing block '%s' in INI file '%s'", token, m_filename.str()) );
 						char buff[1024];
 						snprintf(buff, ARRAY_SIZE(buff), "Error parsing INI file '%s' (Line: '%s')\n",
@@ -469,7 +524,13 @@ UnsignedInt INI::load( AsciiString filename, INILoadType loadType, Xfer *pXfer )
 				{
 					DEBUG_CRASH( ("[LINE: %d - FILE: '%s'] Unknown block '%s'",
 														 getLineNum(), getFilename().str(), token ) );
+#if RTS_ENGINE_CONTEXT
+					// GeneralsX @feature cemlyn007 15/10/2026 Bad data in a game file is the host's input (Common/InvalidInputData.h)
+					throw rts::InvalidInputData(filename.str(),
+						"unknown block '" + std::string(token) + "' at line " + std::to_string(getLineNum()));
+#else
 					throw INI_UNKNOWN_TOKEN;
+#endif
 				}
 
 			}
@@ -482,8 +543,14 @@ UnsignedInt INI::load( AsciiString filename, INILoadType loadType, Xfer *pXfer )
 	{
 		fprintf(stderr, "[INI] ERROR in load('%s') - exception caught\n", filename.str());
 		fflush(stderr);
+		const UnsignedInt lineNum = getLineNum();
 		unPrepFile();
 
+#if RTS_ENGINE_CONTEXT
+		// GeneralsX @feature cemlyn007 15/10/2026 What the INI parser throws on bad data is the host's input, an
+		// InvalidInputData naming the file, not a fault (Common/InvalidInputData.h). Everything else propagates.
+		rethrowInvalidINIData(filename, lineNum);
+#endif
 		// propagate the exception.
 		throw;
 	}
@@ -1601,9 +1668,16 @@ void INI::initFromINIMulti( void *what, const MultiIniFieldParse& parseTableList
 						// GeneralsX @bugfix Copilot 20/09/2026 Do not replace nested field errors with an enclosing module.
 						} catch (const INIException&) {
 							throw;
-						} catch (const FatalEngineError&) { // GeneralsX @bugfix cemlyn007 28/09/2026 Let an embedded-mode fatal error reach the host.
+						}
+#if !RTS_ENGINE_CONTEXT
+						catch (const FatalEngineError&) { // GeneralsX @bugfix cemlyn007 28/09/2026 Let an embedded-mode fatal error reach the host.
 							throw;
-						} catch (...) {
+						}
+#endif
+						catch (...) {
+#if RTS_ENGINE_CONTEXT
+							rts::rethrowIfFaultRaised(); // GeneralsX @refactor cemlyn007 15/10/2026 The sink's unwind leaves with its own reason (Common/EngineFault.h)
+#endif
 							DEBUG_CRASH( ("[LINE: %d - FILE: '%s'] Error reading field '%s' of block '%s'",
 																 INI::getLineNum(), INI::getFilename().str(), field, m_curBlockStart) );
 

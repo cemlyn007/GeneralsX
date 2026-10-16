@@ -32,6 +32,10 @@
 #include "Common/XferSave.h"
 #include "Common/Snapshot.h"
 #include "Common/GameMemory.h"
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 15/10/2026 Its file is opened and closed through the engine's file layer (Common/EngineFiles.h)
+#include "Common/EngineFiles.h"
+#endif
 
 // PRIVATE TYPES //////////////////////////////////////////////////////////////////////////////////
 class XferBlockData : public MemoryPoolObject
@@ -120,7 +124,11 @@ void XferSave::open( AsciiString identifier )
 	Xfer::open( identifier );
 
 	// open the file
+#if RTS_ENGINE_CONTEXT
+	m_fileFP = rts::openEngineFile( identifier.str(), "w+b" );
+#else
 	m_fileFP = fopen( identifier.str(), "w+b" );
+#endif
 	if( m_fileFP == nullptr )
 	{
 
@@ -147,7 +155,11 @@ void XferSave::close()
 	}
 
 	// close the file
+#if RTS_ENGINE_CONTEXT
+	rts::closeEngineFile( m_fileFP );
+#else
 	fclose( m_fileFP );
+#endif
 	m_fileFP = nullptr;
 
 	// erase the filename

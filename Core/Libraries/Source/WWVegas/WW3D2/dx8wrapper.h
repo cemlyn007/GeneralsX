@@ -47,6 +47,8 @@
 // Use angle brackets (not quotes) to skip local d3d8.h stub and get DXVK headers
 // DXVK's d3d8.h includes d3d8types.h internally - no manual includes needed
 #include <d3d8.h>
+// GeneralsX @feature cemlyn007 16/10/2026 The layer's record of the COM objects it holds
+#include "dx8ledger.h"
 #include "WWMath/matrix4.h"
 #include "statistics.h"
 #include "WWLib/wwstring.h"
@@ -162,11 +164,16 @@ extern bool DX8Wrapper_HeadlessRender;
 extern int DX8Wrapper_PreserveFPU;
 #endif
 
-// GeneralsX @feature cemlyn007 30/09/2026 Called, when set, just before DX8Wrapper drops its last reference to a
-// render device (Release_Device) or to its Direct3D interface (Shutdown), with what it releases (PLAN-023 Phase 8,
-// stage RR1). An embedding host running several engines checks there that the release is serialised with its
-// other engines' device creation (rlgenerals asserts its process mutex is held). Set once, before any device.
-extern void (*DX8Wrapper_FinalReleaseHook)(const char* what);
+// GeneralsX @refactor cemlyn007 16/10/2026 DX8Wrapper_FinalReleaseHook, the host's process-wide check before the last
+// release of a render device or Direct3D interface, is gone: with RTS_ENGINE_CONTEXT both are recorded in the engine's
+// ResourceLedger (dx8ledger.h), which is where a host sees them acquired and released.
+
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 16/10/2026 For tests only: the current engine's stand-in for the D3D8 library's
+// Direct3DCreate8, which Init then calls instead of loading the library, so that a test can drive the device wrapper
+// (and its ledger records) on a fake device. Null restores the library.
+void DX8Wrapper_Install_Direct3DCreate8_For_Tests(IDirect3D8* (*create)(UINT sdkVersion));
+#endif
 
 void DX8_Assert();
 void Log_DX8_ErrorCode(unsigned res);
@@ -1043,9 +1050,10 @@ WWINLINE void DX8Wrapper::Set_DX8_Texture(unsigned int stage, IDirect3DBaseTextu
 
 	SNAPSHOT_SAY(("DX8 - SetTexture(%x) ",texture));
 
-	if (Textures[stage]) Textures[stage]->Release();
+	// GeneralsX @feature cemlyn007 16/10/2026 The reference each stage keeps is recorded (dx8ledger.h)
+	if (Textures[stage]) DX8_RELEASE(Textures[stage]);
 	Textures[stage] = texture;
-	if (Textures[stage]) Textures[stage]->AddRef();
+	if (Textures[stage]) DX8_ADD_REF(Textures[stage], TEXTURE);
 	DX8CALL(SetTexture(stage, texture));
 	DX8_RECORD_TEXTURE_CHANGE();
 }

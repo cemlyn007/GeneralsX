@@ -140,6 +140,9 @@ void W3DProfilerFrameCapture::Capture(UnsignedInt displayWidth, UnsignedInt disp
 		REF_PTR_RELEASE(renderTarget);
 		return;
 	}
+	// GeneralsX @feature cemlyn007 16/10/2026 Each reference made here is recorded while held, and released through the
+	// record, in the device-wrapper layer (WW3D2/dx8ledger.h).
+	DX8_RECORD(intermediateTexture, TEXTURE);
 
 	// draw backbuffer to intermediate texture
 	IDirect3DSurface8 *intermediateTextureSurface;
@@ -149,11 +152,12 @@ void W3DProfilerFrameCapture::Capture(UnsignedInt displayWidth, UnsignedInt disp
 		REF_PTR_RELEASE(backBuffer);
 		REF_PTR_RELEASE(surfaceClass);
 		REF_PTR_RELEASE(renderTarget);
-		intermediateTexture->Release();
+		DX8_RELEASE(intermediateTexture);
 		return;
 	}
+	DX8_RECORD(intermediateTextureSurface, SURFACE);
 	DX8Wrapper::_Copy_DX8_Rects(backBufferSurface, nullptr, 0, intermediateTextureSurface, nullptr);
-	intermediateTextureSurface->Release();
+	DX8_RELEASE(intermediateTextureSurface);
 	intermediateTextureSurface = nullptr;
 
 	// release the backbuffer
@@ -222,7 +226,7 @@ void W3DProfilerFrameCapture::Capture(UnsignedInt displayWidth, UnsignedInt disp
 		1,
 		surfaceClass->Peek_D3D_Surface(),
 		&dstPoint);
-	smallRenderTargetSurface->Release();
+	DX8_RELEASE(smallRenderTargetSurface);
 
 	// send pixels to the profiler backend
 	int pitch = 0;
@@ -246,7 +250,7 @@ void W3DProfilerFrameCapture::Capture(UnsignedInt displayWidth, UnsignedInt disp
 	}
 
 	// cleanup
-	intermediateTexture->Release();
+	DX8_RELEASE(intermediateTexture);
 	intermediateTexture = nullptr;
 	REF_PTR_RELEASE(surfaceClass);
 	REF_PTR_RELEASE(renderTarget);

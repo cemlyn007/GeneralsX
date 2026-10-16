@@ -68,7 +68,14 @@
 
 #include "Common/file.h"
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 15/10/2026 alcSetThreadContext and alcGetThreadContext (ALC_EXT_thread_local_context).
+#define AL_ALEXT_PROTOTYPES
+#endif
 #include <AL/alext.h>
+#if RTS_ENGINE_CONTEXT
+#include <stdexcept>
+#endif
 
 extern "C" {
 #include <libavcodec/avcodec.h>
@@ -1531,6 +1538,30 @@ Bool OpenALAudioManager::hasMusicTrackCompleted(const AsciiString& trackName, In
 	return FALSE;
 }
 
+#if RTS_ENGINE_CONTEXT
+//-------------------------------------------------------------------------------------------------
+// GeneralsX @feature cemlyn007 15/10/2026 The process-wide current ALC context (alcMakeContextCurrent) would be
+// shared by every engine in the process, so each audible engine's context is instead the thread context
+// (ALC_EXT_thread_local_context) of exactly the threads running inside that engine: openDevice binds it to the
+// engine's threads through EngineContext::bindThreads, and every rts::Scope that enters or leaves the engine
+// installs or removes it. The process-wide current context stays null.
+namespace
+{
+const rts::EngineContext::ThreadBinding alcThreadContextBinding{
+	[](void* context) noexcept { alcSetThreadContext(static_cast<ALCcontext*>(context)); },
+	[]() noexcept { alcSetThreadContext(nullptr); },
+};
+
+void releaseRecordedContext(std::uintptr_t handle)
+{
+	ALCcontext* const context = reinterpret_cast<ALCcontext*>(handle);
+	if (alcGetThreadContext() == context)
+		alcSetThreadContext(nullptr);
+	alcDestroyContext(context);
+}
+} // namespace
+#endif
+
 //-------------------------------------------------------------------------------------------------
 void OpenALAudioManager::openDevice(void)
 {
@@ -1544,6 +1575,12 @@ void OpenALAudioManager::openDevice(void)
 
 	enumerateDevices();
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 15/10/2026 The ledger is found before the device is opened, so
+	// that an engine with no embedding opens nothing.
+	m_ledger = rts::currentEmbedding("the audio device's ledger").resourceLedger;
+#endif
+
 	m_alcDevice = alcOpenDevice(NULL);
 	if (m_alcDevice == nullptr) {
 		DEBUG_LOG(("Failed to open ALC device"));
@@ -1552,8 +1589,46 @@ void OpenALAudioManager::openDevice(void)
 		return;
 	}
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 15/10/2026 Record the device; its release closes it. OpenAL Soft's
+	// alcCloseDevice also releases any context still on the device, but a context that is still
+	// current stays referenced, so the context has its own record (below), released first.
+	try {
+		m_alcDeviceRecord = m_ledger->record("audio device", reinterpret_cast<std::uintptr_t>(m_alcDevice),
+			[](std::uintptr_t handle) { alcCloseDevice(reinterpret_cast<ALCdevice*>(handle)); });
+	} catch (...) {
+		alcCloseDevice(m_alcDevice);
+		m_alcDevice = nullptr;
+		throw;
+	}
+#endif
+
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 15/10/2026 An engine's context must be its threads' own, which needs
+	// ALC_EXT_thread_local_context: without it the device is refused rather than shared process-wide.
+	if (!alcIsExtensionPresent(m_alcDevice, "ALC_EXT_thread_local_context")) {
+		closeDevice();
+		throw std::runtime_error("the audio device lacks ALC_EXT_thread_local_context, which an embedded engine needs "
+			"so that its ALC context is current only on its own threads");
+	}
+#endif
+
 	ALCint attributes[] = { ALC_FREQUENCY, audioSettings->m_outputRate, 0 /* end-of-list */ };
 	m_alcContext = alcCreateContext(m_alcDevice, attributes);
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 15/10/2026 Record the context; its release clears it as the calling
+	// thread's context if it is that, then destroys it (the host has stopped the engine's threads and
+	// left the engine on its own by then).
+	if (m_alcContext != nullptr) {
+		try {
+			m_alcContextRecord = m_ledger->record("audio context", reinterpret_cast<std::uintptr_t>(m_alcContext),
+				&releaseRecordedContext);
+		} catch (...) {
+			closeDevice();
+			throw;
+		}
+	}
+#endif
 	if (m_alcContext == nullptr) {
 		DEBUG_LOG(("Failed to create ALC context"));
 		setOn(false, AudioAffect_All);
@@ -1563,7 +1638,21 @@ void OpenALAudioManager::openDevice(void)
 		return;
 	}
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 15/10/2026 Bind the context to this engine's threads, which installs it
+	// on this one (openDevice runs inside the engine).
+	try {
+		m_threadBoundEngine = rts::ctx();
+		m_threadBoundEngine->bindThreads(alcThreadContextBinding, m_alcContext);
+	} catch (...) {
+		m_threadBoundEngine = nullptr;
+		closeDevice();
+		throw;
+	}
+	if (alcGetThreadContext() != m_alcContext) {
+#else
 	if (!alcMakeContextCurrent(m_alcContext)) {
+#endif
 		DEBUG_LOG(("Failed to make ALC context current"));
 		setOn(false, AudioAffect_All);
 		// GeneralsX @bugfix cemlyn007 08/10/2026 Release the context and device, so hasContext()
@@ -1605,14 +1694,36 @@ void OpenALAudioManager::closeDevice(void)
 	// engine's context in the same process, and made AL calls when no device was ever opened
 	// (-noaudio, or a device that failed to open). The handles are nulled so a second
 	// closeDevice (the destructor calls it too) is a no-op.
+	// GeneralsX @feature cemlyn007 15/10/2026 Each handle's ledger record is forgotten as this manager
+	// releases the handle itself.
 	if (m_alcContext) {
+#if RTS_ENGINE_CONTEXT
+		// GeneralsX @feature cemlyn007 15/10/2026 Unbind the context from the engine's threads (which removes
+		// it from this one if the engine is current here), and clear it as this thread's context in any case.
+		if (m_threadBoundEngine) {
+			m_threadBoundEngine->unbindThreads(alcThreadContextBinding);
+			m_threadBoundEngine = nullptr;
+		}
+		if (m_alcContextRecord) {
+			m_ledger->forget(*m_alcContextRecord);
+			m_alcContextRecord.reset();
+		}
+		releaseRecordedContext(reinterpret_cast<std::uintptr_t>(m_alcContext));
+#else
 		if (alcGetCurrentContext() == m_alcContext)
 			alcMakeContextCurrent(nullptr);
 		alcDestroyContext(m_alcContext);
+#endif
 		m_alcContext = nullptr;
 	}
 
 	if (m_alcDevice) {
+#if RTS_ENGINE_CONTEXT
+		if (m_alcDeviceRecord) {
+			m_ledger->forget(*m_alcDeviceRecord);
+			m_alcDeviceRecord.reset();
+		}
+#endif
 		alcCloseDevice(m_alcDevice);
 		m_alcDevice = nullptr;
 	}

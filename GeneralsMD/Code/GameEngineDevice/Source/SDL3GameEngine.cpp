@@ -53,6 +53,9 @@
 #include "StdDevice/Common/StdLocalFileSystem.h"
 #include "StdDevice/Common/StdBIGFileSystem.h"
 #include "Common/GlobalData.h"
+#if RTS_ENGINE_CONTEXT
+#include "Common/EmbeddingContract.h"
+#endif
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_vulkan.h>
 #include <cstdio>
@@ -310,12 +313,21 @@ void SDL3GameEngine::pollSDL3Events(void)
 	SDL_Event event;
 	while (SDL_PollEvent(&event)) {
 		switch (event.type) {
+			// GeneralsX @feature cemlyn007 15/10/2026 Through setQuitting, which tells the host's QuitListener
 			case SDL_EVENT_QUIT:
+#if RTS_ENGINE_CONTEXT
+				setQuitting(TRUE);
+#else
 				m_quitting = true;
+#endif
 				break;
 
 			case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
+#if RTS_ENGINE_CONTEXT
+				setQuitting(TRUE);
+#else
 				m_quitting = true;
+#endif
 				break;
 
 			case SDL_EVENT_WINDOW_FOCUS_GAINED:
@@ -617,13 +629,33 @@ WebBrowser *SDL3GameEngine::createWebBrowser(void)
  * GeneralsX @feature cemlyn007 28/09/2026 Honour dummy (headless) and -noaudio with a device-free
  * manager, as Win32GameEngine does, so a headless engine opens no audio device and no audio threads
  * (PLAN-023 Phase 0). m_headlessAudio lets an embedding host keep real audio in headless mode.
+ * GeneralsX @refactor cemlyn007 15/10/2026 The choice is makeAudioManager's, so that a test can make
+ * the manager an engine would get without making the engine.
  */
 AudioManager *SDL3GameEngine::createAudioManager(Bool dummy)
+{
+	return makeAudioManager(dummy);
+}
+
+/**
+ * GeneralsX @feature cemlyn007 15/10/2026 With RTS_ENGINE_CONTEXT the engine's embedding chooses: an
+ * engine embedded with its audio off gets the device-free manager, which opens no audio device,
+ * starts no thread and makes no call into the audio library; one with its audio on gets the real
+ * manager, which records its device in the engine's ResourceLedger (engine-lifecycle: muted engines
+ * are device-free). Headless mode and -noaudio no longer choose: the host says whether the engine
+ * has audio when it makes the engine, and -noaudio still leaves the real manager without a device.
+ */
+AudioManager *SDL3GameEngine::makeAudioManager(Bool dummy)
 {
 	fprintf(stderr, "INFO: SDL3GameEngine::createAudioManager()\n");
 
 #if defined(SAGE_USE_MINIAUDIO) || defined(SAGE_USE_OPENAL)
+#if RTS_ENGINE_CONTEXT
+	(void)dummy;
+	const Bool deviceFree = rts::currentEmbedding("the audio mode").audio == rts::AudioMode::off;
+#else
 	const Bool deviceFree = (dummy && !TheGlobalData->m_headlessAudio) || !TheGlobalData->m_audioOn;
+#endif
 #endif
 
 #ifdef SAGE_USE_MINIAUDIO

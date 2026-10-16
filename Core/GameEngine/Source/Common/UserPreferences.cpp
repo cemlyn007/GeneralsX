@@ -37,6 +37,10 @@
 // USER INCLUDES //////////////////////////////////////////////////////////////
 //-----------------------------------------------------------------------------
 #include "Common/GameSpyMiscPreferences.h"
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 15/10/2026 Its preferences files are opened and closed through the engine's file layer (Common/EngineFiles.h)
+#include "Common/EngineFiles.h"
+#endif
 #include "Common/UserPreferences.h"
 #include "Common/LadderPreferences.h"
 #include "Common/Player.h"
@@ -151,7 +155,11 @@ Bool UserPreferences::load(AsciiString fname)
 	}
 	m_filename.concat(normalizedFname);
 
+#if RTS_ENGINE_CONTEXT
+	FILE *fp = rts::openEngineFile(m_filename.str(), "r");
+#else
 	FILE *fp = fopen(m_filename.str(), "r");
+#endif
 	if (fp)
 	{
 		char buf[LINE_LEN];
@@ -172,7 +180,11 @@ Bool UserPreferences::load(AsciiString fname)
 
 			(*this)[key] = val;
 		}
+#if RTS_ENGINE_CONTEXT
+		rts::closeEngineFile(fp);
+#else
 		fclose(fp);
+#endif
 		return true;
 	}
 	return false;
@@ -187,14 +199,22 @@ Bool UserPreferences::write()
 	// GeneralsX @feature fbraz3 03/09/2026 Ensure parent directory exists before writing preferences
 	std::filesystem::path filePath(m_filename.str());
 	std::filesystem::path parentDir = filePath.parent_path();
+#if RTS_ENGINE_CONTEXT
+	if (!parentDir.empty() && rts::isEngineWritablePath(rts::resolveEnginePath(parentDir.string().c_str())))
+#else
 	if (!parentDir.empty())
+#endif
 	{
 		std::error_code ec;
 		std::filesystem::create_directories(parentDir, ec);
 	}
 #endif
 
+#if RTS_ENGINE_CONTEXT
+	FILE *fp = rts::openEngineFile(m_filename.str(), "w");
+#else
 	FILE *fp = fopen(m_filename.str(), "w");
+#endif
 	if (fp)
 	{
 		PreferenceMap::const_iterator it = begin();
@@ -203,7 +223,11 @@ Bool UserPreferences::write()
 			fprintf(fp, "%s = %s\n", it->first.str(), it->second.str());
 			++it;
 		}
+#if RTS_ENGINE_CONTEXT
+		rts::closeEngineFile(fp);
+#else
 		fclose(fp);
+#endif
 		return true;
 	}
 	return false;

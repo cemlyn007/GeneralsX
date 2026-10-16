@@ -48,8 +48,6 @@ GUARD_CLOSE = "#endif"
 PROCESS_GLOBAL = {
     # Process-wide by design (PLAN-023 Phase 1).
     "TheCritSecPerfGather": "critical-section profiling, process-wide",
-    "TheMemoryPoolFactory": "memory manager, process-wide",
-    "TheDynamicMemoryAllocator": "memory manager, process-wide",
     "TheSystemIsUnicode": "process-global const",
     # Debug-only globals.
     "TheCurrentIgnoreCrashPtr": "debug",

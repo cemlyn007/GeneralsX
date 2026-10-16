@@ -62,6 +62,14 @@
 #include "wwshade/shdsubmesh.h"
 #endif
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @bugfix cemlyn007 16/10/2026 rand and srand keep their generator in the C library's process-wide state;
+// each engine draws from and seeds its own (Common/EngineCLibrary.h), as a single-engine process's rand and srand do.
+#include "Common/EngineCLibrary.h"
+#define rand rts::engineRand
+#define srand rts::engineSrand
+#endif
+
 
 // Global Variables and Functions /////////////////////////////////////////////
 
@@ -3772,10 +3780,12 @@ W3DVolumetricShadowManager::~W3DVolumetricShadowManager()
 /** Releases all W3D/D3D assets before a reset.. */
 void W3DVolumetricShadowManager::ReleaseResources()
 {
+	// GeneralsX @feature cemlyn007 16/10/2026 The shadow buffers are recorded while held, and released through the record, in
+	// the device-wrapper layer (WW3D2/dx8ledger.h).
 	if (shadowIndexBufferD3D)
-		shadowIndexBufferD3D->Release();
+		DX8_RELEASE(shadowIndexBufferD3D);
 	if (shadowVertexBufferD3D)
-		shadowVertexBufferD3D->Release();
+		DX8_RELEASE(shadowVertexBufferD3D);
 	shadowIndexBufferD3D=nullptr;
 	shadowVertexBufferD3D=nullptr;
 	if (TheW3DBufferManager)
@@ -3802,6 +3812,7 @@ Bool W3DVolumetricShadowManager::ReAcquireResources()
 		&shadowIndexBufferD3D
 	)))
 		return FALSE;
+	DX8_RECORD(shadowIndexBufferD3D, INDEX_BUFFER);
 
 	if (shadowVertexBufferD3D == nullptr)
 	{	// Create vertex buffer
@@ -3815,6 +3826,7 @@ Bool W3DVolumetricShadowManager::ReAcquireResources()
 			&shadowVertexBufferD3D
 		)))
 			return FALSE;
+		DX8_RECORD(shadowVertexBufferD3D, VERTEX_BUFFER);
 	}
 
 	if (TheW3DBufferManager)

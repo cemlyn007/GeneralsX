@@ -60,8 +60,10 @@ void W3DSnowManager::ReleaseResources()
 {
 	REF_PTR_RELEASE(m_snowTexture);
 
+	// GeneralsX @feature cemlyn007 16/10/2026 The point-sprite buffer is recorded while held, and released through the
+	// record, in the device-wrapper layer (WW3D2/dx8ledger.h).
 	if (m_VertexBufferD3D)
-		m_VertexBufferD3D->Release();
+		DX8_RELEASE(m_VertexBufferD3D);
 
 	m_VertexBufferD3D=nullptr;
 
@@ -94,6 +96,7 @@ Bool W3DSnowManager::ReAcquireResources()
 				&m_VertexBufferD3D
 			)))
 				return FALSE;
+			DX8_RECORD(m_VertexBufferD3D, VERTEX_BUFFER);
 		}
 	}
 	else

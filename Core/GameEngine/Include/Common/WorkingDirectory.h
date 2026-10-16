@@ -20,6 +20,10 @@
 
 #include "Lib/BaseType.h"
 
+// GeneralsX @refactor cemlyn007 15/10/2026 Not with RTS_ENGINE_CONTEXT: an engine never changes the process's working
+// directory, and its paths lie under its own asset and user data roots instead (Common/EngineFiles.h).
+#if !RTS_ENGINE_CONTEXT
+
 namespace rts
 {
 
@@ -46,3 +50,5 @@ private:
 };
 
 } // namespace rts
+
+#endif

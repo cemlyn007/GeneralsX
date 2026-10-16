@@ -64,6 +64,7 @@
 #include "WW3D2/coltype.h"
 #include "WW3D2/coltest.h"
 #include "WW3D2/assetmgr.h"
+#include "Common/InvalidInputData.h"	// GeneralsX @feature cemlyn007 15/10/2026 A corrupt map is the host's bad input
 
 
 
@@ -564,7 +565,22 @@ Bool W3DTerrainVisual::load( AsciiString filename )
 
   // allocate new height map data to read from file
   REF_PTR_RELEASE( m_logicHeightMap );
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 15/10/2026 A map whose data the height map's reader refuses is the host's bad input
+	// (Common/InvalidInputData.h), not a fault.
+	try
+	{
+		m_logicHeightMap = NEW WorldHeightMap(pStrm);
+	}
+	catch (ErrorCode code)
+	{
+		if (code != ERROR_CORRUPT_FILE_FORMAT)
+			throw;
+		throw rts::InvalidInputData(filename.str(), "the map's data is corrupt");
+	}
+#else
 	m_logicHeightMap = NEW WorldHeightMap(pStrm);
+#endif
 
 #ifdef DO_SEISMIC_SIMULATIONS
 

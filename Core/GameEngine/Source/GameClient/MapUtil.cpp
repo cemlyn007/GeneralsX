@@ -75,6 +75,12 @@ static std::set<std::string> s_failedMapLookups;
 #include "GameNetwork/GameInfo.h"
 #include "GameNetwork/NetworkDefs.h"
 #include "Common/FatalEngineError.h"
+#include "Common/EngineFault.h"
+#include "Common/InvalidInputData.h"
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 15/10/2026 Its map cache files are opened and closed through the engine's file layer (Common/EngineFiles.h)
+#include "Common/EngineFiles.h"
+#endif
 
 
 //-------------------------------------------------------------------------------
@@ -413,7 +419,11 @@ void MapCache::writeCacheINI( const AsciiString &mapDir )
 	TheFileSystem->createDirectory(mapDir);
 
 	filepath.concat(m_mapCacheName);
+#if RTS_ENGINE_CONTEXT
+	FILE *fp = rts::openEngineFile(filepath.str(), "w");
+#else
 	FILE *fp = fopen(filepath.str(), "w");
+#endif
 	DEBUG_ASSERTCRASH(fp != nullptr, ("Failed to create %s", filepath.str()));
 	if (fp == nullptr) {
 		return;
@@ -477,7 +487,11 @@ void MapCache::writeCacheINI( const AsciiString &mapDir )
 		}
 	}
 
+#if RTS_ENGINE_CONTEXT
+	rts::closeEngineFile(fp);
+#else
 	fclose(fp);
+#endif
 }
 
 void MapCache::updateCache()
@@ -513,7 +527,20 @@ void MapCache::updateCache()
 	// Load user map cache first.
 	if (m_doLoadUserMapCacheINI)
 	{
+#if RTS_ENGINE_CONTEXT
+		// GeneralsX @feature cemlyn007 15/10/2026 The user map cache is GeneralsX's own file, not the host's input, so bad
+		// data in it is a fault (Common/InvalidInputData.h). The standard one below is a game file.
+		try
+		{
+			loadMapsFromMapCacheINI(userMapDir);
+		}
+		catch (const rts::InvalidInputData& error)
+		{
+			RELEASE_CRASH(error.what());
+		}
+#else
 		loadMapsFromMapCacheINI(userMapDir);
+#endif
 		m_doLoadUserMapCacheINI = FALSE;
 	}
 
@@ -524,7 +551,9 @@ void MapCache::updateCache()
 		m_doLoadStandardMapCacheINI = TRUE;
 	}
 
-#if !defined(_WIN32)
+// GeneralsX @refactor cemlyn007 15/10/2026 Not with RTS_ENGINE_CONTEXT: an engine's maps are in its asset and user data
+// roots only, never in the user's own directories (Common/EngineFiles.h).
+#if !defined(_WIN32) && !RTS_ENGINE_CONTEXT
 	s_failedMapLookups.clear();
 	// GeneralsX @feature fbraz3 03/09/2026 Check user Documents directory for Zero Hour custom maps
 	// On macOS/Linux, also scan user Documents directory if it exists and differs from userMapDir
@@ -1270,7 +1299,8 @@ const MapMetaData *MapCache::findMap(AsciiString mapName)
 		}
 	}
 
-#if !defined(_WIN32)
+// GeneralsX @refactor cemlyn007 15/10/2026 Not with RTS_ENGINE_CONTEXT (see the user map directories above).
+#if !defined(_WIN32) && !RTS_ENGINE_CONTEXT
 	// Fallback 2: Check standard custom map folders on POSIX if not in cache
 	const char* home = getenv("HOME");
 	if (home && !baseQuery.empty() && s_failedMapLookups.find(baseQuery) == s_failedMapLookups.end())
@@ -1424,13 +1454,18 @@ Image *getMapPreviewImage( AsciiString mapName )
 			copyFromBigToDir(tgaName, mapPreviewDir);
 			success = true;
 		}
+#if !RTS_ENGINE_CONTEXT
 		// GeneralsX @bugfix cemlyn007 28/09/2026 Let an embedded-mode fatal error reach the host.
 		catch (const FatalEngineError&)
 		{
 			throw;
 		}
+#endif
 		catch (...)
 		{
+#if RTS_ENGINE_CONTEXT
+			rts::rethrowIfFaultRaised(); // GeneralsX @refactor cemlyn007 15/10/2026 The sink's unwind leaves with its own reason (Common/EngineFault.h)
+#endif
 			success = false;	// no rethrow
 		}
 

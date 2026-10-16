@@ -34,6 +34,15 @@
 // GeneralsX @build fbraz 03/02/2026 Add C string functions for Linux
 #include <cstring>
 #include <Utility/stdio_adapter.h>
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 15/10/2026 Its result files are written in the engine's user data root, through the engine's file layer (Common/EngineFiles.h)
+#include "Common/EngineFiles.h"
+#define PROFILE_RESULT_OPEN(name, mode) rts::openEngineFile((rts::engineUserDataRoot() / (name)).c_str(), mode)
+#define PROFILE_RESULT_CLOSE(file) rts::closeEngineFile(file)
+#else
+#define PROFILE_RESULT_OPEN(name, mode) fopen(name, mode)
+#define PROFILE_RESULT_CLOSE(file) fclose(file)
+#endif
 
 //////////////////////////////////////////////////////////////////////////////
 // ProfileResultFileCSV
@@ -48,7 +57,7 @@ void ProfileResultFileCSV::WriteThread(ProfileFuncLevel::Thread &thread)
   char help[40];
 
   sprintf(help,"prof%08x-all.csv",thread.GetId());
-  FILE *f=fopen(help,"wt");
+  FILE *f=PROFILE_RESULT_OPEN(help,"wt");
 
   // CSV file header
   fprintf(f,"Function\tFile\tCall count\tPTT (all)\tGTT (all)\tPT/C (all)\tGT/C (all)\tCaller (all)");
@@ -102,7 +111,7 @@ void ProfileResultFileCSV::WriteThread(ProfileFuncLevel::Thread &thread)
     fprintf(f,"\n");
   }
 
-  fclose(f);
+  PROFILE_RESULT_CLOSE(f);
 }
 
 void ProfileResultFileCSV::WriteResults()
@@ -112,7 +121,7 @@ void ProfileResultFileCSV::WriteResults()
   for (;ProfileFuncLevel::EnumThreads(k,t);k++)
     WriteThread(t);
 
-  FILE *f=fopen("profile-high.csv","wt");
+  FILE *f=PROFILE_RESULT_OPEN("profile-high.csv","wt");
 
   // CSV file header
   fprintf(f,"Profile\tUnit\ttotal");
@@ -133,7 +142,7 @@ void ProfileResultFileCSV::WriteResults()
     fprintf(f,"\n");
   }
 
-  fclose(f);
+  PROFILE_RESULT_CLOSE(f);
 }
 
 void ProfileResultFileCSV::Delete()
@@ -213,7 +222,7 @@ void ProfileResultFileDOT::WriteResults()
     if (id.GetCalls(frame))
       active++;
 
-  FILE *f=fopen(m_fileName,"wt");
+  FILE *f=PROFILE_RESULT_OPEN(m_fileName,"wt");
   if (!f)
     return;
 
@@ -303,7 +312,7 @@ void ProfileResultFileDOT::WriteResults()
   }
 
   fprintf(f,"}\n");
-  fclose(f);
+  PROFILE_RESULT_CLOSE(f);
 }
 
 void ProfileResultFileDOT::Delete()

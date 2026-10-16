@@ -34,6 +34,12 @@
 #include "Common/GameEngine.h"
 //#include "GameNetwork/NetworkInterface.h"
 #include "GameNetwork/udp.h"
+#if RTS_ENGINE_CONTEXT
+#include "Common/EngineCLibrary.h" // GeneralsX @bugfix cemlyn007 16/10/2026 rts::lookUpHostAddresses
+#endif
+#if RTS_ENGINE_CONTEXT
+#include "Common/EngineSockets.h" // GeneralsX @feature cemlyn007 16/10/2026 rts::openEngineSocket, rts::closeEngineSocket
+#endif
 
 #if defined(_WIN32) && defined(_MSC_VER)
 typedef int socklen_t;
@@ -125,22 +131,38 @@ UDP::UDP()
 UDP::~UDP()
 {
 	if (fd)
+#if RTS_ENGINE_CONTEXT
+		rts::closeEngineSocket(fd); // GeneralsX @feature cemlyn007 16/10/2026 opened through the engine's socket layer
+#else
 		closesocket(fd);
+#endif
 }
 
 Int UDP::Bind(const char *Host,UnsignedShort port)
 {
+#if !RTS_ENGINE_CONTEXT
   struct hostent *hostStruct;
   struct in_addr *hostNode;
+#endif
 
   if (isdigit(Host[0]))
     return ( Bind( ntohl(inet_addr(Host)), port) );
 
+#if RTS_ENGINE_CONTEXT
+  // GeneralsX @bugfix cemlyn007 16/10/2026 gethostbyname returns the C library's one process-wide result,
+  // which engines on two threads would both write; the lookup returns a list of this caller's own
+  // (Common/EngineCLibrary.h)
+  const std::vector<in_addr> hostAddresses = rts::lookUpHostAddresses(Host);
+  if (hostAddresses.empty())
+    return (0);
+  return ( Bind(ntohl(hostAddresses[0].s_addr),port) );
+#else
   hostStruct = gethostbyname(Host);
   if (hostStruct == nullptr)
     return (0);
   hostNode = (struct in_addr *) hostStruct->h_addr;
   return ( Bind(ntohl(hostNode->s_addr),port) );
+#endif
 }
 
 // You must call bind, implicit binding is for sissies
@@ -160,7 +182,12 @@ Int UDP::Bind(UnsignedInt IP,UnsignedShort Port)
   addr.sin_family=AF_INET;
   addr.sin_port=Port;
   addr.sin_addr.s_addr=IP;
+#if RTS_ENGINE_CONTEXT
+  // GeneralsX @feature cemlyn007 16/10/2026 Opened through the engine's socket layer, which records it in the ledger
+  fd=rts::openEngineSocket(AF_INET,SOCK_DGRAM,DEFAULT_PROTOCOL,"UDP");
+#else
   fd=socket(AF_INET,SOCK_DGRAM,DEFAULT_PROTOCOL);
+#endif
   #ifdef _WIN32
   if (fd==SOCKET_ERROR)
     fd=-1;

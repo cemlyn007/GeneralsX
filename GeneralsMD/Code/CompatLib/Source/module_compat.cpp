@@ -30,6 +30,8 @@ bool GetModuleFileName(HINSTANCE hInstance, char* buffer, int size)
 #endif
 }
 
+// GeneralsX @feature cemlyn007 16/10/2026 Not with RTS_ENGINE_CONTEXT (module_compat.h).
+#if !RTS_ENGINE_CONTEXT
 HMODULE LoadLibrary(const char* lpFileName)
 {
   // GeneralsX @feature BenderAI 24/02/2026 Phase 5 - Platform-agnostic library loading without C++17
@@ -48,6 +50,7 @@ HMODULE LoadLibrary(const char* lpFileName)
   
   return dlopen(lpFileName, RTLD_LAZY);
 }
+#endif
 
 FARPROC GetProcAddress(HMODULE hModule, const char* lpProcName)
 {

@@ -1,4 +1,12 @@
 #include "thread_compat.h"
+#if RTS_ENGINE_CONTEXT
+#if defined(__APPLE__)
+#include <pthread.h>
+#else
+#include <sys/syscall.h>
+#include <unistd.h>
+#endif
+#else
 #include <map>
 #include <mutex>
 
@@ -6,6 +14,7 @@
 static std::map<pthread_t, int> thread_id_map;
 static std::mutex thread_id_map_mutex;
 static int next_thread_id = 1;
+#endif
 
 THREAD_ID GetCurrentThreadId()
 {
@@ -13,6 +22,20 @@ THREAD_ID GetCurrentThreadId()
 	return (THREAD_ID)thread_id;
 }
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 The kernel's id for the calling thread: unique among live threads, never 0,
+// and kept in no process-wide table that every engine would share
+int GetCurrentThreadIdAsInt()
+{
+#if defined(__APPLE__)
+	uint64_t thread_id = 0;
+	pthread_threadid_np(nullptr, &thread_id);
+	return (int)(thread_id & 0x7fffffff);
+#else
+	return (int)syscall(SYS_gettid);
+#endif
+}
+#else
 int GetCurrentThreadIdAsInt()
 {
 	// GeneralsX @feature BenderAI 24/02/2026 Phase 5 - Convert pthread_t to unique int for legacy code
@@ -31,6 +54,11 @@ int GetCurrentThreadIdAsInt()
 	thread_id_map[current] = new_id;
 	return new_id;
 }
+#endif
+
+// GeneralsX @feature cemlyn007 15/10/2026 With RTS_ENGINE_CONTEXT no thread is created here: every thread an engine runs
+// is started through its host's ThreadStarter (Common/EngineThread.h)
+#if !RTS_ENGINE_CONTEXT
 
 struct thread_data
 {
@@ -60,3 +88,4 @@ int TerminateThread(void *hThread, unsigned long dwExitCode)
 {
 	return pthread_cancel((pthread_t)hThread);
 }
+#endif

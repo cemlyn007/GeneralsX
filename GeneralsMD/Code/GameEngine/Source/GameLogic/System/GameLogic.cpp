@@ -298,7 +298,11 @@ GameLogic::GameLogic()
 	for(Int i = 0; i < MAX_SLOTS; i++)
 	{
 		m_progressComplete[i] = FALSE;
+#if RTS_ENGINE_CONTEXT
+		m_progressCompleteTimeout[i].clear();
+#else
 		m_progressCompleteTimeout[i] = 0;
+#endif
 	}
 
 	m_shouldValidateCRCs = 0;
@@ -510,7 +514,11 @@ void GameLogic::reset()
 	for(Int i = 0; i < MAX_SLOTS; ++i)
 	{
 		m_progressComplete[i] = FALSE;
+#if RTS_ENGINE_CONTEXT
+		m_progressCompleteTimeout[i].clear();
+#else
 		m_progressCompleteTimeout[i] = 0;
+#endif
 	}
 	m_forceGameStartByTimeOut = FALSE;
 
@@ -1987,7 +1995,14 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 	else
 	{
 		Int progressCount = LOAD_PROGRESS_LOOP_ALL_THE_FREAKN_OBJECTS;
+#if RTS_ENGINE_CONTEXT
+		// GeneralsX @feature cemlyn007 16/10/2026 The load screen is paced by real time measured outside the logic layer
+		// (Common/RealTimeStopwatch.h): logic code reads no clock, and the pacing changes nothing the simulation keeps.
+		RealTimeStopwatch progressTimer;
+		progressTimer.start();
+#else
 		Int timer = timeGetTime();
+#endif
 		for (MapObject *pMapObj = MapObject::getFirstMapObject(); pMapObj; pMapObj = pMapObj->getNext())
 		{
 
@@ -2083,6 +2098,15 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 
 			}
 
+#if RTS_ENGINE_CONTEXT
+			if(progressTimer.elapsedMilliseconds() > 500)
+			{
+				if(progressCount < LOAD_PROGRESS_MAX_ALL_THE_FREAKN_OBJECTS)
+					progressCount ++;
+				updateLoadProgress(progressCount);
+				progressTimer.start();
+			}
+#else
 			if(timeGetTime() > timer + 500)
 			{
 				if(progressCount < LOAD_PROGRESS_MAX_ALL_THE_FREAKN_OBJECTS)
@@ -2090,6 +2114,7 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 				updateLoadProgress(progressCount);
 				timer = timeGetTime();
 			}
+#endif
 
 		}
 
@@ -4893,7 +4918,11 @@ void GameLogic::lastHeardFrom( Int playerId )
 {
 	if( playerId < 0 || playerId >= MAX_SLOTS)
 		return;
+#if RTS_ENGINE_CONTEXT
+	m_progressCompleteTimeout[playerId].start(); // GeneralsX @feature cemlyn007 16/10/2026 see GameLogic.h
+#else
 	m_progressCompleteTimeout[playerId] = timeGetTime();
+#endif
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -4904,15 +4933,23 @@ void GameLogic::testTimeOut()
 	if(isProgressComplete())
 		return;
 
+#if !RTS_ENGINE_CONTEXT
 	Int curTime = timeGetTime();
+#endif
 	// Loop and test everyone in our game.
 	for(Int i =0; i < MAX_SLOTS; ++i)
 	{
 		// If they've completed their progress, ignore them
 		if(m_progressComplete[i])
 			continue;
+#if RTS_ENGINE_CONTEXT
+		// GeneralsX @feature cemlyn007 16/10/2026 see GameLogic.h
+		if(	m_progressCompleteTimeout[i].elapsedMilliseconds() < PROGRESS_COMPLETE_TIMEOUT )
+			return;
+#else
 		if(	m_progressCompleteTimeout[i] + PROGRESS_COMPLETE_TIMEOUT > curTime )
 			return;
+#endif
 	}
 	// if we made it this far, that means everyone has timed out.
 	m_forceGameStartByTimeOut = TRUE;
@@ -4936,7 +4973,11 @@ void GameLogic::initTimeOutValues()
 		return;
 	for(Int i = 0; i < TheNetwork->getNumPlayers(); ++i)
 	{
+#if RTS_ENGINE_CONTEXT
+		m_progressCompleteTimeout[i].start(); // GeneralsX @feature cemlyn007 16/10/2026 see GameLogic.h
+#else
 		m_progressCompleteTimeout[i] = timeGetTime();
+#endif
 	}
 }
 

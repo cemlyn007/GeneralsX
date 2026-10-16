@@ -102,6 +102,10 @@
 #include <cstdint>
 #include <cstdlib>
 #include <mutex>
+#include <stdexcept>
+#if RTS_ENGINE_CONTEXT
+#include "Common/EmbeddingContract.h"
+#endif
 
 // GeneralsX @feature cemlyn007 30/09/2026 DX8Wrapper's state names as the current engine's W3DRenderState fields,
 // in this file too (PLAN-023 Phase 8, stage RR2a-1; see w3drenderstate.h). After every #include.
@@ -256,11 +260,12 @@ bool DX8Wrapper::GetWindowSize(int& outW, int& outH, float& outDensity)
 
 void DX8Wrapper::Pillarbox_Cleanup()
 {
-	if (s_savedBackbuffer) { s_savedBackbuffer->Release(); s_savedBackbuffer = nullptr; }
-	if (s_savedDepth) { s_savedDepth->Release(); s_savedDepth = nullptr; }
-	if (s_depthSurf) { s_depthSurf->Release(); s_depthSurf = nullptr; }
-	if (s_offscreenSurf) { s_offscreenSurf->Release(); s_offscreenSurf = nullptr; }
-	if (s_offscreenTex) { s_offscreenTex->Release(); s_offscreenTex = nullptr; }
+	// GeneralsX @feature cemlyn007 16/10/2026 Each reference released here is a recorded one (dx8ledger.h).
+	if (s_savedBackbuffer) { DX8_RELEASE(s_savedBackbuffer); s_savedBackbuffer = nullptr; }
+	if (s_savedDepth) { DX8_RELEASE(s_savedDepth); s_savedDepth = nullptr; }
+	if (s_depthSurf) { DX8_RELEASE(s_depthSurf); s_depthSurf = nullptr; }
+	if (s_offscreenSurf) { DX8_RELEASE(s_offscreenSurf); s_offscreenSurf = nullptr; }
+	if (s_offscreenTex) { DX8_RELEASE(s_offscreenTex); s_offscreenTex = nullptr; }
 	s_pillarboxEnabled = false;
 	s_pillarboxActive = false;
 }
@@ -304,16 +309,20 @@ bool DX8Wrapper::Pillarbox_Setup(int gameW, int gameH)
 	HRESULT hr = D3DDevice->CreateTexture(gameW, gameH, 1, D3DUSAGE_RENDERTARGET,
 		D3DFMT_A8R8G8B8, D3DPOOL_DEFAULT, &s_offscreenTex);
 	if (FAILED(hr)) return false;
+	// GeneralsX @feature cemlyn007 16/10/2026 Each reference made here is recorded (dx8ledger.h).
+	DX8_RECORD(s_offscreenTex, TEXTURE);
 	s_offscreenTex->GetSurfaceLevel(0, &s_offscreenSurf);
+	DX8_RECORD(s_offscreenSurf, SURFACE);
 
 	// Create dedicated depth stencil at game resolution
 	hr = D3DDevice->CreateDepthStencilSurface(gameW, gameH,
 		_PresentParameters.AutoDepthStencilFormat, D3DMULTISAMPLE_NONE, &s_depthSurf);
 	if (FAILED(hr)) {
-		s_offscreenSurf->Release(); s_offscreenSurf = nullptr;
-		s_offscreenTex->Release(); s_offscreenTex = nullptr;
+		DX8_RELEASE(s_offscreenSurf); s_offscreenSurf = nullptr;
+		DX8_RELEASE(s_offscreenTex); s_offscreenTex = nullptr;
 		return false;
 	}
+	DX8_RECORD(s_depthSurf, SURFACE);
 
 	// Cache backbuffer size and compute aspect-correct fit rect once
 	s_bbW = bbW; s_bbH = bbH;
@@ -463,7 +472,11 @@ static DX8FrameStatistics LastFrameStatistics;
 
 // GeneralsX @feature cemlyn007 28/09/2026 Atomic (the process's assert switch): every headless engine's command line writes it and any engine's
 // assert path reads it, so engines on separate threads would race on a plain bool (PLAN-023 Phase 5b).
+// GeneralsX @refactor cemlyn007 15/10/2026 With RTS_ENGINE_CONTEXT the crash paths end in the FaultSink, and the assertion
+// dialog asks the engine's render mode, so the process-wide switch goes.
+#if !RTS_ENGINE_CONTEXT
 std::atomic<bool> DX8Wrapper_IsWindowed(true);
+#endif
 #if !RTS_ENGINE_CONTEXT
 bool DX8Wrapper_HeadlessRender = false;  // rlgenerals: see dx8wrapper.h
 
@@ -471,9 +484,6 @@ bool DX8Wrapper_HeadlessRender = false;  // rlgenerals: see dx8wrapper.h
 int DX8Wrapper_PreserveFPU = 0;
 #endif
 
-// GeneralsX @feature cemlyn007 30/09/2026 The host's check before a render device's or Direct3D interface's last
-// release (PLAN-023 Phase 8, stage RR1): see dx8wrapper.h.
-void (*DX8Wrapper_FinalReleaseHook)(const char* what) = nullptr;
 
 /***********************************************************************************
 **
@@ -567,9 +577,23 @@ RTS_ENGINE_GLOBAL(HINSTANCE, D3D8Lib, nullptr);
 static void Release_D3D8_Library()
 {
 	if (D3D8Lib != nullptr)
+#if RTS_ENGINE_CONTEXT && !defined(_WIN32)
+		// GeneralsX @feature cemlyn007 16/10/2026 The engine's reference is recorded in its ledger (dx8ledger.h).
+		DX8Ledger::Close_Library(D3D8Lib);
+#else
 		FreeLibrary(D3D8Lib);
+#endif
 	D3D8Lib = nullptr;
 	Direct3DCreate8Ptr = nullptr;
+}
+
+// GeneralsX @feature cemlyn007 16/10/2026 A test's stand-in for Direct3DCreate8 (dx8wrapper.h), per engine.
+RTS_ENGINE_GLOBAL(Direct3DCreate8Type, InstalledDirect3DCreate8, nullptr);
+#define InstalledDirect3DCreate8 RTS_ENGINE_GLOBAL_REF(InstalledDirect3DCreate8)
+
+void DX8Wrapper_Install_Direct3DCreate8_For_Tests(IDirect3D8* (*create)(UINT sdkVersion))
+{
+	InstalledDirect3DCreate8 = create;
 }
 #else
 Direct3DCreate8Type	Direct3DCreate8Ptr = nullptr;
@@ -687,6 +711,10 @@ void MoveRectIntoOtherRect(const RECT& inner, const RECT& outer, int* x, int* y)
 bool DX8Wrapper::Init(void * hwnd, bool lite)
 {
 #if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 16/10/2026 An engine with no rendering makes no render device, so it never loads
+	// the D3D8 library or records a D3D8 object (render-pipeline: no rendering, with no render device).
+	if (!lite && ::rts::currentEmbedding("the render device").render == ::rts::RenderMode::none)
+		throw std::logic_error("an engine with no rendering (RenderMode::none) makes no render device");
 	// GeneralsX @feature cemlyn007 30/09/2026 This engine's render state, freed by Destroy_Render_State at the end of
 	// WW3D::Shutdown (PLAN-023 Phase 8, stages RR2a-1, RR2a-2).
 	Create_Render_State();
@@ -715,7 +743,9 @@ bool DX8Wrapper::Init(void * hwnd, bool lite)
 	Render2DClass::Set_Screen_Resolution( RectClass( 0, 0, ResolutionWidth, ResolutionHeight ) );
 	BitDepth = DEFAULT_BIT_DEPTH;
 	IsWindowed = false;
+#if !RTS_ENGINE_CONTEXT
 	DX8Wrapper_IsWindowed = false;
+#endif
 
 	for (int light=0;light<4;++light) CurrentDX8LightEnables[light]=false;
 
@@ -750,13 +780,25 @@ bool DX8Wrapper::Init(void * hwnd, bool lite)
 #if !RTS_ENGINE_CONTEXT
 		std::lock_guard<std::mutex> d3d8LibLock(s_d3d8LibMutex);
 #endif
+#if RTS_ENGINE_CONTEXT
+		// GeneralsX @feature cemlyn007 16/10/2026 A test's stand-in, when one is installed, instead of the library.
+		if (InstalledDirect3DCreate8 != nullptr)
+			Direct3DCreate8Ptr = InstalledDirect3DCreate8;
+		if (Direct3DCreate8Ptr == nullptr) [] {
+#else
 		if (D3D8Lib == nullptr || Direct3DCreate8Ptr == nullptr) [] {
+#endif
 			// GeneralsX @build BenderAI 10/02/2026 - Platform-specific DLL/SO/DYLIB loading (Phase 5: macOS)
 #ifdef _WIN32
 			D3D8Lib = LoadLibrary("D3D8.DLL");
 #elif defined(__APPLE__)
 			fprintf(stderr, "DEBUG: DX8Wrapper::Init() - Loading libdxvk_d3d8.dylib (macOS)...\n");
+#if RTS_ENGINE_CONTEXT
+			// GeneralsX @feature cemlyn007 16/10/2026 Loaded and recorded in the engine's ledger (dx8ledger.h).
+			D3D8Lib = DX8Ledger::Open_Library("libdxvk_d3d8.dylib");
+#else
 			D3D8Lib = LoadLibrary("libdxvk_d3d8.dylib");
+#endif
 			fprintf(stderr, "DEBUG: DX8Wrapper::Init() - LoadLibrary result: %p\n", (void*)D3D8Lib);
 			if (D3D8Lib == nullptr) {
 				const char* error = dlerror();
@@ -764,7 +806,12 @@ bool DX8Wrapper::Init(void * hwnd, bool lite)
 			}
 #else
 			fprintf(stderr, "DEBUG: DX8Wrapper::Init() - Loading libdxvk_d3d8.so (Linux)...\n");
+#if RTS_ENGINE_CONTEXT
+			// GeneralsX @feature cemlyn007 16/10/2026 Loaded and recorded in the engine's ledger (dx8ledger.h).
+			D3D8Lib = DX8Ledger::Open_Library("libdxvk_d3d8.so");
+#else
 			D3D8Lib = LoadLibrary("libdxvk_d3d8.so");
+#endif
 			fprintf(stderr, "DEBUG: DX8Wrapper::Init() - LoadLibrary result: %p\n", (void*)D3D8Lib);
 			if (D3D8Lib == nullptr) {
 				const char* error = dlerror();
@@ -784,7 +831,11 @@ bool DX8Wrapper::Init(void * hwnd, bool lite)
 			}
 
 		}();
+#if RTS_ENGINE_CONTEXT
+		d3d8Loaded = Direct3DCreate8Ptr != nullptr;
+#else
 		d3d8Loaded = D3D8Lib != nullptr && Direct3DCreate8Ptr != nullptr;
+#endif
 		}
 		if (!d3d8Loaded) {
 #if RTS_ENGINE_CONTEXT
@@ -809,6 +860,18 @@ bool DX8Wrapper::Init(void * hwnd, bool lite)
 
 			D3DInterface = Direct3DCreate8Ptr(D3D_SDK_VERSION);		// TODO: handle failure cases...
 		}
+#if RTS_ENGINE_CONTEXT
+		// GeneralsX @feature cemlyn007 16/10/2026 The interface is recorded (dx8ledger.h): a host releasing a faulted
+		// engine's ledger newest first releases it last of the engine's D3D8 objects, after the device.
+		try {
+			DX8_RECORD(D3DInterface, INTERFACE);
+		} catch (...) {
+			D3DInterface = nullptr;
+			Release_D3D8_Library();
+			Free_Render_State();
+			throw;
+		}
+#endif
 		fprintf(stderr, "DEBUG: DX8Wrapper::Init() - Direct3DCreate8 returned: %p\n", (void*)D3DInterface);
 		if (D3DInterface == nullptr) {
 			fprintf(stderr, "ERROR: DX8Wrapper::Init() - Direct3DCreate8 returned NULL (DXVK failed to create D3D8 interface)\n");
@@ -848,8 +911,8 @@ void DX8Wrapper::Shutdown()
 	}
 
 	if (D3DInterface) {
-		if (DX8Wrapper_FinalReleaseHook) DX8Wrapper_FinalReleaseHook("a Direct3D interface");
-		D3DInterface->Release();
+		// GeneralsX @feature cemlyn007 16/10/2026 The interface's record is forgotten as it is released (dx8ledger.h).
+		DX8_RELEASE(D3DInterface);
 		D3DInterface=nullptr;
 
 	}
@@ -861,7 +924,7 @@ void DX8Wrapper::Shutdown()
 		{
 			if (Textures[i])
 			{
-				Textures[i]->Release();
+				DX8_RELEASE(Textures[i]);
 				Textures[i] = nullptr;
 			}
 		}
@@ -958,7 +1021,7 @@ void DX8Wrapper::Invalidate_Cached_Render_States()
 		if (_Get_D3D_Device8())
 			_Get_D3D_Device8()->SetTexture(a,nullptr);
 		if (Textures[a] != nullptr) {
-			Textures[a]->Release();
+			DX8_RELEASE(Textures[a]);
 		}
 		Textures[a]=nullptr;
 	}
@@ -1124,6 +1187,13 @@ bool DX8Wrapper::Create_Device()
 
 	dbgHelpGuard.deactivate();
 
+	// GeneralsX @feature cemlyn007 16/10/2026 The device is recorded (dx8ledger.h) after the interface and before any
+	// object made on it, so a host releasing a faulted engine's ledger newest first releases the objects, then the
+	// device, then the interface. Reset_Device keeps this device and record, and what it makes again is recorded after
+	// them; a device made again after Shutdown (a later Init) is recorded again, after a new interface, once the old
+	// device's objects were released and their records forgotten, so the order holds for both.
+	DX8_RECORD(D3DDevice, DEVICE);
+
 	// GeneralsX @feature cemlyn007 30/09/2026 The formats the device was made with, once per device
 	// (so once per engine): an embed host's windowless device must match its windowed one, since
 	// W3DWater's soft shore edge blends on destination alpha (PLAN-023 Phase 8, stage RR0c).
@@ -1210,7 +1280,7 @@ void DX8Wrapper::Release_Device()
 			// the last texture bound to each stage. Shutdown released them only after this function,
 			// and not at all (CurrentCaps is gone by then), so they kept the device alive: see below.
 			if (Textures[a] != nullptr) {
-				Textures[a]->Release();
+				DX8_RELEASE(Textures[a]);
 				Textures[a] = nullptr;
 			}
 		}
@@ -1245,8 +1315,8 @@ void DX8Wrapper::Release_Device()
 		// the GPU driver. A process that exits next unloads the driver under them and dies with
 		// SIGSEGV, most often when a cold shader cache and a loaded machine leave more compiles
 		// in flight. Only destroying the device joins those threads, so any leak is a bug.
-		if (DX8Wrapper_FinalReleaseHook) DX8Wrapper_FinalReleaseHook("a render device");
-		const ULONG refs = D3DDevice->Release();
+		// GeneralsX @feature cemlyn007 16/10/2026 The device's record is forgotten as it is released (dx8ledger.h).
+		const ULONG refs = DX8_RELEASE(D3DDevice);
 		if (refs != 0) {
 			fprintf(stderr, "ERROR: DX8Wrapper::Release_Device() - %lu leaked reference(s) keep the device alive\n", (unsigned long)refs);
 		}
@@ -1530,7 +1600,9 @@ bool DX8Wrapper::Set_Render_Device(int dev, int width, int height, int bits, int
 
 	if (bits != -1)		BitDepth = bits;
 	if (windowed != -1)	IsWindowed = (windowed != 0);
+#if !RTS_ENGINE_CONTEXT
 	DX8Wrapper_IsWindowed = IsWindowed;
+#endif
 
 	WWDEBUG_SAY(("Attempting Set_Render_Device: name: %s (%s:%s), width: %d, height: %d, windowed: %d",
 		_RenderDeviceNameTable[CurRenderDevice].str(),_RenderDeviceDescriptionTable[CurRenderDevice].Get_Driver_Name(),
@@ -2404,6 +2476,8 @@ void DX8Wrapper::Clear(bool clear_color, bool clear_z_stencil, const Vector3 &co
 	IDirect3DSurface8* depthbuffer;
 
 	_Get_D3D_Device8()->GetDepthStencilSurface(&depthbuffer);
+	// GeneralsX @feature cemlyn007 16/10/2026 Recorded while it is held (dx8ledger.h).
+	DX8_RECORD(depthbuffer, SURFACE);
 	DX8_RECORD_DX8_CALLS();
 
 	if (depthbuffer)
@@ -2418,7 +2492,7 @@ void DX8Wrapper::Clear(bool clear_color, bool clear_z_stencil, const Vector3 &co
 		);
 
 		// release ref
-		depthbuffer->Release();
+		DX8_RELEASE(depthbuffer);
 	}
 
 	DWORD flags = 0;
@@ -3043,7 +3117,8 @@ IDirect3DTexture8 * DX8Wrapper::_Create_DX8_Texture
 		DX8_ErrorCode(ret);
 		// Just return the texture, no reduction
 		// allowed for render targets.
-		return texture;
+		// GeneralsX @feature cemlyn007 16/10/2026 Recorded (dx8ledger.h), as every texture this layer makes.
+		return DX8_RECORDED(texture, TEXTURE);
 	}
 
 	// We should never run out of video memory when allocating a non-rendertarget texture.
@@ -3101,7 +3176,7 @@ IDirect3DTexture8 * DX8Wrapper::_Create_DX8_Texture
 	}
 #endif
 
-	return texture;
+	return DX8_RECORDED(texture, TEXTURE);
 }
 
 IDirect3DTexture8 * DX8Wrapper::_Create_DX8_Texture
@@ -3138,12 +3213,14 @@ IDirect3DTexture8 * DX8Wrapper::_Create_DX8_Texture
 	if (result != D3D_OK) {
 		return MissingTexture::_Get_Missing_Texture();
 	}
+	// GeneralsX @feature cemlyn007 16/10/2026 Recorded (dx8ledger.h).
+	DX8_RECORD(texture, TEXTURE);
 
 	// Make sure texture wasn't paletted!
 	D3DSURFACE_DESC desc;
 	texture->GetLevelDesc(0,&desc);
 	if (desc.Format==D3DFMT_P8) {
-		texture->Release();
+		DX8_RELEASE(texture);
 		return MissingTexture::_Get_Missing_Texture();
 	}
 	return texture;
@@ -3171,8 +3248,9 @@ IDirect3DTexture8 * DX8Wrapper::_Create_DX8_Texture
 	// Copy the surface to the texture
 	IDirect3DSurface8 *tex_surface = nullptr;
 	texture->GetSurfaceLevel(0, &tex_surface);
+	DX8_RECORD(tex_surface, SURFACE);
 	DX8_ErrorCode(D3DXLoadSurfaceFromSurface(tex_surface, nullptr, nullptr, surface, nullptr, nullptr, D3DX_FILTER_BOX, 0));
-	tex_surface->Release();
+	DX8_RELEASE(tex_surface);
 
 	// Create mipmaps if needed
 	if (mip_level_count!=MIP_LEVELS_1)
@@ -3257,7 +3335,8 @@ IDirect3DTexture8 * DX8Wrapper::_Create_DX8_ZTexture
 
 	DX8_ErrorCode(ret);
 
-	texture->AddRef(); // don't release this texture
+	DX8_RECORD(texture, TEXTURE);
+	DX8_ADD_REF(texture, TEXTURE); // don't release this texture
 
 	// Just return the texture, no reduction
 	// allowed for render targets.
@@ -3349,7 +3428,7 @@ IDirect3DCubeTexture8* DX8Wrapper::_Create_DX8_Cube_Texture
 		DX8_ErrorCode(ret);
 		// Just return the texture, no reduction
 		// allowed for render targets.
-		return texture;
+		return DX8_RECORDED(texture, CUBE_TEXTURE);
 	}
 
 	// We should never run out of video memory when allocating a non-rendertarget texture.
@@ -3400,7 +3479,7 @@ IDirect3DCubeTexture8* DX8Wrapper::_Create_DX8_Cube_Texture
 	}
 	DX8_ErrorCode(ret);
 
-	return texture;
+	return DX8_RECORDED(texture, CUBE_TEXTURE);
 }
 
 /*!
@@ -3479,7 +3558,7 @@ IDirect3DVolumeTexture8* DX8Wrapper::_Create_DX8_Volume_Texture
 	}
 	DX8_ErrorCode(ret);
 
-	return texture;
+	return DX8_RECORDED(texture, VOLUME_TEXTURE);
 }
 
 
@@ -3495,7 +3574,7 @@ IDirect3DSurface8 * DX8Wrapper::_Create_DX8_Surface(unsigned int width, unsigned
 
 	DX8CALL(CreateImageSurface(width, height, WW3DFormat_To_D3DFormat(format), &surface));
 
-	return surface;
+	return DX8_RECORDED(surface, SURFACE);
 }
 
 IDirect3DSurface8 * DX8Wrapper::_Create_DX8_Surface(const char *filename_)
@@ -3760,7 +3839,7 @@ IDirect3DSurface8 * DX8Wrapper::_Get_DX8_Front_Buffer()
 	DX8CALL(CreateImageSurface(mode.Width,mode.Height,D3DFMT_A8R8G8B8,&fb));
 
 	DX8CALL(GetFrontBuffer(fb));
-	return fb;
+	return DX8_RECORDED(fb, SURFACE);
 }
 
 SurfaceClass * DX8Wrapper::_Get_DX8_Back_Buffer(unsigned int num)
@@ -3770,10 +3849,11 @@ SurfaceClass * DX8Wrapper::_Get_DX8_Back_Buffer(unsigned int num)
 	IDirect3DSurface8 * bb;
 	SurfaceClass *surf=nullptr;
 	DX8CALL(GetBackBuffer(num,D3DBACKBUFFER_TYPE_MONO,&bb));
+	DX8_RECORD(bb, SURFACE);
 	if (bb)
 	{
 		surf=NEW_REF(SurfaceClass,(bb));
-		bb->Release();
+		DX8_RELEASE(bb);
 	}
 
 	return surf;
@@ -3941,13 +4021,13 @@ void DX8Wrapper::Set_Render_Target_With_Z
 		d3d_zbuf=ztexture->Get_D3D_Surface_Level();
 		WWASSERT(d3d_zbuf!=nullptr);
 		Set_Render_Target(d3d_surf,d3d_zbuf);
-		d3d_zbuf->Release();
+		DX8_RELEASE(d3d_zbuf);
 	}
 	else
 	{
 		Set_Render_Target(d3d_surf,true);
 	}
-	d3d_surf->Release();
+	DX8_RELEASE(d3d_surf);
 
 	IsRenderToTexture = true;
 }
@@ -3963,6 +4043,7 @@ DX8Wrapper::Set_Render_Target(IDirect3DSwapChain8 *swap_chain)
 	//
 	LPDIRECT3DSURFACE8 render_target = nullptr;
 	swap_chain->GetBackBuffer (0, D3DBACKBUFFER_TYPE_MONO, &render_target);
+	DX8_RECORD(render_target, SURFACE);
 
 	//
 	//	Set this back buffer as the render target
@@ -3973,7 +4054,7 @@ DX8Wrapper::Set_Render_Target(IDirect3DSwapChain8 *swap_chain)
 	//	Release our hold on the back buffer
 	//
 	if (render_target != nullptr) {
-		render_target->Release ();
+		DX8_RELEASE(render_target);
 		render_target = nullptr;
 	}
 
@@ -4003,11 +4084,11 @@ DX8Wrapper::Set_Render_Target(IDirect3DSurface8 *render_target, bool use_default
 		if (DefaultRenderTarget != nullptr)
 		{
 			DX8CALL(SetRenderTarget (DefaultRenderTarget, DefaultDepthBuffer));
-			DefaultRenderTarget->Release ();
+			DX8_RELEASE(DefaultRenderTarget);
 			DefaultRenderTarget = nullptr;
 			if (DefaultDepthBuffer)
 			{
-				DefaultDepthBuffer->Release ();
+				DX8_RELEASE(DefaultDepthBuffer);
 				DefaultDepthBuffer = nullptr;
 			}
 		}
@@ -4017,13 +4098,13 @@ DX8Wrapper::Set_Render_Target(IDirect3DSurface8 *render_target, bool use_default
 		//
 		if (CurrentRenderTarget != nullptr)
 		{
-			CurrentRenderTarget->Release ();
+			DX8_RELEASE(CurrentRenderTarget);
 			CurrentRenderTarget = nullptr;
 		}
 
 		if (CurrentDepthBuffer!=nullptr)
 		{
-			CurrentDepthBuffer->Release();
+			DX8_RELEASE(CurrentDepthBuffer);
 			CurrentDepthBuffer=nullptr;
 		}
 
@@ -4039,6 +4120,7 @@ DX8Wrapper::Set_Render_Target(IDirect3DSurface8 *render_target, bool use_default
 		{
 //		IDirect3DSurface8 *depth_buffer = nullptr;
 			DX8CALL(GetDepthStencilSurface (&DefaultDepthBuffer));
+			DX8_RECORD(DefaultDepthBuffer, SURFACE);
 		}
 
 		//
@@ -4047,6 +4129,7 @@ DX8Wrapper::Set_Render_Target(IDirect3DSurface8 *render_target, bool use_default
 		if (DefaultRenderTarget == nullptr)
 		{
 			DX8CALL(GetRenderTarget (&DefaultRenderTarget));
+			DX8_RECORD(DefaultRenderTarget, SURFACE);
 		}
 
 		//
@@ -4054,13 +4137,13 @@ DX8Wrapper::Set_Render_Target(IDirect3DSurface8 *render_target, bool use_default
 		//
 		if (CurrentRenderTarget != nullptr)
 		{
-			CurrentRenderTarget->Release ();
+			DX8_RELEASE(CurrentRenderTarget);
 			CurrentRenderTarget = nullptr;
 		}
 
 		if (CurrentDepthBuffer!=nullptr)
 		{
-			CurrentDepthBuffer->Release();
+			DX8_RELEASE(CurrentDepthBuffer);
 			CurrentDepthBuffer=nullptr;
 		}
 
@@ -4071,7 +4154,7 @@ DX8Wrapper::Set_Render_Target(IDirect3DSurface8 *render_target, bool use_default
 		WWASSERT (CurrentRenderTarget != nullptr);
 		if (CurrentRenderTarget != nullptr)
 		{
-			CurrentRenderTarget->AddRef ();
+			DX8_ADD_REF(CurrentRenderTarget, SURFACE);
 
 			//
 			//	Switch render targets
@@ -4129,11 +4212,11 @@ void DX8Wrapper::Set_Render_Target
 		if (DefaultRenderTarget != nullptr)
 		{
 			DX8CALL(SetRenderTarget (DefaultRenderTarget, DefaultDepthBuffer));
-			DefaultRenderTarget->Release ();
+			DX8_RELEASE(DefaultRenderTarget);
 			DefaultRenderTarget = nullptr;
 			if (DefaultDepthBuffer)
 			{
-				DefaultDepthBuffer->Release ();
+				DX8_RELEASE(DefaultDepthBuffer);
 				DefaultDepthBuffer = nullptr;
 			}
 		}
@@ -4143,13 +4226,13 @@ void DX8Wrapper::Set_Render_Target
 		//
 		if (CurrentRenderTarget != nullptr)
 		{
-			CurrentRenderTarget->Release ();
+			DX8_RELEASE(CurrentRenderTarget);
 			CurrentRenderTarget = nullptr;
 		}
 
 		if (CurrentDepthBuffer!=nullptr)
 		{
-			CurrentDepthBuffer->Release();
+			DX8_RELEASE(CurrentDepthBuffer);
 			CurrentDepthBuffer=nullptr;
 		}
 	}
@@ -4164,6 +4247,7 @@ void DX8Wrapper::Set_Render_Target
 		{
 //		IDirect3DSurface8 *depth_buffer = nullptr;
 			DX8CALL(GetDepthStencilSurface (&DefaultDepthBuffer));
+			DX8_RECORD(DefaultDepthBuffer, SURFACE);
 		}
 
 		//
@@ -4172,6 +4256,7 @@ void DX8Wrapper::Set_Render_Target
 		if (DefaultRenderTarget == nullptr)
 		{
 			DX8CALL(GetRenderTarget (&DefaultRenderTarget));
+			DX8_RECORD(DefaultRenderTarget, SURFACE);
 		}
 
 		//
@@ -4179,13 +4264,13 @@ void DX8Wrapper::Set_Render_Target
 		//
 		if (CurrentRenderTarget != nullptr)
 		{
-			CurrentRenderTarget->Release ();
+			DX8_RELEASE(CurrentRenderTarget);
 			CurrentRenderTarget = nullptr;
 		}
 
 		if (CurrentDepthBuffer!=nullptr)
 		{
-			CurrentDepthBuffer->Release();
+			DX8_RELEASE(CurrentDepthBuffer);
 			CurrentDepthBuffer=nullptr;
 		}
 
@@ -4197,8 +4282,8 @@ void DX8Wrapper::Set_Render_Target
 		WWASSERT (CurrentRenderTarget != nullptr);
 		if (CurrentRenderTarget != nullptr)
 		{
-			CurrentRenderTarget->AddRef ();
-			CurrentDepthBuffer->AddRef();
+			DX8_ADD_REF(CurrentRenderTarget, SURFACE);
+			DX8_ADD_REF(CurrentDepthBuffer, SURFACE);
 
 			//
 			//	Switch render targets
@@ -4237,7 +4322,7 @@ DX8Wrapper::Create_Additional_Swap_Chain (HWND render_window)
 	//
 	IDirect3DSwapChain8 *swap_chain = nullptr;
 	DX8CALL(CreateAdditionalSwapChain(&params, &swap_chain));
-	return swap_chain;
+	return DX8_RECORDED(swap_chain, SWAP_CHAIN);
 }
 
 void DX8Wrapper::Flush_DX8_Resource_Manager(unsigned int bytes)

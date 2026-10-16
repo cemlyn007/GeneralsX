@@ -33,6 +33,15 @@
 #include "Common/DataChunk.h"
 #include "Common/file.h"
 #include "Common/FileSystem.h"
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 15/10/2026 Its temporary chunk file is opened and closed through the engine's file layer (Common/EngineFiles.h)
+#include "Common/EngineFiles.h"
+#define DATACHUNK_OPEN(name, mode) rts::openEngineFile(name, mode)
+#define DATACHUNK_CLOSE(file) rts::closeEngineFile(file)
+#else
+#define DATACHUNK_OPEN(name, mode) fopen(name, mode)
+#define DATACHUNK_CLOSE(file) fclose(file)
+#endif
 
 // If verbose, lots of debug logging.
 #define not_VERBOSE
@@ -236,7 +245,7 @@ m_pOut(pOut)
 {
 	AsciiString tmpFileName = TheGlobalData->getPath_UserData();
 	tmpFileName.concat(TEMP_FILENAME);
-	m_tmp_file = ::fopen( tmpFileName.str(), "wb" );
+	m_tmp_file = DATACHUNK_OPEN( tmpFileName.str(), "wb" );
 	m_chunkStack = nullptr;
 }
 
@@ -246,12 +255,12 @@ DataChunkOutput::~DataChunkOutput()
 	m_contents.write(*m_pOut);
 
 	// Rewind the temp m_tmp_file
-	::fclose(m_tmp_file);
+	DATACHUNK_CLOSE(m_tmp_file);
 
 	AsciiString tmpFileName = TheGlobalData->getPath_UserData();
 	tmpFileName.concat(TEMP_FILENAME);
 
- 	m_tmp_file = ::fopen( tmpFileName.str(), "rb" );
+ 	m_tmp_file = DATACHUNK_OPEN( tmpFileName.str(), "rb" );
 	::fseek(m_tmp_file, 0, SEEK_SET);
 
 	// append the temp m_tmp_file m_contents
@@ -264,7 +273,7 @@ DataChunkOutput::~DataChunkOutput()
 		m_pOut->write( buffer, len );
 	}
 
-	::fclose(m_tmp_file);
+	DATACHUNK_CLOSE(m_tmp_file);
 }
 
 void DataChunkOutput::openDataChunk( const char *name, DataChunkVersionType ver )

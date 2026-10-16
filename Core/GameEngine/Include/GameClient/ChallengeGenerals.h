@@ -33,6 +33,9 @@
 #include "Common/GameType.h"
 #include "Common/INI.h"
 #include "Common/Overridable.h"
+#if RTS_ENGINE_CONTEXT
+#include "Common/EngineCLibrary.h" // GeneralsX @bugfix cemlyn007 16/10/2026 rts::engineRand
+#endif
 
 // DEFINES ////////////////////////////////////////////////////////////////////////////////////////
 //static const Int NUM_GENERALS = 12;  // ChallengeMenu.wnd dependent
@@ -103,7 +106,13 @@ public:
 	const AsciiString& getStringVictorious() const { return m_strVictorious; }
 	const AsciiString& getSelectionSound() const { return m_strSelectionSound; }
 	const AsciiString& getRandomTauntSound() const {
+#if RTS_ENGINE_CONTEXT
+		// GeneralsX @bugfix cemlyn007 16/10/2026 rand keeps its generator in the C library's process-wide state; each
+		// engine draws from its own (Common/EngineCLibrary.h), the sequence a single-engine process's rand gives
+		switch (rts::engineRand()%3) // don't care about distribution or exactly how random this is
+#else
 		switch (rand()%3) // don't care about distribution or exactly how random this is
+#endif
 		{
 			case 0:	return m_strTauntSound1;
 			case 1: return m_strTauntSound2;

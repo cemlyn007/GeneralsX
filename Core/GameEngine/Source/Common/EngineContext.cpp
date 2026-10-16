@@ -256,6 +256,97 @@ EngineContext::EngineContext(EmbeddingConfig embedding) : m_embedding(new Embedd
 {
 }
 
+// GeneralsX @feature cemlyn007 15/10/2026 Thread bindings (see EngineContext.h). Scopes read the slots without a
+// lock; binding and unbinding take m_threadBindingWriter, so that two of them never race for one slot. A slot's
+// resource is published before its binding and cleared before it, so a reader sees a binding with its resource
+// or with null.
+namespace
+{
+class ThreadBindingWriter
+{
+public:
+	explicit ThreadBindingWriter(std::atomic<bool>& writer) noexcept : m_writer(writer)
+	{
+		while (m_writer.exchange(true, std::memory_order_acquire))
+			std::this_thread::yield();
+	}
+	~ThreadBindingWriter() { m_writer.store(false, std::memory_order_release); }
+	ThreadBindingWriter(const ThreadBindingWriter&) = delete;
+	ThreadBindingWriter& operator=(const ThreadBindingWriter&) = delete;
+
+private:
+	std::atomic<bool>& m_writer;
+};
+} // namespace
+
+void EngineContext::bindThreads(const ThreadBinding& binding, void* resource)
+{
+	{
+		const ThreadBindingWriter writer(m_threadBindingWriter);
+		ThreadBindingSlot* free = nullptr;
+		for (ThreadBindingSlot& slot : m_threadBindings)
+		{
+			const ThreadBinding* const bound = slot.binding.load(std::memory_order_relaxed);
+			if (bound == &binding)
+				throw std::logic_error("a thread binding is bound twice to one engine");
+			if (bound == nullptr && free == nullptr)
+				free = &slot;
+		}
+		if (free == nullptr)
+			throw std::logic_error("every thread binding slot of an engine is taken");
+		free->resource.store(resource, std::memory_order_release);
+		free->binding.store(&binding, std::memory_order_release);
+		m_threadBindingCount.fetch_add(1, std::memory_order_release);
+	}
+	if (t_engine == this)
+		binding.install(resource);
+}
+
+bool EngineContext::unbindThreads(const ThreadBinding& binding) noexcept
+{
+	{
+		const ThreadBindingWriter writer(m_threadBindingWriter);
+		ThreadBindingSlot* found = nullptr;
+		for (ThreadBindingSlot& slot : m_threadBindings)
+			if (slot.binding.load(std::memory_order_relaxed) == &binding)
+				found = &slot;
+		if (found == nullptr)
+			return false;
+		found->resource.store(nullptr, std::memory_order_release);
+		found->binding.store(nullptr, std::memory_order_release);
+		m_threadBindingCount.fetch_sub(1, std::memory_order_release);
+	}
+	if (t_engine == this)
+		binding.remove();
+	return true;
+}
+
+void EngineContext::installThreadBindings() const noexcept
+{
+	for (const ThreadBindingSlot& slot : m_threadBindings)
+		if (const ThreadBinding* const binding = slot.binding.load(std::memory_order_acquire))
+			binding->install(slot.resource.load(std::memory_order_acquire));
+}
+
+void EngineContext::removeThreadBindings() const noexcept
+{
+	for (const ThreadBindingSlot& slot : m_threadBindings)
+		if (const ThreadBinding* const binding = slot.binding.load(std::memory_order_acquire))
+			binding->remove();
+}
+
+const EmbeddingConfig& currentEmbedding(const char* service)
+{
+	const EmbeddingConfig* const embedding = ctx()->embedding();
+	if (embedding == nullptr)
+	{
+		const std::string reason = std::string(service) + " is used with no embedded engine current";
+		DEBUG_CRASH(("%s", reason.c_str()));
+		throw std::logic_error(reason);
+	}
+	return *embedding;
+}
+
 EngineStatics& EngineContext::statics()
 {
 	EngineStatics* existing = m_statics.load(std::memory_order_acquire);

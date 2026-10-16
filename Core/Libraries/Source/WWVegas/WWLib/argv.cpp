@@ -47,6 +47,15 @@
 #include "ffactory.h"
 #include "RAWFILE.h"
 #if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 15/10/2026 Its argument file is opened and closed through the engine's file layer (Common/EngineFiles.h)
+#include "Common/EngineFiles.h"
+#define ARGV_OPEN(name, mode) rts::openEngineFile(name, mode)
+#define ARGV_CLOSE(file) rts::closeEngineFile(file)
+#else
+#define ARGV_OPEN(name, mode) fopen(name, mode)
+#define ARGV_CLOSE(file) fclose(file)
+#endif
+#if RTS_ENGINE_CONTEXT
 // GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
 RTS_ENGINE_CLASS_STATIC_DEFINE(int, ArgvClass, Argc, 0);
 #define Argc RTS_ENGINE_GLOBAL_REF(Argc)
@@ -253,7 +262,7 @@ int ArgvClass::Init(char *lpCmdLine, const char *fileprefix)
  *=============================================================================================*/
 bool ArgvClass::Load_File(const char *fname)
 {
-	FILE *fp = fopen(fname, "r");
+	FILE *fp = ARGV_OPEN(fname, "r");
 
 	if (fp)  {
 		while (Argc < MAX_ARGC) {
@@ -288,7 +297,7 @@ bool ArgvClass::Load_File(const char *fname)
 				}
 			}
 		}
-		fclose(fp);
+		ARGV_CLOSE(fp);
 		return(true);
 	}
 	return(false);
