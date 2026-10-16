@@ -94,8 +94,9 @@ W3DShroud::~W3DShroud()
 {
 	ReleaseResources();
 
+	// GeneralsX @feature cemlyn007 16/10/2026 The source surface's record is forgotten as it is released (WW3D2/dx8ledger.h)
 	if (m_pSrcTexture)
-		m_pSrcTexture->Release();
+		DX8_RELEASE(m_pSrcTexture);
 
 	delete [] m_finalFogData;
 	delete [] m_currentFogData;
@@ -206,7 +207,7 @@ void W3DShroud::reset()
 	//Free old shroud data since it may no longer fit new map.
 	if (m_pSrcTexture)
 	{
-		m_pSrcTexture->Release();
+		DX8_RELEASE(m_pSrcTexture);
 		m_pSrcTexture=nullptr;
 	}
 

@@ -52,6 +52,8 @@ set(WW3D2_SRC
     dx8fvf.h
     dx8indexbuffer.cpp
     dx8indexbuffer.h
+    dx8ledger.cpp
+    dx8ledger.h
     dx8list.h
     dx8polygonrenderer.cpp
     dx8polygonrenderer.h
@@ -259,6 +261,12 @@ target_compile_definitions(corei_ww3d2 INTERFACE
 
 target_include_directories(corei_ww3d2 INTERFACE
     "${CMAKE_CURRENT_SOURCE_DIR}"
+)
+
+# GeneralsX @feature cemlyn007 16/10/2026 The device wrapper records its D3D8 objects in the engine's ResourceLedger
+# (dx8ledger.h, Common/EmbeddingContract.h)
+target_link_libraries(corei_ww3d2 INTERFACE
+    corei_gameengine_include
 )
 
 if (MSVC AND NOT IS_VS6_BUILD)
