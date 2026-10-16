@@ -143,6 +143,10 @@ enum GameDifficulty CPP_11(: Int)
 	DIFFICULTY_COUNT
 };
 
+// GeneralsX @feature cemlyn007 16/10/2026 TheDifficultyNames is defined in GameCommon.cpp; keep it in sync with
+// GameDifficulty.
+extern const char *const TheDifficultyNames[];
+
 //-------------------------------------------------------------------------------------------------
 enum PlayerType CPP_11(: Int)
 {
