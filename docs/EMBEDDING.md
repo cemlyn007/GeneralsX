@@ -213,6 +213,14 @@ Nothing about faults is process-wide: there is no embedded mode, no process
 fault flag and no teardown flag. An assertion's dialog shows only for an engine
 that renders to a window.
 
+### Games
+
+`rts::startedGames` (`Common/EngineGames.h`) counts the games an engine has
+started through `GameLogic::startNewGame`: skirmishes, loads and replays. The
+count is per engine, starts at zero and never decreases, and is part of no
+checksum, save or replay. A host uses it to drop what it kept for a game a new
+one has replaced.
+
 ### Test hooks
 
 A host's tests can make an engine fault, or ask to quit, on purpose, through
