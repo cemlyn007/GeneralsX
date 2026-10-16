@@ -88,8 +88,11 @@ SDL_Window* TheSDL3Window = nullptr;
 // GameText.cpp uses these paths to load CSF and STR files (game localization)
 // Format %s is replaced with language code in GameTextManager::init()
 // GeneralsX @bugfix BenderAI 13/02/2026 - Fix case-sensitivity on Linux (generals.csf vs Generals.csf)
+// GeneralsX @refactor cemlyn007 16/10/2026 With RTS_ENGINE_CONTEXT these names are GeneralsX's own constants (GameText.cpp)
+#if !RTS_ENGINE_CONTEXT
 const Char *g_csfFile = "data/%s/generals.csf";  ///< CSF file path (lowercase for Linux compatibility)
 const Char *g_strFile = "data/Generals.str";     ///< STR file path
+#endif
 
 // Extern declarations (from GameMain.cpp)
 extern Int GameMain();
@@ -311,7 +314,12 @@ int main(int argc, char* argv[])
 		// TheSuperHackers @build felipebraz 10/02/2026 Phase 1.5
 		// Store argc/argv for CommandLine parser to access via _NSGetArgc/_NSGetArgv or /proc/self/cmdline
 		// For now, let CommandLine::parseCommandLineForStartup() handle this
+#if RTS_ENGINE_CONTEXT
+		// GeneralsX @refactor cemlyn007 16/10/2026 The executable gives its engine its own command line (CommandLine.h)
+		CommandLine::parseCommandLineForStartup(argc, argv);
+#else
 		CommandLine::parseCommandLineForStartup();
+#endif
 
 		// GeneralsX @bugfix Copilot 17/05/2026 Skip SDL3 window bootstrap for CLI/headless replay execution.
 		const bool isHeadlessMode = (TheGlobalData != nullptr && TheGlobalData->m_headless);
