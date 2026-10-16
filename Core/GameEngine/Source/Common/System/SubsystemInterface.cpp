@@ -166,7 +166,14 @@ void SubsystemInterfaceList::initSubsystem(SubsystemInterface* sys, const char* 
 	fflush(stderr);
 
 	sys->setName(name);
-	
+
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @bugfix cemlyn007 16/10/2026 A subsystem whose init or INI load throws (a game file with bad data
+	// throws rts::InvalidInputData) is still listed, so that the engine's ordinary teardown (shutdownAll) deletes it
+	// and nulls its singleton: an engine whose start-up stopped partway must leave nothing behind.
+	try
+	{
+#endif
 	fprintf(stderr, "[SUBSYS] initSubsystem('%s') - About to call sys->init()\n", name.str());
 	fflush(stderr);
 	sys->init();
@@ -188,6 +195,14 @@ void SubsystemInterfaceList::initSubsystem(SubsystemInterface* sys, const char* 
 		fprintf(stderr, "[SUBSYS] initSubsystem('%s') - loadFileDirectory('%s') DONE\n", name.str(), path2);
 		fflush(stderr);
 	}
+#if RTS_ENGINE_CONTEXT
+	}
+	catch (...)
+	{
+		m_subsystems.push_back(sys);
+		throw;
+	}
+#endif
 
 	m_subsystems.push_back(sys);
 	fprintf(stderr, "[SUBSYS] initSubsystem('%s') END\n", name.str());
