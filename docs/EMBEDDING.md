@@ -404,6 +404,17 @@ closes the library, each exactly once and without running any of the engine's
 code. A host keeps a reference of its own to the library while any of its
 engines renders, so an engine closing its own never unloads it under another.
 
+A headless engine (`RenderMode::headless`) and a window engine
+(`RenderMode::window`) given the host's window in its context
+(`dx8PresentWindow`) draw the same way: into an off-screen render target and
+depth surface of the render size, in pinned formats, so their images are the
+same. A window engine's device is created on the host's window, with a back
+buffer of the render size. Its frames never present;
+`DX8Wrapper::Present_Off_Screen_Image` copies the last image into the back
+buffer and presents it when the host asks. Its own window handles stay null,
+so it makes no SDL call and pumps no events. A window engine with no present
+window, such as the game's executable's, keeps upstream's window path.
+
 ### The clock
 
 Logic code reads no clock. Every seeding names its seed: an engine starts on
