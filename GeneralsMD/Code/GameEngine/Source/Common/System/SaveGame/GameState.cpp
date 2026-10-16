@@ -853,6 +853,8 @@ SaveCode GameState::loadGame( AvailableGameInfo gameInfo )
 		// GeneralsX @feature cemlyn007 15/10/2026 A save with invalid data is the host's bad input: the engine is left with
 		// no game loaded and the error names the save (Common/InvalidInputData.h). An engine whose logic is not up yet
 		// has no game to clear.
+		if (TheGameLogic != nullptr)
+			TheGameLogic->forgetUpdateModulesOfAFailedLoad();
 		if (TheGameLogic != nullptr && TheGameLogic->isInGame())
 			TheGameLogic->clearGameData( FALSE );
 		TheGameEngine->reset();
