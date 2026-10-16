@@ -331,6 +331,9 @@ RecorderClass::RecorderClass()
 	m_archiveReplays = FALSE;
 	m_nextFrame = 0;
 	m_wasDesync = FALSE;
+#if RTS_ENGINE_CONTEXT
+	m_crcInfo = nullptr; // GeneralsX @bugfix cemlyn007 16/10/2026 The destructor frees it, so it starts null rather than zeroed by the allocator
+#endif
 	init(); // just for the heck of it.
 }
 
@@ -338,6 +341,16 @@ RecorderClass::RecorderClass()
  * Destructor
  */
 RecorderClass::~RecorderClass() {
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @bugfix cemlyn007 16/10/2026 An engine that is torn down while it plays a replay back closes the replay
+	// file and frees the playback's checksum queue: upstream left both to the end of the process.
+	if (m_file != nullptr) {
+		m_file->close();
+		m_file = nullptr;
+	}
+	delete m_crcInfo;
+	m_crcInfo = nullptr;
+#endif
 }
 
 /**
@@ -1106,6 +1119,12 @@ void RecorderClass::handleCRCMessage(UnsignedInt newCRC, Int playerIndex, Bool f
 		// (e.g. GAME_SKIRMISH vs GAME_REPLAY AIGroup allocation order) cause false positive mismatches.
 		if (mismatchFrame > 0 && newCRC != playbackCRC && !m_crcInfo->sawCRCMismatch())
 		{
+#if RTS_ENGINE_CONTEXT
+			// GeneralsX @feature cemlyn007 16/10/2026 Latch the first mismatch's frame in the engine's context, where
+			// its host reads it to stop running frames (EngineContextFields.inl, playbackMismatchFrame).
+			if (rts::ctx()->playbackMismatchFrame < 0)
+				rts::ctx()->playbackMismatchFrame = mismatchFrame;
+#endif
 			//Kris: Patch 1.01 November 10, 2003 (integrated changes from Matt Campbell)
 			// Since we don't seem to have any *visible* desyncs when replaying games, but get this warning
 			// virtually every replay, the assumption is our CRC checking is faulty.  Since we're at the
@@ -1258,6 +1277,10 @@ void RecorderClass::loadQueuedReplay()
  */
 Bool RecorderClass::playbackFile(AsciiString filename)
 {
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 16/10/2026 Each playback starts with no checksum mismatch seen.
+	rts::ctx()->playbackMismatchFrame = -1;
+#endif
 	if (!m_doingAnalysis)
 	{
 		if (TheGameLogic->isInGame())
@@ -1482,7 +1505,15 @@ void RecorderClass::readNextFrame() {
 	if (bytesRead != sizeof(m_nextFrame)) {
 		DEBUG_LOG(("RecorderClass::readNextFrame - read failed on frame %d", TheGameLogic->getFrame()));
 		m_nextFrame = -1;
+#if RTS_ENGINE_CONTEXT
+		// GeneralsX @feature cemlyn007 16/10/2026 For an embedded host the replay's last order does not end the
+		// playback: the replay's game plays on to the replay's frame count, where the host stops it, and stays loaded
+		// until the host leaves it (RecorderClass::stopPlayback). Only the file is done with.
+		m_file->close();
+		m_file = nullptr;
+#else
 		stopPlayback();
+#endif
 	}
 }
 
