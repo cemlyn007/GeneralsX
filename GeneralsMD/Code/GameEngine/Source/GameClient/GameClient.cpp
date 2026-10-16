@@ -547,6 +547,15 @@ void GameClient::update()
 			delete m_intro;
 			m_intro = nullptr;
 
+#if RTS_ENGINE_CONTEXT
+			// GeneralsX @bugfix cemlyn007 16/10/2026 The intro's end sets m_breakTheMovie, and the main menu's init
+			// clears it again. An embedded engine runs headless, with no main menu (its window manager is the
+			// dummy), so the flag stayed set, and W3DDisplay::draw, which renders only while it is clear, drew
+			// nothing for a render engine's skirmish: every image was the clear colour. Only the single-player
+			// load screen of a -file start cleared it.
+			if (TheGlobalData->m_headless)
+				TheWritableGlobalData->m_breakTheMovie = FALSE;
+#endif
 			TheShell->showShellMap(TRUE);
 			TheShell->showShell();
 
