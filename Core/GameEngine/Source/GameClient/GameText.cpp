@@ -302,8 +302,15 @@ GameTextManager::~GameTextManager()
 // GameTextManager::init
 //============================================================================
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 16/10/2026 The string files' names are GeneralsX's own constants, the game executable's
+// values, not globals an executable defines for every engine in its process
+static constexpr const Char *g_strFile = "data/Generals.str";
+static constexpr const Char *g_csfFile = "data/%s/generals.csf";
+#else
 extern const Char *g_strFile;
 extern const Char *g_csfFile;
+#endif
 
 void GameTextManager::init()
 {
