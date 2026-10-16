@@ -260,6 +260,40 @@ GeneralsX, so that they cannot drift from the engine: `TheAIStateTypeNames`,
 `TheCanAttackResultNames` and `TheLocalLegalToBuildOptionNames`, which names
 the placement options' bits in bit order.
 
+### Replays and saves
+
+Every skirmish an engine starts records the rolling replay into the replay
+folder of its user data root; `RecorderClass::isRecording` says whether that
+recording is still open.
+
+- **The mismatch latch.** The context's `playbackMismatchFrame` holds the frame
+  of a playback's first logic checksum that disagreed with the live
+  simulation, or -1 while none has. Each playback starts with it cleared, and a
+  host stops running frames once it is set.
+- **The end of a playback.** The replay's last order does not end its game:
+  only the replay file is closed, and the game plays on until the host stops it
+  at the replay's frame count. A stopped playback posts the game's exit only
+  while a game is loaded.
+- **Truncated replays.** A playback reads every order of the replay before its
+  game starts, and a replay that ends partway through an order, or holds an
+  argument of no known type, is invalid input.
+- **Host map paths.** A map the host names by its absolute path, outside the
+  map and save directories, is written into a game's options by that path and
+  read back by it, so the replay of a game on it finds it again.
+- **The generator in saves.** The `CHUNK_LogicRandom` save block holds the
+  logic random generator's state, saved last and restored when a load
+  succeeds, so a loaded game resumes with the generator its save had. A save
+  without the block restores nothing, and upstream skips the block.
+- **Scratch maps.** Each engine's `GameStateMap` tracks the scratch maps its
+  loads extracted into the save folder, and deletes only those, through the
+  file layer, at its next load and at its teardown. A map whose delete failed,
+  or whose existence could not be checked for any reason but "not found", stays
+  on the list and is retried. The context's `failingScratchMapDeletes` is a
+  test hook that makes that many of the next deletes fail.
+
+A load whose data fails partway takes every update module off the logic's
+update lists before it clears the half-loaded game, and leaves no game loaded.
+
 ### Test hooks
 
 A host's tests can make an engine fault, or ask to quit, on purpose, through
