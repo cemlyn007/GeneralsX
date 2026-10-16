@@ -99,6 +99,10 @@ RTS_ENGINE_CONTEXT_POINTER(W3DRenderState, w3dRender)
 // device, so before w3dRender exists (PLAN-023 Phase 8, stage RR2a-1).
 RTS_ENGINE_CONTEXT_VALUE(bool, dx8HeadlessRender, false)
 RTS_ENGINE_CONTEXT_VALUE(int, dx8PreserveFPU, 0)
+// GeneralsX @feature cemlyn007 16/10/2026 DX8Wrapper_PresentWindow (dx8wrapper.h): the host's window that a window
+// engine (RenderMode::window) presents its off-screen images into, set before its boot creates the device. Null for
+// every other engine, and for the game's own executable, whose window engine keeps upstream's window path.
+RTS_ENGINE_CONTEXT_VALUE(void*, dx8PresentWindow, nullptr)
 
 // GeneralsX @feature cemlyn007 30/09/2026 This engine's WW3D state (WW3D2/ww3d.h, WW3DState): WW3D's render
 // settings and render-loop statics (IsInitted, the render backend, the static sort lists, the debug shaders,
