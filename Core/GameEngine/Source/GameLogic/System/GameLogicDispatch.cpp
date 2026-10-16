@@ -298,6 +298,20 @@ void GameLogic::clearGameData( Bool showScoreScreen )
 	theBuildPlan = false;
 	thePlanSubjectCount = 0;
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @bugfix cemlyn007 17/10/2026 The logic checksum a frame that is a multiple of the CRC interval posts
+	// waits in the message stream for the next frame, and a game cleared before that frame left it there for the next
+	// game. A playback started next took it for its own first local checksum, read the replay's checksums one behind
+	// from then on, and saw a mismatch at its first comparison. The cleared game's checksums go with it.
+	for (GameMessage *msg = TheMessageStream != nullptr ? TheMessageStream->getFirstMessage() : nullptr; msg != nullptr; )
+	{
+		GameMessage *next = msg->next();
+		if (msg->getType() == GameMessage::MSG_LOGIC_CRC)
+			deleteInstance(msg);
+		msg = next;
+	}
+#endif
+
 //	m_background = TheWindowManager->winCreateLayout("Menus/BlankWindow.wnd");
 //	DEBUG_ASSERTCRASH(m_background,("We Couldn't Load Menus/BlankWindow.wnd"));
 //	m_background->hide(FALSE);
