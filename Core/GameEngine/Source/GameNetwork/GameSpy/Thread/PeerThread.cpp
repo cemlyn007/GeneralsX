@@ -50,6 +50,9 @@
 #include "WWLib/thread.h"
 
 #include "Common/MiniLog.h"
+#if RTS_ENGINE_CONTEXT
+#include "Common/EngineSockets.h" // GeneralsX @feature cemlyn007 16/10/2026 rts::openEngineSocket, rts::closeEngineSocket
+#endif
 
 
 // enable this for trying to track down why SBServers are losing their keyvals  -MDC 2/20/2003
@@ -109,6 +112,30 @@ RTS_ENGINE_GLOBAL(SOCKET, qr2Sock, INVALID_SOCKET);
 #define qr2Sock RTS_ENGINE_GLOBAL_REF(qr2Sock)
 #else
 static SOCKET qr2Sock = INVALID_SOCKET;
+#endif
+
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 16/10/2026 The query-and-reporting socket is opened and closed through the engine's
+// socket layer, which records it in the engine's ResourceLedger. GameSpy's SDK uses it but never closes it.
+static SOCKET openQR2Socket()
+{
+	return rts::openEngineSocket(AF_INET, SOCK_DGRAM, IPPROTO_UDP, "GameSpy query and reporting");
+}
+
+static void closeQR2Socket(SOCKET sock)
+{
+	rts::closeEngineSocket(sock);
+}
+#else
+static SOCKET openQR2Socket()
+{
+	return socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+}
+
+static void closeQR2Socket(SOCKET sock)
+{
+	closesocket(sock);
+}
 #endif
 
 enum
@@ -1054,7 +1081,7 @@ void PeerThreadClass::stopHostingAlready(PEER peer)
 	peerStopGame(peer);
 	if (qr2Sock != INVALID_SOCKET)
 	{
-		closesocket(qr2Sock);
+		closeQR2Socket(qr2Sock);
 		qr2Sock = INVALID_SOCKET;
 	}
 }
@@ -1464,7 +1491,7 @@ void PeerThreadClass::Thread_Function()
 				peerLeaveRoom( peer, StagingRoom, nullptr );
 				if (qr2Sock != INVALID_SOCKET)
 				{
-					closesocket(qr2Sock);
+					closeQR2Socket(qr2Sock);
 					qr2Sock = INVALID_SOCKET;
 				}
 				m_isHosting = false;
@@ -1520,7 +1547,7 @@ void PeerThreadClass::Thread_Function()
 					peerStopGame( peer );
 					if (qr2Sock != INVALID_SOCKET)
 					{
-						closesocket(qr2Sock);
+						closeQR2Socket(qr2Sock);
 						qr2Sock = INVALID_SOCKET;
 					}
 					m_isHosting = false;
@@ -1649,10 +1676,10 @@ void PeerThreadClass::Thread_Function()
 					}
 					else
 					{
-						closesocket(qr2Sock);
+						closeQR2Socket(qr2Sock);
 						qr2Sock = INVALID_SOCKET;
 					}
-					qr2Sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+					qr2Sock = openQR2Socket();
 					struct sockaddr_in saddr;
 					saddr.sin_port=htons(preferredQRPort);
 					saddr.sin_addr.s_addr=localIP;
@@ -1660,7 +1687,7 @@ void PeerThreadClass::Thread_Function()
 					if (bind(qr2Sock, (sockaddr *)&saddr, sizeof(saddr)) != 0)
 					{
 						DEBUG_LOG(("Could not bind to %d!  Falling back to GameSpy's default port", preferredQRPort));
-						closesocket(qr2Sock);
+						closeQR2Socket(qr2Sock);
 						qr2Sock = INVALID_SOCKET;
 						preferredQRPort = 0;
 					}

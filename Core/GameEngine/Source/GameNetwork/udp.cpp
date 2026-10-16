@@ -34,6 +34,9 @@
 #include "Common/GameEngine.h"
 //#include "GameNetwork/NetworkInterface.h"
 #include "GameNetwork/udp.h"
+#if RTS_ENGINE_CONTEXT
+#include "Common/EngineSockets.h" // GeneralsX @feature cemlyn007 16/10/2026 rts::openEngineSocket, rts::closeEngineSocket
+#endif
 
 #if defined(_WIN32) && defined(_MSC_VER)
 typedef int socklen_t;
@@ -125,7 +128,11 @@ UDP::UDP()
 UDP::~UDP()
 {
 	if (fd)
+#if RTS_ENGINE_CONTEXT
+		rts::closeEngineSocket(fd); // GeneralsX @feature cemlyn007 16/10/2026 opened through the engine's socket layer
+#else
 		closesocket(fd);
+#endif
 }
 
 Int UDP::Bind(const char *Host,UnsignedShort port)
@@ -160,7 +167,12 @@ Int UDP::Bind(UnsignedInt IP,UnsignedShort Port)
   addr.sin_family=AF_INET;
   addr.sin_port=Port;
   addr.sin_addr.s_addr=IP;
+#if RTS_ENGINE_CONTEXT
+  // GeneralsX @feature cemlyn007 16/10/2026 Opened through the engine's socket layer, which records it in the ledger
+  fd=rts::openEngineSocket(AF_INET,SOCK_DGRAM,DEFAULT_PROTOCOL,"UDP");
+#else
   fd=socket(AF_INET,SOCK_DGRAM,DEFAULT_PROTOCOL);
+#endif
   #ifdef _WIN32
   if (fd==SOCKET_ERROR)
     fd=-1;
