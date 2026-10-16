@@ -63,9 +63,17 @@
 #include "Common/EngineFiles.h"
 #define FTP_OPEN(name, mode) rts::openEngineFile(name, mode)
 #define FTP_CLOSE(file) rts::closeEngineFile(file)
+// GeneralsX @feature cemlyn007 16/10/2026 Its sockets are opened, accepted and closed through the engine's socket layer, which records each in the engine's ResourceLedger (Common/EngineSockets.h)
+#include "Common/EngineSockets.h"
+#define FTP_SOCKET(what) rts::openEngineSocket(AF_INET, SOCK_STREAM, 0, what)
+#define FTP_ACCEPT(listener) rts::acceptEngineSocket(listener, nullptr, nullptr, "FTP data")
+#define FTP_CLOSESOCKET(sock) rts::closeEngineSocket(sock)
 #else
 #define FTP_OPEN(name, mode) fopen(name, mode)
 #define FTP_CLOSE(file) fclose(file)
+#define FTP_SOCKET(what) socket(AF_INET, SOCK_STREAM, 0)
+#define FTP_ACCEPT(listener) accept(listener, nullptr, nullptr)
+#define FTP_CLOSESOCKET(sock) closesocket(sock)
 #endif
 
 // umm... what?? BGC 3/27/03
@@ -246,13 +254,13 @@ void Cftp::CloseSockets()
 
 	if( m_iDataSocket )
 	{
-		closesocket( m_iDataSocket );
+		FTP_CLOSESOCKET( m_iDataSocket );
 		m_iDataSocket=0;
 	}
 
 	if( m_iCommandSocket )
 	{
-		closesocket( m_iCommandSocket );
+		FTP_CLOSESOCKET( m_iCommandSocket );
 		m_iCommandSocket=0;
 	}
 
@@ -283,16 +291,18 @@ void Cftp::ZeroStuff()
 
 #if RTS_ENGINE_CONTEXT
 // GeneralsX @feature cemlyn007 15/10/2026 The lookup runs on a thread started through the engine's ThreadStarter
-// (Common/EngineThread.h), with its own copy of the host name. gethostbyname cannot be interrupted, so a stop request
-// takes effect when it returns: the thread then leaves the results alone.
+// (Common/EngineThread.h), with its own copy of the host name.
+// GeneralsX @feature cemlyn007 16/10/2026 It asks the name servers through the engine's socket layer
+// (rts::resolveEngineHostName) instead of gethostbyname, which cannot be interrupted, so a stop request ends the lookup
+// within a poll interval; the thread then leaves the results alone.
 static void gethostbynameThreadBody( const std::string& name, const std::stop_token& stop )
 {
-	HOSTENT *he = gethostbyname( name.c_str() );
+	const std::optional<in_addr> address = rts::resolveEngineHostName( name.c_str(), stop );
 	if (stop.stop_requested())
 		return;
 
-	if (he)
-		memcpy((char *)&(gThreadAddress.sin_addr), he->h_addr, he->h_length );
+	if (address)
+		gThreadAddress.sin_addr = *address;
 	else
 		memcpy((char *)&(gThreadAddress.sin_addr),"",strlen("")+1);
 
@@ -443,7 +453,7 @@ HRESULT  Cftp::ConnectToServer(LPCSTR szServerName)
 
 		/* Open a socket. */
 
-		m_iCommandSocket = socket( AF_INET, SOCK_STREAM, 0 );
+		m_iCommandSocket = FTP_SOCKET( "FTP command" );
 
 		if( m_iCommandSocket < 0 )
 		{
@@ -479,7 +489,7 @@ HRESULT  Cftp::ConnectToServer(LPCSTR szServerName)
 			if( error != WSAEISCONN )
 			{
             ////////DBGMSG("Connect failed");
-				closesocket( m_iCommandSocket );
+				FTP_CLOSESOCKET( m_iCommandSocket );
 				return( FTP_FAILED );
 			}
 		}
@@ -502,7 +512,7 @@ HRESULT  Cftp::ConnectToServer(LPCSTR szServerName)
 			return(FTP_TRYING);
 		if (FD_ISSET(m_iCommandSocket, &eset)) {
 			// OK, the exception flag is set, guess we couldn't connect....
-			closesocket( m_iCommandSocket );
+			FTP_CLOSESOCKET( m_iCommandSocket );
 			return( FTP_FAILED );
 		}
 		if (FD_ISSET(m_iCommandSocket, &wset)) {
@@ -1182,7 +1192,7 @@ int Cftp::SendNewPort()
 	if( m_sendNewPortStatus == 0 )
 	{
 
-		m_iDataSocket = socket( AF_INET, SOCK_STREAM, 0 );
+		m_iDataSocket = FTP_SOCKET( "FTP data listener" );
 
 		if( m_iDataSocket < 0 )
 		{
@@ -1317,7 +1327,7 @@ int Cftp::OpenDataConnection()
 		return( FTP_FAILED );
 	}
 
-	if( ( iNewSocket = accept( m_iDataSocket, nullptr, nullptr ) ) < 0 )
+	if( ( iNewSocket = FTP_ACCEPT( m_iDataSocket ) ) < 0 )
 	{
 		if( WSAGetLastError() != (WSAEWOULDBLOCK ) )
 		{
@@ -1329,6 +1339,11 @@ int Cftp::OpenDataConnection()
 		}
 	}
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @bugfix cemlyn007 16/10/2026 The listener is closed once it has given its one data connection: upstream
+	// dropped it open, so every transfer leaked a socket (each SendNewPort opens a new listener).
+	FTP_CLOSESOCKET( m_iDataSocket );
+#endif
 	m_iDataSocket = iNewSocket;
 
 	return( FTP_SUCCEEDED );
@@ -1354,7 +1369,7 @@ int Cftp::OpenDataConnection()
 
 void Cftp::CloseDataConnection()
 {
-	closesocket( m_iDataSocket );
+	FTP_CLOSESOCKET( m_iDataSocket );
 	m_iDataSocket = 0;
 }
 
@@ -1378,7 +1393,7 @@ HRESULT  Cftp::DisconnectFromServer()
 	// Make the download file read-only so it's still there the next time
 	// we're run.
 
-	closesocket( m_iCommandSocket );
+	FTP_CLOSESOCKET( m_iCommandSocket );
 	return( FTP_SUCCEEDED );
 }
 

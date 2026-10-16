@@ -583,6 +583,13 @@ ScriptEngine::~ScriptEngine()
 //-------------------------------------------------------------------------------------------------
 void ScriptEngine::init()
 {
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 16/10/2026 An embedded engine loads no tool library: the script debugger and the
+	// particle editor are Windows DLLs that do not exist for it, and a library it loaded would be one its ResourceLedger
+	// does not know. Without them every hook below is skipped, as when the DLLs are missing upstream.
+	st_DebugDLL = nullptr;
+	st_ParticleDLL = nullptr;
+#else
 	if (TheGlobalData->m_windowed)
 		if (TheGlobalData->m_scriptDebug) {
 			st_DebugDLL = LoadLibrary("DebugWindow.dll");
@@ -595,6 +602,7 @@ void ScriptEngine::init()
 		} else {
 			st_ParticleDLL = nullptr;
 		}
+#endif
 
 		if (st_DebugDLL) {
 			FARPROC proc = GetProcAddress(st_DebugDLL, "CreateDebugDialog");

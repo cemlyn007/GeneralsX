@@ -43,6 +43,9 @@
 #endif
 
 #include "GameNetwork/GameSpy/GameResultsThread.h"
+#if RTS_ENGINE_CONTEXT
+#include "Common/EngineSockets.h" // GeneralsX @feature cemlyn007 16/10/2026 rts::openEngineSocket, rts::closeEngineSocket
+#endif
 #include "WWLib/mutex.h"
 #include "WWLib/thread.h"
 
@@ -357,12 +360,36 @@ static const char *getWSAErrorString( Int error )
 #endif
 //-------------------------------------------------------------------------
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 16/10/2026 The results socket is opened and closed through the engine's socket layer,
+// which records it in the engine's ResourceLedger.
+static Int openResultsSocket()
+{
+	return rts::openEngineSocket( AF_INET, SOCK_STREAM, 0, "game results" );
+}
+
+static void closeResultsSocket( Int sock )
+{
+	rts::closeEngineSocket( sock );
+}
+#else
+static Int openResultsSocket()
+{
+	return socket( AF_INET, SOCK_STREAM, 0 );
+}
+
+static void closeResultsSocket( Int sock )
+{
+	closeResultsSocket( sock );
+}
+#endif
+
 Int GameResultsThreadClass::sendGameResults( UnsignedInt IP, UnsignedShort port, const std::string& results )
 {
 	int error = 0;
 
 	// create the socket
-	Int sock = socket( AF_INET, SOCK_STREAM, 0 );
+	Int sock = openResultsSocket();
 	if (sock < 0)
 	{
 		DEBUG_LOG(("GameResultsThreadClass::sendGameResults() - socket() returned %d(%s)", sock, getWSAErrorString(sock)));
@@ -383,12 +410,15 @@ Int GameResultsThreadClass::sendGameResults( UnsignedInt IP, UnsignedShort port,
 		DEBUG_LOG(("GameResultsThreadClass::sendGameResults() - connect() returned %d(%s)", error, getWSAErrorString(error)));
 		if( ( error == WSAEWOULDBLOCK ) || ( error == WSAEINVAL ) || ( error == WSAEALREADY ) )
 		{
+#if RTS_ENGINE_CONTEXT
+			closeResultsSocket( sock ); // GeneralsX @bugfix cemlyn007 16/10/2026 upstream left this socket open
+#endif
 			return( -1 );
 		}
 
 		if( error != WSAEISCONN )
 		{
-			closesocket( sock );
+			closeResultsSocket( sock );
 			return( -1 );
 		}
 	}
@@ -397,11 +427,11 @@ Int GameResultsThreadClass::sendGameResults( UnsignedInt IP, UnsignedShort port,
 	{
 		error = WSAGetLastError();
 		DEBUG_LOG(("GameResultsThreadClass::sendGameResults() - send() returned %d(%s)", error, getWSAErrorString(error)));
-		closesocket(sock);
+		closeResultsSocket( sock );
 		return WSAGetLastError();
 	}
 
-	closesocket(sock);
+	closeResultsSocket( sock );
 
 	return results.length();
 }

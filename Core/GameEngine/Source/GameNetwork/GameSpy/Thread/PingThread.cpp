@@ -430,6 +430,16 @@ DWORD WINAPI IcmpSendEcho(
 #define LOOPLIMIT   4
 #define DEFAULT_TTL 64
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 16/10/2026 An embedded engine has no ICMP.DLL (a Windows library) and loads no
+// library its ResourceLedger does not know, so every ping fails, with -1, as it does upstream when the DLL is missing.
+Int PingThreadClass::doPing(UnsignedInt IP, Int timeout)
+{
+   (void)IP;
+   (void)timeout;
+   return -1;
+}
+#else
 Int PingThreadClass::doPing(UnsignedInt IP, Int timeout)
 {
    /*
@@ -584,6 +594,7 @@ cleanup:
 
    return pingTime;
 }
+#endif
 
 
 //-------------------------------------------------------------------------

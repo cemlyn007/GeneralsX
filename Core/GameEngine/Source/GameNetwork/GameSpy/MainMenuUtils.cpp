@@ -56,6 +56,7 @@
 #include "WWDownload/urlBuilder.h"
 #if RTS_ENGINE_CONTEXT
 #include "Common/EngineThread.h" // GeneralsX @feature cemlyn007 15/10/2026 rts::startEngineThread
+#include "Common/EngineSockets.h" // GeneralsX @feature cemlyn007 16/10/2026 rts::resolveEngineHostName
 // GeneralsX @feature cemlyn007 15/10/2026 Its files are opened and closed through the engine's file layer (Common/EngineFiles.h)
 #include "Common/EngineFiles.h"
 #endif
@@ -816,17 +817,19 @@ void CheckNumPlayersOnline()
 
 #if RTS_ENGINE_CONTEXT
 // GeneralsX @feature cemlyn007 15/10/2026 The lookup runs on a thread started through the engine's ThreadStarter
-// (Common/EngineThread.h), with its own copy of the host name (the caller's is a local array). gethostbyname cannot
-// be interrupted, so a stop request takes effect when it returns: the thread then leaves the results alone.
+// (Common/EngineThread.h), with its own copy of the host name (the caller's is a local array).
+// GeneralsX @feature cemlyn007 16/10/2026 It asks the name servers through the engine's socket layer
+// (rts::resolveEngineHostName) instead of gethostbyname, which cannot be interrupted, so a stop request ends the lookup
+// within a poll interval; the thread then leaves the results alone.
 static void asyncGethostbynameThreadBody( const std::string& name, const std::stop_token& stop )
 {
-	HOSTENT *he = gethostbyname( name.c_str() );
+	const std::optional<in_addr> address = rts::resolveEngineHostName( name.c_str(), stop );
 	if (stop.stop_requested())
 	{
 		return;
 	}
 
-	s_asyncDNSThreadSucceeded = (he != nullptr) ? TRUE : FALSE;
+	s_asyncDNSThreadSucceeded = address ? TRUE : FALSE;
 	s_asyncDNSThreadDone = TRUE;
 }
 #else
