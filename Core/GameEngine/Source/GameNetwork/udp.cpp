@@ -35,6 +35,9 @@
 //#include "GameNetwork/NetworkInterface.h"
 #include "GameNetwork/udp.h"
 #if RTS_ENGINE_CONTEXT
+#include "Common/EngineCLibrary.h" // GeneralsX @bugfix cemlyn007 16/10/2026 rts::lookUpHostAddresses
+#endif
+#if RTS_ENGINE_CONTEXT
 #include "Common/EngineSockets.h" // GeneralsX @feature cemlyn007 16/10/2026 rts::openEngineSocket, rts::closeEngineSocket
 #endif
 
@@ -137,17 +140,29 @@ UDP::~UDP()
 
 Int UDP::Bind(const char *Host,UnsignedShort port)
 {
+#if !RTS_ENGINE_CONTEXT
   struct hostent *hostStruct;
   struct in_addr *hostNode;
+#endif
 
   if (isdigit(Host[0]))
     return ( Bind( ntohl(inet_addr(Host)), port) );
 
+#if RTS_ENGINE_CONTEXT
+  // GeneralsX @bugfix cemlyn007 16/10/2026 gethostbyname returns the C library's one process-wide result,
+  // which engines on two threads would both write; the lookup returns a list of this caller's own
+  // (Common/EngineCLibrary.h)
+  const std::vector<in_addr> hostAddresses = rts::lookUpHostAddresses(Host);
+  if (hostAddresses.empty())
+    return (0);
+  return ( Bind(ntohl(hostAddresses[0].s_addr),port) );
+#else
   hostStruct = gethostbyname(Host);
   if (hostStruct == nullptr)
     return (0);
   hostNode = (struct in_addr *) hostStruct->h_addr;
   return ( Bind(ntohl(hostNode->s_addr),port) );
+#endif
 }
 
 // You must call bind, implicit binding is for sissies

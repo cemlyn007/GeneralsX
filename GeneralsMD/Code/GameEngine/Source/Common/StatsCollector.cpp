@@ -251,8 +251,17 @@ void StatsCollector::writeFileEnd()
 	struct tm *newTime;
 	time_t aclock;
   time( &aclock );
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @bugfix cemlyn007 16/10/2026 localtime and asctime return the C library's process-wide buffers, which
+	// engines on two threads would both write
+	struct tm localTime;
+	char timeText[26] = "";
+	newTime = localtime_r( &aclock, &localTime );
+	fprintf(f, "End Time:\t%s\n", newTime != nullptr ? asctime_r(newTime, timeText) : timeText );
+#else
   newTime = localtime( &aclock );
 	fprintf(f, "End Time:\t%s\n",asctime(newTime) );
+#endif
 
 	fprintf(f, "=KEY===============================================\n");
 	fprintf(f, "Time* = The Time Interval\n");
@@ -324,7 +333,14 @@ void StatsCollector::createFileName()
 	time_t longTime;
 	struct tm *curtime;
 	time(&longTime);
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @bugfix cemlyn007 16/10/2026 localtime returns the C library's one process-wide buffer, which engines on
+	// two threads would both write
+	struct tm localTime;
+	curtime = localtime_r(&longTime, &localTime);
+#else
 	curtime = localtime(&longTime);
+#endif
 	strftime(datestr, 256, "_%b%d_%I%M%p", curtime);
 //	const MapMetaData *m =  TheMapCache->findMap(TheGlobalData->m_mapName);
 	AsciiString name = TheGlobalData->m_mapName;
@@ -396,8 +412,17 @@ void StatsCollector::writeInitialFileInfo()
 	struct tm *newTime;
 	time_t aclock;
   time( &aclock );
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @bugfix cemlyn007 16/10/2026 localtime and asctime return the C library's process-wide buffers, which
+	// engines on two threads would both write
+	struct tm localTime;
+	char timeText[26] = "";
+	newTime = localtime_r( &aclock, &localTime );
+	fprintf(f, "Date:\t%s", newTime != nullptr ? asctime_r(newTime, timeText) : timeText );
+#else
   newTime = localtime( &aclock );
 	fprintf(f, "Date:\t%s",asctime(newTime) );
+#endif
 
 	// Map
 	fprintf(f, "Map:\t%s\n", TheGlobalData->m_mapName.str());

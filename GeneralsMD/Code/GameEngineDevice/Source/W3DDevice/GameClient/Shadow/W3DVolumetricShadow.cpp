@@ -62,6 +62,14 @@
 #include "wwshade/shdsubmesh.h"
 #endif
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @bugfix cemlyn007 16/10/2026 rand and srand keep their generator in the C library's process-wide state;
+// each engine draws from and seeds its own (Common/EngineCLibrary.h), as a single-engine process's rand and srand do.
+#include "Common/EngineCLibrary.h"
+#define rand rts::engineRand
+#define srand rts::engineSrand
+#endif
+
 
 // Global Variables and Functions /////////////////////////////////////////////
 
