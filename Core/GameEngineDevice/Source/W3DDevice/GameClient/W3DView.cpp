@@ -388,7 +388,23 @@ void W3DView::buildCameraTransform( Matrix3D *transform, const Vector3 &sourcePo
 
 	// build new camera transform
 	transform->Make_Identity();
-	transform->Look_At( sourcePos, targetPos, 0 );
+	// GeneralsX @feature cemlyn007 16/10/2026 Looking straight down, the view direction has no
+	// horizontal part, so Look_At cannot tell the yaw from it and would always turn the view to yaw 0.
+	// Build that view from the yaw instead: face the yaw's horizontal heading, then pitch down a right
+	// angle, as Look_At_Dir does for a direction just short of vertical. Every other view is unchanged.
+	const Vector3 lookDirection = targetPos - sourcePos;
+	const Real horizontalLength = WWMath::Sqrt(lookDirection.X * lookDirection.X + lookDirection.Y * lookDirection.Y);
+	if (lookDirection.Z < 0.0f && horizontalLength <= 1.0e-4f * lookDirection.Length())
+	{
+		const Real yaw = getAngle() - ViewDefaultYawRadians;
+		const Vector3 heading(-WWMath::Sin(yaw), WWMath::Cos(yaw), 0.0f);
+		transform->Look_At( sourcePos, sourcePos + heading, 0 );
+		transform->Rotate_X( -1.0f, 0.0f );
+	}
+	else
+	{
+		transform->Look_At( sourcePos, targetPos, 0 );
+	}
 
 	//WST 11/12/2002 New camera shaker system
 	// TheSuperHackers @tweak The camera shaker is now decoupled from the render update.

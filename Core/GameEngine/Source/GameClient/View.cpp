@@ -186,7 +186,9 @@ void View::setAngle( Real radians )
 void View::setPitch( Real radians )
 {
 #if CLAMP_VIEW_PITCH
-	m_pitch = clamp(DEG_TO_RADF(0.1f), radians, DEG_TO_RADF(89.9f));
+	// GeneralsX @feature cemlyn007 16/10/2026 A pitch of 90 degrees looks straight down (W3DView builds
+	// that view from the yaw), so the clamp's top is 90 degrees rather than 89.9.
+	m_pitch = clamp(DEG_TO_RADF(0.1f), radians, DEG_TO_RADF(90.0f));
 #else
 	m_pitch = WWMath::Normalize_Angle(radians);
 #endif
