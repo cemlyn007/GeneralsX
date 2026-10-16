@@ -156,6 +156,37 @@ enum SnapshotType CPP_11(: Int) {
 	SNAPSHOT_MAX
 };
 
+#if RTS_ENGINE_CONTEXT
+// ------------------------------------------------------------------------------------------------
+/** GeneralsX @feature cemlyn007 16/10/2026 The logic random generator's state as a save block
+	* (CHUNK_LogicRandom), so that a load can resume the generator where the saved game left it.
+	* Upstream saves leave it out, and a loaded game ran on from whatever state the engine was in.
+	* A file without the block (an upstream save) restores nothing; one with it loads upstream too,
+	* which skips a block it does not know. */
+// ------------------------------------------------------------------------------------------------
+class LogicRandomState : public Snapshot
+{
+
+public:
+
+	void forget() { m_loaded = FALSE; }
+	Bool restore();		///< make the state the last load read the engine's logic generator state; FALSE if none was read
+
+protected:
+
+	virtual void crc( Xfer *xfer ) override { }
+	virtual void xfer( Xfer *xfer ) override;
+	virtual void loadPostProcess() override { }
+
+private:
+
+	UnsignedInt m_seed[6] = {};
+	UnsignedInt m_baseSeed = 0;
+	Bool m_loaded = FALSE;
+
+};
+#endif
+
 // ------------------------------------------------------------------------------------------------
 // ------------------------------------------------------------------------------------------------
 class GameState : public SubsystemInterface,
@@ -219,6 +250,12 @@ public:
 	// save/load flow.
 	void friend_iterateSaveFiles( IterateSaveFileCallback callback, void *userData ) { iterateSaveFiles( callback, userData ); }
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 16/10/2026 Test-only: add a save block, as init() adds the engine's own, so that a
+	// host's test can run its own code inside a save or a load (an engine error raised while a valid save loads).
+	void friend_addSnapshotBlock( AsciiString blockName, Snapshot *snapshot ) { addSnapshotBlock( blockName, snapshot, SNAPSHOT_SAVELOAD ); }
+#endif
+
 protected:
 
 	// snapshot methods
@@ -258,6 +295,10 @@ private:
 	AvailableGameInfo *m_availableGames;		///< list of available games we can save over or load from
 
 	Bool m_isInLoadGame; // Brutal hack to allow bone pos validation while loading games
+
+#if RTS_ENGINE_CONTEXT
+	LogicRandomState m_logicRandomState;	///< GeneralsX @feature cemlyn007 16/10/2026 the CHUNK_LogicRandom block
+#endif
 };
 
 // EXTERNALS //////////////////////////////////////////////////////////////////////////////////////

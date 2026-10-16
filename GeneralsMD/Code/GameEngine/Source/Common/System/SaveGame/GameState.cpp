@@ -355,6 +355,11 @@ void GameState::init()
 	addSnapshotBlock( "CHUNK_ParticleSystem",					TheParticleSystemManager,	SNAPSHOT_SAVELOAD );
 	addSnapshotBlock( "CHUNK_TerrainVisual",					TheTerrainVisual,					SNAPSHOT_SAVELOAD );
 	addSnapshotBlock( "CHUNK_GhostObject",						TheGhostObjectManager,		SNAPSHOT_SAVELOAD );
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 16/10/2026 Last, so that a load reads the generator state after every block that
+	// might draw from the generator as it loads.
+	addSnapshotBlock( "CHUNK_LogicRandom",						&m_logicRandomState,			SNAPSHOT_SAVELOAD );
+#endif
 
 	// add all the snapshot objects to our list of data blocks for deep CRCs of logic
 	addSnapshotBlock( "CHUNK_TeamFactory",						TheTeamFactory,						SNAPSHOT_DEEPCRC_LOGICONLY );
@@ -748,6 +753,9 @@ SaveCode GameState::loadGame( AvailableGameInfo gameInfo )
 	TheGhostObjectManager->saveLockGhostObjects( TRUE );
 
 	LatchRestore<Bool> inLoadGame(m_isInLoadGame, TRUE);
+#if RTS_ENGINE_CONTEXT
+	m_logicRandomState.forget();
+#endif
 
 	// load the save data
 	Bool error = FALSE;
@@ -845,6 +853,8 @@ SaveCode GameState::loadGame( AvailableGameInfo gameInfo )
 		// GeneralsX @feature cemlyn007 15/10/2026 A save with invalid data is the host's bad input: the engine is left with
 		// no game loaded and the error names the save (Common/InvalidInputData.h). An engine whose logic is not up yet
 		// has no game to clear.
+		if (TheGameLogic != nullptr)
+			TheGameLogic->forgetUpdateModulesOfAFailedLoad();
 		if (TheGameLogic != nullptr && TheGameLogic->isInGame())
 			TheGameLogic->clearGameData( FALSE );
 		TheGameEngine->reset();
@@ -858,6 +868,11 @@ SaveCode GameState::loadGame( AvailableGameInfo gameInfo )
 #endif
 
 	}
+
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 16/10/2026 The loaded game resumes with the logic generator state the save holds.
+	m_logicRandomState.restore();
+#endif
 
 	//
 	// when loading a mission save, we want to do as much normal loading stuff as we
@@ -1756,6 +1771,45 @@ void GameState::xferSaveData( Xfer *xfer, SnapshotType which )
 	}
 
 }
+
+#if RTS_ENGINE_CONTEXT
+// ------------------------------------------------------------------------------------------------
+/** GeneralsX @feature cemlyn007 16/10/2026 Xfer the logic generator's six seeds and its base seed.
+	* Version Info:
+	* 1: Initial version */
+// ------------------------------------------------------------------------------------------------
+void LogicRandomState::xfer( Xfer *xfer )
+{
+	XferVersion currentVersion = 1;
+	XferVersion version = currentVersion;
+	xfer->xferVersion( &version, currentVersion );
+
+	if( xfer->getXferMode() == XFER_SAVE )
+	{
+		for( Int index = 0; index < 6; ++index )
+			m_seed[ index ] = rts::ctx()->gameLogicSeed[ index ];
+		m_baseSeed = rts::ctx()->gameLogicBaseSeed;
+	}
+	for( Int index = 0; index < 6; ++index )
+		xfer->xferUnsignedInt( &m_seed[ index ] );
+	xfer->xferUnsignedInt( &m_baseSeed );
+	if( xfer->getXferMode() == XFER_LOAD )
+		m_loaded = TRUE;
+}
+
+// ------------------------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------------------
+Bool LogicRandomState::restore()
+{
+	if( !m_loaded )
+		return FALSE;
+	for( Int index = 0; index < 6; ++index )
+		rts::ctx()->gameLogicSeed[ index ] = m_seed[ index ];
+	rts::ctx()->gameLogicBaseSeed = m_baseSeed;
+	m_loaded = FALSE;
+	return TRUE;
+}
+#endif
 
 // ------------------------------------------------------------------------------------------------
 /** Add a snapshot to the post process list for later */

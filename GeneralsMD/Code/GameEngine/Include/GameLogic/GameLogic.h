@@ -140,6 +140,13 @@ public:
 	Real getHeight();													///< Returns the height of the world
 
 	Bool isInGameLogicUpdate() const { return m_isInUpdate; }
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @bugfix cemlyn007 16/10/2026 Take every update module off the update lists, as loadPostProcess does
+	// before it rebuilds them. A load that fails partway has created objects whose update modules its xfer took out of
+	// the sleepy heap's index (UpdateModule::xfer) without the post-process that puts them back, and clearing that game
+	// erased them by index -1. GameState::loadGame calls this before it clears a game whose load failed.
+	void forgetUpdateModulesOfAFailedLoad();
+#endif
 	Bool hasUpdated() const { return m_hasUpdated; } ///< Returns true if the logic frame has advanced in the current client/render update
 	UnsignedInt getFrame();										///< Returns the current simulation frame number
 	UnsignedInt getCRC( Int mode = CRC_CACHED, AsciiString deepCRCFileName = AsciiString::TheEmptyString );		///< Returns the CRC

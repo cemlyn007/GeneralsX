@@ -43,6 +43,7 @@
 #include "GameNetwork/GameSpy/StagingRoomGameInfo.h"
 #include "GameNetwork/LANAPI.h"						// for testing packet size
 #include "GameNetwork/LANAPICallbacks.h"	// for testing packet size
+#include "Lib/PathUtil.h"
 #include "WWLib/strtok_r.h"
 #include "WWLib/utf8.h"
 
@@ -971,11 +972,34 @@ static Bool truncatePlayerNames(const GameInfo& game, AsciiString playerNames[MA
 	return true;
 }
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 16/10/2026 A map file an embedding host names by its absolute path, outside the map
+// directories and the save directory (MapCache::addMapFile). Its game options name it by that path, as it is, so that
+// its replay finds it again: the portable form names a map by its directory under one of those directories.
+static Bool isHostMapPath(const AsciiString& path)
+{
+	if (!isAbsolutePath(path.str()))
+		return FALSE;
+	return !path.startsWithNoCase(GameState::getSaveDirectory())
+		&& !path.startsWithNoCase(TheMapCache->getMapDir())
+		&& !path.startsWithNoCase(TheMapCache->getUserMapDir());
+}
+#endif
+
 static AsciiString buildGameInfoAsciiString(const GameInfo& game, const AsciiString playerNames[MAX_SLOTS])
 {
 	AsciiString mapName = game.getMap();
+#if RTS_ENGINE_CONTEXT
+	const Bool hostMap = isHostMapPath(mapName);
+	if (!hostMap)
+#endif
 	mapName = TheGameState->realMapPathToPortableMapPath(mapName);
 	AsciiString newMapName;
+#if RTS_ENGINE_CONTEXT
+	if (hostMap)
+		newMapName = mapName;
+	else
+#endif
 	if (!mapName.isEmpty())
 	{
 		AsciiString token;
@@ -1233,6 +1257,17 @@ Bool ParseAsciiStringToGameInfo(GameInfo *game, AsciiString options)
 			useStats = atoi(val.str());
 			sawUseStats = true;
 		}
+#if RTS_ENGINE_CONTEXT
+		// GeneralsX @feature cemlyn007 16/10/2026 A host's map, named by its absolute path (isHostMapPath above). The
+		// engine only reads it: a map a game embeds is written through the engine's file layer, which refuses any path
+		// outside the user data root, so the path cannot name a file to overwrite.
+		else if (key.compare("M") == 0 && val.getLength() >= 3 && isHostMapPath(percentDecodeMapName(AsciiString(val.str() + 2))))
+		{
+			mapContentsMask = grabHexInt(val.str());
+			mapName = percentDecodeMapName(AsciiString(val.str() + 2));
+			sawMap = true;
+		}
+#endif
 		else
 		if (key.compare("M") == 0)
 		{

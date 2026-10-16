@@ -331,6 +331,9 @@ RecorderClass::RecorderClass()
 	m_archiveReplays = FALSE;
 	m_nextFrame = 0;
 	m_wasDesync = FALSE;
+#if RTS_ENGINE_CONTEXT
+	m_crcInfo = nullptr; // GeneralsX @bugfix cemlyn007 16/10/2026 The destructor frees it, so it starts null rather than zeroed by the allocator
+#endif
 	init(); // just for the heck of it.
 }
 
@@ -338,6 +341,16 @@ RecorderClass::RecorderClass()
  * Destructor
  */
 RecorderClass::~RecorderClass() {
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @bugfix cemlyn007 16/10/2026 An engine that is torn down while it plays a replay back closes the replay
+	// file and frees the playback's checksum queue: upstream left both to the end of the process.
+	if (m_file != nullptr) {
+		m_file->close();
+		m_file = nullptr;
+	}
+	delete m_crcInfo;
+	m_crcInfo = nullptr;
+#endif
 }
 
 /**
@@ -447,7 +460,14 @@ void RecorderClass::stopPlayback() {
 	}
 	m_fileName.clear();
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @bugfix cemlyn007 16/10/2026 Post the game's exit only while a game is loaded. GameLogic::clearGameData
+	// stops a playback once it has left the game, and the exit it posted then stayed in the message stream, to clear the
+	// next game a host started.
+	if (!m_doingAnalysis && TheGameLogic->isInGame())
+#else
 	if (!m_doingAnalysis)
+#endif
 	{
 		TheGameLogic->exitGame();
 	}
@@ -1106,6 +1126,12 @@ void RecorderClass::handleCRCMessage(UnsignedInt newCRC, Int playerIndex, Bool f
 		// (e.g. GAME_SKIRMISH vs GAME_REPLAY AIGroup allocation order) cause false positive mismatches.
 		if (mismatchFrame > 0 && newCRC != playbackCRC && !m_crcInfo->sawCRCMismatch())
 		{
+#if RTS_ENGINE_CONTEXT
+			// GeneralsX @feature cemlyn007 16/10/2026 Latch the first mismatch's frame in the engine's context, where
+			// its host reads it to stop running frames (EngineContextFields.inl, playbackMismatchFrame).
+			if (rts::ctx()->playbackMismatchFrame < 0)
+				rts::ctx()->playbackMismatchFrame = mismatchFrame;
+#endif
 			//Kris: Patch 1.01 November 10, 2003 (integrated changes from Matt Campbell)
 			// Since we don't seem to have any *visible* desyncs when replaying games, but get this warning
 			// virtually every replay, the assumption is our CRC checking is faulty.  Since we're at the
@@ -1258,6 +1284,10 @@ void RecorderClass::loadQueuedReplay()
  */
 Bool RecorderClass::playbackFile(AsciiString filename)
 {
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 16/10/2026 Each playback starts with no checksum mismatch seen.
+	rts::ctx()->playbackMismatchFrame = -1;
+#endif
 	if (!m_doingAnalysis)
 	{
 		if (TheGameLogic->isInGame())
@@ -1353,6 +1383,12 @@ Bool RecorderClass::playbackFile(AsciiString filename)
 
 	DEBUG_LOG(("RecorderClass::playbackFile() - original game was mode %d", m_originalGameMode));
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 16/10/2026 A replay whose orders are cut short or garbled holds invalid data: refuse
+	// it whole, before its game starts, instead of playing the part that reads.
+	refuseInvalidOrders(header.filename);
+#endif
+
 	// TheSuperHackers @fix helmutbuhler 03/04/2025
 	// In case we restart a replay, we need to clear the command list.
 	// Otherwise a crc message remains and messes up the crc calculation on the restarted replay.
@@ -1393,6 +1429,91 @@ Bool RecorderClass::playbackFile(AsciiString filename)
 	m_playbackFrameCount = header.frameCount;
 	return TRUE;
 }
+
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 16/10/2026 The bytes readArgument reads for an argument of `type`, or 0 for a type it
+// does not know.
+Int RecorderClass::replayArgumentBytes(GameMessageArgumentDataType type) const
+{
+	switch (type)
+	{
+		case ARGUMENTDATATYPE_INTEGER: return sizeof(Int);
+		case ARGUMENTDATATYPE_REAL: return sizeof(Real);
+		case ARGUMENTDATATYPE_BOOLEAN: return sizeof(Bool);
+		case ARGUMENTDATATYPE_OBJECTID: return sizeof(ObjectID);
+		case ARGUMENTDATATYPE_DRAWABLEID: return sizeof(DrawableID);
+		case ARGUMENTDATATYPE_TEAMID: return sizeof(UnsignedInt);
+		case ARGUMENTDATATYPE_LOCATION: return sizeof(Coord3D);
+		case ARGUMENTDATATYPE_PIXEL: return sizeof(ICoord2D);
+		case ARGUMENTDATATYPE_PIXELREGION: return sizeof(IRegion2D);
+		case ARGUMENTDATATYPE_TIMESTAMP: return sizeof(UnsignedInt);
+		case ARGUMENTDATATYPE_WIDECHAR: return static_cast<Int>(m_replayWideCharBytes);
+		case ARGUMENTDATATYPE_UNKNOWN: break;
+	}
+	return 0;
+}
+
+// GeneralsX @feature cemlyn007 16/10/2026 Each order is its frame, type and player, its argument types with their
+// counts, and then its arguments, as writeToFile writes them and appendNextCommand reads them.
+void RecorderClass::refuseInvalidOrders(const AsciiString& path)
+{
+	const Int start = m_file->position();
+	const char* invalid = nullptr;
+	char buffer[64];
+	for (;;)
+	{
+		const Int frameBytes = m_file->read(buffer, sizeof(UnsignedInt));
+		if (frameBytes == 0)
+			break;
+		const Int fixedBytes = sizeof(UnsignedInt) + sizeof(GameMessage::Type) + sizeof(Int);
+		UnsignedByte typeCount = 0;
+		if (frameBytes != sizeof(UnsignedInt)
+				|| m_file->read(buffer, fixedBytes - sizeof(UnsignedInt)) != fixedBytes - static_cast<Int>(sizeof(UnsignedInt))
+				|| m_file->read(&typeCount, sizeof(typeCount)) != sizeof(typeCount))
+		{
+			invalid = "the replay holds invalid data: it ends partway through an order";
+			break;
+		}
+		Int argumentBytes = 0;
+		for (UnsignedByte index = 0; index < typeCount && invalid == nullptr; ++index)
+		{
+			UnsignedByte argumentType = 0;
+			UnsignedByte argumentCount = 0;
+			if (m_file->read(&argumentType, sizeof(argumentType)) != sizeof(argumentType)
+					|| m_file->read(&argumentCount, sizeof(argumentCount)) != sizeof(argumentCount))
+			{
+				invalid = "the replay holds invalid data: it ends partway through an order";
+				break;
+			}
+			const Int bytes = replayArgumentBytes(static_cast<GameMessageArgumentDataType>(argumentType));
+			if (bytes == 0)
+			{
+				invalid = "the replay holds invalid data: an order has an argument of no known type";
+				break;
+			}
+			argumentBytes += bytes * argumentCount;
+		}
+		while (invalid == nullptr && argumentBytes > 0)
+		{
+			const Int chunk = argumentBytes < static_cast<Int>(sizeof(buffer)) ? argumentBytes : static_cast<Int>(sizeof(buffer));
+			if (m_file->read(buffer, chunk) != chunk)
+				invalid = "the replay holds invalid data: it ends partway through an order";
+			argumentBytes -= chunk;
+		}
+		if (invalid != nullptr)
+			break;
+	}
+	if (invalid != nullptr)
+	{
+		m_file->close();
+		m_file = nullptr;
+		m_gameInfo.endGame();
+		m_gameInfo.reset();
+		throw rts::InvalidInputData(path.str(), invalid);
+	}
+	m_file->seek(start, File::START);
+}
+#endif
 
 /**
  * Read a unicode string from the current file position. The string is assumed to be 0-terminated.
@@ -1482,7 +1603,15 @@ void RecorderClass::readNextFrame() {
 	if (bytesRead != sizeof(m_nextFrame)) {
 		DEBUG_LOG(("RecorderClass::readNextFrame - read failed on frame %d", TheGameLogic->getFrame()));
 		m_nextFrame = -1;
+#if RTS_ENGINE_CONTEXT
+		// GeneralsX @feature cemlyn007 16/10/2026 For an embedded host the replay's last order does not end the
+		// playback: the replay's game plays on to the replay's frame count, where the host stops it, and stays loaded
+		// until the host leaves it (RecorderClass::stopPlayback). Only the file is done with.
+		m_file->close();
+		m_file = nullptr;
+#else
 		stopPlayback();
+#endif
 	}
 }
 
