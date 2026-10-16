@@ -2432,7 +2432,16 @@ bool GameLogic::onSetReplayCamera(MAYBE_UNUSED GameMessage *msg)
 {
 	Player *msgPlayer = getMessagePlayer(msg);
 
-	if (TheRecorder->isPlaybackMode() && TheGlobalData->m_useCameraInReplay && TheControlBar->getObserverLookAtPlayer() == msgPlayer)
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 17/10/2026 An embedded host that follows the replay's camera follows the camera of
+	// the player who recorded the replay, the only player whose camera a replay holds, while no player is looked at:
+	// it has no observer control bar to pick one with.
+	Player *lookAtPlayer = TheControlBar->getObserverLookAtPlayer();
+	const Bool looksAtSender = lookAtPlayer == msgPlayer || lookAtPlayer == nullptr;
+#else
+	const Bool looksAtSender = TheControlBar->getObserverLookAtPlayer() == msgPlayer;
+#endif
+	if (TheRecorder->isPlaybackMode() && TheGlobalData->m_useCameraInReplay && looksAtSender)
 	{
 		if (TheTacticalView->isCameraMovementFinished())
 		{
