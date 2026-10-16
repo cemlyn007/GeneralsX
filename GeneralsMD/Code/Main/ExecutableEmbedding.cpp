@@ -22,11 +22,27 @@
 
 #include "ExecutableEmbedding.h"
 
+#include <dlfcn.h>
+
 namespace rts
 {
 
+// GeneralsX @feature cemlyn007 16/10/2026 The executable holds a reference of its own to the D3D8 library for the
+// process's life, as an embedding host holds one while any render engine lives, so the engine closing its own
+// reference at shutdown (dx8ledger.h) never unloads DXVK under the process's other code.
+void holdExecutableD3D8Library()
+{
+#if defined(__APPLE__)
+	static void* const reference = dlopen("libdxvk_d3d8.dylib", RTLD_LAZY);
+#else
+	static void* const reference = dlopen("libdxvk_d3d8.so", RTLD_LAZY);
+#endif
+	(void)reference;
+}
+
 EmbeddingConfig makeExecutableEmbedding()
 {
+	holdExecutableD3D8Library();
 	EmbeddingConfig config;
 	config.assetRoot = executableAssetRoot();
 	config.userDataRoot = executableUserDataRoot();

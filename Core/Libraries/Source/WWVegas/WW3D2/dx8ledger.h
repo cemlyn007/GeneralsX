@@ -54,6 +54,7 @@ inline constexpr const char SURFACE_KIND[] = "D3D8 surface";
 inline constexpr const char VERTEX_BUFFER_KIND[] = "D3D8 vertex buffer";
 inline constexpr const char INDEX_BUFFER_KIND[] = "D3D8 index buffer";
 inline constexpr const char SWAP_CHAIN_KIND[] = "D3D8 swap chain";
+inline constexpr const char LIBRARY_KIND[] = "D3D8 library";
 
 // Records one reference the layer already holds on object. If the ledger refuses the record, the reference is
 // released and the ledger's exception propagates.
@@ -72,6 +73,12 @@ ULONG Add_Ref(IUnknown* object, const char* kind);
 // the object remain (one released past its record) drops them with an error on stderr, so that the ledger never
 // releases a freed object.
 ULONG Release(IUnknown* object);
+// Loads the D3D8 library `name` for this engine and records the engine's reference to it, whose release closes it.
+// Null, with nothing recorded, when the library does not load. The library is recorded before the interface made from
+// it, so that the ledger closes it last.
+void* Open_Library(const char* name);
+// Forgets the record of a library Open_Library loaded, then closes the engine's reference to it.
+void Close_Library(void* library);
 // The number of references the layer has recorded on object, and on all objects; for tests.
 unsigned Recorded_Count(IUnknown* object);
 unsigned Recorded_Count();

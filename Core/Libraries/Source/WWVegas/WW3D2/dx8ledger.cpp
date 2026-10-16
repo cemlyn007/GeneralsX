@@ -26,6 +26,8 @@
 #include "Common/EmbeddingContract.h"
 #include "Common/EngineContext.h"
 
+#include <dlfcn.h>
+
 #include <cstdint>
 #include <cstdio>
 #include <mutex>
@@ -58,6 +60,25 @@ RecordedReferences& Recorded_References()
 {
 	RTS_ENGINE_STATIC_LAST(RecordedReferences, references);
 	return references;
+}
+
+void Close_Recorded_Library(std::uintptr_t handle)
+{
+	::dlclose(reinterpret_cast<void*>(handle));
+}
+
+// The ledger ids of this engine's references to the D3D8 library, by library, newest last.
+struct RecordedLibraries
+{
+	std::mutex mutex;
+	rts::ResourceLedger* ledger = nullptr;
+	std::unordered_map<void*, std::vector<rts::ResourceLedger::Id>> ids;
+};
+
+RecordedLibraries& Recorded_Libraries()
+{
+	RTS_ENGINE_STATIC_LAST(RecordedLibraries, libraries);
+	return libraries;
 }
 
 rts::ResourceLedger& Engine_Ledger()
@@ -142,6 +163,51 @@ ULONG Release(IUnknown* object)
 		}
 	}
 	return count;
+}
+
+void* Open_Library(const char* name)
+{
+	rts::ResourceLedger& ledger = Engine_Ledger();
+	void* const library = ::dlopen(name, RTLD_LAZY);
+	if (library == nullptr)
+		return nullptr;
+	try
+	{
+		const rts::ResourceLedger::Id id =
+			ledger.record(LIBRARY_KIND, reinterpret_cast<std::uintptr_t>(library), &Close_Recorded_Library);
+		RecordedLibraries& libraries = Recorded_Libraries();
+		const std::scoped_lock lock(libraries.mutex);
+		libraries.ledger = &ledger;
+		libraries.ids[library].push_back(id);
+	}
+	catch (...)
+	{
+		::dlclose(library);
+		throw;
+	}
+	return library;
+}
+
+void Close_Library(void* library)
+{
+	RecordedLibraries& libraries = Recorded_Libraries();
+	rts::ResourceLedger* ledger = nullptr;
+	rts::ResourceLedger::Id id = 0;
+	{
+		const std::scoped_lock lock(libraries.mutex);
+		const auto found = libraries.ids.find(library);
+		if (found != libraries.ids.end())
+		{
+			ledger = libraries.ledger;
+			id = found->second.back();
+			found->second.pop_back();
+			if (found->second.empty())
+				libraries.ids.erase(found);
+		}
+	}
+	if (ledger != nullptr)
+		ledger->forget(id);
+	::dlclose(library);
 }
 
 unsigned Recorded_Count(IUnknown* object)
