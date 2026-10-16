@@ -77,6 +77,7 @@
 #include "Common/GameLOD.h"
 #include "Common/FatalEngineError.h"
 #include "Common/EngineFault.h"	// GeneralsX @feature cemlyn007 15/10/2026 The catch-alls end in the FaultSink
+#include "Common/EngineTestHooks.h"	// GeneralsX @feature cemlyn007 16/10/2026 A host's tests' hooks
 #include "Common/InvalidInputData.h"	// GeneralsX @feature cemlyn007 15/10/2026 The host's bad input, no fault
 #include "Common/Registry.h"
 #include "Common/GameCommon.h"	// FOR THE ALLOW_DEBUG_CHEATS_IN_RELEASE #define
@@ -1387,6 +1388,10 @@ void GameEngine::guardedUpdate()
 {
 	try
 	{
+#if RTS_ENGINE_CONTEXT
+		// GeneralsX @feature cemlyn007 16/10/2026 A host's tests strike their frame hook here (Common/EngineTestHooks.h)
+		rts::strikeTestHooks(rts::TestHookPoint::frame);
+#endif
 		// compute a frame
 		update();
 	}

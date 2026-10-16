@@ -852,6 +852,66 @@ Bool MapCache::addMap(
 MapCache *TheMapCache = nullptr;
 #endif
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 16/10/2026 See MapUtil.h. The map parse's scratch is emptied however the parse ends, and
+// a parse that finds the map's data corrupt is the host's bad input, as the terrain logic's is.
+namespace
+{
+struct MapParseScratchReset
+{
+	~MapParseScratchReset() { resetMap(); }
+};
+
+[[noreturn]] void throwCorruptMap(const AsciiString &path)
+{
+	throw rts::InvalidInputData(path.str(), "the map's data is corrupt");
+}
+}
+
+Int MapCache::readStartPositions(const AsciiString &path)
+{
+	if (!TheFileSystem->doesFileExist(path.str()))
+		return -1;
+	const MapParseScratchReset reset;
+	try
+	{
+		if (!loadMap(path))
+			return -1;
+	}
+	catch (ErrorCode code)
+	{
+		if (code != ERROR_CORRUPT_FILE_FORMAT)
+			throw;
+		throwCorruptMap(path);
+	}
+	WaypointMap starts;
+	starts.update();
+	return starts.m_numStartSpots;
+}
+
+const MapMetaData *MapCache::addMapFile(const AsciiString &path)
+{
+	FileInfo fileInfo;
+	if (!TheFileSystem->getFileInfo(path, &fileInfo))
+		return nullptr;
+	AsciiString lowerPath = path;
+	lowerPath.toLower();
+	try
+	{
+		addMap(AsciiString::TheEmptyString, path, lowerPath, fileInfo, FALSE);
+	}
+	catch (ErrorCode code)
+	{
+		resetMap();
+		if (code != ERROR_CORRUPT_FILE_FORMAT)
+			throw;
+		throwCorruptMap(path);
+	}
+	const MapCache::const_iterator entry = find(lowerPath);
+	return entry != end() ? &entry->second : nullptr;
+}
+#endif
+
 // PUBLIC FUNCTIONS //////////////////////////////////////////////////////////////////////////////
 
 Bool WouldMapTransfer( const AsciiString& mapName )

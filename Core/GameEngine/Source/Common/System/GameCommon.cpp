@@ -40,6 +40,17 @@ const char *const TheVeterancyNames[] =
 };
 static_assert(ARRAY_SIZE(TheVeterancyNames) == LEVEL_COUNT + 1, "Incorrect array size");
 
+// GeneralsX @feature cemlyn007 16/10/2026 The names of GameDifficulty's values, which an embedding host's vocabulary
+// generator reads, so that its difficulty enumeration cannot drift from the engine's.
+const char *const TheDifficultyNames[] =
+{
+	"EASY",
+	"NORMAL",
+	"HARD",
+	nullptr
+};
+static_assert(ARRAY_SIZE(TheDifficultyNames) == DIFFICULTY_COUNT + 1, "Incorrect array size");
+
 const char *const TheRelationshipNames[] =
 {
 	"ENEMIES",
