@@ -67,6 +67,7 @@
 #include <string>
 #include "Common/EmbeddingContract.h"
 #include "Common/EngineFault.h"
+#include "Common/EngineFiles.h"
 #include "Common/Errors.h"
 #include "Common/INI.h"
 #include "Common/INIException.h"
@@ -848,17 +849,19 @@ std::string crashTimeString()
 
 // Upstream's ReleaseCrashInfo.txt in the user data root, the one before it kept as ReleaseCrashInfoPrev.txt:
 // `writeHeader` writes the lines before the stack dump.
+// GeneralsX @feature cemlyn007 16/10/2026 The report is opened, closed and removed through the engine's file layer
+// (Common/EngineFiles.h), which records it in the engine's ResourceLedger while it is open.
 template <class WriteHeader>
 void writeCrashReport(const rts::EmbeddingConfig& embedding, WriteHeader writeHeader)
 {
 	const std::string current = (embedding.userDataRoot / RELEASECRASH_FILE_NAME).string();
 	const std::string previous = (embedding.userDataRoot / RELEASECRASH_FILE_NAME_PREV).string();
 
-	remove(previous.c_str());
+	rts::removeEngineFile(previous.c_str());
 	if (rename(current.c_str(), previous.c_str()) != 0)
-		remove(current.c_str());
+		rts::removeEngineFile(current.c_str());
 
-	theReleaseCrashLogFile = fopen(current.c_str(), "w");
+	theReleaseCrashLogFile = rts::openEngineFile(current.c_str(), "w");
 	if (theReleaseCrashLogFile)
 	{
 		writeHeader(theReleaseCrashLogFile);
@@ -869,7 +872,7 @@ void writeCrashReport(const rts::EmbeddingConfig& embedding, WriteHeader writeHe
 		::StackDumpFromAddresses(stacktrace, STACKTRACE_SIZE, releaseCrashLogOutput);
 
 		fflush(theReleaseCrashLogFile);
-		fclose(theReleaseCrashLogFile);
+		rts::closeEngineFile(theReleaseCrashLogFile);
 		theReleaseCrashLogFile = nullptr;
 	}
 }
