@@ -35,6 +35,8 @@
 #include "GameLogic/LocomotorSet.h"
 #include "GameLogic/GameLogic.h"
 
+#include <vector>
+
 class Bridge;
 class Object;
 class Weapon;
@@ -572,6 +574,11 @@ public:
 
 	void setAllPassable();
 
+	// GeneralsX @feature cemlyn007 16/10/2026 Save and restore every zone block's passable mark, for
+	// Pathfinder::QueryScope.
+	void savePassableFlags(std::vector<Bool> &flags) const;
+	void restorePassableFlags(const std::vector<Bool> &flags);
+
 	void setBridge(Int cellX, Int cellY, Bool bridge);
 	Bool interactsWithBridge(Int cellX, Int cellY) const;
 
@@ -658,6 +665,33 @@ private:
 public:
 	Pathfinder();
 	~Pathfinder() ;
+
+	// GeneralsX @feature cemlyn007 16/10/2026 A host's queries run the pathfinder's own searches, which
+	// leave state behind: the tunnelling flag and the count of cells searched (both in the logic CRC),
+	// the zone blocks' passable marks (which later searches read), and the switch to fixed pathfinding
+	// that exhausting the cell-info pool throws. A QueryScope saves all of it and puts it back, so that
+	// a query made between frames changes nothing the simulation does next. A pool the query left to
+	// be cleaned is still cleaned before its next use, as after any search. queryServices()
+	// gives the searches a unit's AI runs (findPath and the rest) to code that holds a QueryScope.
+	class QueryScope
+	{
+	public:
+		explicit QueryScope(Pathfinder &pathfinder);
+		~QueryScope();
+		QueryScope(const QueryScope &) = delete;
+		QueryScope &operator=(const QueryScope &) = delete;
+
+		PathfindServicesInterface *queryServices() const { return &m_pathfinder; }
+
+	private:
+		Pathfinder &m_pathfinder;
+		Bool m_isTunneling;
+		ObjectID m_ignoreObstacleID;
+		Int m_cumulativeCellsAllocated;
+		Int m_moveAlliesDepth;
+		Bool m_useFixedPathfinding;
+		std::vector<Bool> m_passable;
+	};
 
 	void reset();														///< Reset system in preparation for new map
 
