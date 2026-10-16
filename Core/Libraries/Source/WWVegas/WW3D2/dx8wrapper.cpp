@@ -587,6 +587,54 @@ static void Release_D3D8_Library()
 	Direct3DCreate8Ptr = nullptr;
 }
 
+// GeneralsX @feature cemlyn007 16/10/2026 Whether the current engine renders headless: its device has no presentable
+// surface, its formats are pinned, and it draws into its off-screen surfaces (dx8wrapper.h).
+static bool Renders_Headless()
+{
+	return ::rts::currentEmbedding("the render device").render == ::rts::RenderMode::headless;
+}
+
+IDirect3DSurface8* DX8Wrapper::_Get_Off_Screen_Render_Target()
+{
+	return W3D_Render_State().OffScreenRenderTarget;
+}
+
+IDirect3DSurface8* DX8Wrapper::_Get_Off_Screen_Depth_Buffer()
+{
+	return W3D_Render_State().OffScreenDepthBuffer;
+}
+
+bool DX8Wrapper::Create_Off_Screen_Surfaces()
+{
+	W3DRenderState& state = W3D_Render_State();
+	IDirect3DSurface8* target = nullptr;
+	if (FAILED(D3DDevice->CreateRenderTarget(ResolutionWidth, ResolutionHeight, OFF_SCREEN_RENDER_TARGET_FORMAT,
+			D3DMULTISAMPLE_NONE, FALSE, &target)) || target == nullptr)
+		return false;
+	state.OffScreenRenderTarget = DX8_RECORDED(target, SURFACE);
+	IDirect3DSurface8* depth = nullptr;
+	if (FAILED(D3DDevice->CreateDepthStencilSurface(ResolutionWidth, ResolutionHeight, OFF_SCREEN_DEPTH_FORMAT,
+			D3DMULTISAMPLE_NONE, &depth)) || depth == nullptr)
+	{
+		Release_Off_Screen_Surfaces();
+		return false;
+	}
+	state.OffScreenDepthBuffer = DX8_RECORDED(depth, SURFACE);
+	if (FAILED(D3DDevice->SetRenderTarget(state.OffScreenRenderTarget, state.OffScreenDepthBuffer)))
+	{
+		Release_Off_Screen_Surfaces();
+		return false;
+	}
+	return true;
+}
+
+void DX8Wrapper::Release_Off_Screen_Surfaces()
+{
+	W3DRenderState& state = W3D_Render_State();
+	DX8_SAFE_RELEASE(state.OffScreenDepthBuffer);
+	DX8_SAFE_RELEASE(state.OffScreenRenderTarget);
+}
+
 // GeneralsX @feature cemlyn007 16/10/2026 A test's stand-in for Direct3DCreate8 (dx8wrapper.h), per engine.
 RTS_ENGINE_GLOBAL(Direct3DCreate8Type, InstalledDirect3DCreate8, nullptr);
 #define InstalledDirect3DCreate8 RTS_ENGINE_GLOBAL_REF(InstalledDirect3DCreate8)
@@ -1198,6 +1246,17 @@ bool DX8Wrapper::Create_Device()
 	// device's objects were released and their records forgotten, so the order holds for both.
 	DX8_RECORD(D3DDevice, DEVICE);
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 16/10/2026 A headless engine draws into off-screen surfaces of its render size, made
+	// and recorded after the device (dx8wrapper.h).
+	if (Renders_Headless() && !Create_Off_Screen_Surfaces())
+	{
+		DX8_RELEASE(D3DDevice);
+		D3DDevice = nullptr;
+		return false;
+	}
+#endif
+
 	// GeneralsX @feature cemlyn007 30/09/2026 The formats the device was made with, once per device
 	// (so once per engine): an embed host's windowless device must match its windowed one, since
 	// W3DWater's soft shore edge blends on destination alpha (PLAN-023 Phase 8, stage RR0c).
@@ -1245,6 +1304,13 @@ bool DX8Wrapper::Reset_Device(bool reload_assets)
 		memset(Vertex_Shader_Constants,0,sizeof(Vector4)*MAX_VERTEX_SHADER_CONSTANTS);
 		memset(Pixel_Shader_Constants,0,sizeof(Vector4)*MAX_PIXEL_SHADER_CONSTANTS);
 
+#if RTS_ENGINE_CONTEXT
+		// GeneralsX @feature cemlyn007 16/10/2026 A headless engine's off-screen surfaces are released before the reset,
+		// which refuses while they live, and made again after it (dx8wrapper.h).
+		const bool headless = Renders_Headless();
+		if (headless)
+			Release_Off_Screen_Surfaces();
+#endif
 		HRESULT hr=_Get_D3D_Device8()->TestCooperativeLevel();
 		if (hr != D3DERR_DEVICELOST )
 		{	DX8CALL_HRES(Reset(&_PresentParameters),hr)
@@ -1253,6 +1319,10 @@ bool DX8Wrapper::Reset_Device(bool reload_assets)
 		}
 		else
 			return false;	//device is lost and can't be reset.
+#if RTS_ENGINE_CONTEXT
+		if (headless && !Create_Off_Screen_Surfaces())
+			return false;
+#endif
 
 		if (reload_assets)
 		{
@@ -1274,6 +1344,10 @@ bool DX8Wrapper::Reset_Device(bool reload_assets)
 void DX8Wrapper::Release_Device()
 {
 	Pillarbox_Cleanup();
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 16/10/2026 Before the device they were made on (dx8wrapper.h).
+	Release_Off_Screen_Surfaces();
+#endif
 
 	if (D3DDevice) {
 
@@ -1659,6 +1733,16 @@ bool DX8Wrapper::Set_Render_Device(int dev, int width, int height, int bits, int
 	** - if in windowed mode, the backbuffer must use the current display format.
 	** - the depth buffer must use
 	*/
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 16/10/2026 A headless engine's formats are pinned, whatever the adapter's display
+	// mode, so that its images do not depend on the display (dx8wrapper.h).
+	if (Renders_Headless()) {
+		DisplayFormat = D3DFMT_X8R8G8B8;
+		BitDepth = 32;
+		_PresentParameters.BackBufferFormat = OFF_SCREEN_RENDER_TARGET_FORMAT;
+		_PresentParameters.AutoDepthStencilFormat = OFF_SCREEN_DEPTH_FORMAT;
+	} else
+#endif
 	if (IsWindowed) {
 
 		D3DDISPLAYMODE desktop_mode;
