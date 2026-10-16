@@ -232,6 +232,9 @@ is then a null check that reads and allocates nothing, so whether an engine
 records its decisions cannot change its simulation. The host owns the sink and
 keeps it alive for the engine's life.
 
+No hook reports while the game logic clears a game's data, so a game's teardown
+makes no decisions: the next game's begin with its own.
+
 ### Games
 
 `rts::startedGames` (`Common/EngineGames.h`) counts the games an engine has
@@ -277,6 +280,10 @@ recording is still open.
 - **Truncated replays.** A playback reads every order of the replay before its
   game starts, and a replay that ends partway through an order, or holds an
   argument of no known type, is invalid input.
+- **The replay's camera.** A playback follows the replay's camera while
+  `GlobalData::m_useCameraInReplay` is set. With no player looked at, as for a
+  host without the observer control bar, it follows the camera of the player
+  who recorded the replay.
 - **Host map paths.** A map the host names by its absolute path, outside the
   map and save directories, is written into a game's options by that path and
   read back by it, so the replay of a game on it finds it again.
