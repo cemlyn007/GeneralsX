@@ -105,6 +105,10 @@ enum AIStateType CPP_11(: Int)
 	AI_GUARD_RETALIATE,												///< attacks attacker but with restrictions (hybrid of attack and guard).
 };
 
+// GeneralsX @feature cemlyn007 16/10/2026 TheAIStateTypeNames is defined in AIStates.cpp; keep it in sync with
+// AIStateType, whose last value is AI_GUARD_RETALIATE.
+extern const char *const TheAIStateTypeNames[];
+
 //-----------------------------------------------------------------------------------------------------------
 // generically state transition conditions
 extern Bool outOfWeaponRangeObject( State *thisState, void* userData );

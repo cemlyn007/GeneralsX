@@ -69,6 +69,57 @@
 #include "GameLogic/Module/PhysicsUpdate.h"
 #include "GameLogic/Module/StealthUpdate.h"
 
+// GeneralsX @feature cemlyn007 16/10/2026 The names of AIStateType's values, which an embedding host's vocabulary
+// generator reads, so that its AI state enumeration cannot drift from the engine's.
+const char *const TheAIStateTypeNames[] =
+{
+	"IDLE",
+	"MOVE_TO",
+	"FOLLOW_WAYPOINT_PATH_AS_TEAM",
+	"FOLLOW_WAYPOINT_PATH_AS_INDIVIDUALS",
+	"FOLLOW_WAYPOINT_PATH_AS_TEAM_EXACT",
+	"FOLLOW_WAYPOINT_PATH_AS_INDIVIDUALS_EXACT",
+	"FOLLOW_PATH",
+	"FOLLOW_EXITPRODUCTION_PATH",
+	"WAIT",
+	"ATTACK_POSITION",
+	"ATTACK_OBJECT",
+	"FORCE_ATTACK_OBJECT",
+	"ATTACK_AND_FOLLOW_OBJECT",
+	"DEAD",
+	"DOCK",
+	"ENTER",
+	"GUARD",
+	"HUNT",
+	"WANDER",
+	"PANIC",
+	"ATTACK_SQUAD",
+	"GUARD_TUNNEL_NETWORK",
+	"GET_REPAIRED",
+	"MOVE_OUT_OF_THE_WAY",
+	"MOVE_AND_TIGHTEN",
+	"MOVE_AND_EVACUATE",
+	"MOVE_AND_EVACUATE_AND_EXIT",
+	"MOVE_AND_DELETE",
+	"ATTACK_AREA",
+	"HACK_INTERNET",
+	"ATTACK_MOVE_TO",
+	"ATTACKFOLLOW_WAYPOINT_PATH_AS_INDIVIDUALS",
+	"ATTACKFOLLOW_WAYPOINT_PATH_AS_TEAM",
+	"FACE_OBJECT",
+	"FACE_POSITION",
+	"RAPPEL_INTO",
+	"COMBATDROP",
+	"EXIT",
+	"PICK_UP_CRATE",
+	"MOVE_AWAY_FROM_REPULSORS",
+	"WANDER_IN_PLACE",
+	"BUSY",
+	"EXIT_INSTANTLY",
+	"GUARD_RETALIATE",
+	nullptr
+};
+static_assert(ARRAY_SIZE(TheAIStateTypeNames) == AI_GUARD_RETALIATE + 2, "Incorrect array size");
 
 static Bool cannotPossiblyAttackObject( State *thisState, void* userData );
 
