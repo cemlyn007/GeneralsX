@@ -545,7 +545,27 @@ void GameStateMap::xfer( Xfer *xfer )
 // root, fail the same way). Answer only a definite not-found, so clearScratchPadMaps below can
 // tell "really gone" apart from "could not be checked" and keep retrying (and reporting) the
 // latter instead of silently dropping it from m_scratchPadMaps.
-#if defined(_WIN32)
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 16/10/2026 Delete through the engine's file layer, which refuses a path outside the user
+// data root, and fail while the engine's context asks a test's deletes to fail (failingScratchMapDeletes).
+static Bool deleteScratchPadMap( const AsciiString &path )
+{
+	if( rts::ctx()->failingScratchMapDeletes > 0 )
+	{
+		--rts::ctx()->failingScratchMapDeletes;
+		return FALSE;
+	}
+	return rts::removeEngineFile( path.str() ) == 0;
+}
+
+static Bool scratchPadMapIsDefinitelyGone( const AsciiString &path )
+{
+	struct stat st;
+	if( stat( rts::resolveEnginePath( path.str() ).c_str(), &st ) == 0 )
+		return FALSE; // still there
+	return ( errno == ENOENT || errno == ENOTDIR );
+}
+#elif defined(_WIN32)
 static Bool scratchPadMapIsDefinitelyGone( const AsciiString &path )
 {
 	if( GetFileAttributes( path.str() ) != 0xFFFFFFFF )
@@ -617,7 +637,11 @@ void GameStateMap::clearScratchPadMaps()
 		// definitely already gone (another thread or process beat us to it, or whose only remaining
 		// match is a case-variant name) -- one whose existence could not even be checked is treated
 		// the same as one that is still there, not dropped silently
+#if RTS_ENGINE_CONTEXT
+		if( !deleteScratchPadMap( *it ) && !scratchPadMapIsDefinitelyGone( *it ) )
+#else
 		if( DeleteFile( it->str() ) == 0 && !scratchPadMapIsDefinitelyGone( *it ) )
+#endif
 		{
 			fprintf( stderr, "GameStateMap::clearScratchPadMaps - Unable to delete scratch pad map '%s'\n", it->str() );
 			fflush( stderr );
