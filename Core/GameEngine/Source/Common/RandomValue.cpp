@@ -97,6 +97,7 @@ static void seedRandom(UnsignedInt SEED, UnsignedInt (&seed)[6])
 	seed[5] = ax;                   /* mov     seed+20,eax                  */
 }
 
+#if !RTS_ENGINE_CONTEXT
 void InitRandom()
 {
 #ifdef DETERMINISTIC
@@ -114,6 +115,7 @@ void InitRandom()
 	theGameLogicBaseSeed = seconds;
 #endif
 }
+#endif
 
 void InitRandom( UnsignedInt seed )
 {

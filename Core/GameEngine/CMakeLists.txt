@@ -39,6 +39,7 @@ set(GAMEENGINE_SRC
     Include/Common/EngineContextFields.inl
     Include/Common/EngineFiles.h
     Include/Common/EngineSockets.h
+    Include/Common/RealTimeStopwatch.h
     Include/Common/EngineSingletonMacros.h
     Include/Common/EngineSingletons.inl
 #    Include/Common/encrypt.h
@@ -674,6 +675,7 @@ set(GAMEENGINE_SRC
 #    Source/Common/System/List.cpp
     Source/Common/System/EngineFiles.cpp
     Source/Common/System/EngineSockets.cpp
+    Source/Common/System/RealTimeStopwatch.cpp
     Source/Common/System/LocalFile.cpp
     Source/Common/System/LocalFileSystem.cpp
     Source/Common/System/MiniDumper.cpp
