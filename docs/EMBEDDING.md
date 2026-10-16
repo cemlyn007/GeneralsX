@@ -213,6 +213,25 @@ Nothing about faults is process-wide: there is no embedded mode, no process
 fault flag and no teardown flag. An assertion's dialog shows only for an engine
 that renders to a window.
 
+### Decisions
+
+GeneralsX's decision hooks
+(`GeneralsMD/Code/GameEngine/Include/GameLogic/AIDecisionObserver.h`) see each
+order an AI player, an AI script, the message stream or a unit's own reaction
+issues, and each production or construction cancel a player, a script or an AI
+orders. GeneralsX's own cancel-and-refund routine has no hook, so a sale, a
+death or a capture records no cancel. Each hook hands its decision to the
+context's `rts::DecisionSink::record` as an `rts::Decision`
+(`GeneralsMD/Code/GameEngine/Include/GameLogic/Decision.h`), on the logic
+thread, inside the engine's frame. The record owns everything it holds, game
+things by id and names as strings, so the sink may keep it.
+
+The sink is the only place decisions go: there is no process-wide observer.
+An engine whose `EmbeddingConfig` has no sink records nothing, and each hook
+is then a null check that reads and allocates nothing, so whether an engine
+records its decisions cannot change its simulation. The host owns the sink and
+keeps it alive for the engine's life.
+
 ### Games
 
 `rts::startedGames` (`Common/EngineGames.h`) counts the games an engine has
