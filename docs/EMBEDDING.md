@@ -26,6 +26,21 @@ the current context is `rts::g_noEngine`, whose singletons are all null: a
 constant in read-only storage, never destroyed, so nothing can write it. A
 per-engine static used there is refused.
 
+GeneralsX reaches the host's services through `rts::currentEmbedding`, which
+returns the current context's `EmbeddingConfig`. With no embedded engine
+current, or in a context made without a config, it throws `std::logic_error`,
+so a service used outside its engine is refused rather than guessed.
+
+A resource that must be current on every thread inside its engine, and on no
+other, is a thread binding of the context
+(`rts::EngineContext::bindThreads`). Every `rts::Scope` that makes the context
+current installs the context's bindings on its thread, and removes them when it
+restores the previous context, also when it switches a thread from one engine
+to another. Anything that makes an engine current on a thread does it through
+an `rts::Scope`. An audible engine's OpenAL context is one: it is the thread
+context of exactly the threads inside its engine, and the process-wide current
+context stays null.
+
 ## The accessors
 
 `TheXxx` names a singleton of the current context. Each is a macro,
@@ -134,6 +149,13 @@ there is none. Every engine allocates from the system heap, so a block one
 engine's allocator gave can be freed in any context, or none
 (`DynamicMemoryAllocator::freeBytes` is static).
 
+GeneralsX's own `operator new` and `operator delete` (plain, array and sized)
+zero-fill what they allocate and are hidden in the engine's module. They
+forward to the process's operators through versioned symbol references
+(`_Znwm@GLIBCXX_3.4` and the others), which the dynamic linker binds, so they
+hold no state of their own and reach whatever the process uses: libstdc++, an
+allocator it preloads, or a sanitiser's runtime.
+
 An engine's ordinary teardown frees what it allocated. An engine that faulted
 is abandoned instead: its state is left as the fault found it, so none of its
 destructors run, and its memory stays allocated until the process exits.
@@ -158,6 +180,114 @@ services:
 - the render mode (`rts::RenderMode`) and the audio mode (`rts::AudioMode`);
 - the host's implementation of each interface above.
 
+The game's own executable is a host too: `GeneralsMD/Code/Main` gives its one
+engine an `EmbeddingConfig` whose services keep the upstream game's behaviour.
+
+## The services
+
+### Faults
+
+Every crash path ends in the context's `rts::FaultSink`: the release crash
+(`ReleaseCrash`, its localised form and `ReleaseCrashNoReturn`), the assertion
+crash, and the catch-alls at the top of a frame (`GameEngine::guardedUpdate`),
+of start-up (`GameEngine::init`), of a load (`GameState::loadGame`) and of
+teardown (`~GameEngine`), which turn an exception that escapes into a fault.
+Each writes the crash report, `ReleaseCrashInfo.txt`, into the user data root,
+keeping the one before as `ReleaseCrashInfoPrev.txt`, and then hands the reason
+to the sink as raw bytes. The sink does not return.
+
+The engine also marks the fault raised (`rts::faultRaised`, in
+`Common/EngineFault.h`), so that a
+catch-all that catches the sink's unwind throws it on
+(`rts::rethrowIfFaultRaised`), and a second fault keeps the first report.
+Once the teardown has begun (`rts::beginEngineTeardown`), a fault cannot unwind
+through the destructors running it: the crash path hands the fault to the sink,
+the unwind stops where the fault was raised, and the teardown stops at the end
+of that step.
+
+Nothing about faults is process-wide: there is no embedded mode, no process
+fault flag and no teardown flag. An assertion's dialog shows only for an engine
+that renders to a window.
+
+### Input errors
+
+The readers of what a host hands an engine throw `rts::InvalidInputData`, with
+the file's path and the reason, for data they cannot use: the INI parser for the
+game files in the asset root, the map loader, the save reader and the replay
+reader when it starts a playback. It is never a fault: the sink is not called,
+and the catch-alls let it through. GeneralsX's own files are not host input, so
+bad data in them is still a fault. `InvalidInputData` has default visibility,
+so a host built with hidden visibility can catch it
+(`Common/InvalidInputData.h`).
+
+### Quits
+
+Every request the game makes to quit goes through `GameEngine::setQuitting`.
+When the engine starts quitting, it calls the context's
+`rts::QuitListener::quitRequested` once; clearing the request and asking again
+tells it again. GeneralsX never ends the process to quit: the host decides
+what quitting means, and the game executable's listener lets its main loop end.
+
+### Threads
+
+GeneralsX starts every thread through `Common/EngineThread.h`
+(`rts::startEngineThread`, and `rts::startEngineLoop` for a thread that polls),
+which hands it to the context's `rts::ThreadStarter`. The host creates the
+thread and makes the engine's context current on it. The body is given a stop
+token that the host, the engine's teardown or the ledger can stop, and the
+layer checks it before the body runs and between a loop's steps; a body waits
+only in ways that wake for it (`rts::sleepUnlessStopped`). While its body runs,
+the thread is recorded in the ledger as `thread <name>`, and releasing that
+record stops it and waits for its body to return. The engine's teardown stops
+every thread it started before it frees what they use. No GeneralsX source
+creates a thread itself.
+
+### Files
+
+Every path GeneralsX forms lies under one of its engine's two roots. A relative
+path names a file under the asset root, which is only read; the user data root
+is the only place GeneralsX writes, and is `GlobalData::getPath_UserData`. A
+write, removal or directory creation anywhere else is refused with `EACCES`.
+An absolute path the host hands in, such as a replay to play, is read as given.
+GeneralsX never reads or changes the working directory, and its archives are
+the `.big` files at the asset root and in its `ZH_Generals` directory.
+
+`Common/EngineFiles.h` is the file layer, the only code that opens files
+(`rts::openEngineFile`, `rts::closeEngineFile`, `rts::removeEngineFile`). Each
+file open there is recorded in the ledger as `file <path>`, and forgotten when
+the layer closes it. A host passes absolute roots, and makes and checks the
+user data root before the engine starts.
+
+### Audio
+
+The audio mode chooses an engine's audio manager when the engine is made. With
+audio off it gets the device-free manager, which opens no device, starts no
+thread and makes no call into the audio library, drops every request, and
+reports that it cannot play sounds. With audio on it gets the OpenAL manager,
+which records its device (`audio device`) and its context (`audio context`) in
+the ledger and forgets them when it closes them; a device without
+`ALC_EXT_thread_local_context` is refused. The OpenAL context is a thread
+binding of the engine (above). An audible device runs OpenAL Soft's own mixer
+and event threads, which belong to the device, not to GeneralsX.
+
+### The resource ledger
+
+The host's `rts::ResourceLedger` holds a record of every operating-system
+resource an engine holds, each with the raw handle and the release that frees
+it, so that a host can release them all after a fault without running any of
+the engine's code. The layers that acquire resources record them as they do,
+and forget a record when they release the resource themselves:
+
+| Kind | Recorded by |
+|---|---|
+| `file <path>` | the file layer |
+| `thread <name>` | the thread layer |
+| `audio device`, `audio context` | the OpenAL audio manager |
+
+A ledger may be called from any of the engine's threads, and must not hold a
+lock of its own while it runs a release, since a release can wait for a thread
+that forgets its record.
+
 ## What may stay process-wide
 
 Only compile-time constants may stay process-wide: the constant tables,
@@ -175,8 +305,4 @@ Writable storage outside every context holds only:
 Nothing else is shared between engines, and nothing initialises once per
 process. A host can check this on the built library: every symbol in writable
 static storage (`.data`, `.bss`, `.tdata`, `.tbss`) must be one of those
-above. Until operator new forwards to the process's allocator without a cache, and the
-host's services take over the working directory, thread creation, the crash
-paths, the audio loader and the D3D8 device's last release, the state those
-mechanisms still hold is the one exception, and the host's check names each
-piece.
+above.
