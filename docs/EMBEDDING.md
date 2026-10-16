@@ -277,6 +277,9 @@ recording is still open.
   only the replay file is closed, and the game plays on until the host stops it
   at the replay's frame count. A stopped playback posts the game's exit only
   while a game is loaded.
+- **A cleared game's checksums.** Clearing a game's data discards the logic
+  checksum its last frame posted for the next frame, so a playback started
+  next reads the replay's checksums from its own first one.
 - **Truncated replays.** A playback reads every order of the replay before its
   game starts, and a replay that ends partway through an order, or holds an
   argument of no known type, is invalid input.
