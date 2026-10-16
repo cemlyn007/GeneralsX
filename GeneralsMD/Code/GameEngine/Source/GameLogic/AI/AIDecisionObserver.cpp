@@ -28,6 +28,20 @@
 #include "GameLogic/Object.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/SpecialPowerModule.h"
+// GeneralsX @feature cemlyn007 16/10/2026 What the decisions go to with RTS_ENGINE_CONTEXT: the engine's sink.
+#if RTS_ENGINE_CONTEXT
+#include "Common/EmbeddingContract.h"
+#include "Common/EngineContext.h"
+#include "Common/Science.h"
+#include "Common/SpecialPower.h"
+#include "Common/Team.h"
+#include "Common/ThingTemplate.h"
+#include "Common/Upgrade.h"
+#include "GameClient/ControlBar.h"
+#include "GameLogic/Decision.h"
+#include "GameLogic/PolygonTrigger.h"
+#include "GameLogic/TerrainLogic.h"
+#endif
 
 namespace
 {
@@ -35,10 +49,9 @@ namespace
 	// GeneralsX @feature cemlyn007 28/09/2026 Per engine (PLAN-023 Phase 2): each engine has its own
 	// observer (setAIDecisionObserver acts on the current engine) and its own scope, depth and sequence
 	// state, all value-initialised like the statics below (AI_DECISION_REFLEX is 0).
+	// GeneralsX @feature cemlyn007 16/10/2026 The observer's place is taken by the engine's decision sink.
 	struct ObserverPerEngine
 	{
-		AIDecisionObserverFn observer;
-		void *userData;
 		Bool scopeActive;
 		AIDecisionOrigin origin;
 		const char *script;
@@ -50,8 +63,6 @@ namespace
 	inline ObserverPerEngine &observerState() { return s_observerPerEngine.get(); }
 	// Each s_xxx macro is its own out-of-line slot lookup, so functions touching several fields
 	// fetch `ope` once instead.
-#define s_observer (observerState().observer)
-#define s_userData (observerState().userData)
 #define s_scopeActive (observerState().scopeActive)
 #define s_origin (observerState().origin)
 #define s_script (observerState().script)
@@ -105,11 +116,86 @@ namespace
 		return d;
 	}
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 16/10/2026 The current engine's decision sink, or null for an engine that does
+	// not record its decisions. Reading it is the whole cost of a hook on such an engine.
+	rts::DecisionSink *decisionSink()
+	{
+		return rts::currentEmbedding("the decision sink").decisionSink;
+	}
+
+	std::optional<std::uint32_t> objectId(const Object *object)
+	{
+		if (object == nullptr)
+			return std::nullopt;
+		return static_cast<std::uint32_t>(object->getID());
+	}
+
+	std::optional<std::string> nameOf(const AsciiString &name)
+	{
+		return std::string(name.str());
+	}
+
+	rts::DecisionPosition positionOf(const Coord3D &position)
+	{
+		return {position.x, position.y, position.z};
+	}
+
+	// What a decision holds, copied out of the game's objects while the hook runs.
+	rts::Decision recordOf(const AIDecision &d)
+	{
+		rts::Decision r;
+		r.sequence = d.m_seq;
+		r.frame = d.m_frame;
+		r.origin = d.m_origin;
+		r.kind = d.m_kind;
+		r.depth = d.m_depth;
+		if (d.m_player >= 0)
+			r.player = d.m_player;
+		r.actor = objectId(d.m_actor);
+		if (d.m_kind == AI_DECISION_UNIT_COMMAND)
+		{
+			r.command = d.m_aiCommand;
+			r.commandSource = d.m_commandSource;
+			r.intValue = d.m_intValue;
+		}
+		if (d.m_pos != nullptr)
+			r.position = positionOf(*d.m_pos);
+		for (Int i = 0; d.m_coords != nullptr && i < d.m_numCoords; ++i)
+			r.path.push_back(positionOf(d.m_coords[i]));
+		r.target = objectId(d.m_target);
+		r.otherObject = objectId(d.m_other);
+		if (d.m_team != nullptr)
+			r.team = nameOf(d.m_team->getName());
+		if (d.m_waypoint != nullptr)
+			r.waypoint = static_cast<std::uint32_t>(d.m_waypoint->getID());
+		if (d.m_polygon != nullptr)
+			r.polygonTrigger = static_cast<std::int32_t>(d.m_polygon->getID());
+		if (d.m_kind == AI_DECISION_SWITCH_WEAPON)
+			r.weaponSlot = d.m_intValue;
+		if (d.m_commandButton != nullptr)
+			r.commandButton = nameOf(d.m_commandButton->getName());
+		if (d.m_thing != nullptr)
+			r.thingTemplate = static_cast<std::uint32_t>(d.m_thing->getTemplateID());
+		if (d.m_upgrade != nullptr)
+			r.upgrade = nameOf(d.m_upgrade->getUpgradeName());
+		if (d.m_kind == AI_DECISION_PURCHASE_SCIENCE)
+			r.science = nameOf(TheScienceStore->getInternalNameForScience(d.m_science));
+		if (d.m_specialPower != nullptr)
+		{
+			r.specialPower = static_cast<std::uint32_t>(d.m_specialPower->getID());
+			r.commandOptions = d.m_commandOptions;
+		}
+		if (d.m_script != nullptr)
+			r.script = std::string(d.m_script);
+		return r;
+	}
+#endif
+
 	Bool active()
 	{
 #if RTS_ENGINE_CONTEXT
-		ObserverPerEngine &ope = observerState();
-		return ope.observer != nullptr && ope.muted == 0;
+		return decisionSink() != nullptr && observerState().muted == 0;
 #else
 		return s_observer != nullptr && s_muted == 0;
 #endif
@@ -118,8 +204,7 @@ namespace
 	void emit(const AIDecision &d)
 	{
 #if RTS_ENGINE_CONTEXT
-		ObserverPerEngine &ope = observerState();
-		ope.observer(d, ope.userData);
+		decisionSink()->record(recordOf(d));
 #else
 		s_observer(d, s_userData);
 #endif
@@ -135,23 +220,15 @@ namespace
 	}
 }
 
+#if !RTS_ENGINE_CONTEXT
 //-------------------------------------------------------------------------------------------------
 void setAIDecisionObserver(AIDecisionObserverFn fn, void *userData)
 {
-#if RTS_ENGINE_CONTEXT
-	// With no engine current there is no slot to install on: leave g_noEngine untouched.
-	if (rts::ctx() == &rts::g_noEngine)
-		return;
-	ObserverPerEngine &ope = observerState();
-	ope.observer = fn;
-	ope.userData = fn ? userData : nullptr;
-	ope.seq = 0;
-#else
 	s_observer = fn;
 	s_userData = fn ? userData : nullptr;
 	s_seq = 0;
-#endif
 }
+#endif
 
 //-------------------------------------------------------------------------------------------------
 AIDecisionScope::AIDecisionScope(AIDecisionOrigin origin, const char *script)
@@ -328,6 +405,34 @@ void AIDecisionHook::switchWeapon(const Object *actor, const CommandButton *butt
 	d.m_commandButton = button;
 	d.m_intValue = weaponSlot;
 	emit(d);
+}
+
+// GeneralsX @feature cemlyn007 16/10/2026 A construction cancelled by its player, a rally point set and an
+// overcharge toggled.
+void AIDecisionHook::cancelBuild(const Object *structure)
+{
+	if (!active())
+		return;
+	AIDecision d = makeDecision(AI_DECISION_CANCEL_BUILD, structure);
+	d.m_thing = structure->getTemplate();
+	d.m_pos = structure->getPosition();
+	emit(d);
+}
+
+void AIDecisionHook::setRallyPoint(const Object *structure, const Coord3D *pos)
+{
+	if (!active())
+		return;
+	AIDecision d = makeDecision(AI_DECISION_SET_RALLY_POINT, structure);
+	d.m_pos = pos;
+	emit(d);
+}
+
+void AIDecisionHook::toggleOvercharge(const Object *structure)
+{
+	if (!active())
+		return;
+	emit(makeDecision(AI_DECISION_TOGGLE_OVERCHARGE, structure));
 }
 
 void AIDecisionHook::purchaseScience(const Player *player, ScienceType science)
