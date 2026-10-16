@@ -611,6 +611,16 @@ public:
 
 	static IDirect3DDevice8* _Get_D3D_Device8() { return D3DDevice; }
 	static IDirect3D8* _Get_D3D8() { return D3DInterface; }
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 16/10/2026 A headless engine's (RenderMode::headless) off-screen render target and
+	// depth surface, of its render size and in the pinned formats below: its device has no presentable surface, and
+	// every image it draws goes into these (docs/EMBEDDING.md, "The render device"). Null for any other engine, and
+	// before its device exists.
+	static constexpr D3DFORMAT OFF_SCREEN_RENDER_TARGET_FORMAT = D3DFMT_A8R8G8B8;
+	static constexpr D3DFORMAT OFF_SCREEN_DEPTH_FORMAT = D3DFMT_D24S8;
+	static IDirect3DSurface8* _Get_Off_Screen_Render_Target();
+	static IDirect3DSurface8* _Get_Off_Screen_Depth_Buffer();
+#endif
 	/// Returns the display format - added by TR for video playback - not part of W3D
 	static WW3DFormat	getBackBufferFormat();
 	static bool Reset_Device(bool reload_assets=true);
@@ -656,6 +666,11 @@ protected:
 
 	static bool	Create_Device();
 	static void Release_Device();
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 16/10/2026 Make and bind, or release, a headless engine's off-screen surfaces.
+	static bool Create_Off_Screen_Surfaces();
+	static void Release_Off_Screen_Surfaces();
+#endif
 
 	static void Reset_Statistics();
 	static void Enumerate_Devices();

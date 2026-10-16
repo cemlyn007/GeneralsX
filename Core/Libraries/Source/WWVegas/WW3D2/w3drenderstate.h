@@ -196,6 +196,11 @@ struct RTS_ENGINE_CONTEXT_API W3DRenderState
 	IDirect3DSurface8* s_savedBackbuffer;
 	IDirect3DSurface8* s_savedDepth;
 
+	// GeneralsX @feature cemlyn007 16/10/2026 A headless engine's off-screen render target and depth surface
+	// (DX8Wrapper::_Get_Off_Screen_Render_Target).
+	IDirect3DSurface8* OffScreenRenderTarget;
+	IDirect3DSurface8* OffScreenDepthBuffer;
+
 	int ZBias;
 	float ZNear;
 	float ZFar;
