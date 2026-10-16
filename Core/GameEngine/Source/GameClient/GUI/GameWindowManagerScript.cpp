@@ -114,6 +114,22 @@ struct GameWindowParse
 // PRIVATE DATA ///////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @bugfix cemlyn007 16/10/2026 strtok keeps its position in the C library's process-wide state, so engines
+// loading window scripts on two threads at once would continue each other's tokens. Each engine keeps its own
+// position, which this file's parsers share just as they shared strtok's.
+RTS_ENGINE_GLOBAL(char*, scriptTokenPosition, nullptr);
+static char* engineStrtok(char* text, const char* separators)
+{
+#ifdef _WIN32
+	return strtok_s(text, separators, &RTS_ENGINE_GLOBAL_REF(scriptTokenPosition));
+#else
+	return strtok_r(text, separators, &RTS_ENGINE_GLOBAL_REF(scriptTokenPosition));
+#endif
+}
+#define strtok engineStrtok
+#endif
+
 // window methods and their string representations
 #if RTS_ENGINE_CONTEXT
 // GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).

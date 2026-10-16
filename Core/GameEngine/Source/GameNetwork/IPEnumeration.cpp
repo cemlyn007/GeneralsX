@@ -113,6 +113,25 @@ EnumeratedIP * IPEnumeration::getAddresses()
 	}
 	DEBUG_LOG(("Hostname is '%s'", hostname));
 
+#if RTS_ENGINE_CONTEXT && !defined(_WIN32)
+	// GeneralsX @bugfix cemlyn007 16/10/2026 gethostbyname returns the C library's one process-wide result, which engines
+	// starting on two threads at once would both write; getaddrinfo returns a list of the caller's own
+	addrinfo hints = {};
+	hints.ai_family = AF_INET;
+	addrinfo* addresses = nullptr;
+	if (getaddrinfo(hostname, nullptr, &hints, &addresses) != 0)
+	{
+		DEBUG_LOG(("Failed call to getaddrinfo for '%s'", hostname));
+		return m_IPlist;
+	}
+	for (const addrinfo* address = addresses; address != nullptr; address = address->ai_next)
+	{
+		const UnsignedByte* entry =
+			reinterpret_cast<const UnsignedByte*>(&reinterpret_cast<const sockaddr_in*>(address->ai_addr)->sin_addr);
+		addNewIP(entry[0], entry[1], entry[2], entry[3]);
+	}
+	freeaddrinfo(addresses);
+#else
 	// get host information from the host name
 	hostent* hostEnt = gethostbyname(hostname);
 	if (hostEnt == nullptr)
@@ -139,6 +158,8 @@ EnumeratedIP * IPEnumeration::getAddresses()
 			(UnsignedByte)entry[2],
 			(UnsignedByte)entry[3]);
 	}
+
+#endif
 
 	return m_IPlist;
 }
