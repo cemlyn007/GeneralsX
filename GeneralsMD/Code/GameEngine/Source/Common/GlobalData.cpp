@@ -1366,6 +1366,11 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 	{
 		TheWritableGlobalData->m_xResolution = renderXResolution;
 		TheWritableGlobalData->m_yResolution = renderYResolution;
+#if RTS_ENGINE_CONTEXT
+		// GeneralsX @feature cemlyn007 16/10/2026 A render boot's terrain LOD is pinned at its most detailed: left
+		// automatic, W3DDisplay picks it by timing the machine's draws, so the images would follow its speed.
+		TheWritableGlobalData->m_terrainLOD = TERRAIN_LOD_MAX;
+#endif
 	}
 }
 

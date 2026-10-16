@@ -329,6 +329,13 @@ void GameLODManager::init()
 	OptionPreferences optionPref;
 
 	StaticGameLODLevel userSetDetail=(StaticGameLODLevel)optionPref.getStaticGameDetail();
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 16/10/2026 A render boot's images do not follow its display settings file: its static
+	// LOD is pinned at High, whatever the file asks for (render-pipeline, "Render boots pin the display settings images
+	// depend on").
+	if (TheGlobalData->m_headlessRender)
+		userSetDetail = STATIC_GAME_LOD_HIGH;
+#endif
 
 	m_idealDetailLevel=(StaticGameLODLevel)optionPref.getIdealStaticGameDetail();
 
@@ -643,6 +650,12 @@ void GameLODManager::applyStaticLODLevel(StaticGameLODLevel level)
 		TheWritableGlobalData->m_useDrawModuleLOD=!lodInfo->m_useBuildupScaffolds;
 		TheWritableGlobalData->m_useHeatEffects=lodInfo->m_useHeatEffects;
 		TheWritableGlobalData->m_enableDynamicLOD = lodInfo->m_enableDynamicLOD;
+#if RTS_ENGINE_CONTEXT
+		// GeneralsX @feature cemlyn007 16/10/2026 A render boot keeps dynamic LOD off whatever the preset says: it would
+		// lower the detail by how fast the machine draws, so the images would follow the machine's load.
+		if (TheGlobalData->m_headlessRender)
+			TheWritableGlobalData->m_enableDynamicLOD = FALSE;
+#endif
 		TheWritableGlobalData->m_useFpsLimit = lodInfo->m_useFpsLimit;
 		TheWritableGlobalData->m_useTrees = requestedTrees;
 
