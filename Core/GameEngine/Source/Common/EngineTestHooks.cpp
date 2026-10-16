@@ -24,14 +24,23 @@
 
 #if RTS_ENGINE_CONTEXT
 
+#include <cstddef>
+#include <optional>
+#include <stdexcept>
+#include <utility>
+
+#include "Common/Debug.h"
 #include "Common/EngineContext.h"
 #include "Common/GameEngine.h"
 
 namespace
 {
 
+constexpr std::size_t kTestHookPoints = 4;
+
 struct TestHooks
 {
+	std::optional<rts::InjectedFault> faults[kTestHookPoints];
 	bool quitAtNextFrame;
 };
 
@@ -39,7 +48,24 @@ struct TestHooks
 RTS_ENGINE_GLOBAL(TestHooks, theTestHooks);
 #define theTestHooks RTS_ENGINE_GLOBAL_REF(theTestHooks)
 
+std::size_t indexOf(rts::TestHookPoint point)
+{
+	return static_cast<std::size_t>(point);
+}
+
+void raiseInjectedFault(const rts::InjectedFault& fault)
+{
+	if (fault.kind == rts::InjectedFaultKind::foreignException)
+		throw std::runtime_error(fault.reason);
+	ReleaseCrash(fault.reason.c_str());
+}
+
 } // namespace
+
+void rts::armInjectedFault(TestHookPoint point, InjectedFault fault)
+{
+	theTestHooks.faults[indexOf(point)] = std::move(fault);
+}
 
 void rts::armInjectedQuit()
 {
@@ -53,6 +79,23 @@ void rts::strikeTestHooks(TestHookPoint point)
 	{
 		hooks.quitAtNextFrame = false;
 		TheGameEngine->setQuitting(TRUE);
+	}
+	std::optional<InjectedFault>& armed = hooks.faults[indexOf(point)];
+	if (!armed)
+		return;
+	const InjectedFault fault = std::move(*armed);
+	armed.reset();
+	if (!fault.caughtByCatchAll)
+	{
+		raiseInjectedFault(fault);
+		return;
+	}
+	try
+	{
+		raiseInjectedFault(fault);
+	}
+	catch (...)
+	{
 	}
 }
 

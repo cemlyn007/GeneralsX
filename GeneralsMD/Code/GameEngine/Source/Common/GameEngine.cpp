@@ -366,6 +366,10 @@ GameEngine::~GameEngine()
 	// GeneralsX @feature cemlyn007 15/10/2026 The threads this engine started stop before the state they use is freed
 	// (Common/EngineThread.h); its host joins them
 	rts::stopEngineThreads();
+
+	// GeneralsX @feature cemlyn007 16/10/2026 A host's tests strike their teardown hook here (Common/EngineTestHooks.h)
+	rts::strikeTestHooks(rts::TestHookPoint::teardown);
+	RTS_STOP_TEARDOWN_ON_FAULT();
 #endif
 
 	//extern std::vector<std::string>	preloadTextureNamesGlobalHack;
@@ -555,6 +559,9 @@ void GameEngine::init()
 #if !RTS_ENGINE_CONTEXT
 		if (IsEngineEmbeddedMode() && std::getenv("GENERALSX_TEST_FAULT_IN_INIT"))
 			RELEASE_CRASH("test fault inside GameEngine::init (GENERALSX_TEST_FAULT_IN_INIT)");
+#else
+		// GeneralsX @feature cemlyn007 16/10/2026 A host's tests strike their start-up hook here (Common/EngineTestHooks.h)
+		rts::strikeTestHooks(rts::TestHookPoint::startUp);
 #endif
 
 #ifdef DEBUG_LOGGING
