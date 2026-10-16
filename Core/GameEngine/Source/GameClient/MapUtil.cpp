@@ -888,6 +888,28 @@ Int MapCache::readStartPositions(const AsciiString &path)
 	starts.update();
 	return starts.m_numStartSpots;
 }
+
+const MapMetaData *MapCache::addMapFile(const AsciiString &path)
+{
+	FileInfo fileInfo;
+	if (!TheFileSystem->getFileInfo(path, &fileInfo))
+		return nullptr;
+	AsciiString lowerPath = path;
+	lowerPath.toLower();
+	try
+	{
+		addMap(AsciiString::TheEmptyString, path, lowerPath, fileInfo, FALSE);
+	}
+	catch (ErrorCode code)
+	{
+		resetMap();
+		if (code != ERROR_CORRUPT_FILE_FORMAT)
+			throw;
+		throwCorruptMap(path);
+	}
+	const MapCache::const_iterator entry = find(lowerPath);
+	return entry != end() ? &entry->second : nullptr;
+}
 #endif
 
 // PUBLIC FUNCTIONS //////////////////////////////////////////////////////////////////////////////
