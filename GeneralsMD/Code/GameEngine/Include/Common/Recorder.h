@@ -144,6 +144,9 @@ public:
 
 	RecorderModeType getMode();												///< Returns the current operating mode.
 	Bool isPlaybackMode() const { return m_mode == RECORDERMODETYPE_PLAYBACK || m_mode == RECORDERMODETYPE_SIMULATION_PLAYBACK; }
+	// GeneralsX @feature cemlyn007 16/10/2026 Whether a replay recording is in progress: record mode with its file open.
+	// The mode stays RECORD once a recording stops, until the next game starts a fresh one.
+	Bool isRecording() const { return m_mode == RECORDERMODETYPE_RECORD && m_file != nullptr; }
 	void initControls();															///< Show or Hide the Replay controls
 
 	static AsciiString getReplayDir();								///< Returns the directory that holds the replay files.
