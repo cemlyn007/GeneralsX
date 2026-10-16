@@ -145,6 +145,9 @@ Int copyRect(unsigned char *buf, Int bufSize, int oX, int oY, int width, int hei
 		goto error;
 
  	m_pDev->GetRenderTarget(&surface);
+	// GeneralsX @feature cemlyn007 16/10/2026 Both surfaces are recorded while held, and released through the record, in
+	// the device-wrapper layer (WW3D2/dx8ledger.h).
+	DX8_RECORD(surface, SURFACE);
 
 	if (!surface)
 		goto error;
@@ -164,6 +167,8 @@ Int copyRect(unsigned char *buf, Int bufSize, int oX, int oY, int width, int hei
 	dstPoint.y=0;
 
  	hr=m_pDev->CreateImageSurface(  width, height, desc.Format, &tempSurface);
+	if (hr == S_OK)
+		DX8_RECORD(tempSurface, SURFACE);
 
 	if (hr != S_OK)
 		goto error;
@@ -192,9 +197,9 @@ Int copyRect(unsigned char *buf, Int bufSize, int oX, int oY, int width, int hei
 
 error:
 	if (surface)
-		surface->Release();
+		DX8_RELEASE(surface);
 	if (tempSurface)
-		tempSurface->Release();
+		DX8_RELEASE(tempSurface);
 
 	return result;
 }

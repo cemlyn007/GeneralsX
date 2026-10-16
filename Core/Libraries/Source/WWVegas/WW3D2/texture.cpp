@@ -44,6 +44,8 @@
 #include <d3d8.h>
 #include <d3dx8core.h>
 #include "dx8wrapper.h"
+// GeneralsX @feature cemlyn007 16/10/2026 Every reference this file takes on a D3D8 object, and every release of one,
+// goes through the device-wrapper layer's record (dx8ledger.h, included by dx8wrapper.h).
 #include "WWLib/TARGA.h"
 #include <WWLib/nstrdup.h>
 #include "w3d_file.h"
@@ -137,7 +139,7 @@ TextureBaseClass::~TextureBaseClass()
 
 	if (D3DTexture)
 	{
-		D3DTexture->Release();
+		DX8_RELEASE(D3DTexture);
 		D3DTexture = nullptr;
 	}
 
@@ -232,7 +234,7 @@ void TextureBaseClass::Invalidate()
 
 	if (D3DTexture)
 	{
-		D3DTexture->Release();
+		DX8_RELEASE(D3DTexture);
 		D3DTexture = nullptr;
 	}
 
@@ -267,7 +269,7 @@ void TextureBaseClass::Invalidate()
 
 	if (D3DTexture)
 	{
-		D3DTexture->Release();
+		DX8_RELEASE(D3DTexture);
 		D3DTexture = nullptr;
 	}
 
@@ -297,11 +299,11 @@ void TextureBaseClass::Set_D3D_Base_Texture(IDirect3DBaseTexture8* tex)
 	LastAccessed=WW3D::Get_Sync_Time();
 
 	if (D3DTexture != nullptr) {
-		D3DTexture->Release();
+		DX8_RELEASE(D3DTexture);
 	}
 	D3DTexture = tex;
 	if (D3DTexture != nullptr) {
-		D3DTexture->AddRef();
+		DX8_ADD_REF(D3DTexture, TEXTURE);
 	}
 }
 
@@ -313,7 +315,7 @@ void TextureBaseClass::Set_D3D_Base_Texture(IDirect3DBaseTexture8* tex)
 void TextureBaseClass::Load_Locked_Surface()
 {
 	WWPROFILE(("TextureClass::Load_Locked_Surface()"));
-	if (D3DTexture) D3DTexture->Release();
+	if (D3DTexture) DX8_RELEASE(D3DTexture);
 	D3DTexture=nullptr;
 	TextureLoader::Request_Thumbnail(this);
 	Initialized=false;
@@ -334,7 +336,7 @@ bool TextureBaseClass::Is_Missing_Texture()
 
 	if (missing_texture)
 	{
-		missing_texture->Release();
+		DX8_RELEASE(missing_texture);
 	}
 
 	return flag;
@@ -837,9 +839,13 @@ TextureClass::TextureClass(IDirect3DBaseTexture8* d3d_texture)
 	Set_D3D_Base_Texture(d3d_texture);
 	IDirect3DSurface8* surface;
 	DX8_ErrorCode(Peek_D3D_Texture()->GetSurfaceLevel(0,&surface));
+	DX8_RECORD(surface, SURFACE);
 	D3DSURFACE_DESC d3d_desc;
 	::ZeroMemory(&d3d_desc, sizeof(D3DSURFACE_DESC));
 	DX8_ErrorCode(surface->GetDesc(&d3d_desc));
+	// GeneralsX @bugfix cemlyn007 16/10/2026 Release the surface once its description is read: upstream kept the
+	// reference, which keeps the texture (and so the device) alive after the texture is released.
+	DX8_RELEASE(surface);
 	Width=d3d_desc.Width;
 	Height=d3d_desc.Height;
 	TextureFormat=D3DFormat_To_WW3DFormat(d3d_desc.Format);
@@ -917,10 +923,10 @@ void TextureClass::Apply_New_Surface
 {
 	IDirect3DBaseTexture8* d3d_tex=Peek_D3D_Base_Texture();
 
-	if (d3d_tex) d3d_tex->Release();
+	if (d3d_tex) DX8_RELEASE(d3d_tex);
 
 	Poke_Texture(d3d_texture);//TextureLoadTask->Peek_D3D_Texture();
-	d3d_texture->AddRef();
+	DX8_ADD_REF(d3d_texture, TEXTURE);
 
 	if (initialized) Initialized=true;
 	if (disable_auto_invalidation) InactivationTime = 0;
@@ -928,6 +934,7 @@ void TextureClass::Apply_New_Surface
 	WWASSERT(d3d_texture);
 	IDirect3DSurface8* surface;
 	DX8_ErrorCode(Peek_D3D_Texture()->GetSurfaceLevel(0,&surface));
+	DX8_RECORD(surface, SURFACE);
 	D3DSURFACE_DESC d3d_desc;
 	::ZeroMemory(&d3d_desc, sizeof(D3DSURFACE_DESC));
 	DX8_ErrorCode(surface->GetDesc(&d3d_desc));
@@ -937,7 +944,7 @@ void TextureClass::Apply_New_Surface
 		Width=d3d_desc.Width;
 		Height=d3d_desc.Height;
 	}
-	surface->Release();
+	DX8_RELEASE(surface);
 
 }
 
@@ -1010,8 +1017,9 @@ SurfaceClass *TextureClass::Get_Surface_Level(unsigned int level)
 
 	IDirect3DSurface8 *d3d_surface = nullptr;
 	DX8_ErrorCode(Peek_D3D_Texture()->GetSurfaceLevel(level, &d3d_surface));
+	DX8_RECORD(d3d_surface, SURFACE);
 	SurfaceClass *surface = new SurfaceClass(d3d_surface);
-	d3d_surface->Release();
+	DX8_RELEASE(d3d_surface);
 
 	return surface;
 }
@@ -1043,6 +1051,7 @@ IDirect3DSurface8 *TextureClass::Get_D3D_Surface_Level(unsigned int level)
 
 	IDirect3DSurface8 *d3d_surface = nullptr;
 	DX8_ErrorCode(Peek_D3D_Texture()->GetSurfaceLevel(level, &d3d_surface));
+	DX8_RECORD(d3d_surface, SURFACE);
 	return d3d_surface;
 }
 
@@ -1298,10 +1307,10 @@ void ZTextureClass::Apply_New_Surface
 {
 	IDirect3DBaseTexture8* d3d_tex=Peek_D3D_Base_Texture();
 
-	if (d3d_tex) d3d_tex->Release();
+	if (d3d_tex) DX8_RELEASE(d3d_tex);
 
 	Poke_Texture(d3d_texture);//TextureLoadTask->Peek_D3D_Texture();
-	d3d_texture->AddRef();
+	DX8_ADD_REF(d3d_texture, TEXTURE);
 
 	if (initialized) Initialized=true;
 	if (disable_auto_invalidation) InactivationTime = 0;
@@ -1309,6 +1318,7 @@ void ZTextureClass::Apply_New_Surface
 	WWASSERT(Peek_D3D_Texture());
 	IDirect3DSurface8* surface;
 	DX8_ErrorCode(Peek_D3D_Texture()->GetSurfaceLevel(0,&surface));
+	DX8_RECORD(surface, SURFACE);
 	D3DSURFACE_DESC d3d_desc;
 	::ZeroMemory(&d3d_desc, sizeof(D3DSURFACE_DESC));
 	DX8_ErrorCode(surface->GetDesc(&d3d_desc));
@@ -1318,7 +1328,7 @@ void ZTextureClass::Apply_New_Surface
 		Width=d3d_desc.Width;
 		Height=d3d_desc.Height;
 	}
-	surface->Release();
+	DX8_RELEASE(surface);
 }
 
 //**********************************************************************************************
@@ -1335,6 +1345,7 @@ IDirect3DSurface8* ZTextureClass::Get_D3D_Surface_Level(unsigned int level)
 
 	IDirect3DSurface8 *d3d_surface = nullptr;
 	DX8_ErrorCode(Peek_D3D_Texture()->GetSurfaceLevel(level, &d3d_surface));
+	DX8_RECORD(d3d_surface, SURFACE);
 	return d3d_surface;
 }
 
@@ -1579,12 +1590,16 @@ CubeTextureClass::CubeTextureClass(IDirect3DBaseTexture8* d3d_texture)
 	IsProcedural=true;
 	IsReducible=false;
 
-	Peek_Texture()->AddRef();
+	DX8_ADD_REF(Peek_Texture(), TEXTURE);
 	IDirect3DSurface8* surface;
 	DX8_ErrorCode(Peek_D3D_Texture()->GetSurfaceLevel(0,&surface));
+	DX8_RECORD(surface, SURFACE);
 	D3DSURFACE_DESC d3d_desc;
 	::ZeroMemory(&d3d_desc, sizeof(D3DSURFACE_DESC));
 	DX8_ErrorCode(surface->GetDesc(&d3d_desc));
+	// GeneralsX @bugfix cemlyn007 16/10/2026 Release the surface once its description is read: upstream kept the
+	// reference, which keeps the texture (and so the device) alive after the texture is released.
+	DX8_RELEASE(surface);
 	Width=d3d_desc.Width;
 	Height=d3d_desc.Height;
 	TextureFormat=D3DFormat_To_WW3DFormat(d3d_desc.Format);
@@ -1617,10 +1632,10 @@ void CubeTextureClass::Apply_New_Surface
 {
 	IDirect3DBaseTexture8* d3d_tex=Peek_D3D_Base_Texture();
 
-	if (d3d_tex) d3d_tex->Release();
+	if (d3d_tex) DX8_RELEASE(d3d_tex);
 
 	Poke_Texture(d3d_texture);//TextureLoadTask->Peek_D3D_Texture();
-	d3d_texture->AddRef();
+	DX8_ADD_REF(d3d_texture, TEXTURE);
 
 	if (initialized) Initialized=true;
 	if (disable_auto_invalidation) InactivationTime = 0;
@@ -1864,12 +1879,16 @@ CubeTextureClass::CubeTextureClass(IDirect3DBaseTexture8* d3d_texture)
 	IsProcedural=true;
 	IsReducible=false;
 
-	Peek_Texture()->AddRef();
+	DX8_ADD_REF(Peek_Texture(), TEXTURE);
 	IDirect3DSurface8* surface;
 	DX8_ErrorCode(Peek_D3D_Texture()->GetSurfaceLevel(0,&surface));
+	DX8_RECORD(surface, SURFACE);
 	D3DSURFACE_DESC d3d_desc;
 	::ZeroMemory(&d3d_desc, sizeof(D3DSURFACE_DESC));
 	DX8_ErrorCode(surface->GetDesc(&d3d_desc));
+	// GeneralsX @bugfix cemlyn007 16/10/2026 Release the surface once its description is read: upstream kept the
+	// reference, which keeps the texture (and so the device) alive after the texture is released.
+	DX8_RELEASE(surface);
 	Width=d3d_desc.Width;
 	Height=d3d_desc.Height;
 	TextureFormat=D3DFormat_To_WW3DFormat(d3d_desc.Format);
@@ -1905,10 +1924,10 @@ void VolumeTextureClass::Apply_New_Surface
 {
 	IDirect3DBaseTexture8* d3d_tex=Peek_D3D_Base_Texture();
 
-	if (d3d_tex) d3d_tex->Release();
+	if (d3d_tex) DX8_RELEASE(d3d_tex);
 
 	Poke_Texture(d3d_texture);//TextureLoadTask->Peek_D3D_Texture();
-	d3d_texture->AddRef();
+	DX8_ADD_REF(d3d_texture, TEXTURE);
 
 	if (initialized) Initialized=true;
 	if (disable_auto_invalidation) InactivationTime = 0;

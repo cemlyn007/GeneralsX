@@ -52,6 +52,8 @@
 #include "W3DDevice/GameClient/TileData.h"
 #include "Common/GlobalData.h"
 #include "WW3D2/dx8wrapper.h"
+// GeneralsX @feature cemlyn007 16/10/2026 Every surface this file takes from a texture is recorded while held, and released
+// through the record, in the device-wrapper layer (WW3D2/dx8ledger.h, included by dx8wrapper.h).
 #include "d3dx8tex.h"
 
 /******************************************************************************
@@ -101,9 +103,10 @@ int TerrainTextureClass::update(WorldHeightMap *htMap)
 	D3DSURFACE_DESC surface_desc;
 	D3DLOCKED_RECT locked_rect;
 	DX8_ErrorCode(Peek_D3D_Texture()->GetSurfaceLevel(0, &surface_level));
+	DX8_RECORD(surface_level, SURFACE);
 	DX8_ErrorCode(surface_level->GetDesc(&surface_desc));
 	if (surface_desc.Width < TEXTURE_WIDTH) {
-		surface_level->Release();
+		DX8_RELEASE(surface_level);
 		return 0;
 	}
 
@@ -194,7 +197,7 @@ int TerrainTextureClass::update(WorldHeightMap *htMap)
 
 	}
 	surface_level->UnlockRect();
-	surface_level->Release();
+	DX8_RELEASE(surface_level);
 	DX8_ErrorCode(D3DXFilterTexture(Peek_D3D_Texture(), nullptr, 0, D3DX_FILTER_BOX));
 	if (WW3D::Get_Texture_Reduction()) {
 		Peek_D3D_Texture()->SetLOD(WW3D::Get_Texture_Reduction());
@@ -218,9 +221,10 @@ int TerrainTextureClass::update(WorldHeightMap *htMap)
 	D3DSURFACE_DESC surface_desc;
 	D3DLOCKED_RECT locked_rect;
 	DX8_ErrorCode(D3DTexture->GetSurfaceLevel(0, &surface_level));
+	DX8_RECORD(surface_level, SURFACE);
 	DX8_ErrorCode(surface_level->GetDesc(&surface_desc));
 	if (surface_desc.Width < TEXTURE_WIDTH) {
-		surface_level->Release();
+		DX8_RELEASE(surface_level);
 		if (surface_desc.Width == 256) {
 			return update256(htMap);
 		}
@@ -351,7 +355,7 @@ int TerrainTextureClass::update(WorldHeightMap *htMap)
 
 	}
 	surface_level->UnlockRect();
-	surface_level->Release();
+	DX8_RELEASE(surface_level);
 	DX8_ErrorCode(D3DXFilterTexture(D3DTexture, nullptr, 0, D3DX_FILTER_BOX));
 	return(surface_desc.Height);
 }
@@ -381,6 +385,7 @@ Bool TerrainTextureClass::updateFlat(WorldHeightMap *htMap, Int xCell, Int yCell
 	D3DSURFACE_DESC surface_desc;
 	D3DLOCKED_RECT locked_rect;
 	DX8_ErrorCode(Peek_D3D_Texture()->GetSurfaceLevel(0, &surface_level));
+	DX8_RECORD(surface_level, SURFACE);
 	DX8_ErrorCode(surface_level->GetDesc(&surface_desc));
 	DEBUG_ASSERTCRASH((Int)surface_desc.Width == cellWidth*pixelsPerCell, ("Bitmap too small."));
 	DEBUG_ASSERTCRASH((Int)surface_desc.Height == cellWidth*pixelsPerCell, ("Bitmap too small."));
@@ -424,7 +429,7 @@ Bool TerrainTextureClass::updateFlat(WorldHeightMap *htMap, Int xCell, Int yCell
 	}
 
 	surface_level->UnlockRect();
-	surface_level->Release();
+	DX8_RELEASE(surface_level);
 	DX8_ErrorCode(D3DXFilterTexture(Peek_D3D_Texture(), nullptr, 0, D3DX_FILTER_BOX));
 	return(surface_desc.Height);
 }
@@ -775,6 +780,7 @@ int AlphaEdgeTextureClass::update(WorldHeightMap *htMap)
 	D3DSURFACE_DESC surface_desc;
 	D3DLOCKED_RECT locked_rect;
 	DX8_ErrorCode(Peek_D3D_Texture()->GetSurfaceLevel(0, &surface_level));
+	DX8_RECORD(surface_level, SURFACE);
 	DX8_ErrorCode(surface_level->LockRect(&locked_rect, nullptr, 0));
 	DX8_ErrorCode(surface_level->GetDesc(&surface_desc));
 
@@ -836,7 +842,7 @@ int AlphaEdgeTextureClass::update(WorldHeightMap *htMap)
 #endif
 	}
 	surface_level->UnlockRect();
-	surface_level->Release();
+	DX8_RELEASE(surface_level);
 	DX8_ErrorCode(D3DXFilterTexture(Peek_D3D_Texture(), nullptr, 0, D3DX_FILTER_BOX));
 	return(surface_desc.Height);
 }

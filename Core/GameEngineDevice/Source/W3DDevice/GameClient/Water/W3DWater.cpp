@@ -317,8 +317,8 @@ WaterRenderObjClass::~WaterRenderObjClass()
 
 	i=NUM_BUMP_FRAMES;
 	while (i--)
-	{	SAFE_RELEASE( m_pBumpTexture[i]);
-		SAFE_RELEASE( m_pBumpTexture2[i]);
+	{	DX8_SAFE_RELEASE( m_pBumpTexture[i]);
+		DX8_SAFE_RELEASE( m_pBumpTexture2[i]);
 	}
 
 	delete [] m_meshData;
@@ -675,6 +675,9 @@ HRESULT WaterRenderObjClass::generateVertexBuffer( Int sizeX, Int sizeY, Int ver
 			&m_vertexBufferD3D
 		)))
 			return hr;
+		// GeneralsX @feature cemlyn007 16/10/2026 The grid's buffers are recorded while held, and released through the
+		// record, in the device-wrapper layer (WW3D2/dx8ledger.h).
+		DX8_RECORD(m_vertexBufferD3D, VERTEX_BUFFER);
 	}
 
 	m_vertexBufferD3DOffset=0;
@@ -740,6 +743,7 @@ HRESULT WaterRenderObjClass::generateIndexBuffer(Int sizeX, Int sizeY)
 		&m_indexBufferD3D
 	)))
 		return hr;
+	DX8_RECORD(m_indexBufferD3D, INDEX_BUFFER);
 
 	if (FAILED(hr=m_indexBufferD3D->Lock
 	(
@@ -824,8 +828,8 @@ void WaterRenderObjClass::ReleaseResources()
 	REF_PTR_RELEASE(m_indexBuffer);
 
 	REF_PTR_RELEASE(m_pReflectionTexture);
-	SAFE_RELEASE(m_vertexBufferD3D);
-	SAFE_RELEASE(m_indexBufferD3D);
+	DX8_SAFE_RELEASE(m_vertexBufferD3D);
+	DX8_SAFE_RELEASE(m_indexBufferD3D);
 
 	if (m_waterTrackSystem)
 		m_waterTrackSystem->ReleaseResources();
@@ -1226,8 +1230,8 @@ void WaterRenderObjClass::enableWaterGrid(Bool state)
 		reset();
 
 		//Release existing grid data
-		SAFE_RELEASE(m_vertexBufferD3D);
-		SAFE_RELEASE(m_indexBufferD3D);
+		DX8_SAFE_RELEASE(m_vertexBufferD3D);
+		DX8_SAFE_RELEASE(m_indexBufferD3D);
 
 		//Create new grid data
 		if (FAILED(generateIndexBuffer(m_gridCellsX+1,m_gridCellsY+1)))

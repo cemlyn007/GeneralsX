@@ -307,6 +307,7 @@ Bool W3DProjectedShadowManager::ReAcquireResources()
 		&shadowDecalIndexBufferD3D
 	)))
 		return FALSE;
+	DX8_RECORD(shadowDecalIndexBufferD3D, INDEX_BUFFER);
 
 	if (shadowDecalVertexBufferD3D == nullptr)
 	{	// Create vertex buffer
@@ -320,6 +321,7 @@ Bool W3DProjectedShadowManager::ReAcquireResources()
 			&shadowDecalVertexBufferD3D
 		)))
 			return FALSE;
+		DX8_RECORD(shadowDecalVertexBufferD3D, VERTEX_BUFFER);
 	}
 
 	return TRUE;
@@ -329,10 +331,12 @@ void W3DProjectedShadowManager::ReleaseResources()
 {
 	invalidateCachedLightPositions();	//textures need to be updated
 	REF_PTR_RELEASE(m_dynamicRenderTarget);	//need to create a new render target
+	// GeneralsX @feature cemlyn007 16/10/2026 The shadow buffers are recorded while held, and released through the record, in
+	// the device-wrapper layer (WW3D2/dx8ledger.h).
 	if (shadowDecalIndexBufferD3D)
-		shadowDecalIndexBufferD3D->Release();
+		DX8_RELEASE(shadowDecalIndexBufferD3D);
 	if (shadowDecalVertexBufferD3D)
-		shadowDecalVertexBufferD3D->Release();
+		DX8_RELEASE(shadowDecalVertexBufferD3D);
 	shadowDecalIndexBufferD3D=nullptr;
 	shadowDecalVertexBufferD3D=nullptr;
 }

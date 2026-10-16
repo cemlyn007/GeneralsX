@@ -74,7 +74,9 @@ IDirect3DTexture8* MissingTexture::_Get_Missing_Texture()
 		return nullptr;
 	}
 
-	_MissingTexture->AddRef();
+	// GeneralsX @feature cemlyn007 16/10/2026 Every reference this file takes on a D3D8 object, and every release of
+	// one, goes through the device-wrapper layer's record (dx8ledger.h).
+	DX8_ADD_REF(_MissingTexture, TEXTURE);
 	return _MissingTexture;
 }
 
@@ -92,7 +94,7 @@ IDirect3DSurface8* MissingTexture::_Create_Missing_Surface()
 		IDirect3DTexture8 *texture = MissingTexture::_Get_Missing_Texture();
 		if (texture != nullptr)
 		{
-			texture->Release();
+			DX8_RELEASE(texture);
 		}
 	}
 
@@ -104,6 +106,7 @@ IDirect3DSurface8* MissingTexture::_Create_Missing_Surface()
 
 	IDirect3DSurface8 *texture_surface = nullptr;
 	DX8_ErrorCode(_MissingTexture->GetSurfaceLevel(0, &texture_surface));
+	DX8_RECORD(texture_surface, SURFACE);
 	D3DSURFACE_DESC texture_surface_desc;
 	::ZeroMemory(&texture_surface_desc, sizeof(D3DSURFACE_DESC));
 	DX8_ErrorCode(texture_surface->GetDesc(&texture_surface_desc));
@@ -114,8 +117,9 @@ IDirect3DSurface8* MissingTexture::_Create_Missing_Surface()
 		texture_surface_desc.Height,
 		texture_surface_desc.Format,
 		&surface));
+	DX8_RECORD(surface, SURFACE);
 	DX8CALL(CopyRects(texture_surface, nullptr, 0, surface, nullptr));
-	texture_surface->Release();
+	DX8_RELEASE(texture_surface);
 	return surface;
 }
 
@@ -168,7 +172,9 @@ void MissingTexture::_Init()
 	for (unsigned i=1;i<tex->GetLevelCount();++i) {
 		IDirect3DSurface8 *src,*dst;
 		DX8_ErrorCode(tex->GetSurfaceLevel(i-1,&src));
+		DX8_RECORD(src, SURFACE);
 		DX8_ErrorCode(tex->GetSurfaceLevel(i,&dst));
+		DX8_RECORD(dst, SURFACE);
 
 		DX8_ErrorCode(D3DXLoadSurfaceFromSurface(
 			dst,
@@ -180,8 +186,8 @@ void MissingTexture::_Init()
 			D3DX_FILTER_BOX,	// box is good for 2:1 filtering
 			0));
 
-		src->Release();
-		dst->Release();
+		DX8_RELEASE(src);
+		DX8_RELEASE(dst);
 	}
 
 	_MissingTexture=tex;
@@ -228,7 +234,7 @@ void MissingTexture::_Deinit()
 {
 	if (_MissingTexture)
 	{
-		_MissingTexture->Release();
+		DX8_RELEASE(_MissingTexture);
 		_MissingTexture=nullptr;
 	}
 }

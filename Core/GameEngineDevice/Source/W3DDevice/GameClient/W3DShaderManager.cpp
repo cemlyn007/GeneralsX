@@ -2972,6 +2972,10 @@ void W3DShaderManager::init()
 
 		//Some of our effects require an offscreen render target, so try creating it here.
 		HRESULT hr=DX8Wrapper::_Get_D3D_Device8()->GetRenderTarget(&m_oldRenderSurface);
+		// GeneralsX @feature cemlyn007 16/10/2026 Every reference the render-to-texture set-up takes is recorded, and
+		// released through the record, in the device-wrapper layer (WW3D2/dx8ledger.h).
+		if (hr == S_OK)
+			DX8_RECORD(m_oldRenderSurface, SURFACE);
 
 		if (hr != S_OK || !m_oldRenderSurface)
 			return;
@@ -2983,6 +2987,8 @@ void W3DShaderManager::init()
 		if (desc.MultiSampleType == D3DMULTISAMPLE_NONE)
 		{
 			hr=DX8Wrapper::_Get_D3D_Device8()->CreateTexture(desc.Width,desc.Height,1,D3DUSAGE_RENDERTARGET,desc.Format,D3DPOOL_DEFAULT,&m_renderTexture);
+			if (hr == S_OK)
+				DX8_RECORD(m_renderTexture, TEXTURE);
 		}
 		else
 		{
@@ -2992,20 +2998,24 @@ void W3DShaderManager::init()
 
 		if (hr != S_OK)
 		{
-			SAFE_RELEASE(m_oldRenderSurface);
+			DX8_SAFE_RELEASE(m_oldRenderSurface);
 			m_renderTexture = nullptr;
 		} else {
 			hr = m_renderTexture->GetSurfaceLevel(0, &m_newRenderSurface);
+			if (hr == S_OK)
+				DX8_RECORD(m_newRenderSurface, SURFACE);
 			if (hr != S_OK)
 			{
-				SAFE_RELEASE(m_renderTexture);
+				DX8_SAFE_RELEASE(m_renderTexture);
 				m_newRenderSurface = nullptr;
 			}	else {
 				hr = DX8Wrapper::_Get_D3D_Device8()->GetDepthStencilSurface(&m_oldDepthSurface);
+				if (hr == S_OK)
+					DX8_RECORD(m_oldDepthSurface, SURFACE);
 				if (hr != S_OK)
 				{
-					SAFE_RELEASE(m_newRenderSurface);
-					SAFE_RELEASE(m_renderTexture);
+					DX8_SAFE_RELEASE(m_newRenderSurface);
+					DX8_SAFE_RELEASE(m_renderTexture);
 					m_oldDepthSurface = nullptr;
 				}
 			}
@@ -3043,10 +3053,10 @@ void W3DShaderManager::init()
 //=============================================================================
 void W3DShaderManager::shutdown()
 {
-	SAFE_RELEASE(m_newRenderSurface);
-	SAFE_RELEASE(m_renderTexture);
-	SAFE_RELEASE(m_oldRenderSurface);
-	SAFE_RELEASE(m_oldDepthSurface);
+	DX8_SAFE_RELEASE(m_newRenderSurface);
+	DX8_SAFE_RELEASE(m_renderTexture);
+	DX8_SAFE_RELEASE(m_oldRenderSurface);
+	DX8_SAFE_RELEASE(m_oldDepthSurface);
 	m_currentShader = ST_INVALID;
 	m_currentFilter = FT_NULL_FILTER;
 	//release any assets associated with a shader (vertex/pixel shaders, textures, etc.)
@@ -3221,10 +3231,10 @@ void W3DShaderManager::startRenderToTexture()
 	if (hr != S_OK)
 	{
 		// Permanently disable RTT
-		SAFE_RELEASE(m_newRenderSurface);
-		SAFE_RELEASE(m_renderTexture);
-		SAFE_RELEASE(m_oldRenderSurface);
-		SAFE_RELEASE(m_oldDepthSurface);
+		DX8_SAFE_RELEASE(m_newRenderSurface);
+		DX8_SAFE_RELEASE(m_renderTexture);
+		DX8_SAFE_RELEASE(m_oldRenderSurface);
+		DX8_SAFE_RELEASE(m_oldDepthSurface);
 		return;
 	}
 
