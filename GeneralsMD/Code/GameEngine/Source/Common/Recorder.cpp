@@ -1376,6 +1376,12 @@ Bool RecorderClass::playbackFile(AsciiString filename)
 
 	DEBUG_LOG(("RecorderClass::playbackFile() - original game was mode %d", m_originalGameMode));
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 16/10/2026 A replay whose orders are cut short or garbled holds invalid data: refuse
+	// it whole, before its game starts, instead of playing the part that reads.
+	refuseInvalidOrders(header.filename);
+#endif
+
 	// TheSuperHackers @fix helmutbuhler 03/04/2025
 	// In case we restart a replay, we need to clear the command list.
 	// Otherwise a crc message remains and messes up the crc calculation on the restarted replay.
@@ -1416,6 +1422,91 @@ Bool RecorderClass::playbackFile(AsciiString filename)
 	m_playbackFrameCount = header.frameCount;
 	return TRUE;
 }
+
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 16/10/2026 The bytes readArgument reads for an argument of `type`, or 0 for a type it
+// does not know.
+Int RecorderClass::replayArgumentBytes(GameMessageArgumentDataType type) const
+{
+	switch (type)
+	{
+		case ARGUMENTDATATYPE_INTEGER: return sizeof(Int);
+		case ARGUMENTDATATYPE_REAL: return sizeof(Real);
+		case ARGUMENTDATATYPE_BOOLEAN: return sizeof(Bool);
+		case ARGUMENTDATATYPE_OBJECTID: return sizeof(ObjectID);
+		case ARGUMENTDATATYPE_DRAWABLEID: return sizeof(DrawableID);
+		case ARGUMENTDATATYPE_TEAMID: return sizeof(UnsignedInt);
+		case ARGUMENTDATATYPE_LOCATION: return sizeof(Coord3D);
+		case ARGUMENTDATATYPE_PIXEL: return sizeof(ICoord2D);
+		case ARGUMENTDATATYPE_PIXELREGION: return sizeof(IRegion2D);
+		case ARGUMENTDATATYPE_TIMESTAMP: return sizeof(UnsignedInt);
+		case ARGUMENTDATATYPE_WIDECHAR: return static_cast<Int>(m_replayWideCharBytes);
+		case ARGUMENTDATATYPE_UNKNOWN: break;
+	}
+	return 0;
+}
+
+// GeneralsX @feature cemlyn007 16/10/2026 Each order is its frame, type and player, its argument types with their
+// counts, and then its arguments, as writeToFile writes them and appendNextCommand reads them.
+void RecorderClass::refuseInvalidOrders(const AsciiString& path)
+{
+	const Int start = m_file->position();
+	const char* invalid = nullptr;
+	char buffer[64];
+	for (;;)
+	{
+		const Int frameBytes = m_file->read(buffer, sizeof(UnsignedInt));
+		if (frameBytes == 0)
+			break;
+		const Int fixedBytes = sizeof(UnsignedInt) + sizeof(GameMessage::Type) + sizeof(Int);
+		UnsignedByte typeCount = 0;
+		if (frameBytes != sizeof(UnsignedInt)
+				|| m_file->read(buffer, fixedBytes - sizeof(UnsignedInt)) != fixedBytes - static_cast<Int>(sizeof(UnsignedInt))
+				|| m_file->read(&typeCount, sizeof(typeCount)) != sizeof(typeCount))
+		{
+			invalid = "the replay holds invalid data: it ends partway through an order";
+			break;
+		}
+		Int argumentBytes = 0;
+		for (UnsignedByte index = 0; index < typeCount && invalid == nullptr; ++index)
+		{
+			UnsignedByte argumentType = 0;
+			UnsignedByte argumentCount = 0;
+			if (m_file->read(&argumentType, sizeof(argumentType)) != sizeof(argumentType)
+					|| m_file->read(&argumentCount, sizeof(argumentCount)) != sizeof(argumentCount))
+			{
+				invalid = "the replay holds invalid data: it ends partway through an order";
+				break;
+			}
+			const Int bytes = replayArgumentBytes(static_cast<GameMessageArgumentDataType>(argumentType));
+			if (bytes == 0)
+			{
+				invalid = "the replay holds invalid data: an order has an argument of no known type";
+				break;
+			}
+			argumentBytes += bytes * argumentCount;
+		}
+		while (invalid == nullptr && argumentBytes > 0)
+		{
+			const Int chunk = argumentBytes < static_cast<Int>(sizeof(buffer)) ? argumentBytes : static_cast<Int>(sizeof(buffer));
+			if (m_file->read(buffer, chunk) != chunk)
+				invalid = "the replay holds invalid data: it ends partway through an order";
+			argumentBytes -= chunk;
+		}
+		if (invalid != nullptr)
+			break;
+	}
+	if (invalid != nullptr)
+	{
+		m_file->close();
+		m_file = nullptr;
+		m_gameInfo.endGame();
+		m_gameInfo.reset();
+		throw rts::InvalidInputData(path.str(), invalid);
+	}
+	m_file->seek(start, File::START);
+}
+#endif
 
 /**
  * Read a unicode string from the current file position. The string is assumed to be 0-terminated.
