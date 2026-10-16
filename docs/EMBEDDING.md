@@ -221,6 +221,26 @@ count is per engine, starts at zero and never decreases, and is part of no
 checksum, save or replay. A host uses it to drop what it kept for a game a new
 one has replaced.
 
+### Queries
+
+A host may query an engine between frames, and a query must not change what
+the simulation does next. The pathfinder's own searches leave state behind, so
+`Pathfinder::QueryScope` saves what they change and puts it back when it goes
+out of scope: the tunnelling flag and the count of cells searched (both part of
+the logic checksum), the zone blocks' passable marks, which later searches read,
+the obstacle a search ignores, the depth of allies moved aside, and the switch
+to fixed pathfinding that exhausting the cell-information pool throws. A host
+makes every pathfinding query inside one, through its `queryServices()`. A pool
+a query leaves to be cleaned is still cleaned before its next use, as after any
+search. A spatial query changes only the partition manager's iteration stamp,
+which removes duplicates within one search and is part of no checksum.
+
+The values a host names in its own vocabularies are read from tables in
+GeneralsX, so that they cannot drift from the engine: `TheAIStateTypeNames`,
+`TheCellShroudStatusNames`, `TheCanMakeTypeNames`, `TheLegalBuildCodeNames`,
+`TheCanAttackResultNames` and `TheLocalLegalToBuildOptionNames`, which names
+the placement options' bits in bit order.
+
 ### Test hooks
 
 A host's tests can make an engine fault, or ask to quit, on purpose, through
