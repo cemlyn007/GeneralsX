@@ -195,6 +195,15 @@ protected:
 
 	CullBadCommandsResult cullBadCommands(); ///< prevent the user from giving mouse commands that he shouldn't be able to do during playback.
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 16/10/2026 Read the orders from the file position to its end, without queueing any,
+	// and throw rts::InvalidInputData naming the replay at `path` if the file ends partway through one or an order
+	// holds an argument of no known type; the position is then restored. playbackFile checks a replay's orders this
+	// way before it starts the replay's game, so a truncated replay is refused rather than played in part.
+	void refuseInvalidOrders(const AsciiString& path);
+	Int replayArgumentBytes(GameMessageArgumentDataType type) const;
+#endif
+
 	File* m_file;
 	AsciiString m_fileName;
 	Int m_currentFilePosition;
