@@ -41,6 +41,7 @@
 #include "Common/BuildAssistant.h"
 #include "Common/CRCDebug.h"
 #include "Common/EngineTestHooks.h"	// GeneralsX @feature cemlyn007 16/10/2026 A host's tests' hooks
+#include "Common/EngineGames.h"	// GeneralsX @feature cemlyn007 16/10/2026 The count of games an engine has started
 #include "Common/FramePacer.h"
 #include "Common/GameAudio.h"
 #include "Common/GameEngine.h"
@@ -1198,12 +1199,27 @@ void GameLogic::setGameMode( GameMode mode )
 	updateDisplayBusyState();
 }
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 16/10/2026 The count of games this engine has started (Common/EngineGames.h)
+RTS_ENGINE_GLOBAL(UnsignedInt, theStartedGames, 0);
+#define theStartedGames RTS_ENGINE_GLOBAL_REF(theStartedGames)
+
+UnsignedInt rts::startedGames()
+{
+	return theStartedGames;
+}
+#endif
+
 // ------------------------------------------------------------------------------------------------
 /** Entry point for starting a new game, the engine is already in clean state at this
 	* point and ready to load up with all the data */
 // ------------------------------------------------------------------------------------------------
 void GameLogic::startNewGame( Bool loadingSaveGame )
 {
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 16/10/2026 Count the game, whether or not it goes on to load (Common/EngineGames.h)
+	++theStartedGames;
+#endif
 	try
 	{
 #if RTS_ENGINE_CONTEXT
