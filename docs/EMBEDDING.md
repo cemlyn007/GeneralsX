@@ -270,6 +270,40 @@ the ledger and forgets them when it closes them; a device without
 binding of the engine (above). An audible device runs OpenAL Soft's own mixer
 and event threads, which belong to the device, not to GeneralsX.
 
+### Sockets
+
+`Common/EngineSockets.h` is the socket layer, the only code that opens sockets
+(`rts::openEngineSocket`, `rts::acceptEngineSocket`,
+`rts::closeEngineSocket`). Each socket is recorded in the ledger as
+`socket <what>`, and forgotten when the layer closes it; a socket the layer
+did not open is left alone. The engine's own name lookups
+(`rts::resolveEngineHostName`) ask the name servers directly over a recorded
+socket and return within a short time of a stop request, so a thread waiting
+on one stops when asked. The sockets that third-party libraries open for
+themselves (the GameSpy SDK, libcurl) are theirs.
+
+### The render device
+
+Only an engine that renders makes a D3D8 device; one with no rendering refuses
+to (`std::logic_error`) and records nothing. The device-wrapper layer
+(`Core/Libraries/Source/WWVegas/WW3D2/dx8ledger.h`) loads the D3D8 library and
+records the engine's reference to it, then records the interface, the device
+and every reference it holds on an object made on the device, one record per
+reference, each released by the object's own `Release`. It forgets a record
+when it releases that reference itself. Releasing the ledger newest first
+therefore releases every object, then the device, then the interface, and then
+closes the library, each exactly once and without running any of the engine's
+code. A host keeps a reference of its own to the library while any of its
+engines renders, so an engine closing its own never unloads it under another.
+
+### The clock
+
+Logic code reads no clock. Every seeding names its seed: an engine starts on
+seed 0, and each game reseeds from its set-up. What waits in real time beside
+the simulation, such as the load screen's pacing and a network game's load
+timeout, measures it on a steady clock outside the logic code, and none of it
+reaches the simulation.
+
 ### The resource ledger
 
 The host's `rts::ResourceLedger` holds a record of every operating-system
@@ -283,6 +317,8 @@ and forget a record when they release the resource themselves:
 | `file <path>` | the file layer |
 | `thread <name>` | the thread layer |
 | `audio device`, `audio context` | the OpenAL audio manager |
+| `socket <what>` | the socket layer |
+| `D3D8 library`, `D3D8 interface`, `D3D8 device`, and one kind per D3D8 object (`D3D8 texture`, `D3D8 surface`, ...) | the device-wrapper layer |
 
 A ledger may be called from any of the engine's threads, and must not hold a
 lock of its own while it runs a release, since a release can wait for a thread
