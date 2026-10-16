@@ -460,7 +460,14 @@ void RecorderClass::stopPlayback() {
 	}
 	m_fileName.clear();
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @bugfix cemlyn007 16/10/2026 Post the game's exit only while a game is loaded. GameLogic::clearGameData
+	// stops a playback once it has left the game, and the exit it posted then stayed in the message stream, to clear the
+	// next game a host started.
+	if (!m_doingAnalysis && TheGameLogic->isInGame())
+#else
 	if (!m_doingAnalysis)
+#endif
 	{
 		TheGameLogic->exitGame();
 	}
