@@ -69,6 +69,11 @@ class CommandLineData
 	Bool m_hasParsedCommandLineForStartup;
 	Bool m_hasParsedCommandLineForEngineInit;
 	BoolVector m_parsedArguments;
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @refactor cemlyn007 16/10/2026 The command line the engine's host gave CommandLine::parseCommandLineForStartup
+	int m_argc = 0;
+	char** m_argv = nullptr;
+#endif
 };
 
 //-------------------------------------------------------------------------------------------------

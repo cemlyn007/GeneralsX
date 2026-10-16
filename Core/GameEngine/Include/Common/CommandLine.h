@@ -33,7 +33,14 @@ class CommandLine
 public:
 
 	// Parses startup flags and applies the process working directory.
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @refactor cemlyn007 16/10/2026 With RTS_ENGINE_CONTEXT the engine's command line is its host's to give,
+	// never the process's: `argv[0]` is the program name, as in main(), and argc may be 0 for none. The engine keeps the
+	// pointers for parseCommandLineForEngineInit, so the arguments must outlive GameEngine::init.
+	static void parseCommandLineForStartup(int argc, char** argv);
+#else
 	static void parseCommandLineForStartup();
+#endif
 	static void parseCommandLineForEngineInit();
 
 	// Returns true if command-line parsing consumed the zero-based argument index.
