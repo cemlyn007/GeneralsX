@@ -205,9 +205,25 @@ through the destructors running it: the crash path hands the fault to the sink,
 the unwind stops where the fault was raised, and the teardown stops at the end
 of that step.
 
+A foreign exception, one that is no GeneralsX error, which escapes a frame
+becomes a fault whose reason says so: an uncaught exception left the frame,
+with the exception's message.
+
 Nothing about faults is process-wide: there is no embedded mode, no process
 fault flag and no teardown flag. An assertion's dialog shows only for an engine
 that renders to a window.
+
+### Test hooks
+
+A host's tests can make an engine fault, or ask to quit, on purpose, through
+`Common/EngineTestHooks.h`. `rts::armInjectedFault` arms a fault for the next
+time the engine reaches one of its points: start-up, a frame, a load or
+teardown. The fault is a fatal error, raised through the real crash path, or a
+foreign exception, each optionally inside a catch-all that tries to swallow it;
+a swallowed fatal error still faults the engine, since the sink has already
+latched it. `rts::armInjectedQuit` makes the engine ask to quit at its next
+frame. The hooks are per engine, and no GeneralsX source arms one: the banned
+symbol check's "test hooks" rule refuses it.
 
 ### Input errors
 
@@ -256,7 +272,8 @@ the `.big` files at the asset root and in its `ZH_Generals` directory.
 (`rts::openEngineFile`, `rts::closeEngineFile`, `rts::removeEngineFile`). Each
 file open there is recorded in the ledger as `file <path>`, and forgotten when
 the layer closes it. A host passes absolute roots, and makes and checks the
-user data root before the engine starts.
+user data root before the engine starts. Font faces are read through the file
+layer and made from memory, so no font file stays open outside it.
 
 ### Audio
 
