@@ -1441,7 +1441,9 @@ void GameEngine::guardedUpdate()
 #endif
 		}
 #if RTS_ENGINE_CONTEXT
-		rts::faultFromCaughtException("Uncaught Exception in GameEngine::update");
+		// GeneralsX @refactor cemlyn007 16/10/2026 The reason says what happened in the host's words: an exception left
+		// the frame (the exception's own message follows it)
+		rts::faultFromCaughtException("an uncaught exception left the frame");
 #else
 		RELEASE_CRASH(("Uncaught Exception in GameEngine::update"));
 #endif
