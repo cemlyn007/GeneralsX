@@ -118,9 +118,11 @@ public:
 #if RTS_ENGINE_CONTEXT
 	// GeneralsX @feature cemlyn007 16/10/2026 A map file an embedding host names by its path, outside the map
 	// directories. readStartPositions reads how many start positions the file holds from its chunks, without loading
-	// the map and without changing the cache: -1 when the file cannot be opened. A file whose data is corrupt throws
-	// rts::InvalidInputData (Common/InvalidInputData.h).
+	// the map and without changing the cache: -1 when the file cannot be opened. addMapFile caches the file under its
+	// lower-cased path, so that findMap finds it by that path, and returns its entry, or null when the file cannot be
+	// opened. A file whose data is corrupt throws rts::InvalidInputData from either (Common/InvalidInputData.h).
 	static Int readStartPositions(const AsciiString &path);
+	const MapMetaData *addMapFile(const AsciiString &path);
 #endif
 
 private:
