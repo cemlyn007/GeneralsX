@@ -304,6 +304,22 @@ the simulation, such as the load screen's pacing and a network game's load
 timeout, measures it on a steady clock outside the logic code, and none of it
 reaches the simulation.
 
+### The C library
+
+GeneralsX calls no C library function that keeps process-wide state: none with
+a static result buffer or position (`strtok`, `localtime`, `gethostbyname`
+and the like), no hidden random generator, nothing that changes the
+environment or signal handling, and nothing that ends the process or runs at
+its exit. It calls the reentrant forms instead, or keeps the state per engine
+(`Common/EngineCLibrary.h`): `rts::engineRand` and `rts::engineSrand` give each
+engine the C library's own generator, seeded as a fresh process's is, so an
+engine draws the sequence a single-engine process would; `rts::engineStrtok`
+keeps a token position per engine; and `rts::lookUpHostAddresses` returns the
+caller's own list. A bad command line is `rts::InvalidInputData`, not an exit.
+The environment, signals and exit belong to the host. The one piece of C
+library state engines still share is the time-zone cache, which every engine
+computes the same from an environment none of them changes.
+
 ### The resource ledger
 
 The host's `rts::ResourceLedger` holds a record of every operating-system
