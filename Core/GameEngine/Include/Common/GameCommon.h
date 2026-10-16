@@ -165,6 +165,10 @@ enum CellShroudStatus CPP_11(: Int)
 	CELLSHROUD_SHROUDED,
 };
 
+// GeneralsX @feature cemlyn007 16/10/2026 TheCellShroudStatusNames is defined in GameCommon.cpp; keep it in sync with
+// CellShroudStatus.
+extern const char *const TheCellShroudStatusNames[];
+
 //-------------------------------------------------------------------------------------------------
 /// Since an object can take up more than a single PartitionCell, this is a status that applies to the whole Object
 enum ObjectShroudStatus CPP_11(: Int)

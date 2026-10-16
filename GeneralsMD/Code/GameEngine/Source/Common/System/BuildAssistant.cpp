@@ -85,6 +85,53 @@ ObjectSellInfo::~ObjectSellInfo()
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////
+// GeneralsX @feature cemlyn007 16/10/2026 The names of CanMakeType's, LegalBuildCode's and
+// BuildAssistant::LocalLegalToBuildOptions' values, which an embedding host's vocabulary generator reads, so that
+// its verdict and placement-check enumerations cannot drift from the engine's.
+const char *const TheCanMakeTypeNames[] =
+{
+	"OK",
+	"NO_PREREQ",
+	"NO_MONEY",
+	"FACTORY_IS_DISABLED",
+	"QUEUE_FULL",
+	"PARKING_PLACES_FULL",
+	"MAXED_OUT_FOR_PLAYER",
+	nullptr
+};
+static_assert(ARRAY_SIZE(TheCanMakeTypeNames) == CANMAKE_MAXED_OUT_FOR_PLAYER + 2, "Incorrect array size");
+
+const char *const TheLegalBuildCodeNames[] =
+{
+	"OK",
+	"RESTRICTED_TERRAIN",
+	"NOT_FLAT_ENOUGH",
+	"OBJECTS_IN_THE_WAY",
+	"NO_CLEAR_PATH",
+	"SHROUD",
+	"TOO_CLOSE_TO_SUPPLIES",
+	"GENERIC_FAILURE",
+	nullptr
+};
+static_assert(ARRAY_SIZE(TheLegalBuildCodeNames) == LBC_GENERIC_FAILURE + 2, "Incorrect array size");
+
+const char *const TheLocalLegalToBuildOptionNames[] =
+{
+	"TERRAIN_RESTRICTIONS",
+	"CLEAR_PATH",
+	"NO_OBJECT_OVERLAP",
+	"USE_QUICK_PATHFIND",
+	"SHROUD_REVEALED",
+	"NO_ENEMY_OBJECT_OVERLAP",
+	"IGNORE_STEALTHED",
+	"FAIL_STEALTHED_WITHOUT_FEEDBACK",
+	nullptr
+};
+static_assert(ARRAY_SIZE(TheLocalLegalToBuildOptionNames) == LOCAL_LEGAL_TO_BUILD_OPTION_COUNT + 1,
+	"Incorrect array size");
+static_assert(BuildAssistant::FAIL_STEALTHED_WITHOUT_FEEDBACK == 1 << (LOCAL_LEGAL_TO_BUILD_OPTION_COUNT - 1),
+	"TheLocalLegalToBuildOptionNames names every option bit");
+
 
 //-------------------------------------------------------------------------------------------------
 /** Is this object a dozer */

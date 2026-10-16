@@ -3192,6 +3192,32 @@ void PathfindZoneManager::setPassable(Int cellX, Int cellY, Bool passable)
 	m_zoneBlocks[blockX][blockY].setPassable(passable);
 }
 
+// GeneralsX @feature cemlyn007 16/10/2026 Save and restore every zone block's passable mark, for
+// Pathfinder::QueryScope.
+void PathfindZoneManager::savePassableFlags(std::vector<Bool> &flags) const
+{
+	flags.clear();
+	flags.reserve(static_cast<size_t>(m_zoneBlockExtent.x) * static_cast<size_t>(m_zoneBlockExtent.y));
+	for (Int blockX = 0; blockX < m_zoneBlockExtent.x; blockX++) {
+		for (Int blockY = 0; blockY < m_zoneBlockExtent.y; blockY++) {
+			flags.push_back(m_zoneBlocks[blockX][blockY].isPassable());
+		}
+	}
+}
+
+void PathfindZoneManager::restorePassableFlags(const std::vector<Bool> &flags)
+{
+	size_t index = 0;
+	for (Int blockX = 0; blockX < m_zoneBlockExtent.x; blockX++) {
+		for (Int blockY = 0; blockY < m_zoneBlockExtent.y; blockY++) {
+			if (index < flags.size()) {
+				m_zoneBlocks[blockX][blockY].setPassable(flags[index]);
+			}
+			index++;
+		}
+	}
+}
+
 //
 // Get the passable flag for the block at this location.
 //
@@ -11277,6 +11303,35 @@ Path *Pathfinder::findSafePath( const Object *obj, const LocomotorSet& locomotor
 		parentCell->releaseInfo();
 	}
 	return nullptr;
+}
+
+//-----------------------------------------------------------------------------
+// GeneralsX @feature cemlyn007 16/10/2026 A host's queries leave the pathfinder as they found it (see
+// Pathfinder::QueryScope in AIPathfind.h).
+Pathfinder::QueryScope::QueryScope(Pathfinder &pathfinder) :
+	m_pathfinder(pathfinder),
+	m_isTunneling(pathfinder.m_isTunneling),
+	m_ignoreObstacleID(pathfinder.m_ignoreObstacleID),
+	m_cumulativeCellsAllocated(pathfinder.m_cumulativeCellsAllocated),
+	m_moveAlliesDepth(pathfinder.m_moveAlliesDepth),
+	m_useFixedPathfinding(false)
+{
+#if RETAIL_COMPATIBLE_PATHFINDING
+	m_useFixedPathfinding = s_useFixedPathfinding;
+#endif
+	pathfinder.m_zoneManager.savePassableFlags(m_passable);
+}
+
+Pathfinder::QueryScope::~QueryScope()
+{
+	m_pathfinder.m_zoneManager.restorePassableFlags(m_passable);
+#if RETAIL_COMPATIBLE_PATHFINDING
+	s_useFixedPathfinding = m_useFixedPathfinding;
+#endif
+	m_pathfinder.m_moveAlliesDepth = m_moveAlliesDepth;
+	m_pathfinder.m_cumulativeCellsAllocated = m_cumulativeCellsAllocated;
+	m_pathfinder.m_ignoreObstacleID = m_ignoreObstacleID;
+	m_pathfinder.m_isTunneling = m_isTunneling;
 }
 
 //-----------------------------------------------------------------------------
