@@ -30,7 +30,12 @@
 
 #include "Lib/BaseType.h"
 
+#if !RTS_ENGINE_CONTEXT
 extern void InitRandom();
+#endif
+// GeneralsX @feature cemlyn007 16/10/2026 With RTS_ENGINE_CONTEXT every seeding names its seed: there is no seeding
+// from the clock, so nothing an engine does depends on when it ran (the simulation-determinism spec). A game's seed
+// comes from its set-up (skirmish, network or replay game info); before the first game an engine runs on seed 0.
 extern void InitRandom( UnsignedInt seed );
 extern UnsignedInt GetGameLogicRandomSeed();   ///< Get the seed (used for replays)
 extern UnsignedInt GetGameLogicRandomSeedCRC();///< Get the seed (used for CRCs)

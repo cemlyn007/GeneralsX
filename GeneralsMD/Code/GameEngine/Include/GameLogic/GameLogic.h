@@ -37,6 +37,9 @@
 #include "GameNetwork/NetworkDefs.h"
 #include "GameLogic/AI.h"
 #include "GameLogic/Module/UpdateModule.h"	// needed for DIRECT_UPDATEMODULE_ACCESS
+#if RTS_ENGINE_CONTEXT
+#include "Common/RealTimeStopwatch.h" // GeneralsX @feature cemlyn007 16/10/2026 the network load timeout
+#endif
 
 /*
 	At one time, we distinguished between sleepy and nonsleepy
@@ -471,7 +474,13 @@ public:
 
 	Bool m_progressComplete[MAX_SLOTS];
 	enum { PROGRESS_COMPLETE_TIMEOUT = 60000 };							///< Timeout we wait for when we've completed our Load
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 16/10/2026 Real time since each player last reported load progress, measured outside
+	// the logic layer (Common/RealTimeStopwatch.h), which reads no clock.
+	RealTimeStopwatch m_progressCompleteTimeout[MAX_SLOTS];
+#else
 	Int m_progressCompleteTimeout[MAX_SLOTS];
+#endif
 	void testTimeOut();
 	void lastHeardFrom( Int playerId );
 	Bool m_forceGameStartByTimeOut;													///< If we timeout someone we're waiting to load, set this flag to start the game

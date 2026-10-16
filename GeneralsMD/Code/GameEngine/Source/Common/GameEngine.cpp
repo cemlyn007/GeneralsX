@@ -595,7 +595,13 @@ void GameEngine::init()
 		TheSubsystemList->addSubsystem(this);
 
 		// initialize the random number system
+#if RTS_ENGINE_CONTEXT
+		// GeneralsX @feature cemlyn007 16/10/2026 A fixed seed, not the clock: each game reseeds from its set-up's seed
+		// before it starts (Common/RandomValue.h), so this one only drives the shell before the first game.
+		InitRandom(0);
+#else
 		InitRandom();
+#endif
 
 		// Create the low-level file system interface
 		TheFileSystem = createFileSystem();
