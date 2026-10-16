@@ -197,16 +197,18 @@ void initSubsystem(
 	const char* path2 = nullptr)
 {
 	sysref = sys;
-	TheSubsystemList->initSubsystem(sys, path1, path2, pXfer, name);
 #if RTS_ENGINE_CONTEXT
 	// GeneralsX @feature cemlyn007 28/09/2026 shutdownAll nulls sysref once it deletes sys, so the
 	// engine context holds no dangling singleton after teardown (PLAN-023 Phase 1)
+	// GeneralsX @bugfix cemlyn007 16/10/2026 Recorded before the subsystem's init, so that it is nulled too when its
+	// init or INI load throws (SubsystemInterfaceList::initSubsystem lists it all the same)
 	struct Reset
 	{
 		static void apply(void* reference) { *static_cast<SUBSYSTEM**>(reference) = nullptr; }
 	};
 	TheSubsystemList->recordSingletonReference(sys, &sysref, &Reset::apply);
 #endif
+	TheSubsystemList->initSubsystem(sys, path1, path2, pXfer, name);
 }
 
 //-------------------------------------------------------------------------------------------------
