@@ -80,6 +80,10 @@ enum CanMakeType CPP_11(: Int)
 	CANMAKE_MAXED_OUT_FOR_PLAYER	// player has as many as they are allowed at once (eg, Black Lotus
 };
 
+// GeneralsX @feature cemlyn007 16/10/2026 TheCanMakeTypeNames is defined in BuildAssistant.cpp; keep it in sync with
+// CanMakeType.
+extern const char *const TheCanMakeTypeNames[];
+
 //-------------------------------------------------------------------------------------------------
 /** Return codes for queries about legal build locations */
 //-------------------------------------------------------------------------------------------------
@@ -94,6 +98,10 @@ enum LegalBuildCode CPP_11(: Int)
 	LBC_TOO_CLOSE_TO_SUPPLIES,
 	LBC_GENERIC_FAILURE,
 };
+
+// GeneralsX @feature cemlyn007 16/10/2026 TheLegalBuildCodeNames is defined in BuildAssistant.cpp; keep it in sync with
+// LegalBuildCode.
+extern const char *const TheLegalBuildCodeNames[];
 
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
@@ -209,6 +217,12 @@ protected:
 	ObjectSellList m_sellList;			///< list of objects currently going through the "sell process"
 
 };
+
+// GeneralsX @feature cemlyn007 16/10/2026 TheLocalLegalToBuildOptionNames names the bits of
+// BuildAssistant::LocalLegalToBuildOptions in bit order, for an embedding host's vocabulary generator. It is
+// defined in BuildAssistant.cpp; keep it in sync with the options.
+constexpr Int LOCAL_LEGAL_TO_BUILD_OPTION_COUNT = 8;
+extern const char *const TheLocalLegalToBuildOptionNames[];
 
 // EXTERN /////////////////////////////////////////////////////////////////////////////////////////
 #if !RTS_ENGINE_CONTEXT

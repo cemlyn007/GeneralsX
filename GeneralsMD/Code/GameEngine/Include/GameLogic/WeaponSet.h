@@ -190,6 +190,10 @@ enum CanAttackResult CPP_11(: Int)
 	ATTACKRESULT_POSSIBLE,							//I can attack now.
 };
 
+// GeneralsX @feature cemlyn007 16/10/2026 TheCanAttackResultNames is defined in WeaponSet.cpp; keep it in sync with
+// CanAttackResult.
+extern const char *const TheCanAttackResultNames[];
+
 //-------------------------------------------------------------------------------------------------
 class WeaponSet : public Snapshot
 {

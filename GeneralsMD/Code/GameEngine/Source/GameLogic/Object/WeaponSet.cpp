@@ -83,6 +83,18 @@ const char* const WeaponSetFlags::s_bitNameList[] =
 };
 static_assert(ARRAY_SIZE(WeaponSetFlags::s_bitNameList) == WeaponSetFlags::NumBits + 1, "Incorrect array size");
 
+// GeneralsX @feature cemlyn007 16/10/2026 The names of CanAttackResult's values, which an embedding host's vocabulary
+// generator reads, so that its attack verdict enumeration cannot drift from the engine's.
+const char *const TheCanAttackResultNames[] =
+{
+	"NOT_POSSIBLE",
+	"INVALID_SHOT",
+	"POSSIBLE_AFTER_MOVING",
+	"POSSIBLE",
+	nullptr
+};
+static_assert(ARRAY_SIZE(TheCanAttackResultNames) == ATTACKRESULT_POSSIBLE + 2, "Incorrect array size");
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // PRIVATE DATA ///////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////
