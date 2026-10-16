@@ -51,7 +51,14 @@ void Sleep(DWORD ms)
 void GetLocalTime(SYSTEMTIME* st)
 {
 	time_t t = time(NULL);
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @bugfix cemlyn007 16/10/2026 localtime returns the C library's one process-wide buffer, which engines on
+	// two threads would both write
+	struct tm localTime;
+	struct tm* tm = localtime_r(&t, &localTime);
+#else
 	struct tm* tm = localtime(&t);
+#endif
 	st->wYear = tm->tm_year + 1900;
 	st->wMonth = tm->tm_mon + 1;
 	st->wDayOfWeek = tm->tm_wday;

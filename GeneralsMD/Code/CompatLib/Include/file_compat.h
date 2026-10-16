@@ -248,7 +248,14 @@ inline int GetDateFormat(unsigned long locale, unsigned long flags, const SYSTEM
   
   // Get current time if lpDate is nullptr
   time_t now = time(nullptr);
+#if RTS_ENGINE_CONTEXT
+  // GeneralsX @bugfix cemlyn007 16/10/2026 localtime returns the C library's one process-wide buffer, which engines on
+  // two threads would both write
+  struct tm localTime;
+  struct tm* timeinfo = (lpDate == nullptr) ? localtime_r(&now, &localTime) : nullptr;
+#else
   struct tm* timeinfo = (lpDate == nullptr) ? localtime(&now) : nullptr;
+#endif
   
   // If lpDate provided, convert SYSTEMTIME to tm
   struct tm custom_time;
