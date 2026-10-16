@@ -59,7 +59,24 @@ enum AIDecisionOrigin CPP_11(: Byte)
 	AI_DECISION_AI_PLAYER,  // an AIPlayer, via Player's calls into it
 	AI_DECISION_SCRIPT,     // a script (executeScript, a sequential script, friend_executeScriptActions)
 	AI_DECISION_MESSAGE,    // a GameMessage (GameLogic::logicMessageDispatcher)
+
+	AI_DECISION_ORIGIN_COUNT // GeneralsX @feature cemlyn007 16/10/2026 The count, for the name table.
 };
+
+// GeneralsX @feature cemlyn007 16/10/2026 The origins' names, valued as AIDecisionOrigin, for the host's
+// vocabulary generator (design decision 20).
+#ifdef DEFINE_AIDECISION_NAMES
+static const char *const TheAIDecisionOriginNames[] =
+{
+	"REFLEX",
+	"AI_PLAYER",
+	"SCRIPT",
+	"MESSAGE",
+
+	nullptr
+};
+static_assert(ARRAY_SIZE(TheAIDecisionOriginNames) == AI_DECISION_ORIGIN_COUNT + 1, "Incorrect array size");
+#endif
 
 enum AIDecisionKind CPP_11(: Byte)
 {
@@ -72,8 +89,40 @@ enum AIDecisionKind CPP_11(: Byte)
 	AI_DECISION_SELL,
 	AI_DECISION_PURCHASE_SCIENCE,
 	AI_DECISION_SPECIAL_POWER,     // Object::doSpecialPower*
-	AI_DECISION_SWITCH_WEAPON,     // a SWITCH_WEAPON command button (Object::doCommandButton); see m_intValue
+	AI_DECISION_SWITCH_WEAPON,     // a SWITCH_WEAPON command button (Object::doCommandButton) or a player's
+	                               // MSG_SWITCH_WEAPONS (AIGroup::setWeaponLockForGroup); see m_intValue
+	// GeneralsX @feature cemlyn007 16/10/2026 The orders the hooks above missed: a construction cancelled by its
+	// player (MSG_DOZER_CANCEL_CONSTRUCT), a rally point set and an overcharge toggled.
+	AI_DECISION_CANCEL_BUILD,      // GameLogic::onDozerCancelConstruct; m_actor is the structure
+	AI_DECISION_SET_RALLY_POINT,   // doSetRallyPoint (MSG_SET_RALLY_POINT), once the point is accepted; see m_pos
+	AI_DECISION_TOGGLE_OVERCHARGE, // AIGroup::groupToggleOvercharge, per structure that has an overcharge
+
+	AI_DECISION_KIND_COUNT
 };
+
+// GeneralsX @feature cemlyn007 16/10/2026 The kinds' names, valued as AIDecisionKind, for the host's
+// vocabulary generator (design decision 20).
+#ifdef DEFINE_AIDECISION_NAMES
+static const char *const TheAIDecisionKindNames[] =
+{
+	"UNIT_COMMAND",
+	"QUEUE_UNIT",
+	"QUEUE_UPGRADE",
+	"CANCEL_UNIT",
+	"CANCEL_UPGRADE",
+	"BUILD_STRUCTURE",
+	"SELL",
+	"PURCHASE_SCIENCE",
+	"SPECIAL_POWER",
+	"SWITCH_WEAPON",
+	"CANCEL_BUILD",
+	"SET_RALLY_POINT",
+	"TOGGLE_OVERCHARGE",
+
+	nullptr
+};
+static_assert(ARRAY_SIZE(TheAIDecisionKindNames) == AI_DECISION_KIND_COUNT + 1, "Incorrect array size");
+#endif
 
 // One decision. Pointers are only valid for the duration of the observer call.
 struct AIDecision
@@ -107,13 +156,16 @@ struct AIDecision
 	const char *m_script;         // innermost script name, or null
 };
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 16/10/2026 With RTS_ENGINE_CONTEXT there is no observer to install: every decision
+// goes to the current engine's decision sink (EmbeddingConfig::decisionSink, as an rts::Decision of
+// GameLogic/Decision.h), and an engine whose host gave it none records nothing. Each hook is then a null check.
+#else
 typedef void (*AIDecisionObserverFn)(const AIDecision &decision, void *userData);
 
 // Install (or, with null, remove) the observer. One at a time.
-// GeneralsX @feature cemlyn007 28/09/2026 With RTS_ENGINE_CONTEXT, one per engine: this installs it on the
-// current engine only, and only that engine's decisions reach it (PLAN-023 Phase 2). With no engine
-// current the call does nothing.
 void setAIDecisionObserver(AIDecisionObserverFn fn, void *userData);
+#endif
 
 // RAII: attributes every decision made while alive to origin. Scopes nest; the
 // outermost origin wins (a script calling into an AIPlayer is the script's
@@ -159,6 +211,11 @@ namespace AIDecisionHook
 	void cancelUpgrade(const Object *producer, const UpgradeTemplate *upgrade);
 	void purchaseScience(const Player *player, ScienceType science);
 	void switchWeapon(const Object *actor, const CommandButton *button, Int weaponSlot);
+	// GeneralsX @feature cemlyn007 16/10/2026 A construction cancelled by its player, a rally point set and an
+	// overcharge toggled.
+	void cancelBuild(const Object *structure);
+	void setRallyPoint(const Object *structure, const Coord3D *pos);
+	void toggleOvercharge(const Object *structure);
 
 	// Brackets one BuildAssistant::buildObjectNow: what it does on the way (units moved off
 	// the site, the dozer stopped) is reported one level deeper, then report() reports the

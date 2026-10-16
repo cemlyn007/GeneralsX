@@ -1089,6 +1089,8 @@ void AISkirmishPlayer::newMap()
 	DEBUG_ASSERTLOG(build!=nullptr, ("Couldn't find build list for skirmish player."));
 
 	// Build any with the initially built flag.
+	// GeneralsX @feature cemlyn007 16/10/2026 The map's set-up, not anyone's decision, for AIDecisionObserver.
+	AIDecisionMute mapSetUp;
 	for( BuildListInfo *info = m_player->getBuildList(); info; info = info->getNext() )
 	{
 		AsciiString name = info->getTemplateName();
