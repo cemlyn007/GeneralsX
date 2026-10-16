@@ -250,6 +250,12 @@ public:
 	// save/load flow.
 	void friend_iterateSaveFiles( IterateSaveFileCallback callback, void *userData ) { iterateSaveFiles( callback, userData ); }
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 16/10/2026 Test-only: add a save block, as init() adds the engine's own, so that a
+	// host's test can run its own code inside a save or a load (an engine error raised while a valid save loads).
+	void friend_addSnapshotBlock( AsciiString blockName, Snapshot *snapshot ) { addSnapshotBlock( blockName, snapshot, SNAPSHOT_SAVELOAD ); }
+#endif
+
 protected:
 
 	// snapshot methods
