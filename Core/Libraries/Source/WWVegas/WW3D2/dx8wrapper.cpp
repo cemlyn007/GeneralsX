@@ -808,7 +808,11 @@ bool DX8Wrapper::Init(void * hwnd, bool lite)
 			fprintf(stderr, "DEBUG: DX8Wrapper::Init() - Loading libdxvk_d3d8.so (Linux)...\n");
 #if RTS_ENGINE_CONTEXT
 			// GeneralsX @feature cemlyn007 16/10/2026 Loaded and recorded in the engine's ledger (dx8ledger.h).
-			D3D8Lib = DX8Ledger::Open_Library("libdxvk_d3d8.so");
+			// GeneralsX @bugfix cemlyn007 16/10/2026 By DXVK's soname, libdxvk_d3d8.so.0, the name the loader matches
+			// against the libraries already loaded: an embedding host loads its own DXVK by path first
+			// (docs/EMBEDDING.md), and the engine's load must find that one rather than search for a library named
+			// libdxvk_d3d8.so, a development symlink that DXVK's build does not ship and only a system DXVK may have.
+			D3D8Lib = DX8Ledger::Open_Library("libdxvk_d3d8.so.0");
 #else
 			D3D8Lib = LoadLibrary("libdxvk_d3d8.so");
 #endif
