@@ -42,6 +42,11 @@
 #include "GameNetwork/NetworkDefs.h"
 
 #include <atomic>
+#if RTS_ENGINE_CONTEXT
+#include <string>
+
+#include "Common/InvalidInputData.h" // GeneralsX @bugfix cemlyn007 16/10/2026 rts::InvalidInputData
+#endif
 
 
 
@@ -474,7 +479,14 @@ Int parseJobs(char *args[], int num)
 		if (TheGlobalData->m_simulateReplayJobs < SIMULATE_REPLAYS_SEQUENTIAL || TheGlobalData->m_simulateReplayJobs == 0)
 		{
 			printf("Invalid number of jobs: %d\n", TheGlobalData->m_simulateReplayJobs);
+#if RTS_ENGINE_CONTEXT
+			// GeneralsX @bugfix cemlyn007 16/10/2026 GeneralsX never ends the process: a bad command line is the host's
+			// bad input, which it catches (Common/InvalidInputData.h); the game executable exits with 1 for it, as here
+			throw rts::InvalidInputData("the command line",
+				"invalid number of jobs: " + std::to_string(TheGlobalData->m_simulateReplayJobs));
+#else
 			exit(1);
+#endif
 		}
 		return 2;
 	}

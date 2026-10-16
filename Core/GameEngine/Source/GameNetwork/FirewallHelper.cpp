@@ -55,6 +55,9 @@
 #include "GameNetwork/udp.h"
 #include "GameNetwork/NetworkDefs.h"
 #include "GameNetwork/GameSpy/GSConfig.h"
+#if RTS_ENGINE_CONTEXT
+#include "Common/EngineCLibrary.h" // GeneralsX @bugfix cemlyn007 16/10/2026 rts::lookUpHostAddresses
+#endif
 
 
 #if !RTS_ENGINE_CONTEXT
@@ -670,6 +673,33 @@ Bool FirewallHelperClass::detectionBeginUpdate() {
 		/*
 		** Do the lookup.
 		*/
+#if RTS_ENGINE_CONTEXT
+		// GeneralsX @bugfix cemlyn007 16/10/2026 gethostbyname returns the C library's one process-wide result, which
+		// engines on two threads would both write; the lookup returns a list of this caller's own (Common/EngineCLibrary.h)
+		const std::vector<in_addr> host_addresses = rts::lookUpHostAddresses(mangler_name_ptr);
+
+		if (host_addresses.empty()) {
+			DEBUG_LOG(("host lookup failed for %s", mangler_name_ptr));
+			break;
+		}
+		const UnsignedByte *host_address = reinterpret_cast<const UnsignedByte *>(&host_addresses[0]);
+
+		/*
+		** See if we already have that address in the list.
+		*/
+		Bool found = FALSE;
+		for (Int i=0 ; i<m_numManglers; i++) {
+			if (memcmp(mangler_addresses[i], host_address, 4) == 0) {
+				found = TRUE;
+				break;
+			}
+		}
+		if (!found) {
+			Int m = m_numManglers++;
+			memcpy(&mangler_addresses[m][0], host_address, 4);
+			DEBUG_LOG(("Found mangler address at %d.%d.%d.%d", mangler_addresses[m][0], mangler_addresses[m][1], mangler_addresses[m][2], mangler_addresses[m][3]));
+		}
+#else
 		struct hostent *host_info = gethostbyname(mangler_name_ptr);
 
 		if (!host_info) {
@@ -695,6 +725,7 @@ Bool FirewallHelperClass::detectionBeginUpdate() {
 			ntohl(static_cast<UnsignedInt>(reinterpret_cast<uintptr_t>(mangler_addresses[m])));
 			DEBUG_LOG(("Found mangler address at %d.%d.%d.%d", mangler_addresses[m][0], mangler_addresses[m][1], mangler_addresses[m][2], mangler_addresses[m][3]));
 		}
+#endif
 
 	} while ((m_numManglers < MAX_NUM_MANGLERS) && ((timeGetTime() - m_timeoutStart) < m_timeoutLength));
 

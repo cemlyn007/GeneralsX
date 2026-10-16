@@ -61,6 +61,7 @@
 #include <string>
 // GeneralsX @feature cemlyn007 15/10/2026 Its download files are opened, closed, moved and removed through the engine's file layer, so that it writes only under the engine's user data root (Common/EngineFiles.h)
 #include "Common/EngineFiles.h"
+#include "Common/EngineCLibrary.h" // GeneralsX @bugfix cemlyn007 16/10/2026 rts::lookUpHostAddresses
 #define FTP_OPEN(name, mode) rts::openEngineFile(name, mode)
 #define FTP_CLOSE(file) rts::closeEngineFile(file)
 // GeneralsX @feature cemlyn007 16/10/2026 Its sockets are opened, accepted and closed through the engine's socket layer, which records each in the engine's ResourceLedger (Common/EngineSockets.h)
@@ -1086,10 +1087,14 @@ unsigned long MyIPAddress( int sockfd )
 {
 
 	int		 test = 99;
+#if !RTS_ENGINE_CONTEXT
 	int i;
+#endif
 	char pBuffer[ 256 ];
+#if !RTS_ENGINE_CONTEXT
 	char * pAddr;
 	struct hostent * pHE;
+#endif
 	unsigned long ip;
 	struct sockaddr_in sin;
 
@@ -1121,6 +1126,37 @@ unsigned long MyIPAddress( int sockfd )
 
 		/* Look up the machine in "DNS" or whatever. */
 
+#if RTS_ENGINE_CONTEXT
+		// GeneralsX @bugfix cemlyn007 16/10/2026 gethostbyname returns the C library's one process-wide result, which
+		// engines on two threads would both write; the lookup returns a list of this caller's own
+		// (Common/EngineCLibrary.h). Each address is read as the four bytes it is.
+		const std::vector<in_addr> addresses = rts::lookUpHostAddresses( pBuffer );
+
+		if( addresses.empty() )
+		{
+			return( FTP_FAILED );
+		}
+
+		/* Find a good IP address. */
+
+		ip = 0;
+
+		for( const in_addr& address : addresses )
+		{
+
+			ip = address.s_addr;
+
+			if( ( ip != 0 ) && ( ip != inet_addr( "127.0.0.1" ) ) )
+			{
+				break;
+			}
+			else
+			{
+				ip = 0;
+			}
+
+		}
+#else
 		pHE = gethostbyname( pBuffer );
 
 		if( pHE == nullptr )
@@ -1149,6 +1185,7 @@ unsigned long MyIPAddress( int sockfd )
 			}
 
 		}
+#endif
 	}
 
 	if( ip == 0 )

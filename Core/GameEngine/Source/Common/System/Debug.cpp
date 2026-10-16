@@ -893,11 +893,9 @@ void handFaultToSink(const rts::EmbeddingConfig& embedding, std::string reason, 
 	}
 }
 
-// The release crash's report (the reason, the last error dump and the stack), then the sink.
-void raiseReleaseCrash(const char* reason, bool mayReturn)
+// The release crash's report (the reason, the last error dump and the stack), unless the engine has already faulted.
+void writeReleaseCrashReport(const rts::EmbeddingConfig& embedding, const std::string& reasonBytes)
 {
-	const rts::EmbeddingConfig& embedding = rts::currentEmbedding("the fault sink");
-	const std::string reasonBytes = reason != nullptr ? reason : "";
 	if (!rts::faultRaised())
 	{
 		writeCrashReport(embedding, [&](FILE* file)
@@ -906,7 +904,27 @@ void raiseReleaseCrash(const char* reason, bool mayReturn)
 			fprintf(file, "\nLast error:\n%s\n\nCurrent stack:\n", g_LastErrorDump.str());
 		});
 	}
+}
+
+// The release crash's report, then the sink.
+void raiseReleaseCrash(const char* reason, bool mayReturn)
+{
+	const rts::EmbeddingConfig& embedding = rts::currentEmbedding("the fault sink");
+	const std::string reasonBytes = reason != nullptr ? reason : "";
+	writeReleaseCrashReport(embedding, reasonBytes);
 	handFaultToSink(embedding, reasonBytes, mayReturn);
+}
+
+// GeneralsX @bugfix cemlyn007 16/10/2026 The release crash that does not return ends in the sink, which does not
+// return either, so nothing after it ends the process: GeneralsX calls no abort (banned symbol rule "process-wide C
+// library state").
+[[noreturn]] void raiseReleaseCrashNoReturn(const char* reason)
+{
+	const rts::EmbeddingConfig& embedding = rts::currentEmbedding("the fault sink");
+	std::string reasonBytes = reason != nullptr ? reason : "";
+	writeReleaseCrashReport(embedding, reasonBytes);
+	rts::ctx()->faultRaised = true;
+	embedding.faultSink->fault(std::move(reasonBytes));
 }
 
 std::string errorCodeText(UnsignedInt code)
@@ -988,8 +1006,7 @@ void ReleaseCrash(const char *reason)
 
 void ReleaseCrashNoReturn(const char *reason)
 {
-	raiseReleaseCrash(reason, false);
-	std::abort();
+	raiseReleaseCrashNoReturn(reason);
 }
 
 void AssertionCrash(const char *message)

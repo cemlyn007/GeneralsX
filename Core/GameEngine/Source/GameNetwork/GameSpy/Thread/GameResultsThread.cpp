@@ -44,6 +44,9 @@
 
 #include "GameNetwork/GameSpy/GameResultsThread.h"
 #if RTS_ENGINE_CONTEXT
+#include "Common/EngineCLibrary.h" // GeneralsX @bugfix cemlyn007 16/10/2026 rts::lookUpHostAddresses
+#endif
+#if RTS_ENGINE_CONTEXT
 #include "Common/EngineSockets.h" // GeneralsX @feature cemlyn007 16/10/2026 rts::openEngineSocket, rts::closeEngineSocket
 #endif
 #include "WWLib/mutex.h"
@@ -248,6 +251,24 @@ void GameResultsThreadClass::Thread_Function()
 			}
 			else
 			{
+#if RTS_ENGINE_CONTEXT
+				// GeneralsX @bugfix cemlyn007 16/10/2026 gethostbyname returns the C library's one process-wide result,
+				// which engines on two threads would both write; the lookup returns a list of this caller's own
+				// (Common/EngineCLibrary.h)
+				const std::vector<in_addr> hostAddresses = rts::lookUpHostAddresses(hostnameBuffer);
+				if (hostAddresses.empty())
+				{
+					DEBUG_LOG(("sending game results to %s - host lookup failed", hostnameBuffer));
+
+					// Even though this failed to resolve IP, still need to send a
+					//   callback.
+					IP = 0xFFFFFFFF;   // flag for IP resolve failed
+				}
+				else
+				{
+					IP = hostAddresses[0].s_addr;
+				}
+#else
 				hostent *hostStruct;
 				in_addr *hostNode;
 				hostStruct = gethostbyname(hostnameBuffer);
@@ -265,6 +286,7 @@ void GameResultsThreadClass::Thread_Function()
 					IP = hostNode->s_addr;
 					DEBUG_LOG(("sending game results to %s IP = %s", hostnameBuffer, inet_ntoa(*hostNode) ));
 				}
+#endif
 			}
 
 			int result = sendGameResults( IP, req.port, req.results );

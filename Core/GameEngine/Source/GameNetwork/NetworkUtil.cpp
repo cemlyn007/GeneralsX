@@ -26,6 +26,9 @@
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
 #include "GameNetwork/networkutil.h"
+#if RTS_ENGINE_CONTEXT
+#include "Common/EngineCLibrary.h" // GeneralsX @bugfix cemlyn007 16/10/2026 rts::lookUpHostAddresses
+#endif
 
 // TheSuperHackers @tweak Mauller 26/08/2025 reduce the minimum runahead from 10
 // This lets network games run at latencies down to 133ms when the network conditions allow
@@ -107,8 +110,10 @@ void dumpBufferToLog(const void *vBuf, Int len, const char *fname, Int line)
  */
 UnsignedInt ResolveIP(AsciiString host)
 {
+#if !RTS_ENGINE_CONTEXT
   struct hostent *hostStruct;
   struct in_addr *hostNode;
+#endif
 
   if (host.isEmpty())
   {
@@ -123,6 +128,18 @@ UnsignedInt ResolveIP(AsciiString host)
   }
 
   // String such as "localhost"
+#if RTS_ENGINE_CONTEXT
+  // GeneralsX @bugfix cemlyn007 16/10/2026 gethostbyname returns the C library's one process-wide result,
+  // which engines on two threads would both write; the lookup returns a list of this caller's own
+  // (Common/EngineCLibrary.h)
+  const std::vector<in_addr> hostAddresses = rts::lookUpHostAddresses(host.str());
+  if (hostAddresses.empty())
+  {
+	  DEBUG_LOG(("ResolveIP(): Can't resolve %s", host.str()));
+	  return 0;
+  }
+  return ( ntohl(hostAddresses[0].s_addr) );
+#else
   hostStruct = gethostbyname(host.str());
   if (hostStruct == nullptr)
   {
@@ -131,6 +148,7 @@ UnsignedInt ResolveIP(AsciiString host)
   }
   hostNode = (struct in_addr *) hostStruct->h_addr;
   return ( ntohl(hostNode->s_addr) );
+#endif
 }
 
 /**

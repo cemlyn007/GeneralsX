@@ -63,6 +63,13 @@
 #include <stdlib.h>
 #include <assert.h>
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @bugfix cemlyn007 16/10/2026 rand keeps its generator in the C library's process-wide state; each engine
+// draws from its own (Common/EngineCLibrary.h), the sequence a single-engine process's rand gives.
+#include "Common/EngineCLibrary.h"
+#define rand rts::engineRand
+#endif
+
 #undef WWASSERT
 #define WWASSERT	assert					// can't use WWASSERT because we use this module in the MAX plugin...
 const float COINCIDENCE_EPSILON = 0.001f;

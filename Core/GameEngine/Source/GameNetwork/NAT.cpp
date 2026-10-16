@@ -41,6 +41,9 @@
 #include "GameNetwork/GameSpy/PeerDefs.h"
 #include "GameNetwork/GameSpy/PersistentStorageThread.h"
 #include "GameNetwork/GameSpy/GSConfig.h"
+#if RTS_ENGINE_CONTEXT
+#include "Common/EngineCLibrary.h" // GeneralsX @bugfix cemlyn007 16/10/2026 rts::lookUpHostAddresses
+#endif
 
 
 /*
@@ -860,9 +863,18 @@ void NAT::sendMangledSourcePort() {
 	Char manglerName[256];
 	FirewallHelperClass::getManglerName(1, manglerName);
 	DEBUG_LOG(("NAT::sendMangledSourcePort - about to call gethostbyname for mangler at %s", manglerName));
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @bugfix cemlyn007 16/10/2026 gethostbyname returns the C library's one process-wide result,
+	// which engines on two threads would both write; the lookup returns a list of this caller's own
+	// (Common/EngineCLibrary.h)
+	const std::vector<in_addr> hostAddresses = rts::lookUpHostAddresses(manglerName);
+
+	if (hostAddresses.empty()) {
+#else
 	struct hostent *hostInfo = gethostbyname(manglerName);
 
 	if (hostInfo == nullptr) {
+#endif
 		DEBUG_LOG(("NAT::sendMangledSourcePort - gethostbyname failed for mangler address %s", manglerName));
 		// can't find the mangler, we're screwed so just send the source port.
 		sendMangledPortNumberToTarget(sourcePort, targetSlot);
@@ -871,7 +883,11 @@ void NAT::sendMangledSourcePort() {
 		return;
 	}
 
+#if RTS_ENGINE_CONTEXT
+	memcpy(&m_manglerAddress, &hostAddresses[0], 4);
+#else
 	memcpy(&m_manglerAddress, &(hostInfo->h_addr_list[0][0]), 4);
+#endif
 	m_manglerAddress = ntohl(m_manglerAddress);
 	DEBUG_LOG(("NAT::sendMangledSourcePort - mangler %s address is %d.%d.%d.%d", manglerName,
 							PRINTF_IP_AS_4_INTS(m_manglerAddress)));
