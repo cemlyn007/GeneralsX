@@ -577,7 +577,12 @@ RTS_ENGINE_GLOBAL(HINSTANCE, D3D8Lib, nullptr);
 static void Release_D3D8_Library()
 {
 	if (D3D8Lib != nullptr)
+#if RTS_ENGINE_CONTEXT && !defined(_WIN32)
+		// GeneralsX @feature cemlyn007 16/10/2026 The engine's reference is recorded in its ledger (dx8ledger.h).
+		DX8Ledger::Close_Library(D3D8Lib);
+#else
 		FreeLibrary(D3D8Lib);
+#endif
 	D3D8Lib = nullptr;
 	Direct3DCreate8Ptr = nullptr;
 }
@@ -788,7 +793,12 @@ bool DX8Wrapper::Init(void * hwnd, bool lite)
 			D3D8Lib = LoadLibrary("D3D8.DLL");
 #elif defined(__APPLE__)
 			fprintf(stderr, "DEBUG: DX8Wrapper::Init() - Loading libdxvk_d3d8.dylib (macOS)...\n");
+#if RTS_ENGINE_CONTEXT
+			// GeneralsX @feature cemlyn007 16/10/2026 Loaded and recorded in the engine's ledger (dx8ledger.h).
+			D3D8Lib = DX8Ledger::Open_Library("libdxvk_d3d8.dylib");
+#else
 			D3D8Lib = LoadLibrary("libdxvk_d3d8.dylib");
+#endif
 			fprintf(stderr, "DEBUG: DX8Wrapper::Init() - LoadLibrary result: %p\n", (void*)D3D8Lib);
 			if (D3D8Lib == nullptr) {
 				const char* error = dlerror();
@@ -796,7 +806,12 @@ bool DX8Wrapper::Init(void * hwnd, bool lite)
 			}
 #else
 			fprintf(stderr, "DEBUG: DX8Wrapper::Init() - Loading libdxvk_d3d8.so (Linux)...\n");
+#if RTS_ENGINE_CONTEXT
+			// GeneralsX @feature cemlyn007 16/10/2026 Loaded and recorded in the engine's ledger (dx8ledger.h).
+			D3D8Lib = DX8Ledger::Open_Library("libdxvk_d3d8.so");
+#else
 			D3D8Lib = LoadLibrary("libdxvk_d3d8.so");
+#endif
 			fprintf(stderr, "DEBUG: DX8Wrapper::Init() - LoadLibrary result: %p\n", (void*)D3D8Lib);
 			if (D3D8Lib == nullptr) {
 				const char* error = dlerror();
