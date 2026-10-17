@@ -151,6 +151,8 @@ struct DX8FrameStatistics
 // set before the engine's device exists, its EngineContext's.
 #define DX8Wrapper_HeadlessRender (::rts::ctx()->dx8HeadlessRender)
 #define DX8Wrapper_PreserveFPU (::rts::ctx()->dx8PreserveFPU)
+// GeneralsX @feature cemlyn007 16/10/2026 The host's window a window engine presents into (EngineContextFields.inl).
+#define DX8Wrapper_PresentWindow (::rts::ctx()->dx8PresentWindow)
 #else
 extern bool _DX8SingleThreaded;
 
@@ -620,6 +622,11 @@ public:
 	static constexpr D3DFORMAT OFF_SCREEN_DEPTH_FORMAT = D3DFMT_D24S8;
 	static IDirect3DSurface8* _Get_Off_Screen_Render_Target();
 	static IDirect3DSurface8* _Get_Off_Screen_Depth_Buffer();
+	// GeneralsX @feature cemlyn007 16/10/2026 A window engine (RenderMode::window with the host's window,
+	// DX8Wrapper_PresentWindow) draws into the same off-screen surfaces as a headless one, and its device is created
+	// on the host's window. Its frames never present; this copies the last image drawn into the window's back buffer
+	// and presents it. False, presenting nothing, for any other engine or if the device refuses.
+	static bool Present_Off_Screen_Image();
 #endif
 	/// Returns the display format - added by TR for video playback - not part of W3D
 	static WW3DFormat	getBackBufferFormat();
@@ -667,7 +674,8 @@ protected:
 	static bool	Create_Device();
 	static void Release_Device();
 #if RTS_ENGINE_CONTEXT
-	// GeneralsX @feature cemlyn007 16/10/2026 Make and bind, or release, a headless engine's off-screen surfaces.
+	// GeneralsX @feature cemlyn007 16/10/2026 Make and bind, or release, a headless or window engine's off-screen
+	// surfaces.
 	static bool Create_Off_Screen_Surfaces();
 	static void Release_Off_Screen_Surfaces();
 #endif
