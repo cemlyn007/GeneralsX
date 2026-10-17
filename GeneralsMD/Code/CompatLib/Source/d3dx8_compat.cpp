@@ -8,6 +8,50 @@
 #ifndef __APPLE__
 #include <gli/gli.hpp>
 #include <gli/generate_mipmaps.hpp>
+
+#include <cstring>
+
+// GeneralsX @bugfix cemlyn007 17/10/2026 The next mip level, computed with GLI's own arithmetic straight on the
+// locked bytes: the texel positions, blend weights and unorm conversions of gli::generate_mipmaps with
+// FILTER_LINEAR on a two-level texture (its linear_mipmap_nearest filter, without a border), so the bytes are the
+// same as GLI's. GLI fetched and stored each texel through function pointers and recomputed its offset each time,
+// which took half of a render engine's map load and game load under AddressSanitizer.
+namespace
+{
+template <typename Texel, typename Fetch, typename Store>
+void generateNextMipLikeGli(const void *source, glm::ivec2 sourceExtent, void *destination, glm::ivec2 destinationExtent,
+	Fetch fetch, Store store)
+{
+	const unsigned char *sourceBytes = static_cast<const unsigned char *>(source);
+	unsigned char *destinationBytes = static_cast<unsigned char *>(destination);
+	auto texelAt = [&](int x, int y)
+	{
+		Texel texel;
+		std::memcpy(&texel, sourceBytes + (static_cast<size_t>(y) * sourceExtent.x + x) * sizeof(Texel), sizeof(Texel));
+		return fetch(texel);
+	};
+	const glm::vec2 scale = glm::vec2(1) / glm::vec2(glm::max(destinationExtent - glm::ivec2(1), glm::ivec2(1)));
+	const glm::vec2 sourceLast = glm::vec2(sourceExtent) - glm::vec2(1);
+	for (int y = 0; y < destinationExtent.y; ++y)
+	{
+		for (int x = 0; x < destinationExtent.x; ++x)
+		{
+			const glm::vec2 samplePosition = glm::vec2(x, y) * scale;
+			const glm::vec2 scaled = samplePosition * sourceLast;
+			const glm::vec2 lowF = glm::vec2(glm::ivec2(scaled));
+			const glm::vec2 highF = glm::vec2(glm::ivec2(scaled + glm::vec2(0.5)));
+			const glm::vec2 blend = scaled - lowF;
+			const glm::ivec2 low(lowF);
+			const glm::ivec2 high(highF);
+			const glm::vec4 top = glm::mix(texelAt(low.x, low.y), texelAt(high.x, low.y), blend.x);
+			const glm::vec4 bottom = glm::mix(texelAt(low.x, high.y), texelAt(high.x, high.y), blend.x);
+			const Texel texel = store(glm::mix(top, bottom, blend.y));
+			std::memcpy(destinationBytes + (static_cast<size_t>(y) * destinationExtent.x + x) * sizeof(Texel), &texel,
+				sizeof(Texel));
+		}
+	}
+}
+}
 #endif
 
 HRESULT WINAPID3DXGetErrorStringA(HRESULT hr, LPSTR pBuffer, UINT BufferLen)
@@ -183,33 +227,20 @@ D3DXLoadSurfaceFromSurface(
 		}
 	}
 	// Pick a compatible format
-	gli::format imageFormat = gli::format::FORMAT_RGBA8_UNORM_PACK8;
-
 	assert(descSrc.Format == D3DFMT_A8R8G8B8 || descSrc.Format == D3DFMT_A1R5G5B5 || descSrc.Format == D3DFMT_X8R8G8B8);
-	if (descSrc.Format == D3DFMT_A8R8G8B8 || descSrc.Format == D3DFMT_X8R8G8B8)
-	{
-		imageFormat = gli::format::FORMAT_RGBA8_UNORM_PACK8;	
-	}
-	else if (descSrc.Format == D3DFMT_A1R5G5B5)
-	{
-		imageFormat = gli::format::FORMAT_A1RGB5_UNORM_PACK16;
-	}
-	else
+	const bool eightBitChannels = descSrc.Format == D3DFMT_A8R8G8B8 || descSrc.Format == D3DFMT_X8R8G8B8;
+	if (!eightBitChannels && descSrc.Format != D3DFMT_A1R5G5B5)
 	{
 		return D3DERR_INVALIDCALL;
 	}
 
-	// Create two levels of mips, 0 and 1
-	gli::texture2d texSrc(imageFormat, gli::extent2d(descSrc.Width, descSrc.Height), 2);
-
-	// Copy the data to level 0
-	// GeneralsX @bugfix cemlyn007 16/10/2026 Copy level 0's bytes only: the whole two-level texture's size read a
-	// quarter beyond the source surface (found by AddressSanitizer on the device-wrapper ledger test's fake device).
-	memcpy(texSrc.data(), srcRect.pBits, texSrc.size(0));
-	// Generate mip 1 from level 0
-	gli::texture2d mipMap = gli::generate_mipmaps(texSrc, gli::filter::FILTER_LINEAR);
-
-	if (mipMap.size(1) != destRect.Pitch * descDest.Height)
+	// GeneralsX @bugfix cemlyn007 17/10/2026 Level 1 of a two-level texture of the source's extent, as GLI gave it,
+	// written by generateNextMipLikeGli in place of gli::generate_mipmaps, from level 0's bytes only (the source
+	// surface read as tightly packed, as the copy into GLI's texture read it).
+	const glm::ivec2 sourceExtent(descSrc.Width, descSrc.Height);
+	const glm::ivec2 mipExtent = glm::max(sourceExtent >> 1, glm::ivec2(1));
+	const size_t texelBytes = eightBitChannels ? 4 : 2;
+	if (static_cast<size_t>(mipExtent.x) * mipExtent.y * texelBytes != static_cast<size_t>(destRect.Pitch) * descDest.Height)
 	{
 		// The generated dimension would not be the same as the destination
 		// This does not happen in the game, yet let's not allow it
@@ -218,8 +249,18 @@ D3DXLoadSurfaceFromSurface(
 		return D3DERR_INVALIDCALL;
 	}
 
-	// Copy mip level 1 to the destination
-	memcpy(destRect.pBits, mipMap.data(0,0,1), destRect.Pitch * descDest.Height);
+	if (eightBitChannels)
+	{
+		generateNextMipLikeGli<glm::u8vec4>(srcRect.pBits, sourceExtent, destRect.pBits, mipExtent,
+			[](glm::u8vec4 texel) { return glm::vec4(glm::compNormalize<float>(texel)); },
+			[](glm::vec4 value) { return glm::compScale<glm::uint8>(value); });
+	}
+	else
+	{
+		generateNextMipLikeGli<glm::uint16>(srcRect.pBits, sourceExtent, destRect.pBits, mipExtent,
+			[](glm::uint16 texel) { return glm::vec4(glm::unpackUnorm3x5_1x1(texel)); },
+			[](glm::vec4 value) { return glm::packUnorm3x5_1x1(value); });
+	}
 
 	pDestSurface->UnlockRect();
 	pSrcSurface->UnlockRect();
