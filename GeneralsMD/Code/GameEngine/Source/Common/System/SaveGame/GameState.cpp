@@ -68,6 +68,7 @@
 #include "Lib/PathUtil.h"
 #include "Common/FatalEngineError.h"
 #include "Common/EngineFault.h"
+#include "Common/EngineTestHooks.h"	// GeneralsX @feature cemlyn007 16/10/2026 A host's tests' hooks
 #if RTS_ENGINE_CONTEXT
 #include <string>
 #include "Common/InvalidInputData.h"
@@ -771,6 +772,9 @@ SaveCode GameState::loadGame( AvailableGameInfo gameInfo )
 #if !RTS_ENGINE_CONTEXT
 		if (IsEngineEmbeddedMode() && std::getenv("GENERALSX_TEST_FAULT_IN_LOADGAME"))
 			RELEASE_CRASH("test fault inside GameState::loadGame (GENERALSX_TEST_FAULT_IN_LOADGAME)");
+#else
+		// GeneralsX @feature cemlyn007 16/10/2026 A host's tests strike their load hook here (Common/EngineTestHooks.h)
+		rts::strikeTestHooks(rts::TestHookPoint::load);
 #endif
 
 		// load file

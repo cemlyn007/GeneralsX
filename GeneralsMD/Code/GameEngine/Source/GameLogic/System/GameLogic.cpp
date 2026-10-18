@@ -40,6 +40,7 @@
 #include "Common/AudioHandleSpecialValues.h"
 #include "Common/BuildAssistant.h"
 #include "Common/CRCDebug.h"
+#include "Common/EngineTestHooks.h"	// GeneralsX @feature cemlyn007 16/10/2026 A host's tests' hooks
 #include "Common/FramePacer.h"
 #include "Common/GameAudio.h"
 #include "Common/GameEngine.h"
@@ -1205,6 +1206,10 @@ void GameLogic::startNewGame( Bool loadingSaveGame )
 {
 	try
 	{
+#if RTS_ENGINE_CONTEXT
+		// GeneralsX @feature cemlyn007 16/10/2026 A host's tests strike their load hook here (Common/EngineTestHooks.h)
+		rts::strikeTestHooks(rts::TestHookPoint::load);
+#endif
 		tryStartNewGame(loadingSaveGame);
 	}
 	catch (QuitGameException&)

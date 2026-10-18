@@ -40,6 +40,11 @@
 #include "WWDebug/wwprofile.h"
 #include "WWDebug/wwmemlog.h"
 #include "dx8wrapper.h"
+#if RTS_ENGINE_CONTEXT
+#include <cstddef>
+#include <cstdio>
+#include "Common/EngineFiles.h"	// GeneralsX @bugfix cemlyn007 16/10/2026 Font files are read through the engine's file layer
+#endif
 
 
 ////////////////////////////////////////////////////////////////////////////////////
@@ -1636,6 +1641,54 @@ FontCharsClass::Free_GDI_Font ()
 
 #if defined(SAGE_USE_FREETYPE) && !defined(_WIN32)
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @bugfix cemlyn007 16/10/2026 A font face is read into memory through the engine's file layer
+// (Common/EngineFiles.h), which records the file in the engine's ResourceLedger while it is open, rather than opened
+// by FreeType, which held the font file open for the face's life where no ledger saw it: a faulted engine, whose
+// code never runs again, left its font files open in the host's process.
+namespace
+{
+
+void freeFontData(void *face)
+{
+	delete[] static_cast<FT_Byte *>(static_cast<FT_Face>(face)->generic.data);
+}
+
+FT_Error newFontFace(FT_Library library, const char *path, FT_Face *face)
+{
+	std::FILE *file = rts::openEngineFile(path, "rb");
+	if (file == nullptr)
+		return FT_Err_Cannot_Open_Resource;
+	long size = -1;
+	if (std::fseek(file, 0, SEEK_END) == 0)
+		size = std::ftell(file);
+	if (size <= 0 || std::fseek(file, 0, SEEK_SET) != 0)
+	{
+		rts::closeEngineFile(file);
+		return FT_Err_Cannot_Open_Stream;
+	}
+	FT_Byte *data = new FT_Byte[static_cast<std::size_t>(size)];
+	const bool read = std::fread(data, 1, static_cast<std::size_t>(size), file) == static_cast<std::size_t>(size);
+	rts::closeEngineFile(file);
+	if (!read)
+	{
+		delete[] data;
+		return FT_Err_Cannot_Open_Stream;
+	}
+	const FT_Error error = FT_New_Memory_Face(library, data, static_cast<FT_Long>(size), 0, face);
+	if (error != 0)
+	{
+		delete[] data;
+		return error;
+	}
+	(*face)->generic.data = data;
+	(*face)->generic.finalizer = &freeFontData;
+	return 0;
+}
+
+} // namespace
+#endif
+
 ////////////////////////////////////////////////////////////////////////////////////
 //
 //	Locate_Font_FontConfig
@@ -1740,7 +1793,11 @@ FontCharsClass::Create_Freetype_Font (const char *font_name)
 	//
 	//	Load the font face
 	//
+#if RTS_ENGINE_CONTEXT
+	error = newFontFace( FTLibrary, font_path, &FTFace );
+#else
 	error = FT_New_Face( FTLibrary, font_path, 0, &FTFace );
+#endif
 	if ( error != 0 ) {
 		FT_Done_FreeType( FTLibrary );
 		FTLibrary = nullptr;
