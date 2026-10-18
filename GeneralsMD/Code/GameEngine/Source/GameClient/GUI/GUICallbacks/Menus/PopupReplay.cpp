@@ -61,22 +61,63 @@
 
 
 // PRIVATE DATA ///////////////////////////////////////////////////////////////////////////////////
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(NameKeyType, buttonBackKey, NAMEKEY_INVALID);
+#define buttonBackKey RTS_ENGINE_GLOBAL_REF(buttonBackKey)
+#else
 static NameKeyType buttonBackKey					= NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonSaveKey, NAMEKEY_INVALID);
+#define buttonSaveKey RTS_ENGINE_GLOBAL_REF(buttonSaveKey)
+#else
 static NameKeyType buttonSaveKey					= NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, listboxGamesKey, NAMEKEY_INVALID);
+#define listboxGamesKey RTS_ENGINE_GLOBAL_REF(listboxGamesKey)
+#else
 static NameKeyType listboxGamesKey				= NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, textEntryReplayNameKey, NAMEKEY_INVALID);
+#define textEntryReplayNameKey RTS_ENGINE_GLOBAL_REF(textEntryReplayNameKey)
+#else
 static NameKeyType textEntryReplayNameKey = NAMEKEY_INVALID;
+#endif
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, parent, nullptr);
+#define parent RTS_ENGINE_GLOBAL_REF(parent)
+#else
 static GameWindow *parent = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, replaySavedParent, nullptr);
+#define replaySavedParent RTS_ENGINE_GLOBAL_REF(replaySavedParent)
+#else
 static GameWindow *replaySavedParent = nullptr;
+#endif
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(time_t, s_fileSavePopupStartTime, 0);
+#define s_fileSavePopupStartTime RTS_ENGINE_GLOBAL_REF(s_fileSavePopupStartTime)
+#else
 static time_t s_fileSavePopupStartTime = 0;
+#endif
 static const time_t s_fileSavePopupDuration = 1000;
 
 // PUBLIC FUNCTIONS ///////////////////////////////////////////////////////////////////////////////
 extern void PopulateReplayFileListbox(GameWindow *listbox);
 extern void ScoreScreenEnableControls(Bool enable);
 extern UnicodeString GetReplayFilenameFromListbox(GameWindow *listbox, Int index);
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL(std::string, LastReplayFileName);
+#define LastReplayFileName RTS_ENGINE_GLOBAL_REF(LastReplayFileName)
+#else
 extern std::string LastReplayFileName;
+#endif
 
 //-------------------------------------------------------------------------------------------------
 /** Show or hide the "Replay Saved" popup */
@@ -233,12 +274,22 @@ WindowMsgHandledType PopupReplayInput( GameWindow *window, UnsignedInt msg, Wind
 }
 
 static void reallySaveReplay();
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(std::string, replayPath);
+#define replayPath RTS_ENGINE_GLOBAL_REF(replayPath)
+#else
 static std::string replayPath;
+#endif
 
 // ------------------------------------------------------------------------------------------------
 /** Save the replay */
 // ------------------------------------------------------------------------------------------------
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, messageBoxWin, nullptr);
+#define messageBoxWin RTS_ENGINE_GLOBAL_REF(messageBoxWin)
+#else
 static GameWindow *messageBoxWin = nullptr;
+#endif
 static void saveReplay( UnicodeString filename )
 {
 	AsciiString translated;

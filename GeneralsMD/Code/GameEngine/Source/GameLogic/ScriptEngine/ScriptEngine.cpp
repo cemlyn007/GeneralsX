@@ -79,6 +79,10 @@ static HMODULE st_DebugDLL;
 #include "GameClient/ParticleSys.h"
 #include "Common/MapObject.h"
 #include "../../GameEngineDevice/Include/W3DDevice/GameClient/W3DAssetManagerExposed.h"
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+#include <string_view>
+#endif
 
 static void _addUpdatedParticleSystem( AsciiString particleSystemName );
 static void _appendAllParticleSystems();
@@ -137,7 +141,7 @@ struct ScriptEngineDebugHooks
 	VTProc vTResume;
 #endif
 };
-static rts::PerEngineStatic<ScriptEngineDebugHooks> s_scriptEngineDebugHooks_perEngine;
+static constexpr rts::PerEngineStatic<ScriptEngineDebugHooks> s_scriptEngineDebugHooks_perEngine{};
 #define st_LastCurrentFrame (s_scriptEngineDebugHooks_perEngine.get().lastCurrentFrame)
 #define st_CurrentFrame (s_scriptEngineDebugHooks_perEngine.get().currentFrame)
 #define st_CanAppCont (s_scriptEngineDebugHooks_perEngine.get().canAppCont)
@@ -9618,7 +9622,11 @@ AsciiString _getParticleSystemName()
 		return AsciiString::TheEmptyString;
 	}
 
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(char[1024], buff);
+#else
 	static char buff[1024];
+#endif
 
 	((funcptr) proc)(buff);
 
@@ -9762,6 +9770,108 @@ static void _writeOutINI()
 }
 
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 The particle-system writer's words are constants, so read-only: a
+// std::string constant is built at static initialisation into writable storage (docs/EMBEDDING.md).
+namespace
+{
+struct IniWord
+{
+	const char* text;
+	constexpr const char* c_str() const { return text; }
+	constexpr operator std::string_view() const { return text; }
+};
+}
+
+static constexpr IniWord HEADER{"ParticleSystem"};
+static constexpr IniWord SEP_SPACE{" "};
+static constexpr IniWord SEP_HEAD{"  "};
+static constexpr IniWord SEP_EOL{"\n"};
+static constexpr IniWord SEP_TAB{"\t"};
+static constexpr IniWord STR_TRUE{"Yes"};
+static constexpr IniWord STR_FALSE{"No"};
+static constexpr IniWord EQ_WITH_SPACES{" = "};
+static constexpr IniWord STR_R{"R:"};
+static constexpr IniWord STR_G{"G:"};
+static constexpr IniWord STR_B{"B:"};
+static constexpr IniWord STR_X{"X:"};
+static constexpr IniWord STR_Y{"Y:"};
+static constexpr IniWord STR_Z{"Z:"};
+static constexpr IniWord STR_END{"End"};
+static constexpr IniWord F_PRIORITY{"Priority"};
+static constexpr IniWord F_ISONESHOT{"IsOneShot"};
+static constexpr IniWord F_SHADER{"Shader"};
+static constexpr IniWord F_TYPE{"Type"};
+static constexpr IniWord F_PARTICLENAME{"ParticleName"};
+static constexpr IniWord F_ANGLEX{"AngleX"};
+static constexpr IniWord F_ANGLEY{"AngleY"};
+static constexpr IniWord F_ANGLEZ{"AngleZ"};
+static constexpr IniWord F_ANGLERATEX{"AngularRateX"};
+static constexpr IniWord F_ANGLERATEY{"AngularRateY"};
+static constexpr IniWord F_ANGLERATEZ{"AngularRateZ"};
+static constexpr IniWord F_ANGLEDAMP{"AngularDamping"};
+static constexpr IniWord F_VELOCITYDAMP{"VelocityDamping"};
+static constexpr IniWord F_GRAVITY{"Gravity"};
+static constexpr IniWord F_SLAVESYSTEM{"SlaveSystem"};
+static constexpr IniWord F_SLAVEPOS{"SlavePosOffset"};
+static constexpr IniWord F_ATTACHED{"PerParticleAttachedSystem"};
+static constexpr IniWord F_LIFETIME{"Lifetime"};
+static constexpr IniWord F_SYSLIFETIME{"SystemLifetime"};
+static constexpr IniWord F_SIZE{"Size"};
+static constexpr IniWord F_STARTSIZERATE{"StartSizeRate"};
+static constexpr IniWord F_SIZERATE{"SizeRate"};
+static constexpr IniWord F_SIZERATEDAMP{"SizeRateDamping"};
+static constexpr IniWord F_VOLPARTICLEDEPTH{"VolParticleDepth"};
+static constexpr IniWord F_ALPHA1{"Alpha1"};
+static constexpr IniWord F_ALPHA2{"Alpha2"};
+static constexpr IniWord F_ALPHA3{"Alpha3"};
+static constexpr IniWord F_ALPHA4{"Alpha4"};
+static constexpr IniWord F_ALPHA5{"Alpha5"};
+static constexpr IniWord F_ALPHA6{"Alpha6"};
+static constexpr IniWord F_ALPHA7{"Alpha7"};
+static constexpr IniWord F_ALPHA8{"Alpha8"};
+static constexpr IniWord F_COLOR1{"Color1"};
+static constexpr IniWord F_COLOR2{"Color2"};
+static constexpr IniWord F_COLOR3{"Color3"};
+static constexpr IniWord F_COLOR4{"Color4"};
+static constexpr IniWord F_COLOR5{"Color5"};
+static constexpr IniWord F_COLOR6{"Color6"};
+static constexpr IniWord F_COLOR7{"Color7"};
+static constexpr IniWord F_COLOR8{"Color8"};
+static constexpr IniWord F_COLORSCALE{"ColorScale"};
+static constexpr IniWord F_BURSTDELAY{"BurstDelay"};
+static constexpr IniWord F_BURSTCOUNT{"BurstCount"};
+static constexpr IniWord F_INITIALDELAY{"InitialDelay"};
+static constexpr IniWord F_DRIFTVELOCITY{"DriftVelocity"};
+static constexpr IniWord F_VELOCITYTYPE{"VelocityType"};
+static constexpr IniWord F_VELORTHOX{"VelOrthoX"};
+static constexpr IniWord F_VELORTHOY{"VelOrthoY"};
+static constexpr IniWord F_VELORTHOZ{"VelOrthoZ"};
+static constexpr IniWord F_VELSPHERE{"VelSpherical"};
+static constexpr IniWord F_HEMISPHERE{"VelHemispherical"};
+static constexpr IniWord F_VELCYLRAD{"VelCylindricalRadial"};
+static constexpr IniWord F_VELCYLNOR{"VelCylindricalNormal"};
+static constexpr IniWord F_VELOUTWARD{"VelOutward"};
+static constexpr IniWord F_VELOUTOTHER{"VelOutwardOther"};
+static constexpr IniWord F_VOLUMETYPE{"VolumeType"};
+static constexpr IniWord F_VOLLINESTART{"VolLineStart"};
+static constexpr IniWord F_VOLLINEEND{"VolLineEnd"};
+static constexpr IniWord F_VOLBOXHALF{"VolBoxHalfSize"};
+static constexpr IniWord F_VOLSPHERERAD{"VolSphereRadius"};
+static constexpr IniWord F_VOLCYLRAD{"VolCylinderRadius"};
+static constexpr IniWord F_VOLCYLLEN{"VolCylinderLength"};
+static constexpr IniWord F_ISHOLLOW{"IsHollow"};
+static constexpr IniWord F_PARTICLEALIGNMENT{"IsGroundAligned"};
+static constexpr IniWord F_ISEMITABOVEGROUNDONLY{"IsEmitAboveGroundOnly"};
+static constexpr IniWord F_ISPARTICLEUPTOWARDSEMITTER{"IsParticleUpTowardsEmitter"};
+static constexpr IniWord F_WINDMOTION{"WindMotion"};
+static constexpr IniWord F_WINDANGLECHANGEMIN{"WindAngleChangeMin"};
+static constexpr IniWord F_WINDANGLECHANGEMAX{"WindAngleChangeMax"};
+static constexpr IniWord F_WINDPINGPONGSTARTANGLEMIN{"WindPingPongStartAngleMin"};
+static constexpr IniWord F_WINDPINGPONGSTARTANGLEMAX{"WindPingPongStartAngleMax"};
+static constexpr IniWord F_WINDPINGPONGENDANGLEMIN{"WindPingPongEndAngleMin"};
+static constexpr IniWord F_WINDPINGPONGENDANGLEMAX{"WindPingPongEndAngleMax"};
+#else
 static const std::string HEADER =					"ParticleSystem";
 static const std::string SEP_SPACE =			" ";
 static const std::string SEP_HEAD	=				"  ";
@@ -9867,6 +9977,7 @@ static const std::string F_WINDPINGPONGSTARTANGLEMIN = "WindPingPongStartAngleMi
 static const std::string F_WINDPINGPONGSTARTANGLEMAX = "WindPingPongStartAngleMax";
 static const std::string F_WINDPINGPONGENDANGLEMIN = "WindPingPongEndAngleMin";
 static const std::string F_WINDPINGPONGENDANGLEMAX = "WindPingPongEndAngleMax";
+#endif
 
 void _writeSingleParticleSystem( File *out, ParticleSystemTemplate *templ )
 {
@@ -9875,10 +9986,26 @@ void _writeSingleParticleSystem( File *out, ParticleSystemTemplate *templ )
 		return;
 	}
 
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(char[ARBITRARY_BUFF_SIZE], buff1);
+#else
 	static char buff1[ARBITRARY_BUFF_SIZE];
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(char[ARBITRARY_BUFF_SIZE], buff2);
+#else
 	static char buff2[ARBITRARY_BUFF_SIZE];
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(char[ARBITRARY_BUFF_SIZE], buff3);
+#else
 	static char buff3[ARBITRARY_BUFF_SIZE];
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(char[ARBITRARY_BUFF_SIZE], buff4);
+#else
 	static char buff4[ARBITRARY_BUFF_SIZE];
+#endif
 
 
 	// the .append looks REALLY ugly, but this code was written with streams in mind, and so
@@ -10258,7 +10385,11 @@ static void _reloadParticleSystemFromINI( AsciiString particleSystemName )
 	// force the INI to reload with INI_LOAD_OVERWRITE
 	// force the particle system editor to recognize that the system has changed without its consent.
 
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(char[INI_MAX_CHARS_PER_LINE + 1], linebuff);
+#else
 	static char linebuff[INI_MAX_CHARS_PER_LINE + 1];
+#endif
 	linebuff[0] = 0;
 
 	// save the old file

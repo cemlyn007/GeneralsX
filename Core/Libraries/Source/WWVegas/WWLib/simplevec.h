@@ -68,8 +68,9 @@ template <class T> class SimpleVecClass
 {
 public:
 
-	SimpleVecClass(int size = 0);
-	virtual ~SimpleVecClass();
+	// GeneralsX @refactor cemlyn007 15/10/2026 constexpr construction and destruction, so an empty one is a constant (the render defaults, w3drenderstate.h).
+	constexpr SimpleVecClass(int size = 0);
+	constexpr virtual ~SimpleVecClass();
 
 	T & operator[](int index)					{ assert(index < VectorMax); return(Vector[index]); }
 	T const & operator[](int index) const	{ assert(index < VectorMax); return(Vector[index]); }
@@ -100,7 +101,7 @@ protected:
  *   1/25/00    gth : Created.                                                                 *
  *=============================================================================================*/
 template<class T>
-inline SimpleVecClass<T>::SimpleVecClass(int size) :
+inline constexpr SimpleVecClass<T>::SimpleVecClass(int size) :
 	Vector(nullptr),
 	VectorMax(0)
 {
@@ -122,7 +123,7 @@ inline SimpleVecClass<T>::SimpleVecClass(int size) :
  *   1/25/00    gth : Created.                                                                 *
  *=============================================================================================*/
 template<class T>
-inline SimpleVecClass<T>::~SimpleVecClass()
+inline constexpr SimpleVecClass<T>::~SimpleVecClass()
 {
 	delete[] Vector;
 	Vector = nullptr;
@@ -251,8 +252,9 @@ protected:
 
 public:
 
-	SimpleDynVecClass(int size = 0);
-	virtual ~SimpleDynVecClass() override;
+	// GeneralsX @refactor cemlyn007 15/10/2026 constexpr construction and destruction, so an empty one is a constant (the render defaults, w3drenderstate.h).
+	constexpr SimpleDynVecClass(int size = 0);
+	constexpr virtual ~SimpleDynVecClass() override;
 
 	// Array-like access (does not grow)
 	int				Count() const						{ return(ActiveCount); }
@@ -299,7 +301,7 @@ protected:
  *   1/25/00    gth : Created.                                                                 *
  *=============================================================================================*/
 template<class T>
-inline SimpleDynVecClass<T>::SimpleDynVecClass(int size) :
+inline constexpr SimpleDynVecClass<T>::SimpleDynVecClass(int size) :
 	SimpleVecClass<T>(size),
 	ActiveCount(0)
 {
@@ -318,7 +320,7 @@ inline SimpleDynVecClass<T>::SimpleDynVecClass(int size) :
  *   1/25/00    gth : Created.                                                                 *
  *=============================================================================================*/
 template<class T>
-inline SimpleDynVecClass<T>::~SimpleDynVecClass()
+inline constexpr SimpleDynVecClass<T>::~SimpleDynVecClass()
 {
 	delete[] Vector;
 	Vector = nullptr;

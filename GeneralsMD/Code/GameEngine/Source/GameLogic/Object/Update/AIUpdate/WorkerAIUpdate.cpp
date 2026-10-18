@@ -206,12 +206,21 @@ void WorkerAIUpdate::createMachines()
 UnsignedInt WorkerAIUpdate::getActionDelayForDock( Object *dock )
 {
 	// Decide whether to use my Center or Warehouse delay time
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+	RTS_ENGINE_STATIC(const NameKeyType, key_warehouseUpdate, NAMEKEY("SupplyWarehouseDockUpdate"));
+#else
 	static const NameKeyType key_warehouseUpdate = NAMEKEY("SupplyWarehouseDockUpdate");
+#endif
 	SupplyWarehouseDockUpdate *warehouseModule = (SupplyWarehouseDockUpdate*) dock->findUpdateModule( key_warehouseUpdate );
 	if (warehouseModule) {
 		return getWorkerAIUpdateModuleData()->m_warehouseDelay;
 	}
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(const NameKeyType, key_centerUpdate, NAMEKEY("SupplyCenterDockUpdate"));
+#else
 	static const NameKeyType key_centerUpdate = NAMEKEY("SupplyCenterDockUpdate");
+#endif
 	SupplyCenterDockUpdate *centerModule = (SupplyCenterDockUpdate*) dock->findUpdateModule( key_centerUpdate );
 	if (centerModule) {
 		return getWorkerAIUpdateModuleData()->m_centerDelay;
@@ -1479,7 +1488,7 @@ Int WorkerAIUpdate::getUpgradedSupplyBoost() const
 	Player *player = getObject()->getControllingPlayer();
 #if RTS_ENGINE_CONTEXT
 	// GeneralsX @feature cemlyn007 28/09/2026 Per engine: the cached template is this engine's (PLAN-023 Phase 4).
-	static rts::PerEngineStatic<const UpgradeTemplate *> workerShoeTemplate_perEngine;
+	static constexpr rts::PerEngineStatic<const UpgradeTemplate *> workerShoeTemplate_perEngine{};
 	const UpgradeTemplate *workerShoeTemplate = workerShoeTemplate_perEngine.get([&](const UpgradeTemplate *&value) { value = TheUpgradeCenter->findUpgrade( "Upgrade_GLAWorkerShoes" ); });
 #else
 	static const UpgradeTemplate *workerShoeTemplate = TheUpgradeCenter->findUpgrade( "Upgrade_GLAWorkerShoes" );

@@ -46,12 +46,33 @@
 
 // PRIVATE DATA ///////////////////////////////////////////////////////////////////////////////////
 // window ids ------------------------------------------------------------------------------
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(NameKeyType, parentWOLMessageWindowID, NAMEKEY_INVALID);
+#define parentWOLMessageWindowID RTS_ENGINE_GLOBAL_REF(parentWOLMessageWindowID)
+#else
 static NameKeyType parentWOLMessageWindowID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonCancelID, NAMEKEY_INVALID);
+#define buttonCancelID RTS_ENGINE_GLOBAL_REF(buttonCancelID)
+#else
 static NameKeyType buttonCancelID = NAMEKEY_INVALID;
+#endif
 
 // Window Pointers ------------------------------------------------------------------------
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, parentWOLMessageWindow, nullptr);
+#define parentWOLMessageWindow RTS_ENGINE_GLOBAL_REF(parentWOLMessageWindow)
+#else
 static GameWindow *parentWOLMessageWindow = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, buttonCancel, nullptr);
+#define buttonCancel RTS_ENGINE_GLOBAL_REF(buttonCancel)
+#else
 static GameWindow *buttonCancel = nullptr;
+#endif
 
 
 //-------------------------------------------------------------------------------------------------

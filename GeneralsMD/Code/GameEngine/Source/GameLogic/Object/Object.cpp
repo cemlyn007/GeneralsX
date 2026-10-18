@@ -119,6 +119,33 @@ ObjectID TheObjectIDToDebug = INVALID_ID;
 #endif
 
 // ------------------------------------------------------------------------------------------------
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(const ModelConditionFlags[WEAPONSLOT_COUNT], s_allWeaponFireFlags,
+{
+	MAKE_MODELCONDITION_MASK5(
+		MODELCONDITION_FIRING_A,
+		MODELCONDITION_BETWEEN_FIRING_SHOTS_A,
+		MODELCONDITION_RELOADING_A,
+		MODELCONDITION_PREATTACK_A,
+		MODELCONDITION_USING_WEAPON_A
+	),
+	MAKE_MODELCONDITION_MASK5(
+		MODELCONDITION_FIRING_B,
+		MODELCONDITION_BETWEEN_FIRING_SHOTS_B,
+		MODELCONDITION_RELOADING_B,
+		MODELCONDITION_PREATTACK_B,
+		MODELCONDITION_USING_WEAPON_B
+	),
+	MAKE_MODELCONDITION_MASK5(
+		MODELCONDITION_FIRING_C,
+		MODELCONDITION_BETWEEN_FIRING_SHOTS_C,
+		MODELCONDITION_RELOADING_C,
+		MODELCONDITION_PREATTACK_C,
+		MODELCONDITION_USING_WEAPON_C
+	)
+});
+#define s_allWeaponFireFlags RTS_ENGINE_GLOBAL_REF(s_allWeaponFireFlags)
+#else
 static const ModelConditionFlags s_allWeaponFireFlags[WEAPONSLOT_COUNT] =
 {
 	MAKE_MODELCONDITION_MASK5(
@@ -143,6 +170,7 @@ static const ModelConditionFlags s_allWeaponFireFlags[WEAPONSLOT_COUNT] =
 		MODELCONDITION_USING_WEAPON_C
 	)
 };
+#endif
 
 //-------------------------------------------------------------------------------------------------
 extern void addIcon(const Coord3D *pos, Real width, Int numFramesDuration, RGBColor color);
@@ -177,10 +205,16 @@ AsciiString DebugDescribeObject(const Object *obj)
 // GeneralsX @feature cemlyn007 28/09/2026 The shared ModuleData of one kind of Object helper, tagged once, when it is made
 // under the static-initialisation guard: Object::Object used to set the same tag again for every Object, a
 // process-wide write that engines constructing Objects on separate threads would race on (PLAN-023 Phase 5b).
+// GeneralsX @refactor cemlyn007 14/10/2026 Each engine has its own, tagged with its own name key (docs/EMBEDDING.md).
 template <typename T>
 static T& taggedHelperModuleData( NameKeyType tagNameKey )
 {
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+	RTS_ENGINE_STATIC(T, data);
+#else
 	static T data;
+#endif
 	data.setModuleTagNameKey( tagNameKey );
 	return data;
 }
@@ -325,8 +359,17 @@ Object::Object( const ThingTemplate *tt, const ObjectStatusMaskType &objectStatu
 
 	// the helpers are done first -- even before Behaviors! -- in case a module needs
 	// to call something that uses them.
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(const NameKeyType, smcHelperModuleDataTagNameKey, NAMEKEY( "ModuleTag_SMCHelper" ));
+#else
 	static const NameKeyType smcHelperModuleDataTagNameKey = NAMEKEY( "ModuleTag_SMCHelper" );
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(ObjectSMCHelperModuleData*, smcModuleDataOfEngine, &taggedHelperModuleData<ObjectSMCHelperModuleData>( smcHelperModuleDataTagNameKey ));
+	ObjectSMCHelperModuleData& smcModuleData = *smcModuleDataOfEngine;
+#else
 	static ObjectSMCHelperModuleData& smcModuleData = taggedHelperModuleData<ObjectSMCHelperModuleData>( smcHelperModuleDataTagNameKey );
+#endif
 	m_smcHelper = newInstance(ObjectSMCHelper)(this, &smcModuleData);
 	*curB++ = m_smcHelper;
 
@@ -347,13 +390,31 @@ Object::Object( const ThingTemplate *tt, const ObjectStatusMaskType &objectStatu
 
 	if( !isInactiveBody )
 	{
+#if RTS_ENGINE_CONTEXT
+		RTS_ENGINE_STATIC(const NameKeyType, statusHelperModuleDataTagNameKey, NAMEKEY( "ModuleTag_StatusDamageHelper" ));
+#else
 		static const NameKeyType statusHelperModuleDataTagNameKey = NAMEKEY( "ModuleTag_StatusDamageHelper" );
+#endif
+#if RTS_ENGINE_CONTEXT
+		RTS_ENGINE_STATIC(StatusDamageHelperModuleData*, statusModuleDataOfEngine, &taggedHelperModuleData<StatusDamageHelperModuleData>( statusHelperModuleDataTagNameKey ));
+		StatusDamageHelperModuleData& statusModuleData = *statusModuleDataOfEngine;
+#else
 		static StatusDamageHelperModuleData& statusModuleData = taggedHelperModuleData<StatusDamageHelperModuleData>( statusHelperModuleDataTagNameKey );
+#endif
 		m_statusDamageHelper = newInstance(StatusDamageHelper)(this, &statusModuleData);
 		*curB++ = m_statusDamageHelper;
 
+#if RTS_ENGINE_CONTEXT
+		RTS_ENGINE_STATIC(const NameKeyType, subdualHelperModuleDataTagNameKey, NAMEKEY( "ModuleTag_SubdualDamageHelper" ));
+#else
 		static const NameKeyType subdualHelperModuleDataTagNameKey = NAMEKEY( "ModuleTag_SubdualDamageHelper" );
+#endif
+#if RTS_ENGINE_CONTEXT
+		RTS_ENGINE_STATIC(SubdualDamageHelperModuleData*, subdualModuleDataOfEngine, &taggedHelperModuleData<SubdualDamageHelperModuleData>( subdualHelperModuleDataTagNameKey ));
+		SubdualDamageHelperModuleData& subdualModuleData = *subdualModuleDataOfEngine;
+#else
 		static SubdualDamageHelperModuleData& subdualModuleData = taggedHelperModuleData<SubdualDamageHelperModuleData>( subdualHelperModuleDataTagNameKey );
+#endif
 		m_subdualDamageHelper = newInstance(SubdualDamageHelper)(this, &subdualModuleData);
 		*curB++ = m_subdualDamageHelper;
 	}
@@ -363,8 +424,17 @@ Object::Object( const ThingTemplate *tt, const ObjectStatusMaskType &objectStatu
 			&& isKindOf(KINDOF_CAN_BE_REPULSED))
 	{
 		// if we can ever be a temporary-repulsor, make a repulsor helper. (srj)
+#if RTS_ENGINE_CONTEXT
+		RTS_ENGINE_STATIC(const NameKeyType, repulsorHelperModuleDataTagNameKey, NAMEKEY( "ModuleTag_RepulsorHelper" ));
+#else
 		static const NameKeyType repulsorHelperModuleDataTagNameKey = NAMEKEY( "ModuleTag_RepulsorHelper" );
+#endif
+#if RTS_ENGINE_CONTEXT
+		RTS_ENGINE_STATIC(ObjectRepulsorHelperModuleData*, repulsorModuleDataOfEngine, &taggedHelperModuleData<ObjectRepulsorHelperModuleData>( repulsorHelperModuleDataTagNameKey ));
+		ObjectRepulsorHelperModuleData& repulsorModuleData = *repulsorModuleDataOfEngine;
+#else
 		static ObjectRepulsorHelperModuleData& repulsorModuleData = taggedHelperModuleData<ObjectRepulsorHelperModuleData>( repulsorHelperModuleDataTagNameKey );
+#endif
 		m_repulsorHelper = newInstance(ObjectRepulsorHelper)(this, &repulsorModuleData);
 		*curB++ = m_repulsorHelper;
 	}
@@ -377,8 +447,17 @@ Object::Object( const ThingTemplate *tt, const ObjectStatusMaskType &objectStatu
 	// shrubbery cannot defect. no, really.
 	if (!tt->isKindOf(KINDOF_SHRUBBERY))
 	{
+#if RTS_ENGINE_CONTEXT
+		RTS_ENGINE_STATIC(const NameKeyType, defectionModuleDataTagNameKey, NAMEKEY( "ModuleTag_DefectionHelper" ));
+#else
 		static const NameKeyType defectionModuleDataTagNameKey = NAMEKEY( "ModuleTag_DefectionHelper" );
+#endif
+#if RTS_ENGINE_CONTEXT
+		RTS_ENGINE_STATIC(ObjectDefectionHelperModuleData*, defectionModuleDataOfEngine, &taggedHelperModuleData<ObjectDefectionHelperModuleData>( defectionModuleDataTagNameKey ));
+		ObjectDefectionHelperModuleData& defectionModuleData = *defectionModuleDataOfEngine;
+#else
 		static ObjectDefectionHelperModuleData& defectionModuleData = taggedHelperModuleData<ObjectDefectionHelperModuleData>( defectionModuleDataTagNameKey );
+#endif
 		m_defectionHelper = newInstance(ObjectDefectionHelper)(this, &defectionModuleData);
 		*curB++ = m_defectionHelper;
 	}
@@ -386,18 +465,45 @@ Object::Object( const ThingTemplate *tt, const ObjectStatusMaskType &objectStatu
 	if (tt->canPossiblyHaveAnyWeapon())
 	{
 		// we only need a firingtracker and wshelper if we can possibly have a weapon.
+#if RTS_ENGINE_CONTEXT
+		RTS_ENGINE_STATIC(const NameKeyType, weaponStatusModuleDataTagNameKey, NAMEKEY( "ModuleTag_WeaponStatusHelper" ));
+#else
 		static const NameKeyType weaponStatusModuleDataTagNameKey = NAMEKEY( "ModuleTag_WeaponStatusHelper" );
+#endif
+#if RTS_ENGINE_CONTEXT
+		RTS_ENGINE_STATIC(ObjectWeaponStatusHelperModuleData*, weaponStatusModuleDataOfEngine, &taggedHelperModuleData<ObjectWeaponStatusHelperModuleData>( weaponStatusModuleDataTagNameKey ));
+		ObjectWeaponStatusHelperModuleData& weaponStatusModuleData = *weaponStatusModuleDataOfEngine;
+#else
 		static ObjectWeaponStatusHelperModuleData& weaponStatusModuleData = taggedHelperModuleData<ObjectWeaponStatusHelperModuleData>( weaponStatusModuleDataTagNameKey );
+#endif
 		m_wsHelper = newInstance(ObjectWeaponStatusHelper)(this, &weaponStatusModuleData);
 		*curB++ = m_wsHelper;
 
+#if RTS_ENGINE_CONTEXT
+		RTS_ENGINE_STATIC(const NameKeyType, firingTrackerModuleDataTagNameKey, NAMEKEY( "ModuleTag_FiringTrackerHelper" ));
+#else
 		static const NameKeyType firingTrackerModuleDataTagNameKey = NAMEKEY( "ModuleTag_FiringTrackerHelper" );
+#endif
+#if RTS_ENGINE_CONTEXT
+		RTS_ENGINE_STATIC(FiringTrackerModuleData*, firingTrackerModuleDataOfEngine, &taggedHelperModuleData<FiringTrackerModuleData>( firingTrackerModuleDataTagNameKey ));
+		FiringTrackerModuleData& firingTrackerModuleData = *firingTrackerModuleDataOfEngine;
+#else
 		static FiringTrackerModuleData& firingTrackerModuleData = taggedHelperModuleData<FiringTrackerModuleData>( firingTrackerModuleDataTagNameKey );
+#endif
 		m_firingTracker = newInstance(FiringTracker)(this, &firingTrackerModuleData);
 		*curB++ = m_firingTracker;
 
+#if RTS_ENGINE_CONTEXT
+		RTS_ENGINE_STATIC(const NameKeyType, tempWeaponBonusHelperModuleDataTagNameKey, NAMEKEY( "ModuleTag_TempWeaponBonusHelper" ));
+#else
 		static const NameKeyType tempWeaponBonusHelperModuleDataTagNameKey = NAMEKEY( "ModuleTag_TempWeaponBonusHelper" );
+#endif
+#if RTS_ENGINE_CONTEXT
+		RTS_ENGINE_STATIC(TempWeaponBonusHelperModuleData*, tempWeaponBonusModuleDataOfEngine, &taggedHelperModuleData<TempWeaponBonusHelperModuleData>( tempWeaponBonusHelperModuleDataTagNameKey ));
+		TempWeaponBonusHelperModuleData& tempWeaponBonusModuleData = *tempWeaponBonusModuleDataOfEngine;
+#else
 		static TempWeaponBonusHelperModuleData& tempWeaponBonusModuleData = taggedHelperModuleData<TempWeaponBonusHelperModuleData>( tempWeaponBonusHelperModuleDataTagNameKey );
+#endif
 		m_tempWeaponBonusHelper = newInstance(TempWeaponBonusHelper)(this, &tempWeaponBonusModuleData);
 		*curB++ = m_tempWeaponBonusHelper;
 	}
@@ -445,7 +551,11 @@ Object::Object( const ThingTemplate *tt, const ObjectStatusMaskType &objectStatu
 			m_ai = ai;
 		}
 
+#if RTS_ENGINE_CONTEXT
+		RTS_ENGINE_STATIC(NameKeyType, key_PhysicsUpdate, NAMEKEY("PhysicsBehavior"));
+#else
 		static NameKeyType key_PhysicsUpdate = NAMEKEY("PhysicsBehavior");
+#endif
 		if (newMod->getModuleNameKey() == key_PhysicsUpdate)
 		{
 			DEBUG_ASSERTCRASH(m_physics == nullptr, ("You should never have more than one Physics module (%s)",getTemplate()->getName().str()));
@@ -984,7 +1094,11 @@ Bool Object::checkAndDetonateBoobyTrap(const Object *victim)
 
 	if( ourBoobyTrap )
 	{
+#if RTS_ENGINE_CONTEXT
+		RTS_ENGINE_STATIC(NameKeyType, key_StickyBombUpdate, NAMEKEY( "StickyBombUpdate" ));
+#else
 		static NameKeyType key_StickyBombUpdate = NAMEKEY( "StickyBombUpdate" );
+#endif
 		StickyBombUpdate *update = (StickyBombUpdate*)ourBoobyTrap->findUpdateModule( key_StickyBombUpdate );
 		if( update )
 		{
@@ -1179,7 +1293,11 @@ Bool Object::canCrushOrSquish(Object *otherObj, CrushSquishTestType testType ) c
 		//****************************************************************************************
 		{
 			// See if other is squishable
+#if RTS_ENGINE_CONTEXT
+			RTS_ENGINE_STATIC(NameKeyType, key_squish, NAMEKEY( "SquishCollide" ));
+#else
 			static NameKeyType key_squish = NAMEKEY( "SquishCollide" );
+#endif
 			if( otherObj->findModule( key_squish ) )
 			{
 				return true; // squishable.
@@ -1219,7 +1337,11 @@ UnsignedByte Object::getCrushableLevel() const
 // ------------------------------------------------------------------------------------------------
 void Object::topple( const Coord3D *toppleDirection, Real toppleSpeed, UnsignedInt options )
 {
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(NameKeyType, key_ToppleUpdate, NAMEKEY("ToppleUpdate"));
+#else
 	static NameKeyType key_ToppleUpdate = NAMEKEY("ToppleUpdate");
+#endif
 
 	ToppleUpdate* toppleUpdate = (ToppleUpdate*)findModule(key_ToppleUpdate);
 	if( toppleUpdate && toppleUpdate->isAbleToBeToppled() )
@@ -2242,7 +2364,11 @@ void Object::setDisabledUntil( DisabledType type, UnsignedInt frame )
 			}
 			//Not only that, but it also loses any healing bonuses it may have earned in its prior life
 			{
+#if RTS_ENGINE_CONTEXT
+				RTS_ENGINE_STATIC(const NameKeyType, key_AutoHealBehavior, NAMEKEY("AutoHealBehavior"));
+#else
 				static const NameKeyType key_AutoHealBehavior = NAMEKEY("AutoHealBehavior");
+#endif
 				AutoHealBehavior* autoHeal = (AutoHealBehavior*)(findUpdateModule( key_AutoHealBehavior ));
 				if (autoHeal)
 					autoHeal->undoUpgrade();
@@ -2722,7 +2848,7 @@ void Object::setTriggerAreaFlagsForChangeInPosition()
 				// writes this on the release sim path, the same misclassification RT3 fixed for ScriptEngine's
 				// st_* hooks and getTeamNamed's warnCount.
 #if RTS_ENGINE_CONTEXT
-				static rts::PerEngineStatic<Bool> didWarn_perEngine;
+				static constexpr rts::PerEngineStatic<Bool> didWarn_perEngine{};
 				Bool &didWarn = didWarn_perEngine.get();
 #else
 				static Bool didWarn = false;
@@ -3885,7 +4011,11 @@ void Object::onDisabledEdge(Bool becomingDisabled)
 	{
 		//@todo jkmcd - Colin suggested we rewrite this to use the interface stuff. I agree, but need
 		// to get some more bugs fixed today.
+#if RTS_ENGINE_CONTEXT
+		RTS_ENGINE_STATIC(NameKeyType, radar, NAMEKEY("RadarUpgrade"));
+#else
 		static NameKeyType radar = NAMEKEY("RadarUpgrade");
+#endif
 		Module *mod = mod = findModule(radar);
 		if (mod) {
 			RadarUpgrade *radarMod = (RadarUpgrade*) mod;
@@ -3913,8 +4043,16 @@ void Object::onDisabledEdge(Bool becomingDisabled)
 		// We can't affect something that consumes, or else we go low power which removes the consumption
 		// which makes us not low power so we add the consumption so we go low power...
 		// This check also guaards the IsDisabled in friend_adjustPower above
+#if RTS_ENGINE_CONTEXT
+		RTS_ENGINE_STATIC(NameKeyType, powerPlant, NAMEKEY("PowerPlantUpgrade"));
+#else
 		static NameKeyType powerPlant = NAMEKEY("PowerPlantUpgrade");
+#endif
+#if RTS_ENGINE_CONTEXT
+		RTS_ENGINE_STATIC(NameKeyType, overCharge, NAMEKEY("OverchargeBehavior"));
+#else
 		static NameKeyType overCharge = NAMEKEY("OverchargeBehavior");
+#endif
 
 		Module* mod = findModule(powerPlant);
 		if (mod) {
@@ -6108,7 +6246,11 @@ SpecialAbilityUpdate* Object::findSpecialAbilityUpdate( SpecialPowerType type ) 
 // ------------------------------------------------------------------------------------------------
 SpecialPowerCompletionDie* Object::findSpecialPowerCompletionDie() const
 {
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(NameKeyType, key_SpecialPowerCompletionDie, NAMEKEY("SpecialPowerCompletionDie"));
+#else
 	static NameKeyType key_SpecialPowerCompletionDie = NAMEKEY("SpecialPowerCompletionDie");
+#endif
 	return (SpecialPowerCompletionDie*)findModule(key_SpecialPowerCompletionDie);
 }
 

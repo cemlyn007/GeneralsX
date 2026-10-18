@@ -47,9 +47,22 @@ void ControlBar::populateBeacon( Object *beacon )
 	// set the portrait for the thing being constructed
 	setPortraitByObject( beacon );
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+	RTS_ENGINE_STATIC(NameKeyType, textID, NAMEKEY("ControlBar.wnd:EditBeaconText"));
+#else
 	static NameKeyType textID = NAMEKEY("ControlBar.wnd:EditBeaconText");
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(NameKeyType, staticTextID, NAMEKEY("ControlBar.wnd:StaticTextBeaconLabel"));
+#else
 	static NameKeyType staticTextID = NAMEKEY("ControlBar.wnd:StaticTextBeaconLabel");
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(NameKeyType, clearButtonID, NAMEKEY("ControlBar.wnd:ButtonClearBeaconText"));
+#else
 	static NameKeyType clearButtonID = NAMEKEY("ControlBar.wnd:ButtonClearBeaconText");
+#endif
 
 	GameWindow *textEntryWin = TheWindowManager->winGetWindowFromId(nullptr, textID);
 	GameWindow *staticTextWin = TheWindowManager->winGetWindowFromId(nullptr, staticTextID);

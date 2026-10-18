@@ -61,20 +61,81 @@
 #include "GameNetwork/GameSpy/MainMenuUtils.h"
 
 // PRIVATE DATA ///////////////////////////////////////////////////////////////////////////////////
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(NameKeyType, buttonCancelID, NAMEKEY_INVALID);
+#define buttonCancelID RTS_ENGINE_GLOBAL_REF(buttonCancelID)
+#else
 static NameKeyType buttonCancelID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, staticTextSizeID, NAMEKEY_INVALID);
+#define staticTextSizeID RTS_ENGINE_GLOBAL_REF(staticTextSizeID)
+#else
 static NameKeyType staticTextSizeID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, staticTextTimeID, NAMEKEY_INVALID);
+#define staticTextTimeID RTS_ENGINE_GLOBAL_REF(staticTextTimeID)
+#else
 static NameKeyType staticTextTimeID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, staticTextFileID, NAMEKEY_INVALID);
+#define staticTextFileID RTS_ENGINE_GLOBAL_REF(staticTextFileID)
+#else
 static NameKeyType staticTextFileID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, staticTextStatusID, NAMEKEY_INVALID);
+#define staticTextStatusID RTS_ENGINE_GLOBAL_REF(staticTextStatusID)
+#else
 static NameKeyType staticTextStatusID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, progressBarMunkeeID, NAMEKEY_INVALID);
+#define progressBarMunkeeID RTS_ENGINE_GLOBAL_REF(progressBarMunkeeID)
+#else
 static NameKeyType progressBarMunkeeID = NAMEKEY_INVALID;
+#endif
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, staticTextSize, nullptr);
+#define staticTextSize RTS_ENGINE_GLOBAL_REF(staticTextSize)
+#else
 static GameWindow * staticTextSize = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, staticTextTime, nullptr);
+#define staticTextTime RTS_ENGINE_GLOBAL_REF(staticTextTime)
+#else
 static GameWindow * staticTextTime = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, staticTextFile, nullptr);
+#define staticTextFile RTS_ENGINE_GLOBAL_REF(staticTextFile)
+#else
 static GameWindow * staticTextFile = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, staticTextStatus, nullptr);
+#define staticTextStatus RTS_ENGINE_GLOBAL_REF(staticTextStatus)
+#else
 static GameWindow * staticTextStatus = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, progressBarMunkee, nullptr);
+#define progressBarMunkee RTS_ENGINE_GLOBAL_REF(progressBarMunkee)
+#else
 static GameWindow * progressBarMunkee = nullptr;
+#endif
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, parent, nullptr);
+#define parent RTS_ENGINE_GLOBAL_REF(parent)
+#else
 static GameWindow *parent = nullptr;
+#endif
 
 static void closeDownloadWindow()
 {
@@ -205,8 +266,18 @@ HRESULT DownloadManagerMunkee::OnEnd()
 	return ret;
 }
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(time_t, lastUpdate, 0);
+#define lastUpdate RTS_ENGINE_GLOBAL_REF(lastUpdate)
+#else
 static time_t lastUpdate = 0;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Int, timeLeft, 0);
+#define timeLeft RTS_ENGINE_GLOBAL_REF(timeLeft)
+#else
 static Int timeLeft = 0;
+#endif
 HRESULT DownloadManagerMunkee::OnProgressUpdate( Int bytesread, Int totalsize, Int timetaken, Int timeleft )
 {
 	HRESULT ret = DownloadManager::OnProgressUpdate( bytesread, totalsize, timetaken, timeleft );

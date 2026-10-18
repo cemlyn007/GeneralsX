@@ -316,6 +316,12 @@ STDMETHODIMP WebBrowser::TestMethod(Int num1)
 // Linux stub - WOL (Westwood Online) servers offline since 2010
 #pragma message("WebBrowser is stubbed on this platform!")
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(WebBrowser*, TheWebBrowser, nullptr);
+#define TheWebBrowser RTS_ENGINE_GLOBAL_REF(TheWebBrowser)
+#else
 WebBrowser *TheWebBrowser = nullptr;
+#endif
 
 #endif // _WIN32

@@ -956,7 +956,7 @@ protected:
 	{
 		ContainEntry entries[ MAX_COMMANDS_PER_SET ];
 	};
-	static rts::PerEngineStatic<ContainData> s_containData_perEngine;
+	static const rts::PerEngineStatic<ContainData> s_containData_perEngine;
 #else
 	static ContainEntry m_containData[ MAX_COMMANDS_PER_SET ];  ///< inventory buttons integrated into the regular command set for buildings/transports
 #endif
@@ -1044,7 +1044,7 @@ private:
 		const Image *elite;
 		const Image *heroic;
 	};
-	static rts::PerEngineStatic<RankIcons> s_rankIcons_perEngine;
+	static const rts::PerEngineStatic<RankIcons> s_rankIcons_perEngine;
 #else
 	static const Image *m_rankVeteranIcon;
 	static const Image *m_rankEliteIcon;

@@ -85,10 +85,31 @@
 
 const int ARC_TABLE_SIZE=1024;
 const int SIN_TABLE_SIZE=1024;
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_EXTERN_GLOBAL(float[ARC_TABLE_SIZE], _FastAcosTable);
+#define _FastAcosTable RTS_ENGINE_GLOBAL_REF(_FastAcosTable)
+#else
 extern float _FastAcosTable[ARC_TABLE_SIZE];
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL(float[ARC_TABLE_SIZE], _FastAsinTable);
+#define _FastAsinTable RTS_ENGINE_GLOBAL_REF(_FastAsinTable)
+#else
 extern float _FastAsinTable[ARC_TABLE_SIZE];
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL(float[SIN_TABLE_SIZE], _FastSinTable);
+#define _FastSinTable RTS_ENGINE_GLOBAL_REF(_FastSinTable)
+#else
 extern float _FastSinTable[SIN_TABLE_SIZE];
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL(float[SIN_TABLE_SIZE], _FastInvSinTable);
+#define _FastInvSinTable RTS_ENGINE_GLOBAL_REF(_FastInvSinTable)
+#else
 extern float _FastInvSinTable[SIN_TABLE_SIZE];
+#endif
 
 /*
 ** Some simple math functions which work on the built-in types.

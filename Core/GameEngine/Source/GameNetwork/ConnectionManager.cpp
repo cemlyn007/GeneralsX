@@ -1351,7 +1351,12 @@ void ConnectionManager::update(Bool isInGame) {
 }
 
 void ConnectionManager::updateRunAhead(Int oldRunAhead, Int frameRate, Bool didSelfSlug, Int nextExecutionFrame) {
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+	RTS_ENGINE_STATIC(time_t, lasttimesent, 0);
+#else
 	static time_t lasttimesent = 0;
+#endif
 	time_t curTime = timeGetTime();
 
 	if ((lasttimesent == 0) || ((curTime - lasttimesent) > TheGlobalData->m_networkRunAheadMetricsTime)) {
@@ -1681,7 +1686,12 @@ void ConnectionManager::sendLocalCommandDirect(NetCommandMsg *msg, UnsignedByte 
 	msg->detach();
 }
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(Int, commandsReadyDebugSpewage, 0);
+#define commandsReadyDebugSpewage RTS_ENGINE_GLOBAL_REF(commandsReadyDebugSpewage)
+#else
 Int commandsReadyDebugSpewage = 0;
+#endif
 
 /**
  * Returns true if all the commands for the given frame are ready to be executed.
@@ -1800,8 +1810,16 @@ void ConnectionManager::determineRouterFallbackPlan() {
 */
 
 void ConnectionManager::doKeepAlive() {
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(Int, nextIndex, 0);
+#else
 	static Int nextIndex = 0;
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(time_t, startTime, 0);
+#else
 	static time_t startTime = 0;
+#endif
 
 	time_t curTime = timeGetTime();
 
@@ -1860,7 +1878,7 @@ PlayerLeaveCode ConnectionManager::disconnectPlayer(Int slot) {
 		// People are boneheads. Also play a sound
 #if RTS_ENGINE_CONTEXT
 		// GeneralsX @feature cemlyn007 28/09/2026 Per engine: the event keeps this engine's event info and sound rotation (PLAN-023 Phase 4).
-		static rts::PerEngineStatic<AudioEventRTS> leftGameSound_perEngine([](AudioEventRTS& event) { event.setEventName("GUIMessageReceived"); });
+		static constexpr rts::PerEngineStatic<AudioEventRTS> leftGameSound_perEngine([](AudioEventRTS& event) { event.setEventName("GUIMessageReceived"); });
 		AudioEventRTS& leftGameSound = leftGameSound_perEngine.get();
 #else
 		static AudioEventRTS leftGameSound("GUIMessageReceived");

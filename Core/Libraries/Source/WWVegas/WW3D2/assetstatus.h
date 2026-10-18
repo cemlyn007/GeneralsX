@@ -21,6 +21,10 @@
 #include "WWLib/always.h"
 #include "WWLib/hashtemplate.h"
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+#define Instance RTS_ENGINE_GLOBAL_REF(Instance)
+#endif
 class AssetStatusClass
 {
 public:
@@ -53,9 +57,16 @@ public:
 private:
 	bool Reporting;
 	bool LoadOnDemandReporting;
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_CLASS_STATIC(AssetStatusClass, Instance);
+#else
 	static AssetStatusClass Instance;
+#endif
 	HashTemplateClass<StringClass, int> ReportHashTables[REPORT_COUNT];
 
 	void Add_To_Report(int index, const char* name);
 
 };
+#if RTS_ENGINE_CONTEXT
+#undef Instance
+#endif

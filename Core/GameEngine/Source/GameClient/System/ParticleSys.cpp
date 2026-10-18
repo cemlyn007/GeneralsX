@@ -1436,9 +1436,15 @@ void ParticleSystem::attachToObject( const Object *obj )
 // ------------------------------------------------------------------------------------------------
 const Coord3D *ParticleSystem::computePointOnUnitSphere()
 {
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @refactor cemlyn007 15/10/2026 Per engine (Common/EngineStatic.h): returned-by-pointer scratch the caller
+	// consumes at once, and an engine's client runs on one thread at a time.
+	RTS_ENGINE_STATIC(Coord3D, point);
+#else
 	// GeneralsX @feature cemlyn007 28/09/2026 thread_local: returned-by-pointer scratch the caller consumes at once, on its own
 	// thread (PLAN-023 Phase 5b).
 	static THREAD_LOCAL Coord3D point;
+#endif
 
 	do
 	{
@@ -1458,9 +1464,15 @@ const Coord3D *ParticleSystem::computePointOnUnitSphere()
 // ------------------------------------------------------------------------------------------------
 const Coord3D *ParticleSystem::computeParticleVelocity( const Coord3D *pos )
 {
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @refactor cemlyn007 15/10/2026 Per engine (Common/EngineStatic.h): returned-by-pointer scratch the caller
+	// consumes at once, and an engine's client runs on one thread at a time.
+	RTS_ENGINE_STATIC(Coord3D, newVel);
+#else
 	// GeneralsX @feature cemlyn007 28/09/2026 thread_local: returned-by-pointer scratch the caller consumes at once, on its own
 	// thread (PLAN-023 Phase 5b).
 	static THREAD_LOCAL Coord3D newVel;
+#endif
 
 	switch( m_emissionVelocityType )
 	{
@@ -1617,9 +1629,15 @@ const Coord3D *ParticleSystem::computeParticleVelocity( const Coord3D *pos )
 // ------------------------------------------------------------------------------------------------
 const Coord3D *ParticleSystem::computeParticlePosition()
 {
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @refactor cemlyn007 15/10/2026 Per engine (Common/EngineStatic.h): returned-by-pointer scratch the caller
+	// consumes at once, and an engine's client runs on one thread at a time.
+	RTS_ENGINE_STATIC(Coord3D, newPos);
+#else
 	// GeneralsX @feature cemlyn007 28/09/2026 thread_local: returned-by-pointer scratch the caller consumes at once, on its own
 	// thread (PLAN-023 Phase 5b).
 	static THREAD_LOCAL Coord3D newPos;
+#endif
 
 	switch( m_emissionVolumeType )
 	{
@@ -1809,7 +1827,7 @@ const ParticleInfo *ParticleSystem::generateParticleInfo( Int particleNum, Int p
 	// GeneralsX @feature cemlyn007 28/09/2026 Per engine (PLAN-023 Phase 5b): returned by pointer and consumed at once,
 	// but a ParticleInfo (280 bytes, with a constructor) is too big for the library's static TLS, so a slot rather
 	// than thread_local; one engine is on one thread at a time.
-	static rts::PerEngineStatic<ParticleInfo> info_perEngine;
+	static constexpr rts::PerEngineStatic<ParticleInfo> info_perEngine{};
 	ParticleInfo& info = info_perEngine.get();
 #else
 	static ParticleInfo info;

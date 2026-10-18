@@ -125,7 +125,7 @@ struct PointGroupState
 
 	SimpleVecClass<unsigned long> remap;
 };
-rts::PerEngineStatic<PointGroupState> PointGroupState_perEngine;
+constexpr rts::PerEngineStatic<PointGroupState> PointGroupState_perEngine{};
 } // namespace
 #define _TriVertexLocationOrientationTable (PointGroupState_perEngine.get()._TriVertexLocationOrientationTable)
 #define _QuadVertexLocationOrientationTable (PointGroupState_perEngine.get()._QuadVertexLocationOrientationTable)
@@ -164,7 +164,12 @@ VectorClass<Vector3>		PointGroupClass::transformed_loc;		// transformed point lo
 #endif
 
 // This array has vertex locations for screenspace mode - calculated to cover exactly 1x1 and 2x2 pixels.
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 Data no engine writes is constant (docs/EMBEDDING.md).
+const Vector3 PointGroupClass::_ScreenspaceVertexLocationSizeTable[2][3] =
+#else
 Vector3 PointGroupClass::_ScreenspaceVertexLocationSizeTable[2][3] =
+#endif
 {
 	Vector3(0.5f, 0.0f, -1.0f),
 	Vector3(1.0f, 1.0f, -1.0f),

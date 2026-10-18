@@ -47,7 +47,8 @@ public:
 	int		K;
 
 	WWINLINE Vector3i();
-	WWINLINE Vector3i(int i,int j,int k);
+	// GeneralsX @refactor cemlyn007 15/10/2026 constexpr, so constant index triples are constant-initialised and read-only.
+	WWINLINE constexpr Vector3i(int i,int j,int k);
 
 	WWINLINE bool			operator== (const Vector3i & v) const;
    WWINLINE bool			operator!= (const Vector3i& v) const;
@@ -60,9 +61,8 @@ WWINLINE Vector3i::Vector3i()
 {
 }
 
-WWINLINE Vector3i::Vector3i(int i,int j,int k)
+WWINLINE constexpr Vector3i::Vector3i(int i,int j,int k) : I(i), J(j), K(k)
 {
-	I = i; J = j; K = k;
 }
 
 WWINLINE bool Vector3i::operator == (const Vector3i & v) const
@@ -96,7 +96,8 @@ public:
 	unsigned short K;
 
 	WWINLINE Vector3i16();
-	WWINLINE Vector3i16(unsigned short i,unsigned short j,unsigned short k);
+	// GeneralsX @refactor cemlyn007 15/10/2026 constexpr, so constant index triples are constant-initialised and read-only.
+	WWINLINE constexpr Vector3i16(unsigned short i,unsigned short j,unsigned short k);
 
 	WWINLINE bool			operator== (const Vector3i & v) const;
    WWINLINE bool			operator!= (const Vector3i& v) const;
@@ -109,9 +110,8 @@ WWINLINE Vector3i16::Vector3i16()
 {
 }
 
-WWINLINE Vector3i16::Vector3i16(unsigned short i,unsigned short j,unsigned short k)
+WWINLINE constexpr Vector3i16::Vector3i16(unsigned short i,unsigned short j,unsigned short k) : I(i), J(j), K(k)
 {
-	I = i; J = j; K = k;
 }
 
 WWINLINE bool Vector3i16::operator == (const Vector3i & v) const

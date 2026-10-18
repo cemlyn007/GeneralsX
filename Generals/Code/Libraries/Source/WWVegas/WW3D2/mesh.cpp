@@ -773,7 +773,7 @@ void MeshClass::Render(RenderInfoClass & rinfo)
 // GeneralsX @feature cemlyn007 30/09/2026 Per engine: Render_Material_Pass's polygon scratch, filled and consumed
 // within one pass. A file static, so that its slot is taken at static initialisation, not at the first draw (PLAN-023
 // Phase 8, stage RR2b).
-static rts::PerEngineStatic<SimpleDynVecClass<uint32> > Render_Material_Pass_temp_apt_perEngine;
+static constexpr rts::PerEngineStatic<SimpleDynVecClass<uint32> > Render_Material_Pass_temp_apt_perEngine;
 #endif
 
 /***********************************************************************************************

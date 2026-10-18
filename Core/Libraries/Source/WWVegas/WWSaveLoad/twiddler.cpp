@@ -68,8 +68,25 @@ enum
 //	Static factories
 //
 //////////////////////////////////////////////////////////////////////////////////
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+// GeneralsX @refactor cemlyn007 14/10/2026 Per engine (Common/EngineStatic.h), made and so registered by WWSaveLoad::Init (docs/EMBEDDING.md).
+const char TwiddlerClassName[] = "Twiddler";
+using _TwiddlerFactory_rtsEngineType = SimpleDefinitionFactoryClass<TwiddlerClass, CLASSID_TWIDDLERS, TwiddlerClassName>;
+RTS_ENGINE_GLOBAL(_TwiddlerFactory_rtsEngineType, _TwiddlerFactory);
+#define _TwiddlerFactory RTS_ENGINE_GLOBAL_REF(_TwiddlerFactory)
+using _TwiddlerPersistFactory_rtsEngineType = SimplePersistFactoryClass<TwiddlerClass, CHUNKID_TWIDDLER>;
+RTS_ENGINE_GLOBAL(_TwiddlerPersistFactory_rtsEngineType, _TwiddlerPersistFactory);
+#define _TwiddlerPersistFactory RTS_ENGINE_GLOBAL_REF(_TwiddlerPersistFactory)
+void WWSaveLoad_Register_Twiddler_Factories()
+{
+	_TwiddlerFactory;
+	_TwiddlerPersistFactory;
+}
+#else
 DECLARE_DEFINITION_FACTORY(TwiddlerClass, CLASSID_TWIDDLERS, "Twiddler")	_TwiddlerFactory;
 SimplePersistFactoryClass<TwiddlerClass, CHUNKID_TWIDDLER>						_TwiddlerPersistFactory;
+#endif
 
 
 //////////////////////////////////////////////////////////////////////////////////

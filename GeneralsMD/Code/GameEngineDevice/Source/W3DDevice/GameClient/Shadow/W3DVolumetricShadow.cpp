@@ -118,8 +118,17 @@ struct SHADOW_STATIC_VOLUME_VERTEX	//vertex structure passed to D3D
 #define nShadowStartBatchVertex (TheW3DVolumetricShadowManager->m_nShadowStartBatchVertex)
 #define nShadowIndicesInBuf (TheW3DVolumetricShadowManager->m_nShadowIndicesInBuf)
 #define nShadowStartBatchIndex (TheW3DVolumetricShadowManager->m_nShadowStartBatchIndex)
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 Data no engine writes is constant (docs/EMBEDDING.md).
+extern const int SHADOW_VERTEX_SIZE=4096;
+#else
 int SHADOW_VERTEX_SIZE=4096;
+#endif
+#if RTS_ENGINE_CONTEXT
+extern const int SHADOW_INDEX_SIZE=8192;
+#else
 int SHADOW_INDEX_SIZE=8192;
+#endif
 
 //Rough bounding box around visible portion of the terrain
 //useful for quick culling
@@ -1513,7 +1522,12 @@ void W3DVolumetricShadow::RenderMeshVolumeBounds(Int meshIndex, Int lightIndex, 
 	SHADOW_DYNAMIC_VOLUME_VERTEX* pvVertices;
 	UnsignedShort *pvIndices;
 	// Vertex Positions as a function of the box extents
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @refactor cemlyn007 15/10/2026 Data no engine writes is constant (docs/EMBEDDING.md).
+	static const Vector3					_BoxVerts[8] =
+#else
 	static Vector3						_BoxVerts[8] =
+#endif
 	{
 		Vector3(  1.0f, 1.0f, 1.0f ),		// +z ring of 4 verts
 		Vector3( -1.0f, 1.0f, 1.0f ),
@@ -1526,7 +1540,11 @@ void W3DVolumetricShadow::RenderMeshVolumeBounds(Int meshIndex, Int lightIndex, 
 		Vector3(  1.0f,-1.0f,-1.0f ),
 	};
 	// Face Connectivity
+#if RTS_ENGINE_CONTEXT
+	static const Vector3i				_BoxFaces[12] =
+#else
 	static Vector3i					_BoxFaces[12] =
+#endif
 	{
 		Vector3i( 0,1,2 ),		// +z faces
 		Vector3i( 0,2,3 ),

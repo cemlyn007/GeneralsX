@@ -2850,7 +2850,12 @@ const Coord3D* OpenALAudioManager::getCurrentPositionFromEvent(AudioEventRTS* ev
 //-------------------------------------------------------------------------------------------------
 Bool OpenALAudioManager::isOnScreen(const Coord3D* pos) const
 {
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+	RTS_ENGINE_STATIC(ICoord2D, dummy);
+#else
 	static ICoord2D dummy;
+#endif
 	// WorldToScreen will return True if the point is onscreen and false if it is offscreen.
 	return TheTacticalView->worldToScreen(pos, &dummy);
 }

@@ -73,7 +73,7 @@ struct DynamicVertexBufferState
 	int _VertexBufferTotalVertices = 0;
 	int _VertexBufferTotalSize = 0;
 };
-rts::PerEngineStatic<DynamicVertexBufferState> DynamicVertexBufferState_perEngine;
+constexpr rts::PerEngineStatic<DynamicVertexBufferState> DynamicVertexBufferState_perEngine{};
 } // namespace
 #define _DynamicSortingVertexArrayInUse (DynamicVertexBufferState_perEngine.get()._DynamicSortingVertexArrayInUse)
 #define _DynamicSortingVertexArray (DynamicVertexBufferState_perEngine.get()._DynamicSortingVertexArray)
@@ -106,7 +106,13 @@ static int _VertexBufferTotalVertices;
 static int _VertexBufferTotalSize;
 #endif
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(const FVFInfoClass, _DynamicFVFInfo, FVFInfoClass(dynamic_fvf_type));
+#define _DynamicFVFInfo RTS_ENGINE_GLOBAL_REF(_DynamicFVFInfo)
+#else
 static const FVFInfoClass _DynamicFVFInfo(dynamic_fvf_type);
+#endif
 
 // ----------------------------------------------------------------------------
 //

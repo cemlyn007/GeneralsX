@@ -254,11 +254,11 @@ Bool WaveGuideUpdate::initWaveGuide()
 
 #if RTS_ENGINE_CONTEXT
 	// GeneralsX @feature cemlyn007 28/09/2026 Per engine: the cached template is this engine's (PLAN-023 Phase 4).
-	static rts::PerEngineStatic<const ParticleSystemTemplate *> wave1_perEngine;
+	static constexpr rts::PerEngineStatic<const ParticleSystemTemplate *> wave1_perEngine{};
 	const ParticleSystemTemplate *wave1 = wave1_perEngine.get([&](const ParticleSystemTemplate *&value) { value = TheParticleSystemManager->findTemplate( "WaveSpray01" ); });
-	static rts::PerEngineStatic<const ParticleSystemTemplate *> wave2_perEngine;
+	static constexpr rts::PerEngineStatic<const ParticleSystemTemplate *> wave2_perEngine{};
 	const ParticleSystemTemplate *wave2 = wave2_perEngine.get([&](const ParticleSystemTemplate *&value) { value = TheParticleSystemManager->findTemplate( "WaveSpray02" ); });
-	static rts::PerEngineStatic<const ParticleSystemTemplate *> wave3_perEngine;
+	static constexpr rts::PerEngineStatic<const ParticleSystemTemplate *> wave3_perEngine{};
 	const ParticleSystemTemplate *wave3 = wave3_perEngine.get([&](const ParticleSystemTemplate *&value) { value = TheParticleSystemManager->findTemplate( "WaveSpray03" ); });
 #else
 	static const ParticleSystemTemplate *wave1 = TheParticleSystemManager->findTemplate( "WaveSpray01" );
@@ -491,9 +491,9 @@ void WaveGuideUpdate::doShoreEffects()
 	//
 #if RTS_ENGINE_CONTEXT
 	// GeneralsX @feature cemlyn007 28/09/2026 Per engine: the cached template is this engine's (PLAN-023 Phase 4).
-	static rts::PerEngineStatic<const ParticleSystemTemplate *> left_perEngine;
+	static constexpr rts::PerEngineStatic<const ParticleSystemTemplate *> left_perEngine{};
 	const ParticleSystemTemplate *left = left_perEngine.get([&](const ParticleSystemTemplate *&value) { value = TheParticleSystemManager->findTemplate( "WaveSplashLeft01" ); });
-	static rts::PerEngineStatic<const ParticleSystemTemplate *> right_perEngine;
+	static constexpr rts::PerEngineStatic<const ParticleSystemTemplate *> right_perEngine{};
 	const ParticleSystemTemplate *right = right_perEngine.get([&](const ParticleSystemTemplate *&value) { value = TheParticleSystemManager->findTemplate( "WaveSplashRight01" ); });
 #else
 	static const ParticleSystemTemplate *left = TheParticleSystemManager->findTemplate( "WaveSplashLeft01" );
@@ -636,7 +636,7 @@ void WaveGuideUpdate::doDamage()
 				{
 #if RTS_ENGINE_CONTEXT
 					// GeneralsX @feature cemlyn007 28/09/2026 Per engine: the cached template is this engine's (PLAN-023 Phase 4).
-					static rts::PerEngineStatic<const ParticleSystemTemplate *> splash_perEngine;
+					static constexpr rts::PerEngineStatic<const ParticleSystemTemplate *> splash_perEngine{};
 					const ParticleSystemTemplate *splash = splash_perEngine.get([&](const ParticleSystemTemplate *&value) { value = TheParticleSystemManager->findTemplate( "WaveHit01" ); });
 #else
 					static const ParticleSystemTemplate *splash = TheParticleSystemManager->findTemplate( "WaveHit01" );
@@ -857,7 +857,7 @@ UpdateSleepTime WaveGuideUpdate::update()
 	{
 #if RTS_ENGINE_CONTEXT
 		// GeneralsX @feature cemlyn007 28/09/2026 Per engine: the cached template is this engine's (PLAN-023 Phase 4).
-		static rts::PerEngineStatic<const ParticleSystemTemplate *> waveSplash_perEngine;
+		static constexpr rts::PerEngineStatic<const ParticleSystemTemplate *> waveSplash_perEngine{};
 		const ParticleSystemTemplate *waveSplash = waveSplash_perEngine.get([&](const ParticleSystemTemplate *&value) { value = TheParticleSystemManager->findTemplate( "WaveSplash01" ); });
 #else
 		static const ParticleSystemTemplate *waveSplash = TheParticleSystemManager->findTemplate( "WaveSplash01" );

@@ -49,7 +49,12 @@
 
 // -----------------------------------------------------
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 A constant in read-only storage (docs/EMBEDDING.md).
+constexpr AsciiString AsciiString::TheEmptyString;
+#else
 /*static*/ const AsciiString AsciiString::TheEmptyString;
+#endif
 
 namespace
 {

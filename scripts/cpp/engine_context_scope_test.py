@@ -402,61 +402,15 @@ class ScopeInvariants(unittest.TestCase):
         self.assertLess(grown, 100 * 1024, f"the heap grew by {grown} bytes over 1000 threads")
 
 
-SET_ASSET_ROOT = "_ZN18StdLocalFileSystem16setAssetRootPathERK11AsciiString"
-
-
-class AssetRootIsWriteOnce(unittest.TestCase):
-    def run_calls(self, *roots):
-        # A fresh process (the root is process-wide) calls StdLocalFileSystem::setAssetRootPath for each root in
-        # turn (a member function that never uses `this`); "" is an AsciiString with no data, as a boot that resolved
-        # no root passes. The AsciiStrings are made by the library's own constructor, so the test does not depend on
-        # their layout. Returns the child's stderr, once it has finished the calls and exited cleanly.
-        path = os.environ.get("GENERALSX_LIBRARY") or find_library_path()
-        if path is None or not os.path.exists(path):
-            skip("no libgeneralsx.so (pass --library)")
-        code = (
-            "import ctypes, sys\n"
-            "lib = ctypes.CDLL(sys.argv[1])\n"
-            "try:\n"
-            "    lib[sys.argv[3]]\n"  # no entry function: the library is built without the context
-            "    f = lib[sys.argv[2]]\n"
-            "except AttributeError:\n"
-            "    sys.exit(77)\n"
-            "f.argtypes = [ctypes.c_void_p, ctypes.c_void_p]\n"
-            "make = lib['_ZN11AsciiStringC1EPKc']\n"
-            "make.argtypes = [ctypes.c_void_p, ctypes.c_char_p]\n"
-            "lib['_Z17initMemoryManagerv']()\n"  # the engine's operator new needs it
-            "for root in sys.argv[4:]:\n"
-            "    ascii_string = ctypes.c_void_p()\n"
-            "    make(ctypes.byref(ascii_string), root.encode())\n"
-            "    f(None, ctypes.byref(ascii_string))\n"  # a member function that does not use `this`
-            "print('done')\n"
-        )
-        import subprocess
-        result = subprocess.run([sys.executable, "-c", code, os.path.realpath(path), SET_ASSET_ROOT, ENTER, *roots],
-                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        if result.returncode == 77:
-            skip("the library has no engine context or no StdLocalFileSystem::setAssetRootPath")
-        self.assertEqual(result.returncode, 0, "the child failed: " + result.stderr)
-        self.assertIn("done", result.stdout, "the child did not finish its calls: " + result.stderr)
-        return result.stderr
-
-    def test_a_root_after_a_first_boot_that_resolved_none_is_refused(self):
-        # The usual first boot finds its BIGs through the current directory and resolves no root. A later boot
-        # that does (an environment variable set in between) must not be the first write of the shared path.
-        self.assertIn("setAssetRootPath - the asset fallback path is process-wide", self.run_calls("", "/some/install"))
-
-    def test_the_same_root_again_is_not_refused(self):
-        self.assertNotIn("refused", self.run_calls("/some/install", "/some/install"))
-
-    def test_another_root_after_a_first_one_is_refused(self):
-        self.assertIn("refused", self.run_calls("/some/install", "/another/install"))
+# GeneralsX @refactor cemlyn007 15/10/2026 The asset root and the guard that settles it are per engine
+# (baseline-engine-specs task 4.9): rlgenerals' //third_party/generalsx/tests:asset_root_test checks that each engine
+# settles its own, that one engine refuses a second root, and that a root with no engine current is refused.
 
 
 class BootPassesTheRootUnconditionally(unittest.TestCase):
     def test_the_big_file_system_settles_the_root_even_when_empty(self):
         # StdBIGFileSystem::init is the call site that makes the usual first boot (BIGs found through the current
-        # directory, no root resolved) settle the process-wide root. It cannot be run without a game install, so
+        # directory, no root resolved) settle the engine's root. It cannot be run without a game install, so
         # this checks the source: under RTS_ENGINE_CONTEXT the call must not sit behind an isNotEmpty() guard.
         source = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "Core", "GameEngineDevice",
                               "Source", "StdDevice", "Common", "StdBIGFileSystem.cpp")

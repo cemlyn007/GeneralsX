@@ -3074,7 +3074,12 @@ void AIUpdateInterface::privateMoveToAndEvacuateAndExit( const Coord3D *pos, Com
 	m_isBlockedAndStuck = FALSE;
 	setLastCommandSource( cmdSource );
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+	RTS_ENGINE_STATIC(NameKeyType, key_DeliverPayloadAIUpdate, NAMEKEY("DeliverPayloadAIUpdate"));
+#else
 	static NameKeyType key_DeliverPayloadAIUpdate = NAMEKEY("DeliverPayloadAIUpdate");
+#endif
 	DeliverPayloadAIUpdate *dp = (DeliverPayloadAIUpdate*)getObject()->findUpdateModule( key_DeliverPayloadAIUpdate );
 	if( dp )
 	{
@@ -3973,7 +3978,11 @@ void AIUpdateInterface::privateExecuteRailedTransport( CommandSourceType cmdSour
 ///< life altering state change, if this AI can do it
 void AIUpdateInterface::privateGoProne( const DamageInfo *damageInfo, CommandSourceType )
 {
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(NameKeyType, proneModuleKey, TheNameKeyGenerator->nameToKey( "ProneUpdate" ));
+#else
 	static NameKeyType proneModuleKey = TheNameKeyGenerator->nameToKey( "ProneUpdate" );
+#endif
 	ProneUpdate *proneModule = (ProneUpdate *)getObject()->findUpdateModule( proneModuleKey );
 
 	if( proneModule )
@@ -4183,7 +4192,11 @@ void AIUpdateInterface::privateHackInternet( CommandSourceType cmdSource )
 	getStateMachine()->clear();
 	setLastCommandSource( cmdSource );
 
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(NameKeyType, key_HackInternetAIUpdate, NAMEKEY("HackInternetAIUpdate"));
+#else
 	static NameKeyType key_HackInternetAIUpdate = NAMEKEY("HackInternetAIUpdate");
+#endif
 	HackInternetAIUpdate *ai = (HackInternetAIUpdate*)getObject()->findUpdateModule( key_HackInternetAIUpdate );
 	if( ai )
 	{
@@ -4714,7 +4727,7 @@ Bool AIUpdateInterface::hasNationalism() const
 		///@todo Find a better way to represent nationalism without hard coding here (CBD)
 #if RTS_ENGINE_CONTEXT
 		// GeneralsX @feature cemlyn007 28/09/2026 Per engine: the cached template is this engine's (PLAN-023 Phase 4).
-		static rts::PerEngineStatic<const UpgradeTemplate *> nationalismTemplate_perEngine;
+		static constexpr rts::PerEngineStatic<const UpgradeTemplate *> nationalismTemplate_perEngine{};
 		const UpgradeTemplate *nationalismTemplate = nationalismTemplate_perEngine.get([&](const UpgradeTemplate *&value) { value = TheUpgradeCenter->findUpgrade( "Upgrade_Nationalism" ); });
 #else
 		static const UpgradeTemplate *nationalismTemplate = TheUpgradeCenter->findUpgrade( "Upgrade_Nationalism" );
@@ -4736,7 +4749,7 @@ Bool AIUpdateInterface::hasFanaticism() const
 		///@todo Find a better way to represent fanaticism without hard coding here (MAL)
 #if RTS_ENGINE_CONTEXT
 		// GeneralsX @feature cemlyn007 28/09/2026 Per engine: the cached template is this engine's (PLAN-023 Phase 4).
-		static rts::PerEngineStatic<const UpgradeTemplate *> fanaticismTemplate_perEngine;
+		static constexpr rts::PerEngineStatic<const UpgradeTemplate *> fanaticismTemplate_perEngine{};
 		const UpgradeTemplate *fanaticismTemplate = fanaticismTemplate_perEngine.get([&](const UpgradeTemplate *&value) { value = TheUpgradeCenter->findUpgrade( "Upgrade_Fanaticism" ); });
 #else
 		static const UpgradeTemplate *fanaticismTemplate = TheUpgradeCenter->findUpgrade( "Upgrade_Fanaticism" );

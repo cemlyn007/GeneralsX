@@ -48,7 +48,13 @@
 /*
 ** Static members
 */
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_CLASS_STATIC_DEFINE(RefMultiListClass<LookupTableClass>, LookupTableMgrClass, Tables);
+#define Tables RTS_ENGINE_GLOBAL_REF(Tables)
+#else
 RefMultiListClass<LookupTableClass>	LookupTableMgrClass::Tables;
+#endif
 
 /*
 ** Save-Load stuff.  Lookup tables are basically saved 1D curve classes.  They are turned

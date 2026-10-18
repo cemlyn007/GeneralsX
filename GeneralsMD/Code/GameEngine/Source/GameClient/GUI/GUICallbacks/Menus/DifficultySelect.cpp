@@ -66,17 +66,63 @@
 //-----------------------------------------------------------------------------
 // DEFINES ////////////////////////////////////////////////////////////////////
 //-----------------------------------------------------------------------------
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameDifficulty, s_AIDiff, DIFFICULTY_NORMAL);
+#define s_AIDiff RTS_ENGINE_GLOBAL_REF(s_AIDiff)
+#else
 static GameDifficulty s_AIDiff = DIFFICULTY_NORMAL;
+#endif
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(NameKeyType, buttonOkID, NAMEKEY_INVALID);
+#define buttonOkID RTS_ENGINE_GLOBAL_REF(buttonOkID)
+#else
 static NameKeyType    buttonOkID      = NAMEKEY_INVALID;
+#endif
 static GameWindow *   buttonOk       = nullptr;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonCancelID, NAMEKEY_INVALID);
+#define buttonCancelID RTS_ENGINE_GLOBAL_REF(buttonCancelID)
+#else
 static NameKeyType    buttonCancelID      = NAMEKEY_INVALID;
+#endif
 static GameWindow *   buttonCancel       = nullptr;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, radioButtonEasyAIID, NAMEKEY_INVALID);
+#define radioButtonEasyAIID RTS_ENGINE_GLOBAL_REF(radioButtonEasyAIID)
+#else
 static NameKeyType    radioButtonEasyAIID      = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, radioButtonMediumAIID, NAMEKEY_INVALID);
+#define radioButtonMediumAIID RTS_ENGINE_GLOBAL_REF(radioButtonMediumAIID)
+#else
 static NameKeyType    radioButtonMediumAIID      = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, radioButtonHardAIID, NAMEKEY_INVALID);
+#define radioButtonHardAIID RTS_ENGINE_GLOBAL_REF(radioButtonHardAIID)
+#else
 static NameKeyType    radioButtonHardAIID      = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, radioButtonEasyAI, nullptr);
+#define radioButtonEasyAI RTS_ENGINE_GLOBAL_REF(radioButtonEasyAI)
+#else
 static GameWindow *   radioButtonEasyAI       = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, radioButtonMediumAI, nullptr);
+#define radioButtonMediumAI RTS_ENGINE_GLOBAL_REF(radioButtonMediumAI)
+#else
 static GameWindow *   radioButtonMediumAI       = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, radioButtonHardAI, nullptr);
+#define radioButtonHardAI RTS_ENGINE_GLOBAL_REF(radioButtonHardAI)
+#else
 static GameWindow *   radioButtonHardAI       = nullptr;
+#endif
 
 void setupGameStart(AsciiString mapName, GameDifficulty diff);
 //-----------------------------------------------------------------------------

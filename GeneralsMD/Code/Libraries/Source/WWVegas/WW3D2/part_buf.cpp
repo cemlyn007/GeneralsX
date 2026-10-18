@@ -69,6 +69,17 @@ const static unsigned int MAX_RANDOM_ENTRIES = 32;	// MUST be power of two!
 // Static array of screen-size clamps for the 17 possible LOD levels a particle buffer can have.
 // We can change these from being global to being per-buffer later if we wish. Default is
 // NO_MAX_SCREEN_SIZE.
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_CLASS_STATIC_DEFINE(float[17], ParticleBufferClass, LODMaxScreenSizes, {
+	NO_MAX_SCREEN_SIZE, NO_MAX_SCREEN_SIZE, NO_MAX_SCREEN_SIZE, NO_MAX_SCREEN_SIZE,
+	NO_MAX_SCREEN_SIZE, NO_MAX_SCREEN_SIZE, NO_MAX_SCREEN_SIZE, NO_MAX_SCREEN_SIZE,
+	NO_MAX_SCREEN_SIZE, NO_MAX_SCREEN_SIZE, NO_MAX_SCREEN_SIZE, NO_MAX_SCREEN_SIZE,
+	NO_MAX_SCREEN_SIZE, NO_MAX_SCREEN_SIZE, NO_MAX_SCREEN_SIZE, NO_MAX_SCREEN_SIZE,
+	NO_MAX_SCREEN_SIZE
+});
+#define LODMaxScreenSizes RTS_ENGINE_GLOBAL_REF(LODMaxScreenSizes)
+#else
 float ParticleBufferClass::LODMaxScreenSizes[17] = {
 	NO_MAX_SCREEN_SIZE, NO_MAX_SCREEN_SIZE, NO_MAX_SCREEN_SIZE, NO_MAX_SCREEN_SIZE,
 	NO_MAX_SCREEN_SIZE, NO_MAX_SCREEN_SIZE, NO_MAX_SCREEN_SIZE, NO_MAX_SCREEN_SIZE,
@@ -76,11 +87,12 @@ float ParticleBufferClass::LODMaxScreenSizes[17] = {
 	NO_MAX_SCREEN_SIZE, NO_MAX_SCREEN_SIZE, NO_MAX_SCREEN_SIZE, NO_MAX_SCREEN_SIZE,
 	NO_MAX_SCREEN_SIZE
 };
+#endif
 
 #if RTS_ENGINE_CONTEXT
 // GeneralsX @feature cemlyn007 28/09/2026 Per engine: the particle buffers' generator, so one engine's particles do
 // not advance another's sequence (PLAN-023 Phase 3).
-static rts::PerEngineStatic<Random4Class> rand_gen_perEngine;
+static constexpr rts::PerEngineStatic<Random4Class> rand_gen_perEngine{};
 #define rand_gen (rand_gen_perEngine.get())
 #else
 static Random4Class rand_gen;
@@ -996,7 +1008,7 @@ struct RenderLineScratch
 	SimpleDynVecClass<Vector4> tmp_diffuse;
 	SimpleDynVecClass<unsigned char> tmp_id;
 };
-rts::PerEngineStatic<RenderLineScratch> RenderLineScratch_perEngine;
+constexpr rts::PerEngineStatic<RenderLineScratch> RenderLineScratch_perEngine{};
 } // namespace
 #endif
 

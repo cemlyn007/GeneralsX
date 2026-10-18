@@ -88,8 +88,17 @@ ProjectedShadowManager	*TheProjectedShadowManager;				//global singleton with si
 #define nShadowStartBatchVertex (TheW3DVolumetricShadowManager->m_nShadowStartBatchVertex)
 #define nShadowIndicesInBuf (TheW3DVolumetricShadowManager->m_nShadowIndicesInBuf)
 #define nShadowStartBatchIndex (TheW3DVolumetricShadowManager->m_nShadowStartBatchIndex)
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 Data no engine writes is constant (docs/EMBEDDING.md).
+extern const int SHADOW_VERTEX_SIZE;
+#else
 extern int SHADOW_VERTEX_SIZE;
+#endif
+#if RTS_ENGINE_CONTEXT
+extern const int SHADOW_INDEX_SIZE;
+#else
 extern int SHADOW_INDEX_SIZE;
+#endif
 
 //Global streaming vertex buffer with x,y,z,u,v type.
 struct SHADOW_DECAL_VERTEX	//vertex structure passed to D3D
@@ -111,8 +120,16 @@ struct SHADOW_DECAL_VERTEX	//vertex structure passed to D3D
 #define nShadowDecalStartBatchIndex (TheW3DProjectedShadowManager->m_nShadowDecalStartBatchIndex)
 #define nShadowDecalPolysInBatch (TheW3DProjectedShadowManager->m_nShadowDecalPolysInBatch)
 #define nShadowDecalVertsInBatch (TheW3DProjectedShadowManager->m_nShadowDecalVertsInBatch)
+#if RTS_ENGINE_CONTEXT
+extern const int SHADOW_DECAL_VERTEX_SIZE=32768;
+#else
 int SHADOW_DECAL_VERTEX_SIZE=32768;
+#endif
+#if RTS_ENGINE_CONTEXT
+extern const int SHADOW_DECAL_INDEX_SIZE=65536;
+#else
 int SHADOW_DECAL_INDEX_SIZE=65536;
+#endif
 
 
 class W3DShadowTexture;	//forward reference
@@ -1706,7 +1723,11 @@ Shadow* W3DProjectedShadowManager::addDecal(RenderObjClass *robj, Shadow::Shadow
 W3DProjectedShadow* W3DProjectedShadowManager::addShadow(RenderObjClass *robj, Shadow::ShadowTypeInfo *shadowInfo, Drawable *draw)
 {
 	W3DShadowTexture *st=nullptr;
+#if RTS_ENGINE_CONTEXT
+	static const char	defaultDecalName[]={"shadow.tga"};
+#else
 	static char	defaultDecalName[]={"shadow.tga"};
+#endif
 	ShadowType shadowType=SHADOW_NONE;		/// type of projection
 	Bool	allowWorldAlign=FALSE;	/// wrap shadow around world geometry - else align perpendicular to local z-axis.
 	Real	decalSizeX=0.0f;
@@ -1901,7 +1922,11 @@ W3DProjectedShadow* W3DProjectedShadowManager::addShadow(RenderObjClass *robj, S
 W3DProjectedShadow* W3DProjectedShadowManager::createDecalShadow(Shadow::ShadowTypeInfo *shadowInfo)
 {
 	W3DShadowTexture *st=nullptr;
+#if RTS_ENGINE_CONTEXT
+	static const char	defaultDecalName[]={"shadow.tga"};
+#else
 	static char	defaultDecalName[]={"shadow.tga"};
+#endif
 	ShadowType shadowType=SHADOW_DECAL;		/// type of projection
 	Bool	allowWorldAlign=FALSE;	/// wrap shadow around world geometry - else align perpendicular to local z-axis.
 	Real	decalSizeX=0.0f;

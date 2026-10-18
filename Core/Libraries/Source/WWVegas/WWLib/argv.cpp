@@ -46,8 +46,19 @@
 #include <stdlib.h>
 #include "ffactory.h"
 #include "RAWFILE.h"
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_CLASS_STATIC_DEFINE(int, ArgvClass, Argc, 0);
+#define Argc RTS_ENGINE_GLOBAL_REF(Argc)
+#else
 int   	 ArgvClass::Argc = 0;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_CLASS_STATIC_DEFINE(char*[MAX_ARGC], ArgvClass, Argv);
+#define Argv RTS_ENGINE_GLOBAL_REF(Argv)
+#else
 char 		*ArgvClass::Argv[MAX_ARGC];
+#endif
 
 /***********************************************************************************************
  * CurrentPos -- Create an instance to parse argv with.                                        *

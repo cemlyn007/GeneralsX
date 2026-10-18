@@ -21,9 +21,21 @@
 #include "mesh.h"
 #include "meshmdl.h"
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+using MeshHash_rtsEngineType = HashTemplateClass<unsigned, MeshClass*>;
+RTS_ENGINE_GLOBAL(MeshHash_rtsEngineType, MeshHash);
+#define MeshHash RTS_ENGINE_GLOBAL_REF(MeshHash)
+#else
 static HashTemplateClass<unsigned, MeshClass*> MeshHash;
+#endif
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_CLASS_STATIC_DEFINE(bool, DX8RendererDebugger, Enabled);
+#define Enabled RTS_ENGINE_GLOBAL_REF(Enabled)
+#else
 bool DX8RendererDebugger::Enabled;
+#endif
 
 void DX8RendererDebugger::Enable(bool enable)
 {

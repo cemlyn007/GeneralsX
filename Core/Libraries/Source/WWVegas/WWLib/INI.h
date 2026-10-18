@@ -67,6 +67,10 @@ template<class T, class U> class IndexClass;
 **	This is an INI database handler class. It handles a database with a disk format identical
 **	to the INI files commonly used by Windows.
 */
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+#define KeepBlankEntries RTS_ENGINE_GLOBAL_REF(KeepBlankEntries)
+#endif
 class INIClass {
 	public:
 		INIClass();
@@ -231,5 +235,12 @@ class INIClass {
 		/*
 		** The flag used to control the blank entry loading behavior.
 		*/
+#if RTS_ENGINE_CONTEXT
+		RTS_ENGINE_CLASS_STATIC(bool, KeepBlankEntries);
+#else
 		static bool KeepBlankEntries;
+#endif
 };
+#if RTS_ENGINE_CONTEXT
+#undef KeepBlankEntries
+#endif

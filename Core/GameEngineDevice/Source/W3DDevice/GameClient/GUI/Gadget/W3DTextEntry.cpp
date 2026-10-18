@@ -75,7 +75,12 @@ static void drawTextEntryText( GameWindow *window, WinInstanceData *instData,
 															 Color compositeColor, Color compositeDropColor,
 															 Int x, Int y, Int width, Int fontHeight )
 {
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+	RTS_ENGINE_STATIC(Byte, drawCnt, 0);
+#else
 	static Byte drawCnt = 0;
+#endif
 	EntryData *e = (EntryData *)window->winGetUserData();
 //	Int charPos = e->charPos;
 	Int cursorPos;

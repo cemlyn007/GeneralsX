@@ -44,10 +44,31 @@ void deleteNotificationBox();
 static void raiseOverlays();
 
 // Message boxes -------------------------------------
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(GameWindow*, messageBoxWindow, nullptr);
+#define messageBoxWindow RTS_ENGINE_GLOBAL_REF(messageBoxWindow)
+#else
 static GameWindow *messageBoxWindow = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWinMsgBoxFunc, okFunc, nullptr);
+#define okFunc RTS_ENGINE_GLOBAL_REF(okFunc)
+#else
 static GameWinMsgBoxFunc okFunc = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWinMsgBoxFunc, cancelFunc, nullptr);
+#define cancelFunc RTS_ENGINE_GLOBAL_REF(cancelFunc)
+#else
 static GameWinMsgBoxFunc cancelFunc = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Bool, reOpenPlayerInfoFlag, FALSE);
+#define reOpenPlayerInfoFlag RTS_ENGINE_GLOBAL_REF(reOpenPlayerInfoFlag)
+#else
 static Bool reOpenPlayerInfoFlag = FALSE;
+#endif
 /**
 	* messageBoxOK is called when a message box is destroyed
 	* by way of an OK button, so we can clear our pointers to it.
@@ -178,6 +199,21 @@ static const char * gsOverlays[GSOVERLAY_MAX] =
 	"Menus/OptionsMenu.wnd",			// popup options
 };
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(WindowLayout*[GSOVERLAY_MAX], overlayLayouts, 
+{
+	nullptr,
+	nullptr,
+	nullptr,
+	nullptr,
+	nullptr,
+	nullptr,
+	nullptr,
+	nullptr,
+	nullptr,
+});
+#define overlayLayouts RTS_ENGINE_GLOBAL_REF(overlayLayouts)
+#else
 static WindowLayout *overlayLayouts[GSOVERLAY_MAX] =
 {
 	nullptr,
@@ -190,6 +226,7 @@ static WindowLayout *overlayLayouts[GSOVERLAY_MAX] =
 	nullptr,
 	nullptr,
 };
+#endif
 
 static void buddyTryReconnect()
 {

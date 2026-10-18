@@ -123,17 +123,23 @@
 #if RTS_ENGINE_CONTEXT
 // GeneralsX @feature cemlyn007 28/09/2026 Per engine: the mesh ID counter, so an engine numbers its meshes as it
 // does alone (PLAN-023 Phase 3).
-static rts::PerEngineStatic<unsigned> MeshDebugIdCount_perEngine;
+static constexpr rts::PerEngineStatic<unsigned> MeshDebugIdCount_perEngine{};
 #define MeshDebugIdCount (MeshDebugIdCount_perEngine.get())
 #else
 static unsigned MeshDebugIdCount;
 #endif
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_CLASS_STATIC_DEFINE(bool, MeshClass, Legacy_Meshes_Fogged, true);
+#define Legacy_Meshes_Fogged RTS_ENGINE_GLOBAL_REF(Legacy_Meshes_Fogged)
+#else
 bool MeshClass::Legacy_Meshes_Fogged = true;
+#endif
 #if RTS_ENGINE_CONTEXT
 // GeneralsX @feature cemlyn007 30/09/2026 Per engine: the decal polygon scratch, filled and consumed
 // within one decal or projection (PLAN-023 Phase 8, stage RR2b).
-static rts::PerEngineStatic<SimpleDynVecClass<uint32>> temp_apt_perEngine;
+static constexpr rts::PerEngineStatic<SimpleDynVecClass<uint32>> temp_apt_perEngine;
 #define temp_apt (temp_apt_perEngine.get())
 #else
 static SimpleDynVecClass<uint32> temp_apt;
@@ -156,7 +162,7 @@ static SimpleDynVecClass<uint32> temp_apt;
 #if RTS_ENGINE_CONTEXT
 // GeneralsX @feature cemlyn007 28/09/2026 Per engine, so that engines on separate threads do not share it
 // (PLAN-023 Phase 5b); also the skinned vis-render scratch below.
-static rts::PerEngineStatic<DynamicVectorClass<Vector3> > _TempVertexBuffer_perEngine;
+static constexpr rts::PerEngineStatic<DynamicVectorClass<Vector3> > _TempVertexBuffer_perEngine;
 #define _TempVertexBuffer (_TempVertexBuffer_perEngine.get())
 #else
 static DynamicVectorClass<Vector3>	_TempVertexBuffer;

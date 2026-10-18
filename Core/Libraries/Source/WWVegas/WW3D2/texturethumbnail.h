@@ -81,13 +81,21 @@ public:
 
 // ----------------------------------------------------------------------------
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+#define CreateThumbnailIfNotFound RTS_ENGINE_GLOBAL_REF(CreateThumbnailIfNotFound)
+#endif
 class ThumbnailManagerClass : public DLNodeClass<ThumbnailManagerClass>
 {
 	W3DMPO_CODE(ThumbnailManagerClass);
 
 	friend ThumbnailClass;
 
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_CLASS_STATIC(bool, CreateThumbnailIfNotFound);
+#else
 	static bool CreateThumbnailIfNotFound;
+#endif
 	bool PerTextureTimeStampUsed;
 	StringClass ThumbnailFileName;
 	HashTemplateClass<StringClass,ThumbnailClass*> ThumbnailHash;
@@ -122,3 +130,6 @@ public:
 };
 
 // ----------------------------------------------------------------------------
+#if RTS_ENGINE_CONTEXT
+#undef CreateThumbnailIfNotFound
+#endif

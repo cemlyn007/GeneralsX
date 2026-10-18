@@ -32,8 +32,25 @@
 #include <cstring>
 #include "internal.h"
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+// GeneralsX @refactor cemlyn007 14/10/2026 Profile's per-engine statics (Common/EngineStatic.h)
+#define firstPatternEntry RTS_ENGINE_GLOBAL_REF(firstPatternEntry)
+#define lastPatternEntry RTS_ENGINE_GLOBAL_REF(lastPatternEntry)
+#endif
+
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_CLASS_STATIC_DEFINE(unsigned, ProfileCmdInterface, numResIf);
+#define numResIf RTS_ENGINE_GLOBAL_REF(numResIf)
+#else
 unsigned ProfileCmdInterface::numResIf;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_CLASS_STATIC_DEFINE(ProfileCmdInterface::Factory*, ProfileCmdInterface, resIf);
+#define resIf RTS_ENGINE_GLOBAL_REF(resIf)
+#else
 ProfileCmdInterface::Factory *ProfileCmdInterface::resIf;
+#endif
 
 void ProfileCmdInterface::AddResultFunction(ProfileResultInterface* (*func)(int, const char * const *),
                                             const char *name, const char *arg)

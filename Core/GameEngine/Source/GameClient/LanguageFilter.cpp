@@ -78,7 +78,12 @@ void LanguageFilter::reset() {
 void LanguageFilter::update() {
 }
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 Strings no engine writes are constant (docs/EMBEDDING.md).
+const wchar_t ignoredChars[] = L"-_*'\"";
+#else
 wchar_t ignoredChars[] = L"-_*'\"";
+#endif
 
 void LanguageFilter::filterLine(UnicodeString &line)
 {

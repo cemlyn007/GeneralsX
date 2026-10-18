@@ -206,7 +206,12 @@ void FlammableUpdate::tryToIgnite()
 		startBurningSound();
 
 		// bleah. this sucks. (srj)
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+		RTS_ENGINE_STATIC(const NameKeyType, key_FireSpreadUpdate, NAMEKEY("FireSpreadUpdate"));
+#else
 		static const NameKeyType key_FireSpreadUpdate = NAMEKEY("FireSpreadUpdate");
+#endif
 		FireSpreadUpdate* fu = (FireSpreadUpdate*)getObject()->findUpdateModule(key_FireSpreadUpdate);
 		if (fu != nullptr)
 		{

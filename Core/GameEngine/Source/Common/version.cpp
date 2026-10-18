@@ -35,7 +35,9 @@
 #include <ctype.h>
 #include <stdio.h>
 
+#if !RTS_ENGINE_CONTEXT
 Version *TheVersion = nullptr;	///< The Version singleton
+#endif
 
 Version::Version()
 {

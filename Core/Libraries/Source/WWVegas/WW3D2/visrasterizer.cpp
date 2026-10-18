@@ -141,7 +141,7 @@ struct VisClipState
 	VisPolyClass _VisPoly0;
 	VisPolyClass _VisPoly1;
 };
-rts::PerEngineStatic<VisClipState> VisClipState_perEngine;
+constexpr rts::PerEngineStatic<VisClipState> VisClipState_perEngine{};
 } // namespace
 #define _VisPoly0 (VisClipState_perEngine.get()._VisPoly0)
 #define _VisPoly1 (VisClipState_perEngine.get()._VisPoly1)

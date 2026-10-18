@@ -304,23 +304,84 @@ Int PlayerTemplateStore::getTemplateNumByName(AsciiString name) const
 const PlayerTemplate* PlayerTemplateStore::findPlayerTemplate(NameKeyType namekey) const
 {
 // begin ugly, hokey code to quietly load old maps...
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+	RTS_ENGINE_STATIC(NameKeyType, a0, NAMEKEY("FactionAmerica"));
+#else
 	static NameKeyType a0 = NAMEKEY("FactionAmerica");
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(NameKeyType, a1, NAMEKEY("FactionAmericaChooseAGeneral"));
+#else
 	static NameKeyType a1 = NAMEKEY("FactionAmericaChooseAGeneral");
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(NameKeyType, a2, NAMEKEY("FactionAmericaTankCommand"));
+#else
 	static NameKeyType a2 = NAMEKEY("FactionAmericaTankCommand");
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(NameKeyType, a3, NAMEKEY("FactionAmericaSpecialForces"));
+#else
 	static NameKeyType a3 = NAMEKEY("FactionAmericaSpecialForces");
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(NameKeyType, a4, NAMEKEY("FactionAmericaAirForce"));
+#else
 	static NameKeyType a4 = NAMEKEY("FactionAmericaAirForce");
+#endif
 
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(NameKeyType, c0, NAMEKEY("FactionChina"));
+#else
 	static NameKeyType c0 = NAMEKEY("FactionChina");
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(NameKeyType, c1, NAMEKEY("FactionChinaChooseAGeneral"));
+#else
 	static NameKeyType c1 = NAMEKEY("FactionChinaChooseAGeneral");
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(NameKeyType, c2, NAMEKEY("FactionChinaRedArmy"));
+#else
 	static NameKeyType c2 = NAMEKEY("FactionChinaRedArmy");
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(NameKeyType, c3, NAMEKEY("FactionChinaSpecialWeapons"));
+#else
 	static NameKeyType c3 = NAMEKEY("FactionChinaSpecialWeapons");
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(NameKeyType, c4, NAMEKEY("FactionChinaSecretPolice"));
+#else
 	static NameKeyType c4 = NAMEKEY("FactionChinaSecretPolice");
+#endif
 
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(NameKeyType, g0, NAMEKEY("FactionGLA"));
+#else
 	static NameKeyType g0 = NAMEKEY("FactionGLA");
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(NameKeyType, g1, NAMEKEY("FactionGLAChooseAGeneral"));
+#else
 	static NameKeyType g1 = NAMEKEY("FactionGLAChooseAGeneral");
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(NameKeyType, g2, NAMEKEY("FactionGLATerrorCell"));
+#else
 	static NameKeyType g2 = NAMEKEY("FactionGLATerrorCell");
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(NameKeyType, g3, NAMEKEY("FactionGLABiowarCommand"));
+#else
 	static NameKeyType g3 = NAMEKEY("FactionGLABiowarCommand");
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(NameKeyType, g4, NAMEKEY("FactionGLAWarlordCommand"));
+#else
 	static NameKeyType g4 = NAMEKEY("FactionGLAWarlordCommand");
+#endif
 
 	if (namekey == a1 || namekey == a2 || namekey == a3 || namekey == a4)
 		namekey = a0;

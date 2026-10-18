@@ -371,7 +371,13 @@ inline GameWinTooltipFunc GameWindowManager::getDefaultTooltip() { return GameWi
 #if !RTS_ENGINE_CONTEXT
 extern GameWindowManager *TheWindowManager;			///< singleton extern definition
 #endif
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_EXTERN_GLOBAL(UnsignedInt, WindowLayoutCurrentVersion);
+#define WindowLayoutCurrentVersion RTS_ENGINE_GLOBAL_REF(WindowLayoutCurrentVersion)
+#else
 extern UnsignedInt WindowLayoutCurrentVersion;  ///< current version of our window layouts
+#endif
 
 // this function lets us generically pass button selections to our parent, we may
 // frequently want to do this because we want windows grouped on child windows for

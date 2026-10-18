@@ -230,7 +230,7 @@ struct ShatterState
 	// library's process-wide rand() (PLAN-023 Phase 8, stage RR3).
 	Random3Class PatternRandom;
 };
-rts::PerEngineStatic<ShatterState> ShatterState_perEngine;
+constexpr rts::PerEngineStatic<ShatterState> ShatterState_perEngine{};
 } // namespace
 #define ShatterPatterns (ShatterState_perEngine.get().ShatterPatterns)
 #define ClipPools (ShatterState_perEngine.get().ClipPools)

@@ -38,9 +38,20 @@
 #include "GameClient/DisplayStringManager.h"
 
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(Int, IMECandidateWindowLineSpacing, 2);
+#define IMECandidateWindowLineSpacing RTS_ENGINE_GLOBAL_REF(IMECandidateWindowLineSpacing)
+#else
 Int	IMECandidateWindowLineSpacing = 2;
+#endif
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(DisplayString*, Dstring, nullptr);
+#define Dstring RTS_ENGINE_GLOBAL_REF(Dstring)
+#else
 static DisplayString *Dstring = nullptr;
+#endif
 
 //-------------------------------------------------------------------------------------------------
 /** Input procedure for the candidate window */

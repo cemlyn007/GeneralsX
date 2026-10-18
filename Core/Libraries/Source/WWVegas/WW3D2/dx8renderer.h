@@ -73,6 +73,10 @@ class CameraClass;
 ** Then, all polygons will be rendered in 'TextureCategory' batches to reduce the number of stage changes
 ** (and most importantly, texture changes) that we cause in DX8.
 */
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+#define m_gForceMultiply RTS_ENGINE_GLOBAL_REF(m_gForceMultiply)
+#endif
 class DX8TextureCategoryClass : public MultiListObjectClass
 {
 	int												pass;
@@ -83,7 +87,11 @@ class DX8TextureCategoryClass : public MultiListObjectClass
 	DX8FVFCategoryContainer*					container;
 
 	PolyRenderTaskClass *						render_task_head;			// polygon renderers queued for rendering
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_CLASS_STATIC(bool, m_gForceMultiply);
+#else
 	static bool											m_gForceMultiply;  // Forces opaque materials to use the multiply blend - pseudo transparent effect.  jba.
+#endif
 	friend void LogSkinRender(class DX8TextureCategoryClass* category, int pass);
 
 public:
@@ -357,4 +365,7 @@ DX8MeshRendererClass & DX8_Current_Mesh_Renderer();
 #define TheDX8MeshRenderer (DX8_Current_Mesh_Renderer())
 #else
 extern DX8MeshRendererClass TheDX8MeshRenderer;
+#if RTS_ENGINE_CONTEXT
+#undef m_gForceMultiply
+#endif
 #endif

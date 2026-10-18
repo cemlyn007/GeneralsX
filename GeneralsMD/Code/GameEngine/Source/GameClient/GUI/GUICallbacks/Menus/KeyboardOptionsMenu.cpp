@@ -72,46 +72,137 @@
 WindowMsgHandledType KeyboardTextEntryInput( GameWindow *window, UnsignedInt msg,
 													 WindowMsgData mData1, WindowMsgData mData2 );
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(NameKeyType, buttonBackID, NAMEKEY_INVALID);
+#define buttonBackID RTS_ENGINE_GLOBAL_REF(buttonBackID)
+#else
 static NameKeyType buttonBackID = NAMEKEY_INVALID;
+#endif
 static GameWindow *buttonBack = nullptr;
 
 static NameKeyType parentKeyboardOptionsMenuID = NAMEKEY_INVALID;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, parentKeyboardOptionsMenu, nullptr);
+#define parentKeyboardOptionsMenu RTS_ENGINE_GLOBAL_REF(parentKeyboardOptionsMenu)
+#else
 static GameWindow *parentKeyboardOptionsMenu = nullptr;
+#endif
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, comboBoxCategoryListID, NAMEKEY_INVALID);
+#define comboBoxCategoryListID RTS_ENGINE_GLOBAL_REF(comboBoxCategoryListID)
+#else
 static NameKeyType comboBoxCategoryListID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, comboBoxCategoryList, nullptr);
+#define comboBoxCategoryList RTS_ENGINE_GLOBAL_REF(comboBoxCategoryList)
+#else
 static GameWindow *comboBoxCategoryList = nullptr;
+#endif
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, listBoxCommandListID, NAMEKEY_INVALID);
+#define listBoxCommandListID RTS_ENGINE_GLOBAL_REF(listBoxCommandListID)
+#else
 static NameKeyType listBoxCommandListID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, listBoxCommandList, nullptr);
+#define listBoxCommandList RTS_ENGINE_GLOBAL_REF(listBoxCommandList)
+#else
 static GameWindow *listBoxCommandList   = nullptr;
+#endif
 
 static NameKeyType staticTextDescriptionID = NAMEKEY_INVALID;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, staticTextDescription, nullptr);
+#define staticTextDescription RTS_ENGINE_GLOBAL_REF(staticTextDescription)
+#else
 static GameWindow *staticTextDescription   = nullptr;
+#endif
 
 static NameKeyType staticTextCurrentHotkeyID = NAMEKEY_INVALID;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, staticTextCurrentHotkey, nullptr);
+#define staticTextCurrentHotkey RTS_ENGINE_GLOBAL_REF(staticTextCurrentHotkey)
+#else
 static GameWindow *staticTextCurrentHotkey     = nullptr;
+#endif
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonResetAllID, NAMEKEY_INVALID);
+#define buttonResetAllID RTS_ENGINE_GLOBAL_REF(buttonResetAllID)
+#else
 static NameKeyType buttonResetAllID = NAMEKEY_INVALID;
+#endif
 static GameWindow *buttonResetAll   = nullptr;
 
 static NameKeyType textEntryAssignHotkeyID = NAMEKEY_INVALID;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, textEntryAssignHotkey, nullptr);
+#define textEntryAssignHotkey RTS_ENGINE_GLOBAL_REF(textEntryAssignHotkey)
+#else
 static GameWindow *textEntryAssignHotkey   = nullptr;
+#endif
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonAssignID, NAMEKEY_INVALID);
+#define buttonAssignID RTS_ENGINE_GLOBAL_REF(buttonAssignID)
+#else
 static NameKeyType buttonAssignID = NAMEKEY_INVALID;
+#endif
 static GameWindow *buttonAssign = nullptr;
 
 //use Bools to test if modifiers are used
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(Bool, shiftDown, false);
+#define shiftDown RTS_ENGINE_GLOBAL_REF(shiftDown)
+#else
 Bool shiftDown = false;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(Bool, altDown, false);
+#define altDown RTS_ENGINE_GLOBAL_REF(altDown)
+#else
 Bool altDown = false;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(Bool, ctrlDown, false);
+#define ctrlDown RTS_ENGINE_GLOBAL_REF(ctrlDown)
+#else
 Bool ctrlDown = false;
+#endif
 
 // shows whether or not a correctly formatted hotkey assignment is in the text area
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(Bool, absolute, false);
+#define absolute RTS_ENGINE_GLOBAL_REF(absolute)
+#else
 Bool absolute = false;
+#endif
 
 // initialize these, they will be used a lot
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(UnicodeString, alt);
+#define alt RTS_ENGINE_GLOBAL_REF(alt)
+#else
 UnicodeString alt;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(UnicodeString, ctrl);
+#define ctrl RTS_ENGINE_GLOBAL_REF(ctrl)
+#else
 UnicodeString ctrl;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(UnicodeString, shift);
+#define shift RTS_ENGINE_GLOBAL_REF(shift)
+#else
 UnicodeString shift;
+#endif
 
 
 

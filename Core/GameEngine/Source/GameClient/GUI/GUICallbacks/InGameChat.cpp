@@ -59,7 +59,7 @@ struct InGameChatState
 	UnicodeString savedChat;
 	InGameChatType chatType;
 };
-static rts::PerEngineStatic<InGameChatState> s_inGameChatState_perEngine;
+static constexpr rts::PerEngineStatic<InGameChatState> s_inGameChatState_perEngine{};
 #define chatWindow (s_inGameChatState_perEngine.get().chatWindow)
 #define chatTextEntry (s_inGameChatState_perEngine.get().chatTextEntry)
 #define chatTypeStaticText (s_inGameChatState_perEngine.get().chatTypeStaticText)
@@ -99,11 +99,20 @@ void ShowInGameChat( Bool immediate )
 	{
 		chatWindow = TheWindowManager->winCreateFromScript( "InGameChat.wnd" );
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+		RTS_ENGINE_STATIC(NameKeyType, textEntryChatID, TheNameKeyGenerator->nameToKey( "InGameChat.wnd:TextEntryChat" ));
+#else
 		static NameKeyType textEntryChatID = TheNameKeyGenerator->nameToKey( "InGameChat.wnd:TextEntryChat" );
+#endif
 		chatTextEntry = TheWindowManager->winGetWindowFromId( nullptr, textEntryChatID );
 		GadgetTextEntrySetText( chatTextEntry, UnicodeString::TheEmptyString );
 
+#if RTS_ENGINE_CONTEXT
+		RTS_ENGINE_STATIC(NameKeyType, chatTypeStaticTextID, TheNameKeyGenerator->nameToKey( "InGameChat.wnd:StaticTextChatType" ));
+#else
 		static NameKeyType chatTypeStaticTextID = TheNameKeyGenerator->nameToKey( "InGameChat.wnd:StaticTextChatType" );
+#endif
 		chatTypeStaticText = TheWindowManager->winGetWindowFromId( nullptr, chatTypeStaticTextID );
 	}
 	TheWindowManager->winSetFocus( chatTextEntry );
@@ -178,7 +187,12 @@ Bool IsInGameChatActive() {
 extern "C" {
 int getQR2HostingStatus();
 }
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL(int, isThreadHosting);
+#define isThreadHosting RTS_ENGINE_GLOBAL_REF(isThreadHosting)
+#else
 extern int isThreadHosting;
+#endif
 
 Bool handleInGameSlashCommands(UnicodeString uText)
 {
@@ -210,7 +224,11 @@ Bool handleInGameSlashCommands(UnicodeString uText)
 // ------------------------------------------------------------------------------------------------
 void ToggleInGameChat( Bool immediate )
 {
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(Bool, justHid, false);
+#else
 	static Bool justHid = false;
+#endif
 	if (justHid)
 	{
 		justHid = false;
@@ -357,7 +375,11 @@ WindowMsgHandledType InGameChatSystem( GameWindow *window, UnsignedInt msg,
 		case GBM_SELECTED:
 		{
 			GameWindow *control = (GameWindow *)mData1;
+#if RTS_ENGINE_CONTEXT
+			RTS_ENGINE_STATIC(NameKeyType, buttonClearID, TheNameKeyGenerator->nameToKey( "InGameChat.wnd:ButtonClear" ));
+#else
 			static NameKeyType buttonClearID = TheNameKeyGenerator->nameToKey( "InGameChat.wnd:ButtonClear" );
+#endif
 			if (control && control->winGetWindowId() == buttonClearID)
 			{
 				if (chatTextEntry)

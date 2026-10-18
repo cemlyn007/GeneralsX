@@ -38,7 +38,13 @@
 #include	"bufffile.h"
 #include	"WWDebug/wwdebug.h"
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_CLASS_STATIC_DEFINE(int, BufferedFileClass, _DesiredBufferSize, 1024*16);
+#define _DesiredBufferSize RTS_ENGINE_GLOBAL_REF(_DesiredBufferSize)
+#else
 int		BufferedFileClass::_DesiredBufferSize	=	1024*16;
+#endif
 
 /***********************************************************************************************
  * BufferedFileClass::BufferedFileClass -- Default constructor for a file object.              *

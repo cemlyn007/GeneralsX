@@ -52,7 +52,7 @@
 #if RTS_ENGINE_CONTEXT
 // GeneralsX @feature cemlyn007 28/09/2026 Per engine: the random UV mappers' generator, so one engine's
 // asset loads do not advance another's sequence (PLAN-023 Phase 3, pulled forward).
-static rts::PerEngineStatic<Random4Class> rand4_perEngine;
+static constexpr rts::PerEngineStatic<Random4Class> rand4_perEngine{};
 #define rand4 (rand4_perEngine.get())
 #else
 Random4Class rand4;

@@ -168,7 +168,7 @@ struct BoxRenderState
 	int DisplayMask = 0;
 	VertexMaterialClass* _BoxMaterial = nullptr;
 };
-rts::PerEngineStatic<BoxRenderState> BoxRenderState_perEngine;
+constexpr rts::PerEngineStatic<BoxRenderState> BoxRenderState_perEngine{};
 } // namespace
 #define IsInitted (BoxRenderState_perEngine.get().IsInitted)
 #define DisplayMask (BoxRenderState_perEngine.get().DisplayMask)

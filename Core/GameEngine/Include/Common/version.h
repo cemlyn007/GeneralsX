@@ -125,4 +125,6 @@ private:
 	Bool m_showFullVersion;
 };
 
+#if !RTS_ENGINE_CONTEXT
 extern Version *TheVersion;
+#endif

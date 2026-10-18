@@ -112,7 +112,7 @@ public:
 	// list an EngineContext field, the dict a PER_ENGINE_STATIC): every map load rebuilds them, so
 	// process-wide ones were rebuilt under another engine (PLAN-023 Phase 2). The uses are unchanged.
 	static constexpr rts::ContextField<MapObject*, &rts::EngineContext::mapObjectList> TheMapObjectListPtr{};
-	static rts::PerEngineStatic<Dict> TheWorldDict_perEngine;
+	static const rts::PerEngineStatic<Dict> TheWorldDict_perEngine;
 #define TheWorldDict (TheWorldDict_perEngine.get())
 #else
 	static MapObject *TheMapObjectListPtr;

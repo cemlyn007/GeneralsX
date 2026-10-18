@@ -65,6 +65,10 @@ struct VertexFormatXYZNDUV2;
 /**
 ** MeshClass -- Render3DObject for rendering meshes.
 */
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+#define Legacy_Meshes_Fogged RTS_ENGINE_GLOBAL_REF(Legacy_Meshes_Fogged)
+#endif
 class MeshClass : public RenderObjClass
 {
 	W3DMPO_CODE(MeshClass)
@@ -147,7 +151,11 @@ public:
 	int								Get_Base_Vertex_Offset() { return BaseVertexOffset; }
 
 	// Do old .w3d mesh files get fog turned on or off?
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_CLASS_STATIC(bool, Legacy_Meshes_Fogged);
+#else
 	static bool						Legacy_Meshes_Fogged;
+#endif
 
 	void								Replace_Texture(TextureClass* texture,TextureClass* new_texture);
 	void								Replace_VertexMaterial(VertexMaterialClass* vmat,VertexMaterialClass* new_vmat);
@@ -197,3 +205,6 @@ inline MeshModelClass * MeshClass::Peek_Model()
 // model. This is useful for stuff like making a RenderObjects' polys sort.
 //void Set_MeshModel_Flag(RenderObjClass *robj, MeshModelClass::FlagsType flag, int onoff);
 void Set_MeshModel_Flag(RenderObjClass *robj, int flag, int onoff);
+#if RTS_ENGINE_CONTEXT
+#undef Legacy_Meshes_Fogged
+#endif

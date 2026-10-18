@@ -131,6 +131,19 @@ class ChunkLoadClass;
 //	SaveLoadSystemClass
 //
 //////////////////////////////////////////////////////////////////////////////////
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+#define FactoryListHead RTS_ENGINE_GLOBAL_REF(FactoryListHead)
+#endif
+#if RTS_ENGINE_CONTEXT
+#define PointerRemapper RTS_ENGINE_GLOBAL_REF(PointerRemapper)
+#endif
+#if RTS_ENGINE_CONTEXT
+#define PostLoadList RTS_ENGINE_GLOBAL_REF(PostLoadList)
+#endif
+#if RTS_ENGINE_CONTEXT
+#define SubSystemListHead RTS_ENGINE_GLOBAL_REF(SubSystemListHead)
+#endif
 class SaveLoadSystemClass
 {
 public:
@@ -186,10 +199,26 @@ protected:
 
 	static bool		Is_Post_Load_Callback_Registered(PostLoadableClass * obj);
 
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_CLASS_STATIC(SaveLoadSubSystemClass*, SubSystemListHead);
+#else
 	static SaveLoadSubSystemClass *		SubSystemListHead;
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_CLASS_STATIC(PersistFactoryClass*, FactoryListHead);
+#else
 	static PersistFactoryClass *			FactoryListHead;
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_CLASS_STATIC(PointerRemapClass, PointerRemapper);
+#else
 	static PointerRemapClass				PointerRemapper;
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_CLASS_STATIC(SList<PostLoadableClass>, PostLoadList);
+#else
 	static SList<PostLoadableClass>		PostLoadList;
+#endif
 
 	/*
 	** these are friends so that they can register themselves at construction time.
@@ -209,4 +238,10 @@ protected:
 #else
 #define REQUEST_POINTER_REMAP(pp)					SaveLoadSystemClass::Request_Pointer_Remap(pp)
 #define REQUEST_REF_COUNTED_POINTER_REMAP(pp)	SaveLoadSystemClass::Request_Ref_Counted_Pointer_Remap(pp)
+#if RTS_ENGINE_CONTEXT
+#undef SubSystemListHead
+#undef PostLoadList
+#undef PointerRemapper
+#undef FactoryListHead
+#endif
 #endif

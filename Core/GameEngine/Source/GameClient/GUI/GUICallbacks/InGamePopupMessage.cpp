@@ -70,16 +70,42 @@
 
 static NameKeyType parentID = NAMEKEY_INVALID;
 static NameKeyType staticTextMessageID = NAMEKEY_INVALID;
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(NameKeyType, buttonOkID, NAMEKEY_INVALID);
+#define buttonOkID RTS_ENGINE_GLOBAL_REF(buttonOkID)
+#else
 static NameKeyType buttonOkID = NAMEKEY_INVALID;
+#endif
 
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, parent, nullptr);
+#define parent RTS_ENGINE_GLOBAL_REF(parent)
+#else
 static GameWindow *parent = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, staticTextMessage, nullptr);
+#define staticTextMessage RTS_ENGINE_GLOBAL_REF(staticTextMessage)
+#else
 static GameWindow *staticTextMessage = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, buttonOk, nullptr);
+#define buttonOk RTS_ENGINE_GLOBAL_REF(buttonOk)
+#else
 static GameWindow *buttonOk = nullptr;
+#endif
 
 // GeneralsX @bugfix BenderAI 12/02/2026 - Renamed 'pause' to 'shouldPause'
 // Avoids conflict with POSIX pause() function from <unistd.h> on Linux
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Bool, shouldPause, FALSE);
+#define shouldPause RTS_ENGINE_GLOBAL_REF(shouldPause)
+#else
 static Bool shouldPause = FALSE;
+#endif
 //-----------------------------------------------------------------------------
 // PUBLIC FUNCTIONS ///////////////////////////////////////////////////////////
 //-----------------------------------------------------------------------------

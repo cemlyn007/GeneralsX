@@ -44,6 +44,47 @@
 //	Static member initialzation
 ///////////////////////////////////////////////////////////////////
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 The empty string is a read-only constant, and the temporary buffers are this
+// engine's (docs/EMBEDDING.md).
+const WCHAR		WideStringClass::m_NullChar				= 0;
+WCHAR * const	WideStringClass::m_EmptyString			= const_cast<WCHAR *>(&WideStringClass::m_NullChar);
+
+struct WideStringClass::TempPool
+{
+	// A trick to optimize strings that are allocated from the stack and used only temporarily
+	char		string1[WideStringClass::MAX_TEMP_BYTES];
+	char		string2[WideStringClass::MAX_TEMP_BYTES];
+	char		string3[WideStringClass::MAX_TEMP_BYTES];
+	char		string4[WideStringClass::MAX_TEMP_BYTES];
+	WCHAR *	freeTempPtr[WideStringClass::MAX_TEMP_STRING] = {
+		reinterpret_cast<WCHAR *> (string1 + sizeof (WideStringClass::_HEADER)),
+		reinterpret_cast<WCHAR *> (string2 + sizeof (WideStringClass::_HEADER)),
+		reinterpret_cast<WCHAR *> (string3 + sizeof (WideStringClass::_HEADER)),
+		reinterpret_cast<WCHAR *> (string4 + sizeof (WideStringClass::_HEADER))
+	};
+	WCHAR *	resTempPtr[WideStringClass::MAX_TEMP_STRING] = {};
+	int		usedTempStringCount = 0;
+	FastCriticalSectionClass tempMutex;
+};
+
+WideStringClass::TempPool& WideStringClass::Temp_Pool()
+{
+	RTS_ENGINE_STATIC(TempPool, pool);
+	return pool;
+}
+
+WideStringClass::TempPool* WideStringClass::Find_Temp_Pool()
+{
+	return rts::hasCurrentEngine() ? &Temp_Pool() : nullptr;
+}
+
+// Get_String and Free_String find this engine's pool first.
+#define m_FreeTempPtr (pool->freeTempPtr)
+#define m_ResTempPtr (pool->resTempPtr)
+#define m_UsedTempStringCount (pool->usedTempStringCount)
+#define m_TempMutex (pool->tempMutex)
+#else
 int		WideStringClass::m_UsedTempStringCount	= 0;
 
 FastCriticalSectionClass WideStringClass::m_TempMutex;
@@ -72,6 +113,7 @@ WCHAR *	WideStringClass::m_ResTempPtr[MAX_TEMP_STRING] = {
 	nullptr,
 	nullptr
 };
+#endif
 
 
 ///////////////////////////////////////////////////////////////////
@@ -91,7 +133,12 @@ WideStringClass::Get_String (int length, bool is_temp)
 		//
 		//	Should we attempt to use a temp buffer for this string?
 		//
+#if RTS_ENGINE_CONTEXT
+		TempPool* const pool = Find_Temp_Pool();
+		if (pool != nullptr && is_temp && length < MAX_TEMP_LEN && m_UsedTempStringCount < MAX_TEMP_STRING) {
+#else
 		if (is_temp && length < MAX_TEMP_LEN && m_UsedTempStringCount < MAX_TEMP_STRING) {
+#endif
 
 			//
 			//	Make sure no one else is requesting a temp pointer
@@ -194,7 +241,12 @@ WideStringClass::Free_String ()
 		//	Check to see if this string was a temporary string
 		//
 		bool found = false;
+#if RTS_ENGINE_CONTEXT
+		TempPool* const pool = Find_Temp_Pool();
+		for (int index = 0; pool != nullptr && index < MAX_TEMP_STRING; index ++) {
+#else
 		for (int index = 0; index < MAX_TEMP_STRING; index ++) {
+#endif
 			if (m_Buffer == m_ResTempPtr[index]) {
 				//
 				//	Make sure no one else is modifying a temp pointer

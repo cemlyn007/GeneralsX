@@ -62,38 +62,179 @@
 #include "GameClient/GameWindowTransitions.h"
 
 // PRIVATE DATA ///////////////////////////////////////////////////////////////////////////////////
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(NameKeyType, buttonBackKey, NAMEKEY_INVALID);
+#define buttonBackKey RTS_ENGINE_GLOBAL_REF(buttonBackKey)
+#else
 static NameKeyType buttonBackKey					= NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonSaveKey, NAMEKEY_INVALID);
+#define buttonSaveKey RTS_ENGINE_GLOBAL_REF(buttonSaveKey)
+#else
 static NameKeyType buttonSaveKey					= NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonLoadKey, NAMEKEY_INVALID);
+#define buttonLoadKey RTS_ENGINE_GLOBAL_REF(buttonLoadKey)
+#else
 static NameKeyType buttonLoadKey					= NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonDeleteKey, NAMEKEY_INVALID);
+#define buttonDeleteKey RTS_ENGINE_GLOBAL_REF(buttonDeleteKey)
+#else
 static NameKeyType buttonDeleteKey				= NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, listboxGamesKey, NAMEKEY_INVALID);
+#define listboxGamesKey RTS_ENGINE_GLOBAL_REF(listboxGamesKey)
+#else
 static NameKeyType listboxGamesKey				= NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonOverwriteCancel, NAMEKEY_INVALID);
+#define buttonOverwriteCancel RTS_ENGINE_GLOBAL_REF(buttonOverwriteCancel)
+#else
 static NameKeyType buttonOverwriteCancel	= NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonOverwriteConfirm, NAMEKEY_INVALID);
+#define buttonOverwriteConfirm RTS_ENGINE_GLOBAL_REF(buttonOverwriteConfirm)
+#else
 static NameKeyType buttonOverwriteConfirm = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonLoadCancel, NAMEKEY_INVALID);
+#define buttonLoadCancel RTS_ENGINE_GLOBAL_REF(buttonLoadCancel)
+#else
 static NameKeyType buttonLoadCancel				= NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonLoadConfirm, NAMEKEY_INVALID);
+#define buttonLoadConfirm RTS_ENGINE_GLOBAL_REF(buttonLoadConfirm)
+#else
 static NameKeyType buttonLoadConfirm			= NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonSaveDescCancel, NAMEKEY_INVALID);
+#define buttonSaveDescCancel RTS_ENGINE_GLOBAL_REF(buttonSaveDescCancel)
+#else
 static NameKeyType buttonSaveDescCancel		= NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonSaveDescConfirm, NAMEKEY_INVALID);
+#define buttonSaveDescConfirm RTS_ENGINE_GLOBAL_REF(buttonSaveDescConfirm)
+#else
 static NameKeyType buttonSaveDescConfirm	= NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonDeleteConfirm, NAMEKEY_INVALID);
+#define buttonDeleteConfirm RTS_ENGINE_GLOBAL_REF(buttonDeleteConfirm)
+#else
 static NameKeyType buttonDeleteConfirm		= NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonDeleteCancel, NAMEKEY_INVALID);
+#define buttonDeleteCancel RTS_ENGINE_GLOBAL_REF(buttonDeleteCancel)
+#else
 static NameKeyType buttonDeleteCancel			= NAMEKEY_INVALID;
+#endif
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, buttonFrame, nullptr);
+#define buttonFrame RTS_ENGINE_GLOBAL_REF(buttonFrame)
+#else
 static GameWindow *buttonFrame = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, overwriteConfirm, nullptr);
+#define overwriteConfirm RTS_ENGINE_GLOBAL_REF(overwriteConfirm)
+#else
 static GameWindow *overwriteConfirm = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, loadConfirm, nullptr);
+#define loadConfirm RTS_ENGINE_GLOBAL_REF(loadConfirm)
+#else
 static GameWindow *loadConfirm = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, saveDesc, nullptr);
+#define saveDesc RTS_ENGINE_GLOBAL_REF(saveDesc)
+#else
 static GameWindow *saveDesc = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, listboxGames, nullptr);
+#define listboxGames RTS_ENGINE_GLOBAL_REF(listboxGames)
+#else
 static GameWindow *listboxGames = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, editDesc, nullptr);
+#define editDesc RTS_ENGINE_GLOBAL_REF(editDesc)
+#else
 static GameWindow *editDesc = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, deleteConfirm, nullptr);
+#define deleteConfirm RTS_ENGINE_GLOBAL_REF(deleteConfirm)
+#else
 static GameWindow *deleteConfirm = nullptr;
+#endif
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, parent, nullptr);
+#define parent RTS_ENGINE_GLOBAL_REF(parent)
+#else
 static GameWindow *parent = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(SaveLoadLayoutType, currentLayoutType, SLLT_INVALID);
+#define currentLayoutType RTS_ENGINE_GLOBAL_REF(currentLayoutType)
+#else
 static SaveLoadLayoutType currentLayoutType = SLLT_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Bool, isPopup, FALSE);
+#define isPopup RTS_ENGINE_GLOBAL_REF(isPopup)
+#else
 static Bool isPopup = FALSE;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Int, initialGadgetDelay, 2);
+#define initialGadgetDelay RTS_ENGINE_GLOBAL_REF(initialGadgetDelay)
+#else
 static Int	initialGadgetDelay = 2;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Bool, justEntered, FALSE);
+#define justEntered RTS_ENGINE_GLOBAL_REF(justEntered)
+#else
 static Bool justEntered = FALSE;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Bool, isShuttingDown, false);
+#define isShuttingDown RTS_ENGINE_GLOBAL_REF(isShuttingDown)
+#else
 static Bool isShuttingDown = false;
+#endif
 
 // PUBLIC FUNCTIONS ///////////////////////////////////////////////////////////////////////////////
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL(Bool, DontShowMainMenu);
+#define DontShowMainMenu RTS_ENGINE_GLOBAL_REF(DontShowMainMenu)
+#else
 extern Bool DontShowMainMenu; //KRIS
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL(Bool, ReplayWasPressed);
+#define ReplayWasPressed RTS_ENGINE_GLOBAL_REF(ReplayWasPressed)
+#else
 extern Bool ReplayWasPressed;
+#endif
 // ------------------------------------------------------------------------------------------------
 /** Given the current layout and selection in the game listbox, update the main save/load
 	* menu buttons to be enabled or disabled */
@@ -568,6 +709,9 @@ WindowMsgHandledType SaveLoadMenuSystem( GameWindow *window, UnsignedInt msg,
 
     //----------------------------------------------------------------------------------------------
 		case GLM_DOUBLE_CLICKED:
+#if RTS_ENGINE_CONTEXT
+#undef listboxGames
+#endif
 			{
 				GameWindow *control = (GameWindow *)mData1;
 				GameWindow *listboxGames = TheWindowManager->winGetWindowFromId( window, listboxGamesKey );
@@ -584,9 +728,15 @@ WindowMsgHandledType SaveLoadMenuSystem( GameWindow *window, UnsignedInt msg,
 				}
 				break;
 			}
+#if RTS_ENGINE_CONTEXT
+#define listboxGames RTS_ENGINE_GLOBAL_REF(listboxGames)
+#endif
 
 		// --------------------------------------------------------------------------------------------
 		case GLM_SELECTED:
+#if RTS_ENGINE_CONTEXT
+#undef listboxGames
+#endif
 		{
 			GameWindow *control = (GameWindow *)mData1;
 
@@ -603,6 +753,9 @@ WindowMsgHandledType SaveLoadMenuSystem( GameWindow *window, UnsignedInt msg,
 			break;
 
 		}
+#if RTS_ENGINE_CONTEXT
+#define listboxGames RTS_ENGINE_GLOBAL_REF(listboxGames)
+#endif
 
     //---------------------------------------------------------------------------------------------
 		case GBM_SELECTED:

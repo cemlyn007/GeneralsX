@@ -133,6 +133,17 @@ private:
 // things that all module definitions must have in order to work with
 // the module creation factory
 //-------------------------------------------------------------------------------------------------
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 The module's name key is this engine's (docs/EMBEDDING.md).
+#define MAKE_STANDARD_MODULE_MACRO( cls ) \
+public: \
+	static Module* friend_newModuleInstance( Thing *thing, const ModuleData* moduleData ) { return newInstance( cls )( thing, moduleData ); } \
+	virtual NameKeyType getModuleNameKey() const override { RTS_ENGINE_STATIC(NameKeyType, nk, NAMEKEY(#cls)); return nk; } \
+protected: \
+	virtual void crc( Xfer *xfer ) override; \
+	virtual void xfer( Xfer *xfer ) override; \
+	virtual void loadPostProcess() override;
+#else
 #define MAKE_STANDARD_MODULE_MACRO( cls ) \
 public: \
 	static Module* friend_newModuleInstance( Thing *thing, const ModuleData* moduleData ) { return newInstance( cls )( thing, moduleData ); } \
@@ -141,6 +152,7 @@ protected: \
 	virtual void crc( Xfer *xfer ) override; \
 	virtual void xfer( Xfer *xfer ) override; \
 	virtual void loadPostProcess() override;
+#endif
 
 // ------------------------------------------------------------------------------------------------
 // For the creation of abstract module classes

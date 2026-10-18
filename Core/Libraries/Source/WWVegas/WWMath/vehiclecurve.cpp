@@ -45,7 +45,18 @@
 //////////////////////////////////////////////////////////////////////
 // Save-Load stuff
 //////////////////////////////////////////////////////////////////////
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 Per engine (Common/EngineStatic.h), made and so registered by WWMath::Init (docs/EMBEDDING.md).
+using _VehicleCurveFactory_rtsEngineType = SimplePersistFactoryClass<VehicleCurveClass,WWMATH_CHUNKID_VEHICLECURVE>;
+RTS_ENGINE_GLOBAL(_VehicleCurveFactory_rtsEngineType, _VehicleCurveFactory);
+#define _VehicleCurveFactory RTS_ENGINE_GLOBAL_REF(_VehicleCurveFactory)
+void WWMath_Register_Vehiclecurve_Factories()
+{
+	_VehicleCurveFactory;
+}
+#else
 SimplePersistFactoryClass<VehicleCurveClass,WWMATH_CHUNKID_VEHICLECURVE>	_VehicleCurveFactory;
+#endif
 
 ////////////////////////////////////////////////////////////////
 //	Save/Load constants

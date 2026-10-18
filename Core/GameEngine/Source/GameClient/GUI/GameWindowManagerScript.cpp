@@ -115,10 +115,31 @@ struct GameWindowParse
 ///////////////////////////////////////////////////////////////////////////////
 
 // window methods and their string representations
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(GameWinSystemFunc, systemFunc, nullptr);
+#define systemFunc RTS_ENGINE_GLOBAL_REF(systemFunc)
+#else
 static GameWinSystemFunc		systemFunc = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWinInputFunc, inputFunc, nullptr);
+#define inputFunc RTS_ENGINE_GLOBAL_REF(inputFunc)
+#else
 static GameWinInputFunc		inputFunc = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWinTooltipFunc, tooltipFunc, nullptr);
+#define tooltipFunc RTS_ENGINE_GLOBAL_REF(tooltipFunc)
+#else
 static GameWinTooltipFunc	tooltipFunc = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWinDrawFunc, drawFunc, nullptr);
+#define drawFunc RTS_ENGINE_GLOBAL_REF(drawFunc)
+#else
 static GameWinDrawFunc			drawFunc = nullptr;
+#endif
 #if RTS_ENGINE_CONTEXT
 // GeneralsX @feature cemlyn007 03/10/2026 Per engine: every engine's ~GameWindowManager clears these
 // (freeStaticStrings), headless ones too, while the rendering engine may be parsing a .wnd file (PLAN-023 Phase 4).
@@ -129,7 +150,7 @@ struct WindowCallbackStrings
 	AsciiString tooltip;
 	AsciiString draw;
 };
-static rts::PerEngineStatic<WindowCallbackStrings> s_windowCallbackStrings_perEngine;
+static constexpr rts::PerEngineStatic<WindowCallbackStrings> s_windowCallbackStrings_perEngine{};
 #define theSystemString (s_windowCallbackStrings_perEngine.get().system)
 #define theInputString (s_windowCallbackStrings_perEngine.get().input)
 #define theTooltipString (s_windowCallbackStrings_perEngine.get().tooltip)
@@ -142,13 +163,48 @@ static AsciiString theDrawString;
 #endif
 
 // default visual properties
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Color, defEnabledColor, 0);
+#define defEnabledColor RTS_ENGINE_GLOBAL_REF(defEnabledColor)
+#else
 static Color defEnabledColor		= 0;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Color, defDisabledColor, 0);
+#define defDisabledColor RTS_ENGINE_GLOBAL_REF(defDisabledColor)
+#else
 static Color defDisabledColor		= 0;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Color, defBackgroundColor, 0);
+#define defBackgroundColor RTS_ENGINE_GLOBAL_REF(defBackgroundColor)
+#else
 static Color defBackgroundColor	= 0;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Color, defHiliteColor, 0);
+#define defHiliteColor RTS_ENGINE_GLOBAL_REF(defHiliteColor)
+#else
 static Color defHiliteColor			= 0;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Color, defSelectedColor, 0);
+#define defSelectedColor RTS_ENGINE_GLOBAL_REF(defSelectedColor)
+#else
 static Color defSelectedColor		= 0;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Color, defTextColor, 0);
+#define defTextColor RTS_ENGINE_GLOBAL_REF(defTextColor)
+#else
 static Color defTextColor				= 0;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameFont*, defFont, nullptr);
+#define defFont RTS_ENGINE_GLOBAL_REF(defFont)
+#else
 static GameFont  *defFont				= nullptr;
+#endif
 
 //
 // These strings must be in the same order as they are in their definitions
@@ -172,35 +228,150 @@ const char *const WindowStyleNames[] = { "PUSHBUTTON",	"RADIOBUTTON",	"CHECKBOX"
 														 nullptr };
 
 // Implement a stack to keep track of parent/child nested window descriptions.
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*[ WIN_STACK_DEPTH ], windowStack);
+#define windowStack RTS_ENGINE_GLOBAL_REF(windowStack)
+#else
 static GameWindow *windowStack[ WIN_STACK_DEPTH ];
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow**, stackPtr);
+#define stackPtr RTS_ENGINE_GLOBAL_REF(stackPtr)
+#else
 static GameWindow **stackPtr;
+#endif
 
 // for parsing
 static const char *seps = " =;\n\r\t";
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(WinDrawData[ MAX_DRAW_DATA ], enabledDropDownButtonDrawData);  ///< for combo boxes
+#define enabledDropDownButtonDrawData RTS_ENGINE_GLOBAL_REF(enabledDropDownButtonDrawData)
+#else
 WinDrawData enabledDropDownButtonDrawData[ MAX_DRAW_DATA ];  ///< for combo boxes
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(WinDrawData[ MAX_DRAW_DATA ], disabledDropDownButtonDrawData);  ///< for combo boxes
+#define disabledDropDownButtonDrawData RTS_ENGINE_GLOBAL_REF(disabledDropDownButtonDrawData)
+#else
 WinDrawData disabledDropDownButtonDrawData[ MAX_DRAW_DATA ];  ///< for combo boxes
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(WinDrawData[ MAX_DRAW_DATA ], hiliteDropDownButtonDrawData);  ///< for combo boxes
+#define hiliteDropDownButtonDrawData RTS_ENGINE_GLOBAL_REF(hiliteDropDownButtonDrawData)
+#else
 WinDrawData hiliteDropDownButtonDrawData[ MAX_DRAW_DATA ];  ///< for combo boxes
+#endif
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(WinDrawData[ MAX_DRAW_DATA ], enabledEditBoxDrawData);  ///< for combo boxes
+#define enabledEditBoxDrawData RTS_ENGINE_GLOBAL_REF(enabledEditBoxDrawData)
+#else
 WinDrawData enabledEditBoxDrawData[ MAX_DRAW_DATA ];  ///< for combo boxes
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(WinDrawData[ MAX_DRAW_DATA ], disabledEditBoxDrawData);  ///< for combo boxes
+#define disabledEditBoxDrawData RTS_ENGINE_GLOBAL_REF(disabledEditBoxDrawData)
+#else
 WinDrawData disabledEditBoxDrawData[ MAX_DRAW_DATA ];  ///< for combo boxes
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(WinDrawData[ MAX_DRAW_DATA ], hiliteEditBoxDrawData);  ///< for combo boxes
+#define hiliteEditBoxDrawData RTS_ENGINE_GLOBAL_REF(hiliteEditBoxDrawData)
+#else
 WinDrawData hiliteEditBoxDrawData[ MAX_DRAW_DATA ];  ///< for combo boxes
+#endif
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(WinDrawData[ MAX_DRAW_DATA ], enabledListBoxDrawData);  ///< for combo boxes
+#define enabledListBoxDrawData RTS_ENGINE_GLOBAL_REF(enabledListBoxDrawData)
+#else
 WinDrawData enabledListBoxDrawData[ MAX_DRAW_DATA ];  ///< for combo boxes
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(WinDrawData[ MAX_DRAW_DATA ], disabledListBoxDrawData);  ///< for combo boxes
+#define disabledListBoxDrawData RTS_ENGINE_GLOBAL_REF(disabledListBoxDrawData)
+#else
 WinDrawData disabledListBoxDrawData[ MAX_DRAW_DATA ];  ///< for combo boxes
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(WinDrawData[ MAX_DRAW_DATA ], hiliteListBoxDrawData);  ///< for combo boxes
+#define hiliteListBoxDrawData RTS_ENGINE_GLOBAL_REF(hiliteListBoxDrawData)
+#else
 WinDrawData hiliteListBoxDrawData[ MAX_DRAW_DATA ];  ///< for combo boxes
+#endif
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(WinDrawData[ MAX_DRAW_DATA ], enabledUpButtonDrawData);  ///< for list boxes and combo boxes
+#define enabledUpButtonDrawData RTS_ENGINE_GLOBAL_REF(enabledUpButtonDrawData)
+#else
 WinDrawData enabledUpButtonDrawData[ MAX_DRAW_DATA ];  ///< for list boxes and combo boxes
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(WinDrawData[ MAX_DRAW_DATA ], disabledUpButtonDrawData);  ///< for list boxes and combo boxes
+#define disabledUpButtonDrawData RTS_ENGINE_GLOBAL_REF(disabledUpButtonDrawData)
+#else
 WinDrawData disabledUpButtonDrawData[ MAX_DRAW_DATA ];  ///< for list boxes and combo boxes
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(WinDrawData[ MAX_DRAW_DATA ], hiliteUpButtonDrawData);  ///< for list boxes and combo boxes
+#define hiliteUpButtonDrawData RTS_ENGINE_GLOBAL_REF(hiliteUpButtonDrawData)
+#else
 WinDrawData hiliteUpButtonDrawData[ MAX_DRAW_DATA ];  ///< for list boxes and combo boxes
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(WinDrawData[ MAX_DRAW_DATA ], enabledDownButtonDrawData);  ///< for list boxes and combo boxes
+#define enabledDownButtonDrawData RTS_ENGINE_GLOBAL_REF(enabledDownButtonDrawData)
+#else
 WinDrawData enabledDownButtonDrawData[ MAX_DRAW_DATA ];  ///< for list boxes and combo boxes
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(WinDrawData[ MAX_DRAW_DATA ], disabledDownButtonDrawData);  ///< for list boxes and combo boxes
+#define disabledDownButtonDrawData RTS_ENGINE_GLOBAL_REF(disabledDownButtonDrawData)
+#else
 WinDrawData disabledDownButtonDrawData[ MAX_DRAW_DATA ];  ///< for list boxes and combo boxes
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(WinDrawData[ MAX_DRAW_DATA ], hiliteDownButtonDrawData);  ///< for list boxes and combo boxes
+#define hiliteDownButtonDrawData RTS_ENGINE_GLOBAL_REF(hiliteDownButtonDrawData)
+#else
 WinDrawData hiliteDownButtonDrawData[ MAX_DRAW_DATA ];  ///< for list boxes and combo boxes
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(WinDrawData[ MAX_DRAW_DATA ], enabledSliderDrawData);  ///< for list boxes and combo boxes
+#define enabledSliderDrawData RTS_ENGINE_GLOBAL_REF(enabledSliderDrawData)
+#else
 WinDrawData enabledSliderDrawData[ MAX_DRAW_DATA ];  ///< for list boxes and combo boxes
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(WinDrawData[ MAX_DRAW_DATA ], disabledSliderDrawData);  ///< for list boxes and combo boxes
+#define disabledSliderDrawData RTS_ENGINE_GLOBAL_REF(disabledSliderDrawData)
+#else
 WinDrawData disabledSliderDrawData[ MAX_DRAW_DATA ];  ///< for list boxes and combo boxes
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(WinDrawData[ MAX_DRAW_DATA ], hiliteSliderDrawData);  ///< for list boxes and combo boxes
+#define hiliteSliderDrawData RTS_ENGINE_GLOBAL_REF(hiliteSliderDrawData)
+#else
 WinDrawData hiliteSliderDrawData[ MAX_DRAW_DATA ];  ///< for list boxes and combo boxes
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(WinDrawData[ MAX_DRAW_DATA ], enabledSliderThumbDrawData);  ///< for sliders and list boxes and combo boxes
+#define enabledSliderThumbDrawData RTS_ENGINE_GLOBAL_REF(enabledSliderThumbDrawData)
+#else
 WinDrawData enabledSliderThumbDrawData[ MAX_DRAW_DATA ];  ///< for sliders and list boxes and combo boxes
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(WinDrawData[ MAX_DRAW_DATA ], disabledSliderThumbDrawData);  ///< for sliders and list boxes and combo boxes
+#define disabledSliderThumbDrawData RTS_ENGINE_GLOBAL_REF(disabledSliderThumbDrawData)
+#else
 WinDrawData disabledSliderThumbDrawData[ MAX_DRAW_DATA ];  ///< for sliders and list boxes and combo boxes
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(WinDrawData[ MAX_DRAW_DATA ], hiliteSliderThumbDrawData);  ///< for sliders and list boxes and combo boxes
+#define hiliteSliderThumbDrawData RTS_ENGINE_GLOBAL_REF(hiliteSliderThumbDrawData)
+#else
 WinDrawData hiliteSliderThumbDrawData[ MAX_DRAW_DATA ];  ///< for sliders and list boxes and combo boxes
+#endif
 
 // PUBLIC DATA ////////////////////////////////////////////////////////////////
 
@@ -1380,13 +1551,41 @@ static Bool parseDrawData( const char *token, WinInstanceData *instData,
 //=============================================================================
 void *getDataTemplate( char *type )
 {
+#if RTS_ENGINE_CONTEXT
+  RTS_ENGINE_STATIC(EntryData, eData);
+#else
   static EntryData eData;
+#endif
+#if RTS_ENGINE_CONTEXT
+  RTS_ENGINE_STATIC(SliderData, sData);
+#else
   static SliderData sData;
+#endif
+#if RTS_ENGINE_CONTEXT
+  RTS_ENGINE_STATIC(ListboxData, lData);
+#else
   static ListboxData lData;
+#endif
+#if RTS_ENGINE_CONTEXT
+  RTS_ENGINE_STATIC(TextData, tData);
+#else
   static TextData tData;
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(RadioButtonData, rData);
+#else
 	static RadioButtonData rData;
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(TabControlData, tcData);
+#else
 	static TabControlData tcData;
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(ComboBoxData, cData);
+#else
 	static ComboBoxData	cData;
+#endif
 	void *data;
 
   if( strcmp( type, "VERTSLIDER" ) == 0 || strcmp( type, "HORZSLIDER" ) == 0 )
@@ -1464,11 +1663,31 @@ void *getDataTemplate( char *type )
 static Bool parseData( void **data, char *type, char *buffer )
 {
   char *c;
+#if RTS_ENGINE_CONTEXT
+  RTS_ENGINE_STATIC(EntryData, eData);
+#else
   static EntryData eData;
+#endif
+#if RTS_ENGINE_CONTEXT
+  RTS_ENGINE_STATIC(SliderData, sData);
+#else
   static SliderData sData;
+#endif
+#if RTS_ENGINE_CONTEXT
+  RTS_ENGINE_STATIC(ListboxData, lData);
+#else
   static ListboxData lData;
+#endif
+#if RTS_ENGINE_CONTEXT
+  RTS_ENGINE_STATIC(TextData, tData);
+#else
   static TextData tData;
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(RadioButtonData, rData);
+#else
 	static RadioButtonData rData;
+#endif
 	static ComboBoxData cData;
 
   if( strcmp( type, "VERTSLIDER" ) == 0 || strcmp( type, "HORZSLIDER" ) == 0 )
@@ -2268,6 +2487,63 @@ static Bool parseChildWindows( GameWindow *window,
 }
 
 // lookup table for parsing functions
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindowParse[47], gameWindowFieldList, 
+{
+	{ "NAME", parseName },
+	{ "STATUS", parseStatus },
+	{ "STYLE", parseStyle },
+	{ "SYSTEMCALLBACK", parseSystemCallback },
+	{ "INPUTCALLBACK", parseInputCallback },
+	{ "TOOLTIPCALLBACK", parseTooltipCallback },
+	{ "DRAWCALLBACK", parseDrawCallback },
+	{ "FONT", parseFont },
+	{ "HEADERTEMPLATE", parseHeaderTemplate },
+	{ "LISTBOXDATA", parseListboxData },
+	{ "COMBOBOXDATA", parseComboBoxData },
+	{ "SLIDERDATA", parseSliderData },
+	{ "RADIOBUTTONDATA", parseRadioButtonData },
+	{	"TOOLTIPTEXT", parseTooltipText },
+  { "TOOLTIPDELAY", parseTooltipDelay },
+	{ "TEXT", parseText },
+	{ "TEXTCOLOR", parseTextColor },
+	{ "STATICTEXTDATA", parseStaticTextData },
+	{ "TEXTENTRYDATA", parseTextEntryData },
+	{ "TABCONTROLDATA", parseTabControlData },
+
+	{ "ENABLEDDRAWDATA", parseDrawData },
+	{ "DISABLEDDRAWDATA", parseDrawData },
+	{ "HILITEDRAWDATA", parseDrawData },
+	{ "LISTBOXENABLEDUPBUTTONDRAWDATA", parseDrawData },
+	{ "LISTBOXENABLEDDOWNBUTTONDRAWDATA", parseDrawData },
+	{ "LISTBOXENABLEDSLIDERDRAWDATA", parseDrawData },
+	{ "LISTBOXDISABLEDUPBUTTONDRAWDATA", parseDrawData },
+	{ "LISTBOXDISABLEDDOWNBUTTONDRAWDATA", parseDrawData },
+	{ "LISTBOXDISABLEDSLIDERDRAWDATA", parseDrawData },
+	{ "LISTBOXHILITEUPBUTTONDRAWDATA", parseDrawData },
+	{ "LISTBOXHILITEDOWNBUTTONDRAWDATA", parseDrawData },
+	{ "LISTBOXHILITESLIDERDRAWDATA", parseDrawData },
+	{ "SLIDERTHUMBENABLEDDRAWDATA", parseDrawData },
+	{ "SLIDERTHUMBDISABLEDDRAWDATA", parseDrawData },
+	{ "SLIDERTHUMBHILITEDRAWDATA", parseDrawData },
+
+	{ "COMBOBOXDROPDOWNBUTTONENABLEDDRAWDATA", parseDrawData },
+	{ "COMBOBOXDROPDOWNBUTTONDISABLEDDRAWDATA", parseDrawData },
+	{ "COMBOBOXDROPDOWNBUTTONHILITEDRAWDATA", parseDrawData },
+	{ "COMBOBOXEDITBOXENABLEDDRAWDATA", parseDrawData },
+	{ "COMBOBOXEDITBOXDISABLEDDRAWDATA", parseDrawData },
+	{ "COMBOBOXEDITBOXHILITEDRAWDATA", parseDrawData },
+	{ "COMBOBOXLISTBOXENABLEDDRAWDATA", parseDrawData },
+	{ "COMBOBOXLISTBOXDISABLEDDRAWDATA", parseDrawData },
+	{ "COMBOBOXLISTBOXHILITEDRAWDATA", parseDrawData },
+
+	{ "IMAGEOFFSET", parseImageOffset },
+	{ "TOOLTIP", parseTooltip },
+
+	{ nullptr, nullptr }
+});
+#define gameWindowFieldList RTS_ENGINE_GLOBAL_REF(gameWindowFieldList)
+#else
 static GameWindowParse gameWindowFieldList[] =
 {
 	{ "NAME", parseName },
@@ -2322,6 +2598,7 @@ static GameWindowParse gameWindowFieldList[] =
 
 	{ nullptr, nullptr }
 };
+#endif
 
 // parseWindow ================================================================
 /** Parse a WINDOW entry in the script. */
@@ -2579,6 +2856,18 @@ Bool parseShutdown( const char *token, char *buffer, UnsignedInt version, Window
 
 }
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(LayoutScriptParse[4], layoutScriptTable, 
+{
+	{ "LAYOUTINIT",										parseInit },
+	{ "LAYOUTUPDATE",									parseUpdate },
+	{ "LAYOUTSHUTDOWN",								parseShutdown },
+
+	{ nullptr,															nullptr },
+
+});
+#define layoutScriptTable RTS_ENGINE_GLOBAL_REF(layoutScriptTable)
+#else
 static LayoutScriptParse layoutScriptTable[] =
 {
 	{ "LAYOUTINIT",										parseInit },
@@ -2588,6 +2877,7 @@ static LayoutScriptParse layoutScriptTable[] =
 	{ nullptr,															nullptr },
 
 };
+#endif
 
 //-------------------------------------------------------------------------------------------------
 /** Parse the layout block which MUST be present in every window file */
@@ -2716,7 +3006,11 @@ GameWindow *GameWindowManager::winCreateFromScript( AsciiString filenameString,
 																										WindowLayoutInfo *info )
 {
 	const char* filename = filenameString.str();
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(char[ WIN_BUFFER_LENGTH ], buffer); 		// input buffer for reading
+#else
 	static char buffer[ WIN_BUFFER_LENGTH ]; 		// input buffer for reading
+#endif
 	GameWindow *firstWindow = nullptr;
   GameWindow *window;
   char filepath[ _MAX_PATH ] = "Window\\";

@@ -207,7 +207,12 @@ public:
 			ai->aiAttackPosition( secondary, m_numberOfShots, CMD_FROM_AI );
 		}
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+		RTS_ENGINE_STATIC(NameKeyType, key_RadiusDecalUpdate, NAMEKEY("RadiusDecalUpdate"));
+#else
 		static NameKeyType key_RadiusDecalUpdate = NAMEKEY("RadiusDecalUpdate");
+#endif
 		RadiusDecalUpdate *rd = (RadiusDecalUpdate*)primaryObject->findUpdateModule(key_RadiusDecalUpdate);
 		if (rd)
 		{
@@ -407,7 +412,11 @@ public:
 					die->setCreator(INVALID_ID);
 			}
 
+#if RTS_ENGINE_CONTEXT
+			RTS_ENGINE_STATIC(NameKeyType, key_DeliverPayloadAIUpdate, NAMEKEY("DeliverPayloadAIUpdate"));
+#else
 			static NameKeyType key_DeliverPayloadAIUpdate = NAMEKEY("DeliverPayloadAIUpdate");
+#endif
 			DeliverPayloadAIUpdate *ai = (DeliverPayloadAIUpdate*)transport->findUpdateModule(key_DeliverPayloadAIUpdate);
 			if( ai )
 			{
@@ -716,7 +725,7 @@ static const char* const DebrisDispositionNames[] =
 // GeneralsX @feature cemlyn007 28/09/2026 Per engine: this engine's ObjectCreationList parse fills it and its
 // GameClient's preload empties it, so another engine's boot must not feed this one's preload (PLAN-023
 // Phase 4). GameClient.cpp reads it by this name too.
-rts::PerEngineStatic<std::vector<AsciiString> > debrisModelNamesGlobalHack_perEngine;
+extern constexpr rts::PerEngineStatic<std::vector<AsciiString> > debrisModelNamesGlobalHack_perEngine{};
 #define debrisModelNamesGlobalHack (debrisModelNamesGlobalHack_perEngine.get())
 #else
 std::vector<AsciiString>	debrisModelNamesGlobalHack;
@@ -938,7 +947,11 @@ protected:
 	{
 		obj->setProducer(sourceObj);
 
+#if RTS_ENGINE_CONTEXT
+		RTS_ENGINE_STATIC(NameKeyType, key_LifetimeUpdate, NAMEKEY("LifetimeUpdate"));
+#else
 		static NameKeyType key_LifetimeUpdate = NAMEKEY("LifetimeUpdate");
+#endif
 		LifetimeUpdate* lup = (LifetimeUpdate*)obj->findUpdateModule(key_LifetimeUpdate);
 		if( lup )
 		{
@@ -1236,7 +1249,11 @@ protected:
 
 		if( BitIsSet( m_disposition, FLOATING ) )
 		{
+#if RTS_ENGINE_CONTEXT
+			RTS_ENGINE_STATIC(NameKeyType, key, NAMEKEY( "FloatUpdate" ));
+#else
 			static NameKeyType key = NAMEKEY( "FloatUpdate" );
+#endif
 			FloatUpdate *floatUpdate = (FloatUpdate *)obj->findUpdateModule( key );
 
 			if( floatUpdate )
@@ -1317,7 +1334,7 @@ protected:
 	{
 #if RTS_ENGINE_CONTEXT
 		// GeneralsX @feature cemlyn007 28/09/2026 Per engine: the cached template is this engine's (PLAN-023 Phase 4).
-		static rts::PerEngineStatic<const ThingTemplate *> debrisTemplate_perEngine;
+		static constexpr rts::PerEngineStatic<const ThingTemplate *> debrisTemplate_perEngine{};
 		const ThingTemplate *debrisTemplate = debrisTemplate_perEngine.get([&](const ThingTemplate *&value) { value = TheThingFactory->findTemplate("GenericDebris"); });
 #else
 		static const ThingTemplate* debrisTemplate = TheThingFactory->findTemplate("GenericDebris");

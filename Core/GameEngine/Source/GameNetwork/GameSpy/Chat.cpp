@@ -127,7 +127,7 @@ Color GameSpyColor[GSCOLOR_MAX] =
 };
 
 #if RTS_ENGINE_CONTEXT
-rts::PerEngineStatic<Color[GSCOLOR_MAX]> GameSpyColor_perEngine([](Color (&colors)[GSCOLOR_MAX])
+extern constexpr rts::PerEngineStatic<Color[GSCOLOR_MAX]> GameSpyColor_perEngine([](Color (&colors)[GSCOLOR_MAX])
 {
 	for (Int i = 0; i < GSCOLOR_MAX; ++i)
 		colors[i] = GameSpyColorDefaults[i];
@@ -136,7 +136,12 @@ rts::PerEngineStatic<Color[GSCOLOR_MAX]> GameSpyColor_perEngine([](Color (&color
 
 Bool GameSpyInfo::sendChat( UnicodeString message, Bool isAction, GameWindow *playerListbox )
 {
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+	RTS_ENGINE_STATIC(UnicodeString, s_prevMsg, UnicodeString::TheEmptyString);  //stop spam before it happens
+#else
 	static UnicodeString s_prevMsg = UnicodeString::TheEmptyString;  //stop spam before it happens
+#endif
 
 	RoomType roomType = StagingRoom;
 	if (getCurrentGroupRoom())
@@ -333,7 +338,11 @@ Int GameSpyInfo::addText( UnicodeString message, Color c, GameWindow *win )
 {
 	if (TheGameSpyGame && TheGameSpyGame->isInGame() && TheGameSpyGame->isGameInProgress())
 	{
+#if RTS_ENGINE_CONTEXT
+		RTS_ENGINE_STATIC(AudioEventRTS, messageFromChatSound, AudioEventRTS("GUIMessageReceived"));
+#else
 		static AudioEventRTS messageFromChatSound("GUIMessageReceived");
+#endif
 		TheAudio->addAudioEvent(&messageFromChatSound);
 
 		TheInGameUI->message(message);

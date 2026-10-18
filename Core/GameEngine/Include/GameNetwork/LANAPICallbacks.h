@@ -44,18 +44,69 @@ extern LANAPI *TheLAN;
 
 //external declarations of the Gadgets the callbacks can use
 // LanLobby
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_EXTERN_GLOBAL(NameKeyType, listboxChatWindowID);
+#define listboxChatWindowID RTS_ENGINE_GLOBAL_REF(listboxChatWindowID)
+#else
 extern NameKeyType listboxChatWindowID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL(GameWindow*, listboxChatWindow);
+#define listboxChatWindow RTS_ENGINE_GLOBAL_REF(listboxChatWindow)
+#else
 extern GameWindow *listboxChatWindow;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL(GameWindow*, listboxPlayers);
+#define listboxPlayers RTS_ENGINE_GLOBAL_REF(listboxPlayers)
+#else
 extern GameWindow *listboxPlayers;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL(NameKeyType, listboxGamesID);
+#define listboxGamesID RTS_ENGINE_GLOBAL_REF(listboxGamesID)
+#else
 extern NameKeyType listboxGamesID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL(GameWindow*, listboxGames);
+#define listboxGames RTS_ENGINE_GLOBAL_REF(listboxGames)
+#else
 extern GameWindow *listboxGames;
+#endif
 //LanGame Options screen
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL(NameKeyType, listboxChatWindowLanGameID);
+#define listboxChatWindowLanGameID RTS_ENGINE_GLOBAL_REF(listboxChatWindowLanGameID)
+#else
 extern NameKeyType listboxChatWindowLanGameID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL(GameWindow*, listboxChatWindowLanGame);
+#define listboxChatWindowLanGame RTS_ENGINE_GLOBAL_REF(listboxChatWindowLanGame)
+#else
 extern GameWindow *listboxChatWindowLanGame;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL(WindowLayout*, mapSelectLayout);
+#define mapSelectLayout RTS_ENGINE_GLOBAL_REF(mapSelectLayout)
+#else
 extern WindowLayout *mapSelectLayout;
+#endif
 // ScoreScreen
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL(NameKeyType, listboxChatWindowScoreScreenID);
+#define listboxChatWindowScoreScreenID RTS_ENGINE_GLOBAL_REF(listboxChatWindowScoreScreenID)
+#else
 extern NameKeyType listboxChatWindowScoreScreenID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL(GameWindow*, listboxChatWindowScoreScreen);
+#define listboxChatWindowScoreScreen RTS_ENGINE_GLOBAL_REF(listboxChatWindowScoreScreen)
+#else
 extern GameWindow *listboxChatWindowScoreScreen;
+#endif
 
 
 //Colors used for the chat dialogs

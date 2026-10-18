@@ -97,6 +97,13 @@ void Copy_Emitter_Property_Struct
 ** the object containing the emitter (emitters will typically be inserted
 ** into a hierarchy object or some such) will remain separate.
 */
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+#define DebugDisable RTS_ENGINE_GLOBAL_REF(DebugDisable)
+#endif
+#if RTS_ENGINE_CONTEXT
+#define DefaultRemoveOnComplete RTS_ENGINE_GLOBAL_REF(DefaultRemoveOnComplete)
+#endif
 class ParticleEmitterClass : public RenderObjClass
 {
 	public:
@@ -340,9 +347,23 @@ class ParticleEmitterClass : public RenderObjClass
 		// This is used to set the global behavior of emitters...
 		// Should they be removed from the scene when they complete their
 		// emissions, or should they stay in the scene.  (For editing purposes)
+#if RTS_ENGINE_CONTEXT
+		RTS_ENGINE_CLASS_STATIC(bool, DefaultRemoveOnComplete);
+#else
 		static bool					DefaultRemoveOnComplete;
+#endif
 
 		// This setting is used in debug and profile builds to disable
 		// all particle emitters.
+#if RTS_ENGINE_CONTEXT
+		RTS_ENGINE_CLASS_STATIC(bool, DebugDisable);
+#else
 		static bool					DebugDisable;
+#endif
 };
+#if RTS_ENGINE_CONTEXT
+#undef DebugDisable
+#if RTS_ENGINE_CONTEXT
+#undef DefaultRemoveOnComplete
+#endif
+#endif

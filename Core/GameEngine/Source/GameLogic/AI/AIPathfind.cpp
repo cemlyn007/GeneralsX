@@ -196,7 +196,13 @@ const Coord3D *PathNode::computeDirectionVector()
 {
 	// GeneralsX @feature cemlyn007 28/09/2026 thread_local: returned-by-pointer scratch the caller consumes at once, on its own
 	// thread (PLAN-023 Phase 2).
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @refactor cemlyn007 14/10/2026 Per engine (Common/EngineStatic.h): an engine's logic runs on one thread at
+	// a time.
+	RTS_ENGINE_STATIC(Coord3D, dir);
+#else
 	static THREAD_LOCAL Coord3D dir;
+#endif
 
 	if (m_next == nullptr)
 	{
@@ -1251,7 +1257,7 @@ PathfindCell::~PathfindCell()
 	// GeneralsX @bugfix cemlyn007 02/10/2026 Not debug-only: every engine's pathfinder frees its own cells
 	// on its own thread, the same misclassification RT3 fixed for ScriptEngine's st_*.
 #if RTS_ENGINE_CONTEXT
-	static rts::PerEngineStatic<Bool> warn_perEngine([](Bool &value) { value = true; });
+	static constexpr rts::PerEngineStatic<Bool> warn_perEngine([](Bool &value) { value = true; });
 	Bool &warn = warn_perEngine.get();
 #else
 	static Bool warn = true;

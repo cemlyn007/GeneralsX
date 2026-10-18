@@ -62,7 +62,13 @@ struct ScreenshotWrittenMessage
 	ScreenshotWrittenMessage* next;
 	char leafname[_MAX_FNAME];
 };
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(MPSCIntrusiveQueue<ScreenshotWrittenMessage>, s_screenshotWrittenQueue);
+#define s_screenshotWrittenQueue RTS_ENGINE_GLOBAL_REF(s_screenshotWrittenQueue)
+#else
 static MPSCIntrusiveQueue<ScreenshotWrittenMessage> s_screenshotWrittenQueue;
+#endif
 
 #ifdef _WIN32
 static DWORD WINAPI screenshotThreadFunc(LPVOID param)

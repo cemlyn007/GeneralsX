@@ -56,6 +56,29 @@
 #define FILTER_TABLE_GEN_START (16)
 #define FILTER_TABLE_GEN_SIZE  (FILTER_TABLE_SIZE - FILTER_TABLE_GEN_START)
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(float[FILTER_TABLE_SIZE], filtertable, {
+	0.00000001f,
+	0.0000001f,
+	0.000001f,
+	0.00001f,
+	0.0001f,
+	0.001f,
+	0.01f,
+	0.1f,
+	1.0f,
+	10.0f,
+	100.0f,
+	1000.0f,
+	10000.0f,
+	100000.0f,
+	1000000.0f,
+	10000000.0f,
+
+});
+#define filtertable RTS_ENGINE_GLOBAL_REF(filtertable)
+#else
 static float filtertable[FILTER_TABLE_SIZE] = {
 	0.00000001f,
 	0.0000001f,
@@ -75,11 +98,17 @@ static float filtertable[FILTER_TABLE_SIZE] = {
 	10000000.0f,
 
 };
+#endif
 #if RTS_ENGINE_CONTEXT
 // GeneralsX @feature cemlyn007 28/09/2026 Built once per process, under std::call_once: the table comes from
 // constants, the same for every engine, and several engines may be the first (PLAN-023 Phase 3).
 #include <mutex>
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(std::once_flag, table_once);
+#define table_once RTS_ENGINE_GLOBAL_REF(table_once)
+#else
 static std::once_flag table_once;
+#endif
 #else
 static bool table_valid = false;
 #endif

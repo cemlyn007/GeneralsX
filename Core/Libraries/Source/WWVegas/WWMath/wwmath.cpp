@@ -43,33 +43,61 @@
 #include "WWDebug/wwprofile.h"
 
 // TODO: convert to use loouptablemanager...
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(float[ARC_TABLE_SIZE], _FastAcosTable);
+#define _FastAcosTable RTS_ENGINE_GLOBAL_REF(_FastAcosTable)
+#else
 float _FastAcosTable[ARC_TABLE_SIZE];
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(float[ARC_TABLE_SIZE], _FastAsinTable);
+#define _FastAsinTable RTS_ENGINE_GLOBAL_REF(_FastAsinTable)
+#else
 float _FastAsinTable[ARC_TABLE_SIZE];
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(float[SIN_TABLE_SIZE], _FastSinTable);
+#define _FastSinTable RTS_ENGINE_GLOBAL_REF(_FastSinTable)
+#else
 float _FastSinTable[SIN_TABLE_SIZE];
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(float[SIN_TABLE_SIZE], _FastInvSinTable);
+#define _FastInvSinTable RTS_ENGINE_GLOBAL_REF(_FastInvSinTable)
+#else
 float _FastInvSinTable[SIN_TABLE_SIZE];
+#endif
 
 #if RTS_ENGINE_CONTEXT
-// GeneralsX @feature cemlyn007 28/09/2026 Init and Shutdown are counted: every engine calls them, and a
-// second Init would add a second default lookup table and rewrite the _Fast* tables other engines are
-// reading. The first Init builds the tables (the same values every time) and the last Shutdown frees the
-// lookup tables (PLAN-023 Phase 3). Each engine holds at most one count (EngineContext::wwMathInitialized),
-// so an unpaired Shutdown (W3DDisplay's failed init, then its destructor) cannot release another engine's.
-#include <mutex>
+// GeneralsX @feature cemlyn007 28/09/2026 Init and Shutdown pair per engine (EngineContext::wwMathInitialized), so an
+// unpaired Shutdown (W3DDisplay's failed init, then its destructor) does nothing.
+// GeneralsX @refactor cemlyn007 14/10/2026 Each engine builds its own _Fast* tables and lookup tables, and registers its
+// own persist factories: they are per-engine statics (docs/EMBEDDING.md), so no count across engines is kept.
 #include "WWLib/RANDOM.h"
-static std::mutex WWMathInitMutex;
-static int WWMathInitCount = 0;
+#include "WWSaveLoad/wwsaveload.h"
+void WWMath_Register_Hermitespline_Factories();
+void WWMath_Register_Curve_Factories();
+void WWMath_Register_Catmullromspline_Factories();
+void WWMath_Register_Tcbspline_Factories();
+void WWMath_Register_Vehiclecurve_Factories();
+void WWMath_Register_Cardinalspline_Factories();
 #endif
 
 void		WWMath::Init()
 {
 #if RTS_ENGINE_CONTEXT
-	std::lock_guard<std::mutex> lock(WWMathInitMutex);
 	rts::EngineContext* context = rts::ctx();
 	if (context->wwMathInitialized)
 		return;
 	context->wwMathInitialized = true;
-	if (WWMathInitCount++ > 0)
-		return;
+	WWSaveLoad::Init();
+	WWMath_Register_Hermitespline_Factories();
+	WWMath_Register_Curve_Factories();
+	WWMath_Register_Catmullromspline_Factories();
+	WWMath_Register_Tcbspline_Factories();
+	WWMath_Register_Vehiclecurve_Factories();
+	WWMath_Register_Cardinalspline_Factories();
 #endif
 	LookupTableMgrClass::Init();
 
@@ -95,13 +123,10 @@ void		WWMath::Init()
 void		WWMath::Shutdown()
 {
 #if RTS_ENGINE_CONTEXT
-	std::lock_guard<std::mutex> lock(WWMathInitMutex);
 	rts::EngineContext* context = rts::ctx();
 	if (!context->wwMathInitialized)
 		return;
 	context->wwMathInitialized = false;
-	if (--WWMathInitCount > 0)
-		return;
 #endif
 	LookupTableMgrClass::Shutdown();
 }
@@ -110,7 +135,7 @@ void		WWMath::Shutdown()
 // GeneralsX @bugfix cemlyn007 01/10/2026 From the engine's own generator, seeded the same for every engine, not the C
 // library's process-wide rand(): the camera shake (CameraShakeSystem) draws its frequencies and jitter from it, so an
 // engine's shake, and its image, followed whatever other engines had drawn (PLAN-023 Phase 8, stage RR3).
-static rts::PerEngineStatic<Random3Class> RandomFloat_perEngine;
+static constexpr rts::PerEngineStatic<Random3Class> RandomFloat_perEngine{};
 
 float		WWMath::Random_Float()
 {

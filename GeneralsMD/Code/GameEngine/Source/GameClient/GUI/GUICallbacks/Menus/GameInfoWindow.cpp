@@ -45,23 +45,84 @@
 #include "GameNetwork/LANAPI.h"
 
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, parent, nullptr);
+#define parent RTS_ENGINE_GLOBAL_REF(parent)
+#else
 static GameWindow *parent = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, staticTextGameName, nullptr);
+#define staticTextGameName RTS_ENGINE_GLOBAL_REF(staticTextGameName)
+#else
 static GameWindow *staticTextGameName = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, staticTextMapName, nullptr);
+#define staticTextMapName RTS_ENGINE_GLOBAL_REF(staticTextMapName)
+#else
 static GameWindow *staticTextMapName = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, listBoxPlayers, nullptr);
+#define listBoxPlayers RTS_ENGINE_GLOBAL_REF(listBoxPlayers)
+#else
 static GameWindow *listBoxPlayers = nullptr;
+#endif
 static GameWindow *winCrates = nullptr;
 static GameWindow *winSuperWeapons = nullptr;
 static GameWindow *winFreeForAll = nullptr;
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(NameKeyType, parentID, NAMEKEY_INVALID);
+#define parentID RTS_ENGINE_GLOBAL_REF(parentID)
+#else
 static NameKeyType parentID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, staticTextGameNameID, NAMEKEY_INVALID);
+#define staticTextGameNameID RTS_ENGINE_GLOBAL_REF(staticTextGameNameID)
+#else
 static NameKeyType staticTextGameNameID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, staticTextMapNameID, NAMEKEY_INVALID);
+#define staticTextMapNameID RTS_ENGINE_GLOBAL_REF(staticTextMapNameID)
+#else
 static NameKeyType staticTextMapNameID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, listBoxPlayersID, NAMEKEY_INVALID);
+#define listBoxPlayersID RTS_ENGINE_GLOBAL_REF(listBoxPlayersID)
+#else
 static NameKeyType listBoxPlayersID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, winCratesID, NAMEKEY_INVALID);
+#define winCratesID RTS_ENGINE_GLOBAL_REF(winCratesID)
+#else
 static NameKeyType winCratesID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, winSuperWeaponsID, NAMEKEY_INVALID);
+#define winSuperWeaponsID RTS_ENGINE_GLOBAL_REF(winSuperWeaponsID)
+#else
 static NameKeyType winSuperWeaponsID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, winFreeForAllID, NAMEKEY_INVALID);
+#define winFreeForAllID RTS_ENGINE_GLOBAL_REF(winFreeForAllID)
+#else
 static NameKeyType winFreeForAllID = NAMEKEY_INVALID;
+#endif
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(WindowLayout*, gameInfoWindowLayout, nullptr);
+#define gameInfoWindowLayout RTS_ENGINE_GLOBAL_REF(gameInfoWindowLayout)
+#else
 static WindowLayout *gameInfoWindowLayout = nullptr;
+#endif
 // PUBLIC FUNCTIONS ///////////////////////////////////////////////////////////////////////////////
 
 void CreateLANGameInfoWindow( GameWindow *sizeAndPosWin )
@@ -96,8 +157,16 @@ void DestroyGameInfoWindow()
 
 void RefreshGameInfoWindow(GameInfo *gameInfo, UnicodeString gameName)
 {
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(const Image*, randomIcon, TheMappedImageCollection->findImageByName("GameinfoRANDOM"));
+#else
 	static const Image *randomIcon = TheMappedImageCollection->findImageByName("GameinfoRANDOM");
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(const Image*, observerIcon, TheMappedImageCollection->findImageByName("GameinfoOBSRVR"));
+#else
 	static const Image *observerIcon = TheMappedImageCollection->findImageByName("GameinfoOBSRVR");
+#endif
 	if(!gameInfoWindowLayout || !gameInfo )
 		return;
 

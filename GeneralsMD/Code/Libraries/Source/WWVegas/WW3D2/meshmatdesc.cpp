@@ -173,7 +173,12 @@ void UVBufferClass::Update_CRC()
 **
 **
 **************************************************************************************************/
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 Data no engine writes is constant (docs/EMBEDDING.md).
+const ShaderClass MeshMatDescClass::NullShader(0);	// Used to mark no shader data
+#else
 ShaderClass MeshMatDescClass::NullShader(0);	// Used to mark no shader data
+#endif
 
 MeshMatDescClass::MeshMatDescClass() :
 	PassCount(1),

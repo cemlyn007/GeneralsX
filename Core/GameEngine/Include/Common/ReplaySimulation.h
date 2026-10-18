@@ -18,6 +18,12 @@
 
 #pragma once
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+#define s_isRunning RTS_ENGINE_GLOBAL_REF(s_isRunning)
+#define s_replayIndex RTS_ENGINE_GLOBAL_REF(s_replayIndex)
+#define s_replayCount RTS_ENGINE_GLOBAL_REF(s_replayCount)
+#endif
 class ReplaySimulation
 {
 public:
@@ -42,7 +48,18 @@ private:
 
 private:
 
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_CLASS_STATIC(Bool, s_isRunning);
+	RTS_ENGINE_CLASS_STATIC(UnsignedInt, s_replayIndex);
+	RTS_ENGINE_CLASS_STATIC(UnsignedInt, s_replayCount);
+#else
 	static Bool s_isRunning;
 	static UnsignedInt s_replayIndex;
 	static UnsignedInt s_replayCount;
+#endif
 };
+#if RTS_ENGINE_CONTEXT
+#undef s_isRunning
+#undef s_replayIndex
+#undef s_replayCount
+#endif

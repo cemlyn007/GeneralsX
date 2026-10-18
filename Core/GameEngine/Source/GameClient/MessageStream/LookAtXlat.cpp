@@ -65,7 +65,13 @@ enum
 	DIR_RIGHT
 };
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(Bool[4], scrollDir, { false, false, false, false });
+#define scrollDir RTS_ENGINE_GLOBAL_REF(scrollDir)
+#else
 static Bool scrollDir[4] = { false, false, false, false };
+#endif
 
 // TheSuperHackers @tweak Introduces the SCROLL_MULTIPLIER for all scrolling to
 //
@@ -81,7 +87,12 @@ constexpr const Real SCROLL_AMT = 100.0f * SCROLL_MULTIPLIER;
 
 static const Int edgeScrollSize = 3;
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Mouse::MouseCursor, prevCursor, Mouse::ARROW);
+#define prevCursor RTS_ENGINE_GLOBAL_REF(prevCursor)
+#else
 static Mouse::MouseCursor prevCursor = Mouse::ARROW;
+#endif
 
 //-----------------------------------------------------------------------------
 void LookAtTranslator::setScrolling(ScrollType scrollType)

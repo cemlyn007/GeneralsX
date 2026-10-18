@@ -70,12 +70,23 @@ public:
 	//	Public constructors/destructors
 	////////////////////////////////////////////////////////////
 	StringClass (bool hint_temporary);
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @refactor cemlyn007 15/10/2026 constexpr default construction and destruction, so an empty string is a
+	// constant (the render defaults, w3drenderstate.h): it holds m_EmptyString, as Get_String (0, false) leaves it.
+	constexpr StringClass () noexcept : m_Buffer (m_EmptyString) { }
+	StringClass (int initial_len, bool hint_temporary = false);
+#else
 	StringClass (int initial_len = 0, bool hint_temporary = false);
+#endif
 	StringClass (const StringClass &string, bool hint_temporary = false);
 	StringClass (const TCHAR *string, bool hint_temporary = false);
 	StringClass (TCHAR ch, bool hint_temporary = false);
 	StringClass (const WCHAR *string, bool hint_temporary = false);
+#if RTS_ENGINE_CONTEXT
+	constexpr ~StringClass ();
+#else
 	~StringClass ();
+#endif
 
 	////////////////////////////////////////////////////////////
 	//	Public operators
@@ -182,6 +193,17 @@ private:
 	// GeneralsX @bugfix cemlyn007 02/10/2026 atomic<unsigned> (not just unsigned) so Get_String can take a
 	// lock-free relaxed-load early-out when every temp buffer is in use, instead of taking m_Mutex on that
 	// path too; the authoritative test-and-set under m_Mutex is unaffected.
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @refactor cemlyn007 14/10/2026 The temporary buffers are per engine (Temp_Pool, wwstring.cpp). The empty
+	// string is a constant every engine shares read-only: nothing writes it (the constructors leave it alone).
+	struct TempPool;
+	static TempPool& Temp_Pool();
+	// This engine's temporary buffers, or null outside every engine, where a string uses none.
+	static TempPool* Find_Temp_Pool();
+
+	static const TCHAR	m_NullChar;
+	static constexpr TCHAR *	m_EmptyString = const_cast<TCHAR *>(&m_NullChar);
+#else
 	static std::atomic<unsigned> ReservedMask;
 	static char m_TempStrings[];
 
@@ -189,6 +211,7 @@ private:
 
 	static TCHAR	m_NullChar;
 	static TCHAR *	m_EmptyString;
+#endif
 };
 
 ///////////////////////////////////////////////////////////////////
@@ -344,11 +367,21 @@ StringClass::StringClass (const WCHAR *string, bool hint_temporary)
 ///////////////////////////////////////////////////////////////////
 //	~StringClass
 ///////////////////////////////////////////////////////////////////
+#if RTS_ENGINE_CONTEXT
+inline constexpr
+StringClass::~StringClass ()
+{
+	if (m_Buffer != m_EmptyString) {
+		Free_String ();
+	}
+}
+#else
 inline
 StringClass::~StringClass ()
 {
 	Free_String ();
 }
+#endif
 
 
 ///////////////////////////////////////////////////////////////////

@@ -110,7 +110,12 @@
 #define NUM_BOX_FACES	12
 
 // Face Connectivity
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 Data no engine writes is constant (docs/EMBEDDING.md).
+static const TriIndex				_BoxFaces[NUM_BOX_FACES] =
+#else
 static TriIndex					_BoxFaces[NUM_BOX_FACES] =
+#endif
 {
 	TriIndex( 0,1,2 ),		// +z faces
 	TriIndex( 0,2,3 ),
@@ -127,7 +132,11 @@ static TriIndex					_BoxFaces[NUM_BOX_FACES] =
 };
 
 // Vertex Positions as a function of the box extents
+#if RTS_ENGINE_CONTEXT
+static const Vector3					_BoxVerts[NUM_BOX_VERTS] =
+#else
 static Vector3						_BoxVerts[NUM_BOX_VERTS] =
+#endif
 {
 	Vector3(  1.0f, 1.0f, 1.0f ),		// +z ring of 4 verts
 	Vector3( -1.0f, 1.0f, 1.0f ),
@@ -141,7 +150,11 @@ static Vector3						_BoxVerts[NUM_BOX_VERTS] =
 };
 
 // Vertex Normals
+#if RTS_ENGINE_CONTEXT
+static const Vector3					_BoxVertexNormals[NUM_BOX_VERTS] =
+#else
 static Vector3						_BoxVertexNormals[NUM_BOX_VERTS] =
+#endif
 {
 	Vector3( WWMATH_OOSQRT3, WWMATH_OOSQRT3, WWMATH_OOSQRT3 ),
 	Vector3(-WWMATH_OOSQRT3, WWMATH_OOSQRT3, WWMATH_OOSQRT3 ),
@@ -168,12 +181,13 @@ struct BoxRenderState
 	int DisplayMask = 0;
 	VertexMaterialClass* _BoxMaterial = nullptr;
 };
-rts::PerEngineStatic<BoxRenderState> BoxRenderState_perEngine;
+constexpr rts::PerEngineStatic<BoxRenderState> BoxRenderState_perEngine{};
 } // namespace
 #define IsInitted (BoxRenderState_perEngine.get().IsInitted)
 #define DisplayMask (BoxRenderState_perEngine.get().DisplayMask)
 #define _BoxMaterial (BoxRenderState_perEngine.get()._BoxMaterial)
-static const ShaderClass				_BoxShader = ShaderClass::_PresetAlphaSolidShader; //_PresetAdditiveSolidShader;
+// GeneralsX @refactor cemlyn007 15/10/2026 A reference to the preset, so it is a constant (docs/EMBEDDING.md).
+static const ShaderClass&				_BoxShader = ShaderClass::_PresetAlphaSolidShader; //_PresetAdditiveSolidShader;
 #else
 bool										BoxRenderObjClass::IsInitted			= false;
 int										BoxRenderObjClass::DisplayMask		= 0;
@@ -1413,6 +1427,11 @@ RenderObjClass * BoxPrototypeClass::Create()
 /*
 ** Global instance of the box loader
 */
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(BoxLoaderClass, _BoxLoader);
+#define _BoxLoader RTS_ENGINE_GLOBAL_REF(_BoxLoader)
+#else
 BoxLoaderClass _BoxLoader;
+#endif
 
 

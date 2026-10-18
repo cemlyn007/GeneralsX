@@ -199,7 +199,12 @@ void	DebugDisplay::printf( const Char *format, ...)
 {
 	va_list args;
 	int result;
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+	RTS_ENGINE_STATIC(char[5*1024], text);
+#else
 	static char text[5*1024];
+#endif
 
   va_start( args, format );
 	result = vsprintf( text, format, args );

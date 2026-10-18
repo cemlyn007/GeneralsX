@@ -79,7 +79,13 @@ struct AnimatedCursor {
 
 // Global cursor resources array - fighter19 pattern
 // GeneralsX @bugfix BenderAI 22/02/2026 Global cursor resource cache
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(AnimatedCursor*[Mouse::NUM_MOUSE_CURSORS][MAX_2D_CURSOR_DIRECTIONS], cursorResources);
+#define cursorResources RTS_ENGINE_GLOBAL_REF(cursorResources)
+#else
 AnimatedCursor* cursorResources[Mouse::NUM_MOUSE_CURSORS][MAX_2D_CURSOR_DIRECTIONS];
+#endif
 
 // RIFF/ANI parsing helpers (fighter19 pattern)
 // GeneralsX @bugfix BenderAI 22/02/2026 RIFF format parsing for cursor loading

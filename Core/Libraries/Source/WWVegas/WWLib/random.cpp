@@ -233,7 +233,8 @@ int Random2Class::operator() (int minval, int maxval)
 **	that the algorithm is not vulnerable to being primed with a weak seed
 **	and thus prevents the algorithm from breaking down as a result.
 */
-int Random3Class::Mix1[20] = {
+// GeneralsX @refactor cemlyn007 14/10/2026 Constant, so read-only: engines share no writable state (docs/EMBEDDING.md).
+const int Random3Class::Mix1[20] = {
 	(int)0xbaa96887, (int)0x1e17d32c, (int)0x03bcdc3c, (int)0x0f33d1b2,
 	(int)0x76a6491d, (int)0xc570d85d, (int)0xe382b1e3, (int)0x78db4362,
 	(int)0x7439a9d4, (int)0x9cea8ac5, (int)0x89537c5c, (int)0x2588f55d,
@@ -241,7 +242,7 @@ int Random3Class::Mix1[20] = {
 	(int)0x3ea5cc8c, (int)0xd26a0f74, (int)0xf3a9222b, (int)0x48aad7e4
 };
 
-int Random3Class::Mix2[20] = {
+const int Random3Class::Mix2[20] = {
 	(int)0x4b0f3b58, (int)0xe874f0c3, (int)0x6955c5a6, (int)0x55a7ca46,
 	(int)0x4d9a9d86, (int)0xfe28a195, (int)0xb1ca7865, (int)0x6b235751,
 	(int)0x9a997a61, (int)0xaa6e95c8, (int)0xaaa98ee1, (int)0x5af9154c,

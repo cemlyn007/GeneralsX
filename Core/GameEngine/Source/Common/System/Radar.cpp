@@ -1102,7 +1102,7 @@ void Radar::tryUnderAttackEvent( const Object *obj )
 			// play audio event
 #if RTS_ENGINE_CONTEXT
 			// GeneralsX @feature cemlyn007 28/09/2026 Per engine: the event keeps this engine's event info and sound rotation (PLAN-023 Phase 4).
-			static rts::PerEngineStatic<AudioEventRTS> structureAttackSound_perEngine([](AudioEventRTS& event) { event = TheAudio->getMiscAudio()->m_radarStructureUnderAttackSound; });
+			static constexpr rts::PerEngineStatic<AudioEventRTS> structureAttackSound_perEngine([](AudioEventRTS& event) { event = TheAudio->getMiscAudio()->m_radarStructureUnderAttackSound; });
 			AudioEventRTS& structureAttackSound = structureAttackSound_perEngine.get();
 #else
 			static AudioEventRTS structureAttackSound = TheAudio->getMiscAudio()->m_radarStructureUnderAttackSound;
@@ -1120,7 +1120,7 @@ void Radar::tryUnderAttackEvent( const Object *obj )
 			// play audio event
 #if RTS_ENGINE_CONTEXT
 			// GeneralsX @feature cemlyn007 28/09/2026 Per engine: the event keeps this engine's event info and sound rotation (PLAN-023 Phase 4).
-			static rts::PerEngineStatic<AudioEventRTS> underAttackSound_perEngine([](AudioEventRTS& event) { event = TheAudio->getMiscAudio()->m_radarStructureUnderAttackSound; });
+			static constexpr rts::PerEngineStatic<AudioEventRTS> underAttackSound_perEngine([](AudioEventRTS& event) { event = TheAudio->getMiscAudio()->m_radarStructureUnderAttackSound; });
 			AudioEventRTS& underAttackSound = underAttackSound_perEngine.get();
 #else
 			static AudioEventRTS underAttackSound = TheAudio->getMiscAudio()->m_radarStructureUnderAttackSound;
@@ -1170,7 +1170,7 @@ void Radar::tryInfiltrationEvent( const Object *obj )
 	// play audio event
 #if RTS_ENGINE_CONTEXT
 	// GeneralsX @feature cemlyn007 28/09/2026 Per engine: the event keeps this engine's event info and sound rotation (PLAN-023 Phase 4).
-	static rts::PerEngineStatic<AudioEventRTS> infiltrationWarningSound_perEngine([](AudioEventRTS& event) { event = TheAudio->getMiscAudio()->m_radarInfiltrationSound; });
+	static constexpr rts::PerEngineStatic<AudioEventRTS> infiltrationWarningSound_perEngine([](AudioEventRTS& event) { event = TheAudio->getMiscAudio()->m_radarInfiltrationSound; });
 	AudioEventRTS& infiltrationWarningSound = infiltrationWarningSound_perEngine.get();
 #else
 	static AudioEventRTS infiltrationWarningSound = TheAudio->getMiscAudio()->m_radarInfiltrationSound;

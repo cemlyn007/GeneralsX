@@ -187,7 +187,7 @@ struct PredictiveLODOptimizerState
 	LODHeapNode* VisibleObjArray2 = nullptr;
 	int VisibleObjArraySize = 0;
 };
-rts::PerEngineStatic<PredictiveLODOptimizerState> PredictiveLODOptimizerState_perEngine;
+constexpr rts::PerEngineStatic<PredictiveLODOptimizerState> PredictiveLODOptimizerState_perEngine{};
 } // namespace
 #define ObjectArray (PredictiveLODOptimizerState_perEngine.get().ObjectArray)
 #define ArraySize (PredictiveLODOptimizerState_perEngine.get().ArraySize)

@@ -17,6 +17,9 @@
 */
 
 #include "cpudetect.h"
+
+#include <atomic>
+#include <mutex>
 #include "wwstring.h"
 #include "WWDebug/wwdebug.h"
 #include "thread.h"
@@ -44,14 +47,32 @@ struct OSInfoStruct {
 	unsigned short BuildSub;
 };
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 Get_OS_Info's parameters share names with CPUDetectClass's fields.
+#pragma push_macro("OSVersionPlatformId")
+#undef OSVersionPlatformId
+#pragma push_macro("OSVersionNumberMajor")
+#undef OSVersionNumberMajor
+#pragma push_macro("OSVersionNumberMinor")
+#undef OSVersionNumberMinor
+#pragma push_macro("OSVersionBuildNumber")
+#undef OSVersionBuildNumber
+#endif
 static void Get_OS_Info(
 	OSInfoStruct& os_info,
 	unsigned OSVersionPlatformId,
 	unsigned OSVersionNumberMajor,
 	unsigned OSVersionNumberMinor,
 	unsigned OSVersionBuildNumber);
+#if RTS_ENGINE_CONTEXT
+#pragma pop_macro("OSVersionPlatformId")
+#pragma pop_macro("OSVersionNumberMajor")
+#pragma pop_macro("OSVersionNumberMinor")
+#pragma pop_macro("OSVersionBuildNumber")
+#endif
 
 
+#if !RTS_ENGINE_CONTEXT
 StringClass CPUDetectClass::ProcessorLog;
 StringClass CPUDetectClass::CompactLog;
 
@@ -117,6 +138,29 @@ CPUDetectClass::RiseProcessorType CPUDetectClass::RiseProcessor;
 
 char CPUDetectClass::VendorID[20];
 char CPUDetectClass::ProcessorString[48];
+#else
+// GeneralsX @refactor cemlyn007 14/10/2026 This engine's detected fields, detected on its first use (see cpudetect.h)
+#define CompactLog RTS_ENGINE_GLOBAL_REF(CompactLog)
+
+CPUDetectClass::DetectedState& CPUDetectClass::Detected()
+{
+	RTS_ENGINE_STATIC(DetectedState, state);
+	RTS_ENGINE_STATIC(std::atomic<bool>, detected);
+	RTS_ENGINE_STATIC(std::recursive_mutex, detecting);
+	RTS_ENGINE_STATIC(bool, started);
+	if (detected.load(std::memory_order_acquire))
+		return state;
+	// Detect() reads and writes the fields through this function, on this thread: it finds the state it is filling.
+	const std::lock_guard<std::recursive_mutex> lock(detecting);
+	if (!started)
+	{
+		started = true;
+		Detect();
+		detected.store(true, std::memory_order_release);
+	}
+	return state;
+}
+#endif
 
 const char* CPUDetectClass::Get_Processor_Manufacturer_Name()
 {
@@ -1127,6 +1171,27 @@ void CPUDetectClass::Init_Compact_Log()
 	COMPACTLOG(("%x\t%x\t",Get_Feature_Bits(),Get_Extended_Feature_Bits()));
 }
 
+#if RTS_ENGINE_CONTEXT
+void CPUDetectClass::Detect()
+{
+	CPUDetectClass::Init_CPUID_Instruction();
+	// We pretty much need CPUID, but let's not crash if it doesn't exist.
+	// Every processor our games run should have CPUID so it would be extremely unlikely for it not to be present.
+	// One can never be sure about the clones though...
+	if (CPUDetectClass::Has_CPUID_Instruction()) {
+		CPUDetectClass::Init_Processor_Manufacturer();
+		CPUDetectClass::Init_Processor_Family();
+		CPUDetectClass::Init_Processor_String();
+		CPUDetectClass::Init_Processor_Features();
+		CPUDetectClass::Init_Memory();
+		CPUDetectClass::Init_OS();
+	}
+	CPUDetectClass::Init_Processor_Speed();
+
+	CPUDetectClass::Init_Processor_Log();
+	CPUDetectClass::Init_Compact_Log();
+}
+#else
 static class CPUDetectInitClass
 {
 public:
@@ -1150,9 +1215,11 @@ public:
 		CPUDetectClass::Init_Compact_Log();
 	}
 } _CPU_Detect_Init;
+#endif
 
 
-OSInfoStruct Windows9xVersionTable[]={
+// GeneralsX @refactor cemlyn007 14/10/2026 Constant, so read-only: engines share no writable state.
+static const OSInfoStruct Windows9xVersionTable[]={
 	{"WIN95",	"FINAL",		"Windows 95",								4,0,950,			4,0,950		},
 	{"WIN95",	"A",			"Windows 95a OSR1 final Update",		4,0,950,			4,0,951		},
 	{"WIN95",	"B20OEM",	"Windows 95B OSR 2.0 final OEM",		4,0,950,			4,0,1111		},
@@ -1255,6 +1322,17 @@ OSInfoStruct Windows9xVersionTable[]={
 	{"WINME",	"FINAL",		"Windows ME",								4,90,3000,/*,2*/4,90,3000/*,2*/	},
 };
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 Get_OS_Info's parameters share names with CPUDetectClass's fields.
+#pragma push_macro("OSVersionPlatformId")
+#undef OSVersionPlatformId
+#pragma push_macro("OSVersionNumberMajor")
+#undef OSVersionNumberMajor
+#pragma push_macro("OSVersionNumberMinor")
+#undef OSVersionNumberMinor
+#pragma push_macro("OSVersionBuildNumber")
+#undef OSVersionBuildNumber
+#endif
 void Get_OS_Info(
 	OSInfoStruct& os_info,
 	unsigned OSVersionPlatformId,
@@ -1360,3 +1438,9 @@ void Get_OS_Info(
 #endif
 	}
 }
+#if RTS_ENGINE_CONTEXT
+#pragma pop_macro("OSVersionPlatformId")
+#pragma pop_macro("OSVersionNumberMajor")
+#pragma pop_macro("OSVersionNumberMinor")
+#pragma pop_macro("OSVersionBuildNumber")
+#endif

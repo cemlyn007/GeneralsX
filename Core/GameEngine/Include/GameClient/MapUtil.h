@@ -134,7 +134,13 @@ private:
 #if !RTS_ENGINE_CONTEXT
 extern MapCache *TheMapCache;
 #endif
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_EXTERN_GLOBAL(TechAndSupplyImages, TheSupplyAndTechImageLocations);
+#define TheSupplyAndTechImageLocations RTS_ENGINE_GLOBAL_REF(TheSupplyAndTechImageLocations)
+#else
 extern TechAndSupplyImages TheSupplyAndTechImageLocations;
+#endif
 
 // TheSuperHackers @refactor xezon 28/11/2025 Refactors the map list population implementation
 // by breaking it into smaller pieces to make it more maintainable.

@@ -53,27 +53,93 @@ typedef UnicodeString ReplayName;
 typedef UnicodeString TooltipString;
 typedef std::map<ReplayName, TooltipString> ReplayTooltipMap;
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(ReplayTooltipMap, replayTooltipCache);
+#define replayTooltipCache RTS_ENGINE_GLOBAL_REF(replayTooltipCache)
+#else
 static ReplayTooltipMap replayTooltipCache;
+#endif
 
 // window ids -------------------------------------------------------------------------------------
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(NameKeyType, parentReplayMenuID, NAMEKEY_INVALID);
+#define parentReplayMenuID RTS_ENGINE_GLOBAL_REF(parentReplayMenuID)
+#else
 static NameKeyType parentReplayMenuID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonLoadID, NAMEKEY_INVALID);
+#define buttonLoadID RTS_ENGINE_GLOBAL_REF(buttonLoadID)
+#else
 static NameKeyType buttonLoadID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonBackID, NAMEKEY_INVALID);
+#define buttonBackID RTS_ENGINE_GLOBAL_REF(buttonBackID)
+#else
 static NameKeyType buttonBackID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, listboxReplayFilesID, NAMEKEY_INVALID);
+#define listboxReplayFilesID RTS_ENGINE_GLOBAL_REF(listboxReplayFilesID)
+#else
 static NameKeyType listboxReplayFilesID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonDeleteID, NAMEKEY_INVALID);
+#define buttonDeleteID RTS_ENGINE_GLOBAL_REF(buttonDeleteID)
+#else
 static NameKeyType buttonDeleteID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonCopyID, NAMEKEY_INVALID);
+#define buttonCopyID RTS_ENGINE_GLOBAL_REF(buttonCopyID)
+#else
 static NameKeyType buttonCopyID = NAMEKEY_INVALID;
+#endif
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Bool, isShuttingDown, false);
+#define isShuttingDown RTS_ENGINE_GLOBAL_REF(isShuttingDown)
+#else
 static Bool isShuttingDown = false;
+#endif
 
 // window pointers --------------------------------------------------------------------------------
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, parentReplayMenu, nullptr);
+#define parentReplayMenu RTS_ENGINE_GLOBAL_REF(parentReplayMenu)
+#else
 static GameWindow *parentReplayMenu = nullptr;
+#endif
 static GameWindow *buttonLoad = nullptr;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, buttonBack, nullptr);
+#define buttonBack RTS_ENGINE_GLOBAL_REF(buttonBack)
+#else
 static GameWindow *buttonBack = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, listboxReplayFiles, nullptr);
+#define listboxReplayFiles RTS_ENGINE_GLOBAL_REF(listboxReplayFiles)
+#else
 static GameWindow *listboxReplayFiles = nullptr;
+#endif
 static GameWindow *buttonDelete = nullptr;
 static GameWindow *buttonCopy = nullptr;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Int, initialGadgetDelay, 2);
+#define initialGadgetDelay RTS_ENGINE_GLOBAL_REF(initialGadgetDelay)
+#else
 static Int	initialGadgetDelay = 2;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Bool, justEntered, FALSE);
+#define justEntered RTS_ENGINE_GLOBAL_REF(justEntered)
+#else
 static Bool justEntered = FALSE;
+#endif
 
 
 #if defined(RTS_DEBUG)
@@ -82,8 +148,18 @@ static GameWindow *buttonAnalyzeReplay = nullptr;
 
 void deleteReplay();
 void copyReplay();
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Bool, callCopy, FALSE);
+#define callCopy RTS_ENGINE_GLOBAL_REF(callCopy)
+#else
 static Bool callCopy = FALSE;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Bool, callDelete, FALSE);
+#define callDelete RTS_ENGINE_GLOBAL_REF(callDelete)
+#else
 static Bool callDelete = FALSE;
+#endif
 void deleteReplayFlag() { callDelete = TRUE;}
 void copyReplayFlag() { callCopy = TRUE;}
 

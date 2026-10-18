@@ -84,28 +84,99 @@
 //-----------------------------------------------------------------------------
 
 static NameKeyType parentPopupID = NAMEKEY_INVALID;
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(NameKeyType, textEntryGameNameID, NAMEKEY_INVALID);
+#define textEntryGameNameID RTS_ENGINE_GLOBAL_REF(textEntryGameNameID)
+#else
 static NameKeyType textEntryGameNameID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonCreateGameID, NAMEKEY_INVALID);
+#define buttonCreateGameID RTS_ENGINE_GLOBAL_REF(buttonCreateGameID)
+#else
 static NameKeyType buttonCreateGameID = NAMEKEY_INVALID;
+#endif
 static NameKeyType checkBoxAllowObserversID = NAMEKEY_INVALID;
 static NameKeyType textEntryGameDescriptionID = NAMEKEY_INVALID;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonCancelID, NAMEKEY_INVALID);
+#define buttonCancelID RTS_ENGINE_GLOBAL_REF(buttonCancelID)
+#else
 static NameKeyType buttonCancelID = NAMEKEY_INVALID;
+#endif
 static NameKeyType textEntryLadderPasswordID = NAMEKEY_INVALID;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, comboBoxLadderNameID, NAMEKEY_INVALID);
+#define comboBoxLadderNameID RTS_ENGINE_GLOBAL_REF(comboBoxLadderNameID)
+#else
 static NameKeyType comboBoxLadderNameID = NAMEKEY_INVALID;
+#endif
 static NameKeyType textEntryGamePasswordID = NAMEKEY_INVALID;
 static NameKeyType checkBoxLimitArmiesID = NAMEKEY_INVALID;
 static NameKeyType checkBoxUseStatsID = NAMEKEY_INVALID;
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, parentPopup, nullptr);
+#define parentPopup RTS_ENGINE_GLOBAL_REF(parentPopup)
+#else
 static GameWindow *parentPopup = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, textEntryGameName, nullptr);
+#define textEntryGameName RTS_ENGINE_GLOBAL_REF(textEntryGameName)
+#else
 static GameWindow *textEntryGameName = nullptr;
+#endif
 static GameWindow *buttonCreateGame = nullptr;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, checkBoxAllowObservers, nullptr);
+#define checkBoxAllowObservers RTS_ENGINE_GLOBAL_REF(checkBoxAllowObservers)
+#else
 static GameWindow *checkBoxAllowObservers = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, textEntryGameDescription, nullptr);
+#define textEntryGameDescription RTS_ENGINE_GLOBAL_REF(textEntryGameDescription)
+#else
 static GameWindow *textEntryGameDescription = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, buttonCancel, nullptr);
+#define buttonCancel RTS_ENGINE_GLOBAL_REF(buttonCancel)
+#else
 static GameWindow *buttonCancel = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, comboBoxLadderName, nullptr);
+#define comboBoxLadderName RTS_ENGINE_GLOBAL_REF(comboBoxLadderName)
+#else
 static GameWindow *comboBoxLadderName = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, textEntryLadderPassword, nullptr);
+#define textEntryLadderPassword RTS_ENGINE_GLOBAL_REF(textEntryLadderPassword)
+#else
 static GameWindow *textEntryLadderPassword = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, textEntryGamePassword, nullptr);
+#define textEntryGamePassword RTS_ENGINE_GLOBAL_REF(textEntryGamePassword)
+#else
 static GameWindow *textEntryGamePassword = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, checkBoxLimitArmies, nullptr);
+#define checkBoxLimitArmies RTS_ENGINE_GLOBAL_REF(checkBoxLimitArmies)
+#else
 static GameWindow *checkBoxLimitArmies = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, checkBoxUseStats, nullptr);
+#define checkBoxUseStats RTS_ENGINE_GLOBAL_REF(checkBoxUseStats)
+#else
 static GameWindow *checkBoxUseStats = nullptr;
+#endif
 
 
 void createGame();
@@ -116,7 +187,12 @@ void createGame();
 
 // Ladders --------------------------------------------------------------------------------
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(bool, isPopulatingLadderBox, false);
+#define isPopulatingLadderBox RTS_ENGINE_GLOBAL_REF(isPopulatingLadderBox)
+#else
 static bool isPopulatingLadderBox = false;
+#endif
 
 void CustomMatchHideHostPopup(Bool hide)
 {

@@ -78,7 +78,8 @@ public:
 	// Constructors
 	WWINLINE Vector2() {};
 	WWINLINE Vector2(const Vector2 & v) { X = v.X; Y = v.Y; }
-	WWINLINE Vector2(float x, float y) { X = x; Y = y; }
+	// GeneralsX @refactor cemlyn007 15/10/2026 constexpr, so constant vectors are constant-initialised and read-only.
+	WWINLINE constexpr Vector2(float x, float y) : X(x), Y(y) {}
 	WWINLINE Vector2(const float vector[2]) { X = vector[0]; Y = vector[1]; }
 
 

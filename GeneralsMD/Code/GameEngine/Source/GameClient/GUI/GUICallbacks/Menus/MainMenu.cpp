@@ -103,8 +103,18 @@ enum
 	DROPDOWN_COUNT
 };
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Bool, raiseMessageBoxes, TRUE);
+#define raiseMessageBoxes RTS_ENGINE_GLOBAL_REF(raiseMessageBoxes)
+#else
 static Bool raiseMessageBoxes = TRUE;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Bool, campaignSelected, FALSE);
+#define campaignSelected RTS_ENGINE_GLOBAL_REF(campaignSelected)
+#else
 static Bool campaignSelected = FALSE;
+#endif
 #if defined(RTS_DEBUG) || defined RTS_PROFILE_LEGACY
 static NameKeyType campaignID = NAMEKEY_INVALID;
 static GameWindow *buttonCampaign = nullptr;
@@ -116,45 +126,216 @@ void DoCompressTest();
 
 
 // window ids -------------------------------------------------------------------------------------
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(NameKeyType, mainMenuID, NAMEKEY_INVALID);
+#define mainMenuID RTS_ENGINE_GLOBAL_REF(mainMenuID)
+#else
 static NameKeyType mainMenuID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, skirmishID, NAMEKEY_INVALID);
+#define skirmishID RTS_ENGINE_GLOBAL_REF(skirmishID)
+#else
 static NameKeyType skirmishID = NAMEKEY_INVALID;
+#endif
 // GeneralsX @feature fbraz3 18/09/2026 Enable Steam Custom Mission button
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonCustomMissionID, NAMEKEY_INVALID);
+#define buttonCustomMissionID RTS_ENGINE_GLOBAL_REF(buttonCustomMissionID)
+#else
 static NameKeyType buttonCustomMissionID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, onlineID, NAMEKEY_INVALID);
+#define onlineID RTS_ENGINE_GLOBAL_REF(onlineID)
+#else
 static NameKeyType onlineID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, networkID, NAMEKEY_INVALID);
+#define networkID RTS_ENGINE_GLOBAL_REF(networkID)
+#else
 static NameKeyType networkID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, optionsID, NAMEKEY_INVALID);
+#define optionsID RTS_ENGINE_GLOBAL_REF(optionsID)
+#else
 static NameKeyType optionsID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, exitID, NAMEKEY_INVALID);
+#define exitID RTS_ENGINE_GLOBAL_REF(exitID)
+#else
 static NameKeyType exitID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, motdID, NAMEKEY_INVALID);
+#define motdID RTS_ENGINE_GLOBAL_REF(motdID)
+#else
 static NameKeyType motdID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, worldBuilderID, NAMEKEY_INVALID);
+#define worldBuilderID RTS_ENGINE_GLOBAL_REF(worldBuilderID)
+#else
 static NameKeyType worldBuilderID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, getUpdateID, NAMEKEY_INVALID);
+#define getUpdateID RTS_ENGINE_GLOBAL_REF(getUpdateID)
+#else
 static NameKeyType getUpdateID = NAMEKEY_INVALID;
+#endif
 static NameKeyType buttonTRAININGID = NAMEKEY_INVALID;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonChallengeID, NAMEKEY_INVALID);
+#define buttonChallengeID RTS_ENGINE_GLOBAL_REF(buttonChallengeID)
+#else
 static NameKeyType buttonChallengeID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonUSAID, NAMEKEY_INVALID);
+#define buttonUSAID RTS_ENGINE_GLOBAL_REF(buttonUSAID)
+#else
 static NameKeyType buttonUSAID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonGLAID, NAMEKEY_INVALID);
+#define buttonGLAID RTS_ENGINE_GLOBAL_REF(buttonGLAID)
+#else
 static NameKeyType buttonGLAID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonChinaID, NAMEKEY_INVALID);
+#define buttonChinaID RTS_ENGINE_GLOBAL_REF(buttonChinaID)
+#else
 static NameKeyType buttonChinaID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonUSARecentSaveID, NAMEKEY_INVALID);
+#define buttonUSARecentSaveID RTS_ENGINE_GLOBAL_REF(buttonUSARecentSaveID)
+#else
 static NameKeyType buttonUSARecentSaveID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonUSALoadGameID, NAMEKEY_INVALID);
+#define buttonUSALoadGameID RTS_ENGINE_GLOBAL_REF(buttonUSALoadGameID)
+#else
 static NameKeyType buttonUSALoadGameID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonGLARecentSaveID, NAMEKEY_INVALID);
+#define buttonGLARecentSaveID RTS_ENGINE_GLOBAL_REF(buttonGLARecentSaveID)
+#else
 static NameKeyType buttonGLARecentSaveID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonGLALoadGameID, NAMEKEY_INVALID);
+#define buttonGLALoadGameID RTS_ENGINE_GLOBAL_REF(buttonGLALoadGameID)
+#else
 static NameKeyType buttonGLALoadGameID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonChinaRecentSaveID, NAMEKEY_INVALID);
+#define buttonChinaRecentSaveID RTS_ENGINE_GLOBAL_REF(buttonChinaRecentSaveID)
+#else
 static NameKeyType buttonChinaRecentSaveID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonChinaLoadGameID, NAMEKEY_INVALID);
+#define buttonChinaLoadGameID RTS_ENGINE_GLOBAL_REF(buttonChinaLoadGameID)
+#else
 static NameKeyType buttonChinaLoadGameID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonSinglePlayerID, NAMEKEY_INVALID);
+#define buttonSinglePlayerID RTS_ENGINE_GLOBAL_REF(buttonSinglePlayerID)
+#else
 static NameKeyType buttonSinglePlayerID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonMultiPlayerID, NAMEKEY_INVALID);
+#define buttonMultiPlayerID RTS_ENGINE_GLOBAL_REF(buttonMultiPlayerID)
+#else
 static NameKeyType buttonMultiPlayerID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonMultiBackID, NAMEKEY_INVALID);
+#define buttonMultiBackID RTS_ENGINE_GLOBAL_REF(buttonMultiBackID)
+#else
 static NameKeyType buttonMultiBackID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonSingleBackID, NAMEKEY_INVALID);
+#define buttonSingleBackID RTS_ENGINE_GLOBAL_REF(buttonSingleBackID)
+#else
 static NameKeyType buttonSingleBackID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonLoadReplayBackID, NAMEKEY_INVALID);
+#define buttonLoadReplayBackID RTS_ENGINE_GLOBAL_REF(buttonLoadReplayBackID)
+#else
 static NameKeyType buttonLoadReplayBackID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonReplayID, NAMEKEY_INVALID);
+#define buttonReplayID RTS_ENGINE_GLOBAL_REF(buttonReplayID)
+#else
 static NameKeyType buttonReplayID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonLoadReplayID, NAMEKEY_INVALID);
+#define buttonLoadReplayID RTS_ENGINE_GLOBAL_REF(buttonLoadReplayID)
+#else
 static NameKeyType buttonLoadReplayID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonLoadID, NAMEKEY_INVALID);
+#define buttonLoadID RTS_ENGINE_GLOBAL_REF(buttonLoadID)
+#else
 static NameKeyType buttonLoadID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonCreditsID, NAMEKEY_INVALID);
+#define buttonCreditsID RTS_ENGINE_GLOBAL_REF(buttonCreditsID)
+#else
 static NameKeyType buttonCreditsID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonEasyID, NAMEKEY_INVALID);
+#define buttonEasyID RTS_ENGINE_GLOBAL_REF(buttonEasyID)
+#else
 static NameKeyType buttonEasyID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonMediumID, NAMEKEY_INVALID);
+#define buttonMediumID RTS_ENGINE_GLOBAL_REF(buttonMediumID)
+#else
 static NameKeyType buttonMediumID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonHardID, NAMEKEY_INVALID);
+#define buttonHardID RTS_ENGINE_GLOBAL_REF(buttonHardID)
+#else
 static NameKeyType buttonHardID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonDiffBackID, NAMEKEY_INVALID);
+#define buttonDiffBackID RTS_ENGINE_GLOBAL_REF(buttonDiffBackID)
+#else
 static NameKeyType buttonDiffBackID = NAMEKEY_INVALID;
+#endif
 
 
 // window pointers --------------------------------------------------------------------------------
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, parentMainMenu, nullptr);
+#define parentMainMenu RTS_ENGINE_GLOBAL_REF(parentMainMenu)
+#else
 static GameWindow *parentMainMenu = nullptr;
+#endif
 static GameWindow *buttonSinglePlayer = nullptr;
 static GameWindow *buttonMultiPlayer = nullptr;
 static GameWindow *buttonSkirmish = nullptr;
@@ -177,28 +358,93 @@ static GameWindow *buttonChallenge = nullptr;
 static GameWindow *buttonUSA = nullptr;
 static GameWindow *buttonGLA = nullptr;
 static GameWindow *buttonChina = nullptr;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, buttonUSARecentSave, nullptr);
+#define buttonUSARecentSave RTS_ENGINE_GLOBAL_REF(buttonUSARecentSave)
+#else
 static GameWindow *buttonUSARecentSave = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, buttonUSALoadGame, nullptr);
+#define buttonUSALoadGame RTS_ENGINE_GLOBAL_REF(buttonUSALoadGame)
+#else
 static GameWindow *buttonUSALoadGame = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, buttonGLARecentSave, nullptr);
+#define buttonGLARecentSave RTS_ENGINE_GLOBAL_REF(buttonGLARecentSave)
+#else
 static GameWindow *buttonGLARecentSave = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, buttonGLALoadGame, nullptr);
+#define buttonGLALoadGame RTS_ENGINE_GLOBAL_REF(buttonGLALoadGame)
+#else
 static GameWindow *buttonGLALoadGame = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, buttonChinaRecentSave, nullptr);
+#define buttonChinaRecentSave RTS_ENGINE_GLOBAL_REF(buttonChinaRecentSave)
+#else
 static GameWindow *buttonChinaRecentSave = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, buttonChinaLoadGame, nullptr);
+#define buttonChinaLoadGame RTS_ENGINE_GLOBAL_REF(buttonChinaLoadGame)
+#else
 static GameWindow *buttonChinaLoadGame = nullptr;
+#endif
 static GameWindow *buttonReplay = nullptr;
 static GameWindow *buttonLoadReplay = nullptr;
 static GameWindow *buttonLoad = nullptr;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, buttonCredits, nullptr);
+#define buttonCredits RTS_ENGINE_GLOBAL_REF(buttonCredits)
+#else
 static GameWindow *buttonCredits = nullptr;
+#endif
 static GameWindow *buttonEasy = nullptr;
 static GameWindow *buttonMedium = nullptr;
 static GameWindow *buttonHard = nullptr;
 static GameWindow *buttonDiffBack = nullptr;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*[DROPDOWN_COUNT], dropDownWindows);
+#define dropDownWindows RTS_ENGINE_GLOBAL_REF(dropDownWindows)
+#else
 static GameWindow *dropDownWindows[DROPDOWN_COUNT];
+#endif
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Bool, buttonPushed, FALSE);
+#define buttonPushed RTS_ENGINE_GLOBAL_REF(buttonPushed)
+#else
 static Bool buttonPushed = FALSE;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Bool, isShuttingDown, FALSE);
+#define isShuttingDown RTS_ENGINE_GLOBAL_REF(isShuttingDown)
+#else
 static Bool isShuttingDown = FALSE;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Bool, startGame, FALSE);
+#define startGame RTS_ENGINE_GLOBAL_REF(startGame)
+#else
 static Bool startGame = FALSE;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Int, initialGadgetDelay, 210);
+#define initialGadgetDelay RTS_ENGINE_GLOBAL_REF(initialGadgetDelay)
+#else
 static Int	initialGadgetDelay = 210;
+#endif
 // GeneralsX @bugfix BenderAI 31/03/2026 Keep fallback credit label tied to main menu lifecycle so it does not leak into gameplay.
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, fallbackCreditLabel, nullptr);
+#define fallbackCreditLabel RTS_ENGINE_GLOBAL_REF(fallbackCreditLabel)
+#else
 static GameWindow *fallbackCreditLabel = nullptr;
+#endif
 
 enum
 {
@@ -215,24 +461,76 @@ static Int showFade = FALSE;
 static Int dropDown = DROPDOWN_NONE;
 static Int pendingDropDown = DROPDOWN_NONE;
 static AnimateWindowManager *localAnimateWindowManager = nullptr;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Bool, notShown, TRUE);
+#define notShown RTS_ENGINE_GLOBAL_REF(notShown)
+#else
 static Bool notShown = TRUE;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Bool, FirstTimeRunningTheGame, TRUE);
+#define FirstTimeRunningTheGame RTS_ENGINE_GLOBAL_REF(FirstTimeRunningTheGame)
+#else
 static Bool FirstTimeRunningTheGame = TRUE;
+#endif
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Bool, showLogo, FALSE);
+#define showLogo RTS_ENGINE_GLOBAL_REF(showLogo)
+#else
 static Bool showLogo = FALSE;
+#endif
 static Int  showFrames = 0;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Int, showSide, SHOW_NONE);
+#define showSide RTS_ENGINE_GLOBAL_REF(showSide)
+#else
 static Int  showSide = SHOW_NONE;
+#endif
 static Bool logoIsShown = FALSE;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Bool, justEntered, FALSE);
+#define justEntered RTS_ENGINE_GLOBAL_REF(justEntered)
+#else
 static Bool justEntered = FALSE;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Bool, launchChallengeMenu, FALSE);
+#define launchChallengeMenu RTS_ENGINE_GLOBAL_REF(launchChallengeMenu)
+#else
 static Bool launchChallengeMenu = FALSE;
+#endif
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Bool, dontAllowTransitions, FALSE);
+#define dontAllowTransitions RTS_ENGINE_GLOBAL_REF(dontAllowTransitions)
+#else
 static Bool dontAllowTransitions = FALSE;
+#endif
 
 const Int /*TIME_OUT = 15,*/ CORNER = 10;
 void AcceptResolution();
 void DeclineResolution();
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(GameWindow*, resAcceptMenu, nullptr);
+#define resAcceptMenu RTS_ENGINE_GLOBAL_REF(resAcceptMenu)
+#else
 GameWindow *resAcceptMenu = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL(DisplaySettings, oldDispSettings);
+#define oldDispSettings RTS_ENGINE_GLOBAL_REF(oldDispSettings)
+RTS_ENGINE_EXTERN_GLOBAL(DisplaySettings, newDispSettings);
+#define newDispSettings RTS_ENGINE_GLOBAL_REF(newDispSettings)
+#else
 extern DisplaySettings oldDispSettings, newDispSettings;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL(Bool, dispChanged);
+#define dispChanged RTS_ENGINE_GLOBAL_REF(dispChanged)
+#else
 extern Bool dispChanged;
+#endif
 //static time_t timeStarted = 0, currentTime = 0;
 
 void diffReverseSide();
@@ -770,7 +1068,12 @@ void MainMenuShutdown( WindowLayout *layout, void *userData )
 //		localAnimateWindowManager->reverseAnimateWindow();
 }
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL(Bool, DontShowMainMenu);
+#define DontShowMainMenu RTS_ENGINE_GLOBAL_REF(DontShowMainMenu)
+#else
 extern Bool DontShowMainMenu;
+#endif
 
 ////////////////////////////////////////////////////////////////////////////
 //Allows the user to confirm the change, goes back to the previous mode
@@ -1123,8 +1426,16 @@ WindowMsgHandledType MainMenuInput( GameWindow *window, UnsignedInt msg,
 				mouse.x = mData1 & 0xFFFF;
 				mouse.y = mData1 >> 16;
 
+#if RTS_ENGINE_CONTEXT
+				RTS_ENGINE_STATIC(Int, mousePosX, mouse.x);
+#else
 				static Int mousePosX = mouse.x;
+#endif
+#if RTS_ENGINE_CONTEXT
+				RTS_ENGINE_STATIC(Int, mousePosY, mouse.y);
+#else
 				static Int mousePosY = mouse.y;
+#endif
 
 				doShow = abs(mouse.x - mousePosX) > 20 || abs(mouse.y - mousePosY) > 20;
 			}

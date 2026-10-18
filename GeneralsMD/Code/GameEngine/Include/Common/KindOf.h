@@ -221,5 +221,11 @@ inline void FLIP_KINDOFMASK(KindOfMaskType& m)
 }
 
 // defined in Common/System/Kindof.cpp
-extern KindOfMaskType KINDOFMASK_NONE;	// inits to all zeroes
+extern const KindOfMaskType KINDOFMASK_NONE;	// inits to all zeroes
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_EXTERN_GLOBAL(KindOfMaskType, KINDOFMASK_FS);		// Initializes all FS types for faction structures.
+#define KINDOFMASK_FS RTS_ENGINE_GLOBAL_REF(KINDOFMASK_FS)
+#else
 extern KindOfMaskType KINDOFMASK_FS;		// Initializes all FS types for faction structures.
+#endif

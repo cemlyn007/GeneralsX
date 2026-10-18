@@ -30,8 +30,14 @@
 class GameWindow;
 class GameInfo;
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 Tables no engine writes are constant (docs/EMBEDDING.md).
+void ShowUnderlyingGUIElements( Bool show, const char *layoutFilename, const char *parentName,
+															 const char * const *gadgetsToHide, const char * const *perPlayerGadgetsToHide );
+#else
 void ShowUnderlyingGUIElements( Bool show, const char *layoutFilename, const char *parentName,
 															 const char **gadgetsToHide, const char **perPlayerGadgetsToHide );
+#endif
 
 void PopulateColorComboBox(Int comboBox, GameWindow *comboArray[], GameInfo *myGame, Bool isObserver = FALSE);
 void PopulatePlayerTemplateComboBox(Int comboBox, GameWindow *comboArray[], GameInfo *myGame, Bool allowObservers );

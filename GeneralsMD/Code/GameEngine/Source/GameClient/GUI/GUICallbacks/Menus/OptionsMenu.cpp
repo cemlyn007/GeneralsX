@@ -83,49 +83,155 @@
 
 
 static NameKeyType		comboBoxOnlineIPID	= NAMEKEY_INVALID;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, comboBoxOnlineIP, nullptr);
+#define comboBoxOnlineIP RTS_ENGINE_GLOBAL_REF(comboBoxOnlineIP)
+#else
 static GameWindow *		comboBoxOnlineIP		= nullptr;
+#endif
 
 static NameKeyType		comboBoxLANIPID	= NAMEKEY_INVALID;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, comboBoxLANIP, nullptr);
+#define comboBoxLANIP RTS_ENGINE_GLOBAL_REF(comboBoxLANIP)
+#else
 static GameWindow *		comboBoxLANIP		= nullptr;
+#endif
 
 static NameKeyType    comboBoxAntiAliasingID   = NAMEKEY_INVALID;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, comboBoxAntiAliasing, nullptr);
+#define comboBoxAntiAliasing RTS_ENGINE_GLOBAL_REF(comboBoxAntiAliasing)
+#else
 static GameWindow *   comboBoxAntiAliasing     = nullptr;
+#endif
 
 static NameKeyType    comboBoxResolutionID      = NAMEKEY_INVALID;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, comboBoxResolution, nullptr);
+#define comboBoxResolution RTS_ENGINE_GLOBAL_REF(comboBoxResolution)
+#else
 static GameWindow *   comboBoxResolution       = nullptr;
+#endif
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(NameKeyType, comboBoxDetailID, NAMEKEY_INVALID);
+#define comboBoxDetailID RTS_ENGINE_GLOBAL_REF(comboBoxDetailID)
+#else
 static NameKeyType    comboBoxDetailID      = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, comboBoxDetail, nullptr);
+#define comboBoxDetail RTS_ENGINE_GLOBAL_REF(comboBoxDetail)
+#else
 static GameWindow *   comboBoxDetail        = nullptr;
+#endif
 
 static NameKeyType		checkAlternateMouseID	= NAMEKEY_INVALID;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, checkAlternateMouse, nullptr);
+#define checkAlternateMouse RTS_ENGINE_GLOBAL_REF(checkAlternateMouse)
+#else
 static GameWindow *		checkAlternateMouse		= nullptr;
+#endif
 
 static NameKeyType		checkRetaliationID	= NAMEKEY_INVALID;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, checkRetaliation, nullptr);
+#define checkRetaliation RTS_ENGINE_GLOBAL_REF(checkRetaliation)
+#else
 static GameWindow *		checkRetaliation		= nullptr;
+#endif
 
 static NameKeyType		checkDoubleClickAttackMoveID	= NAMEKEY_INVALID;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, checkDoubleClickAttackMove, nullptr);
+#define checkDoubleClickAttackMove RTS_ENGINE_GLOBAL_REF(checkDoubleClickAttackMove)
+#else
 static GameWindow *		checkDoubleClickAttackMove		= nullptr;
+#endif
 
 static NameKeyType		sliderScrollSpeedID	= NAMEKEY_INVALID;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, sliderScrollSpeed, nullptr);
+#define sliderScrollSpeed RTS_ENGINE_GLOBAL_REF(sliderScrollSpeed)
+#else
 static GameWindow *		sliderScrollSpeed		= nullptr;
+#endif
 
 static NameKeyType    checkLanguageFilterID = NAMEKEY_INVALID;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, checkLanguageFilter, nullptr);
+#define checkLanguageFilter RTS_ENGINE_GLOBAL_REF(checkLanguageFilter)
+#else
 static GameWindow *   checkLanguageFilter   = nullptr;
+#endif
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, checkUseCameraID, NAMEKEY_INVALID);
+#define checkUseCameraID RTS_ENGINE_GLOBAL_REF(checkUseCameraID)
+#else
 static NameKeyType		checkUseCameraID		= NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, checkUseCamera, nullptr);
+#define checkUseCamera RTS_ENGINE_GLOBAL_REF(checkUseCamera)
+#else
 static GameWindow *		checkUseCamera			= nullptr;
+#endif
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, checkSaveCameraID, NAMEKEY_INVALID);
+#define checkSaveCameraID RTS_ENGINE_GLOBAL_REF(checkSaveCameraID)
+#else
 static NameKeyType		checkSaveCameraID		= NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, checkSaveCamera, nullptr);
+#define checkSaveCamera RTS_ENGINE_GLOBAL_REF(checkSaveCamera)
+#else
 static GameWindow *		checkSaveCamera			= nullptr;
+#endif
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, checkDrawAnchorID, NAMEKEY_INVALID);
+#define checkDrawAnchorID RTS_ENGINE_GLOBAL_REF(checkDrawAnchorID)
+#else
 static NameKeyType		checkDrawAnchorID		= NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, checkDrawAnchor, nullptr);
+#define checkDrawAnchor RTS_ENGINE_GLOBAL_REF(checkDrawAnchor)
+#else
 static GameWindow *		checkDrawAnchor			= nullptr;
+#endif
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, checkMoveAnchorID, NAMEKEY_INVALID);
+#define checkMoveAnchorID RTS_ENGINE_GLOBAL_REF(checkMoveAnchorID)
+#else
 static NameKeyType		checkMoveAnchorID		= NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, checkMoveAnchor, nullptr);
+#define checkMoveAnchor RTS_ENGINE_GLOBAL_REF(checkMoveAnchor)
+#else
 static GameWindow *		checkMoveAnchor			= nullptr;
+#endif
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonFirewallRefreshID, NAMEKEY_INVALID);
+#define buttonFirewallRefreshID RTS_ENGINE_GLOBAL_REF(buttonFirewallRefreshID)
+#else
 static NameKeyType		buttonFirewallRefreshID	= NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, buttonFirewallRefresh, nullptr);
+#define buttonFirewallRefresh RTS_ENGINE_GLOBAL_REF(buttonFirewallRefresh)
+#else
 static GameWindow *		buttonFirewallRefresh		= nullptr;
+#endif
 //
 //static NameKeyType    checkAudioHardwareID = NAMEKEY_INVALID;
 //static GameWindow *   checkAudioHardware   = nullptr;
@@ -135,65 +241,165 @@ static GameWindow *		buttonFirewallRefresh		= nullptr;
 ////volume controls
 //
 static NameKeyType    sliderMusicVolumeID = NAMEKEY_INVALID;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, sliderMusicVolume, nullptr);
+#define sliderMusicVolume RTS_ENGINE_GLOBAL_REF(sliderMusicVolume)
+#else
 static GameWindow *   sliderMusicVolume   = nullptr;
+#endif
 
 static NameKeyType    sliderSFXVolumeID = NAMEKEY_INVALID;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, sliderSFXVolume, nullptr);
+#define sliderSFXVolume RTS_ENGINE_GLOBAL_REF(sliderSFXVolume)
+#else
 static GameWindow *   sliderSFXVolume   = nullptr;
+#endif
 
 static NameKeyType    sliderVoiceVolumeID = NAMEKEY_INVALID;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, sliderVoiceVolume, nullptr);
+#define sliderVoiceVolume RTS_ENGINE_GLOBAL_REF(sliderVoiceVolume)
+#else
 static GameWindow *   sliderVoiceVolume   = nullptr;
+#endif
 
 static NameKeyType    sliderGammaID = NAMEKEY_INVALID;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, sliderGamma, nullptr);
+#define sliderGamma RTS_ENGINE_GLOBAL_REF(sliderGamma)
+#else
 static GameWindow *   sliderGamma = nullptr;
+#endif
 
 //Advanced Options Screen
 static NameKeyType    WinAdvancedDisplayID      = NAMEKEY_INVALID;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, WinAdvancedDisplay, nullptr);
+#define WinAdvancedDisplay RTS_ENGINE_GLOBAL_REF(WinAdvancedDisplay)
+#else
 static GameWindow *   WinAdvancedDisplay				= nullptr;
+#endif
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, ButtonAdvancedAcceptID, NAMEKEY_INVALID);
+#define ButtonAdvancedAcceptID RTS_ENGINE_GLOBAL_REF(ButtonAdvancedAcceptID)
+#else
 static NameKeyType    ButtonAdvancedAcceptID      = NAMEKEY_INVALID;
+#endif
 static GameWindow *   ButtonAdvancedAccept				= nullptr;
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, ButtonAdvancedCancelID, NAMEKEY_INVALID);
+#define ButtonAdvancedCancelID RTS_ENGINE_GLOBAL_REF(ButtonAdvancedCancelID)
+#else
 static NameKeyType    ButtonAdvancedCancelID      = NAMEKEY_INVALID;
+#endif
 static GameWindow *   ButtonAdvancedCancel				= nullptr;
 
 static NameKeyType    sliderTextureResolutionID = NAMEKEY_INVALID;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, sliderTextureResolution, nullptr);
+#define sliderTextureResolution RTS_ENGINE_GLOBAL_REF(sliderTextureResolution)
+#else
 static GameWindow *   sliderTextureResolution = nullptr;
+#endif
 
 static NameKeyType    sliderParticleCapID = NAMEKEY_INVALID;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, sliderParticleCap, nullptr);
+#define sliderParticleCap RTS_ENGINE_GLOBAL_REF(sliderParticleCap)
+#else
 static GameWindow *   sliderParticleCap = nullptr;
+#endif
 
 static NameKeyType    check3DShadowsID = NAMEKEY_INVALID;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, check3DShadows, nullptr);
+#define check3DShadows RTS_ENGINE_GLOBAL_REF(check3DShadows)
+#else
 static GameWindow *   check3DShadows   = nullptr;
+#endif
 
 static NameKeyType    check2DShadowsID = NAMEKEY_INVALID;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, check2DShadows, nullptr);
+#define check2DShadows RTS_ENGINE_GLOBAL_REF(check2DShadows)
+#else
 static GameWindow *   check2DShadows   = nullptr;
+#endif
 
 static NameKeyType    checkCloudShadowsID = NAMEKEY_INVALID;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, checkCloudShadows, nullptr);
+#define checkCloudShadows RTS_ENGINE_GLOBAL_REF(checkCloudShadows)
+#else
 static GameWindow *   checkCloudShadows   = nullptr;
+#endif
 
 static NameKeyType    checkGroundLightingID = NAMEKEY_INVALID;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, checkGroundLighting, nullptr);
+#define checkGroundLighting RTS_ENGINE_GLOBAL_REF(checkGroundLighting)
+#else
 static GameWindow *   checkGroundLighting   = nullptr;
+#endif
 
 static NameKeyType    checkSmoothWaterID = NAMEKEY_INVALID;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, checkSmoothWater, nullptr);
+#define checkSmoothWater RTS_ENGINE_GLOBAL_REF(checkSmoothWater)
+#else
 static GameWindow *   checkSmoothWater   = nullptr;
+#endif
 
 static NameKeyType    checkBuildingOcclusionID = NAMEKEY_INVALID;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, checkBuildingOcclusion, nullptr);
+#define checkBuildingOcclusion RTS_ENGINE_GLOBAL_REF(checkBuildingOcclusion)
+#else
 static GameWindow *   checkBuildingOcclusion   = nullptr;
+#endif
 
 static NameKeyType    checkPropsID = NAMEKEY_INVALID;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, checkProps, nullptr);
+#define checkProps RTS_ENGINE_GLOBAL_REF(checkProps)
+#else
 static GameWindow *   checkProps   = nullptr;
+#endif
 
 static NameKeyType    checkExtraAnimationsID = NAMEKEY_INVALID;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, checkExtraAnimations, nullptr);
+#define checkExtraAnimations RTS_ENGINE_GLOBAL_REF(checkExtraAnimations)
+#else
 static GameWindow *   checkExtraAnimations   = nullptr;
+#endif
 
 static NameKeyType    checkNoDynamicLodID = NAMEKEY_INVALID;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, checkNoDynamicLod, nullptr);
+#define checkNoDynamicLod RTS_ENGINE_GLOBAL_REF(checkNoDynamicLod)
+#else
 static GameWindow *   checkNoDynamicLod   = nullptr;
+#endif
 
 static NameKeyType    checkUnlockFpsID = NAMEKEY_INVALID;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, checkUnlockFps, nullptr);
+#define checkUnlockFps RTS_ENGINE_GLOBAL_REF(checkUnlockFps)
+#else
 static GameWindow *   checkUnlockFps   = nullptr;
+#endif
 
 static NameKeyType    checkHeatEffectsID = NAMEKEY_INVALID;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, checkHeatEffects, nullptr);
+#define checkHeatEffects RTS_ENGINE_GLOBAL_REF(checkHeatEffects)
+#else
 static GameWindow *   checkHeatEffects   = nullptr;
+#endif
 
 /*
 
@@ -206,14 +412,41 @@ static GameWindow *   radioLow   = nullptr;
 
 */
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(DisplaySettings, oldDispSettings);
+#define oldDispSettings RTS_ENGINE_GLOBAL_REF(oldDispSettings)
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(DisplaySettings, newDispSettings);
+#define newDispSettings RTS_ENGINE_GLOBAL_REF(newDispSettings)
+#else
 DisplaySettings oldDispSettings, newDispSettings;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(Bool, dispChanged, FALSE);
+#define dispChanged RTS_ENGINE_GLOBAL_REF(dispChanged)
+#else
 Bool dispChanged = FALSE;
+#endif
 extern Int timer;
 extern void DoResolutionDialog();
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Bool, ignoreSelected, FALSE);
+#define ignoreSelected RTS_ENGINE_GLOBAL_REF(ignoreSelected)
+#else
 static Bool ignoreSelected = FALSE;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(WindowLayout*, OptionsLayout, nullptr);
+#define OptionsLayout RTS_ENGINE_GLOBAL_REF(OptionsLayout)
+#else
 WindowLayout *OptionsLayout = nullptr;
+#endif
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(OptionPreferences*, pref, nullptr);
+#define pref RTS_ENGINE_GLOBAL_REF(pref)
+#else
 static OptionPreferences *pref = nullptr;
+#endif
 
 static void setDefaults()
 {
@@ -1528,11 +1761,27 @@ WindowMsgHandledType OptionsMenuInput( GameWindow *window, UnsignedInt msg,
 WindowMsgHandledType OptionsMenuSystem( GameWindow *window, UnsignedInt msg,
 																				WindowMsgData mData1, WindowMsgData mData2 )
 {
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(NameKeyType, buttonBack, NAMEKEY_INVALID);
+#else
 	static NameKeyType buttonBack = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(NameKeyType, buttonDefaults, NAMEKEY_INVALID);
+#else
 	static NameKeyType buttonDefaults = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(NameKeyType, buttonAccept, NAMEKEY_INVALID);
+#else
 	static NameKeyType buttonAccept = NAMEKEY_INVALID;
+#endif
 	static NameKeyType buttonReplayMenu = NAMEKEY_INVALID;
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(NameKeyType, buttonKeyboardOptionsMenu, NAMEKEY_INVALID);
+#else
 	static NameKeyType buttonKeyboardOptionsMenu = NAMEKEY_INVALID;
+#endif
 
 	switch( msg )
 	{

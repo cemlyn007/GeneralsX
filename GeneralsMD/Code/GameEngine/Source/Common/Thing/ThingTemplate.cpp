@@ -82,7 +82,13 @@ const Int USE_EXP_VALUE_FOR_SKILL_VALUE = -999;
 // PRIVATE DATA ///////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_CLASS_STATIC_DEFINE(AudioEventRTS, ThingTemplate, s_audioEventNoSound);
+#define s_audioEventNoSound RTS_ENGINE_GLOBAL_REF(s_audioEventNoSound)
+#else
 AudioEventRTS ThingTemplate::s_audioEventNoSound;
+#endif
 
 static void parseKindOfFromINI(INI* ini, void* instance, void *store, const void* userData)
 {

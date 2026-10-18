@@ -70,7 +70,7 @@ struct QuitMenuState
 	Bool isVisible;
 	GameWindow *quitConfirmationWindow;
 };
-static rts::PerEngineStatic<QuitMenuState> s_quitMenuState_perEngine;
+static constexpr rts::PerEngineStatic<QuitMenuState> s_quitMenuState_perEngine{};
 #define quitMenuLayout (s_quitMenuState_perEngine.get().quitMenuLayout)
 #define fullQuitMenuLayout (s_quitMenuState_perEngine.get().fullQuitMenuLayout)
 #define noSaveLoadQuitMenuLayout (s_quitMenuState_perEngine.get().noSaveLoadQuitMenuLayout)
@@ -87,18 +87,69 @@ static GameWindow *quitConfirmationWindow = nullptr;
 #endif
 
 //external declarations of the Gadgets the callbacks can use
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(WindowLayout*, saveLoadMenuLayout, nullptr);
+#define saveLoadMenuLayout RTS_ENGINE_GLOBAL_REF(saveLoadMenuLayout)
+#else
 static WindowLayout *saveLoadMenuLayout = nullptr;
+#endif
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, buttonRestartWin, nullptr);
+#define buttonRestartWin RTS_ENGINE_GLOBAL_REF(buttonRestartWin)
+#else
 static GameWindow *buttonRestartWin	= nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, buttonSaveLoadWin, nullptr);
+#define buttonSaveLoadWin RTS_ENGINE_GLOBAL_REF(buttonSaveLoadWin)
+#else
 static GameWindow *buttonSaveLoadWin = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, buttonOptionsWin, nullptr);
+#define buttonOptionsWin RTS_ENGINE_GLOBAL_REF(buttonOptionsWin)
+#else
 static GameWindow *buttonOptionsWin = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, buttonExitWin, nullptr);
+#define buttonExitWin RTS_ENGINE_GLOBAL_REF(buttonExitWin)
+#else
 static GameWindow *buttonExitWin = nullptr;
+#endif
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(NameKeyType, buttonExit, NAMEKEY_INVALID);
+#define buttonExit RTS_ENGINE_GLOBAL_REF(buttonExit)
+#else
 static NameKeyType buttonExit = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonRestart, NAMEKEY_INVALID);
+#define buttonRestart RTS_ENGINE_GLOBAL_REF(buttonRestart)
+#else
 static NameKeyType buttonRestart = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonReturn, NAMEKEY_INVALID);
+#define buttonReturn RTS_ENGINE_GLOBAL_REF(buttonReturn)
+#else
 static NameKeyType buttonReturn = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonOptions, NAMEKEY_INVALID);
+#define buttonOptions RTS_ENGINE_GLOBAL_REF(buttonOptions)
+#else
 static NameKeyType buttonOptions = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonSaveLoad, NAMEKEY_INVALID);
+#define buttonSaveLoad RTS_ENGINE_GLOBAL_REF(buttonSaveLoad)
+#else
 static NameKeyType buttonSaveLoad = NAMEKEY_INVALID;
+#endif
 
 static void initGadgetsFullQuit()
 {

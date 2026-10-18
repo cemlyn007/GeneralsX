@@ -31,6 +31,9 @@
 
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
 #include "Common/STLTypedefs.h"
+#if RTS_ENGINE_CONTEXT
+#include <initializer_list>
+#endif
 
 class INI;
 class Xfer;
@@ -51,6 +54,30 @@ class BitFlags
 private:
 	std::bitset<NUMBITS>				m_bits;
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @refactor cemlyn007 14/10/2026 The kInit constructors' constant part (see below)
+	static constexpr Bool isLowBit(Int idx)
+	{
+		return idx >= 0 && idx < 64 && static_cast<size_t>(idx) < NUMBITS;
+	}
+
+	static constexpr unsigned long long lowBits(std::initializer_list<Int> idxs)
+	{
+		unsigned long long bits = 0;
+		for (Int idx : idxs)
+			if (isLowBit(idx))
+				bits |= 1ULL << idx;
+		return bits;
+	}
+
+	constexpr void setOtherBits(std::initializer_list<Int> idxs)
+	{
+		for (Int idx : idxs)
+			if (!isLowBit(idx))
+				m_bits.set(idx);
+	}
+#endif
+
 public:
 	CPP_11(static constexpr size_t NumBits = NUMBITS);
 	static const char* const s_bitNameList[];
@@ -61,14 +88,19 @@ public:
 	enum BogusInitType { kInit };
 	enum InitSetAllType { kInitSetAll };
 
-	BitFlags()
+	// GeneralsX @refactor cemlyn007 14/10/2026 constexpr, so constant masks are constant-initialised and read-only
+	constexpr BitFlags()
 	{
 	}
 
 	// This constructor sets all bits to 1
-	BitFlags(InitSetAllType)
+	// GeneralsX @refactor cemlyn007 14/10/2026 constexpr for masks of up to 64 bits, which std::bitset's constructor from an
+	// integer can fill, so such a constant mask is read-only
+	constexpr BitFlags(InitSetAllType)
+		: m_bits(NUMBITS <= 64 ? ~0ULL : 0ULL)
 	{
-		m_bits.set();
+		if constexpr (NUMBITS > 64)
+			m_bits.set();
 	}
 
 	BitFlags(UnsignedInt value)
@@ -76,6 +108,40 @@ public:
 	{
 	}
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @refactor cemlyn007 14/10/2026 constexpr: std::bitset's constexpr constructor from an integer sets the
+	// bits below the 64th, so a constant mask of only those is constant-initialised and read-only. Any other index is
+	// set at run time, as before (and an index out of range still throws).
+	constexpr BitFlags(BogusInitType k, Int idx1)
+		: m_bits(lowBits({idx1}))
+	{
+		setOtherBits({idx1});
+	}
+
+	constexpr BitFlags(BogusInitType k, Int idx1, Int idx2)
+		: m_bits(lowBits({idx1, idx2}))
+	{
+		setOtherBits({idx1, idx2});
+	}
+
+	constexpr BitFlags(BogusInitType k, Int idx1, Int idx2, Int idx3)
+		: m_bits(lowBits({idx1, idx2, idx3}))
+	{
+		setOtherBits({idx1, idx2, idx3});
+	}
+
+	constexpr BitFlags(BogusInitType k, Int idx1, Int idx2, Int idx3, Int idx4)
+		: m_bits(lowBits({idx1, idx2, idx3, idx4}))
+	{
+		setOtherBits({idx1, idx2, idx3, idx4});
+	}
+
+	constexpr BitFlags(BogusInitType k, Int idx1, Int idx2, Int idx3, Int idx4, Int idx5)
+		: m_bits(lowBits({idx1, idx2, idx3, idx4, idx5}))
+	{
+		setOtherBits({idx1, idx2, idx3, idx4, idx5});
+	}
+#else
 	// TheSuperHackers @todo Replace with variadic template
 
 	BitFlags(BogusInitType k, Int idx1)
@@ -112,6 +178,7 @@ public:
 		m_bits.set(idx4);
 		m_bits.set(idx5);
 	}
+#endif
 
 	// Set all given indices in the array.
 	BitFlags(BogusInitType, const Int* idxs, Int count)
@@ -234,7 +301,8 @@ public:
 		return val;
 	}
 
-  static const char* const* getBitNames()
+  // GeneralsX @refactor cemlyn007 14/10/2026 constexpr, so a constant parse table naming the bits is constant-initialised
+  static constexpr const char* const* getBitNames()
   {
     return s_bitNameList;
   }

@@ -32,14 +32,40 @@ static const Int WOL_NAME_LEN = 64;
 /// Max number of commands per frame
 static const Int MAX_COMMANDS = 256;
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 15/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_EXTERN_GLOBAL(Int, MIN_LOGIC_FRAMES);
+#define MIN_LOGIC_FRAMES RTS_ENGINE_GLOBAL_REF(MIN_LOGIC_FRAMES)
+#else
 extern Int MIN_LOGIC_FRAMES;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL(Int, MAX_FRAMES_AHEAD);
+#define MAX_FRAMES_AHEAD RTS_ENGINE_GLOBAL_REF(MAX_FRAMES_AHEAD)
+#else
 extern Int MAX_FRAMES_AHEAD;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL(Int, MIN_RUNAHEAD);
+#define MIN_RUNAHEAD RTS_ENGINE_GLOBAL_REF(MIN_RUNAHEAD)
+#else
 extern Int MIN_RUNAHEAD;
+#endif
 
 // FRAME_DATA_LENGTH needs to be MAX_FRAMES_AHEAD+1 because a player on a different
 // computer can send commands for a frame that is one beyond twice the max runahead.
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL(Int, FRAME_DATA_LENGTH);
+#define FRAME_DATA_LENGTH RTS_ENGINE_GLOBAL_REF(FRAME_DATA_LENGTH)
+#else
 extern Int FRAME_DATA_LENGTH;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL(Int, FRAMES_TO_KEEP);
+#define FRAMES_TO_KEEP RTS_ENGINE_GLOBAL_REF(FRAMES_TO_KEEP)
+#else
 extern Int FRAMES_TO_KEEP;
+#endif
 
 // This is the connection numbering: 1-8 are for players
 enum ConnectionNumbers CPP_11(: Int)

@@ -106,7 +106,7 @@ struct BuildTooltipState
 	AnimateWindowManager *theAnimateWindowManager;
 	GameWindow *prevWindow;
 };
-static rts::PerEngineStatic<BuildTooltipState> s_buildTooltipState_perEngine;
+static constexpr rts::PerEngineStatic<BuildTooltipState> s_buildTooltipState_perEngine{};
 #define theAnimateWindowManager (s_buildTooltipState_perEngine.get().theAnimateWindowManager)
 #define prevWindow (s_buildTooltipState_perEngine.get().prevWindow)
 #else
@@ -151,8 +151,16 @@ void ControlBar::showBuildTooltipLayout( GameWindow *cmdButton )
 	}
 
 	Bool passedWaitTime = FALSE;
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(Bool, isInitialized, FALSE);
+#else
 	static Bool isInitialized = FALSE;
+#endif
+#if RTS_ENGINE_CONTEXT
+	RTS_ENGINE_STATIC(UnsignedInt, beginWaitTime);
+#else
 	static UnsignedInt beginWaitTime;
+#endif
 	if(prevWindow == cmdButton)
 	{
 		m_showBuildToolTipLayout = TRUE;
@@ -657,8 +665,17 @@ void ControlBar::populateBuildTooltipLayout( const CommandButton *commandButton,
 	win = TheWindowManager->winGetWindowFromId(m_buildToolTipLayout->getFirstWindow(), TheNameKeyGenerator->nameToKey("ControlBarPopupDescription.wnd:StaticTextDescription"));
 	if(win)
 	{
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+		RTS_ENGINE_STATIC(NameKeyType, winNamekey, TheNameKeyGenerator->nameToKey( "ControlBar.wnd:BackgroundMarker" ));
+#else
 		static NameKeyType winNamekey	= TheNameKeyGenerator->nameToKey( "ControlBar.wnd:BackgroundMarker" );
+#endif
+#if RTS_ENGINE_CONTEXT
+		RTS_ENGINE_STATIC(ICoord2D, lastOffset, { 0, 0 });
+#else
 		static ICoord2D lastOffset = { 0, 0 };
+#endif
 
 		ICoord2D size, newSize, pos;
 		Int diffSize;
@@ -699,7 +716,11 @@ void ControlBar::populateBuildTooltipLayout( const CommandButton *commandButton,
 //		heightChange = controlBarPos.y - m_defaultControlBarPosition.y;
 
 		GameWindow *marker =  TheWindowManager->winGetWindowFromId(nullptr,winNamekey);
+#if RTS_ENGINE_CONTEXT
+		RTS_ENGINE_STATIC(ICoord2D, basePos);
+#else
 		static ICoord2D basePos;
+#endif
 		if(!marker)
 		{
 			return;

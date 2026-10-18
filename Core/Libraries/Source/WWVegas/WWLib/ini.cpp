@@ -126,7 +126,13 @@
 
 
 // Instance of the static variables.
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_CLASS_STATIC_DEFINE(bool, INIClass, KeepBlankEntries, false);
+#define KeepBlankEntries RTS_ENGINE_GLOBAL_REF(KeepBlankEntries)
+#else
 bool INIClass::KeepBlankEntries = false;
+#endif
 const int INIClass::MAX_LINE_LENGTH = 4096;
 
 

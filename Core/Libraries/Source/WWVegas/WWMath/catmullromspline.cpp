@@ -56,8 +56,24 @@ DECLARE_FORCE_LINK(catmullromspline);
 /*
 ** Save-Load stuff
 */
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+// GeneralsX @refactor cemlyn007 14/10/2026 Per engine (Common/EngineStatic.h), made and so registered by WWMath::Init (docs/EMBEDDING.md).
+using _CatmullRomSpline3DFactory_rtsEngineType = SimplePersistFactoryClass<CatmullRomSpline3DClass,WWMATH_CHUNKID_CATMULLROMSPLINE3D>;
+RTS_ENGINE_GLOBAL(_CatmullRomSpline3DFactory_rtsEngineType, _CatmullRomSpline3DFactory);
+#define _CatmullRomSpline3DFactory RTS_ENGINE_GLOBAL_REF(_CatmullRomSpline3DFactory)
+using _CatmullRomSpline1DFactory_rtsEngineType = SimplePersistFactoryClass<CatmullRomSpline1DClass,WWMATH_CHUNKID_CATMULLROMSPLINE1D>;
+RTS_ENGINE_GLOBAL(_CatmullRomSpline1DFactory_rtsEngineType, _CatmullRomSpline1DFactory);
+#define _CatmullRomSpline1DFactory RTS_ENGINE_GLOBAL_REF(_CatmullRomSpline1DFactory)
+void WWMath_Register_Catmullromspline_Factories()
+{
+	_CatmullRomSpline3DFactory;
+	_CatmullRomSpline1DFactory;
+}
+#else
 SimplePersistFactoryClass<CatmullRomSpline3DClass,WWMATH_CHUNKID_CATMULLROMSPLINE3D>	_CatmullRomSpline3DFactory;
 SimplePersistFactoryClass<CatmullRomSpline1DClass,WWMATH_CHUNKID_CATMULLROMSPLINE1D>	_CatmullRomSpline1DFactory;
+#endif
 
 enum
 {

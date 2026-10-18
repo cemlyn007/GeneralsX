@@ -353,7 +353,12 @@ protected:
 
 	Bool m_waterGridEnabled;			 ///< TRUE when water grid is enabled
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @refactor cemlyn007 14/10/2026 The grid water handle is a constant whose address marks grid water (docs/EMBEDDING.md).
+	static const WaterHandle m_gridWaterHandle;		///< water handle for the grid water (we only presently have one)
+#else
 	static WaterHandle m_gridWaterHandle;		///< water handle for the grid water (we only presently have one)
+#endif
 
 	//
 	// we will force a limit of MAX_DYNAMIC_WATER as the max dynamically changeable water

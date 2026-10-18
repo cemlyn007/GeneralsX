@@ -46,22 +46,68 @@
 #include "GameClient/MapUtil.h"
 
 // PRIVATE DATA ///////////////////////////////////////////////////////////////////////////////////
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(NameKeyType, buttonBack, NAMEKEY_INVALID);
+#define buttonBack RTS_ENGINE_GLOBAL_REF(buttonBack)
+#else
 static NameKeyType buttonBack = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonOK, NAMEKEY_INVALID);
+#define buttonOK RTS_ENGINE_GLOBAL_REF(buttonOK)
+#else
 static NameKeyType buttonOK = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, listboxMap, NAMEKEY_INVALID);
+#define listboxMap RTS_ENGINE_GLOBAL_REF(listboxMap)
+#else
 static NameKeyType listboxMap = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, parent, nullptr);
+#define parent RTS_ENGINE_GLOBAL_REF(parent)
+#else
 static GameWindow *parent = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, mapList, nullptr);
+#define mapList RTS_ENGINE_GLOBAL_REF(mapList)
+#else
 static GameWindow *mapList = nullptr;
+#endif
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, radioButtonSystemMapsID, NAMEKEY_INVALID);
+#define radioButtonSystemMapsID RTS_ENGINE_GLOBAL_REF(radioButtonSystemMapsID)
+#else
 static NameKeyType radioButtonSystemMapsID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, radioButtonUserMapsID, NAMEKEY_INVALID);
+#define radioButtonUserMapsID RTS_ENGINE_GLOBAL_REF(radioButtonUserMapsID)
+#else
 static NameKeyType radioButtonUserMapsID = NAMEKEY_INVALID;
+#endif
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*[MAX_SLOTS], buttonMapStartPosition, {0});
+#define buttonMapStartPosition RTS_ENGINE_GLOBAL_REF(buttonMapStartPosition)
+#else
 static GameWindow *buttonMapStartPosition[MAX_SLOTS] = {0};
+#endif
 static NameKeyType buttonMapStartPositionID[MAX_SLOTS] = { NAMEKEY_INVALID,NAMEKEY_INVALID,
 																									NAMEKEY_INVALID,NAMEKEY_INVALID,
 																										NAMEKEY_INVALID,NAMEKEY_INVALID,
 																										NAMEKEY_INVALID,NAMEKEY_INVALID };
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, winMapPreview, nullptr);
+#define winMapPreview RTS_ENGINE_GLOBAL_REF(winMapPreview)
+#else
 static GameWindow *winMapPreview = nullptr;
+#endif
 static NameKeyType winMapPreviewID = NAMEKEY_INVALID;
 
 static void NullifyControls()
@@ -79,7 +125,12 @@ static void NullifyControls()
 	}
 }
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL(WindowLayout*, skirmishMapSelectLayout);
+#define skirmishMapSelectLayout RTS_ENGINE_GLOBAL_REF(skirmishMapSelectLayout)
+#else
 extern WindowLayout *skirmishMapSelectLayout;
+#endif
 
 // Tooltips -------------------------------------------------------------------------------
 
@@ -128,6 +179,9 @@ static void mapListTooltipFunc(GameWindow *window,
 void positionStartSpots( AsciiString mapName, GameWindow *buttonMapStartPositions[], GameWindow *mapWindow);
 void skirmishPositionStartSpots();
 void skirmishUpdateSlotList();
+#if RTS_ENGINE_CONTEXT
+#undef parent
+#endif
 void showSkirmishGameOptionsUnderlyingGUIElements( Bool show )
 {
 	NameKeyType parentID = TheNameKeyGenerator->nameToKey( "SkirmishGameOptionsMenu.wnd:SkirmishGameOptionsMenuParent" );
@@ -243,6 +297,9 @@ void showSkirmishGameOptionsUnderlyingGUIElements( Bool show )
 	win	= TheWindowManager->winGetWindowFromId( parent, TheNameKeyGenerator->nameToKey("SkirmishGameOptionsMenu.wnd:ButtonBack") );
 	win->winEnable( show );
 }
+#if RTS_ENGINE_CONTEXT
+#define parent RTS_ENGINE_GLOBAL_REF(parent)
+#endif
 
 //-------------------------------------------------------------------------------------------------
 /** Initialize the MapSelect menu */

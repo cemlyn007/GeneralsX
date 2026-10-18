@@ -62,13 +62,43 @@
 #include "GameNetwork/LANAPICallbacks.h"
 #include "GameNetwork/LANGameInfo.h"
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(Bool, LANisShuttingDown, false);
+#define LANisShuttingDown RTS_ENGINE_GLOBAL_REF(LANisShuttingDown)
+#else
 Bool LANisShuttingDown = false;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(Bool, LANbuttonPushed, false);
+#define LANbuttonPushed RTS_ENGINE_GLOBAL_REF(LANbuttonPushed)
+#else
 Bool LANbuttonPushed = false;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(Bool, LANSocketErrorDetected, FALSE);
+#define LANSocketErrorDetected RTS_ENGINE_GLOBAL_REF(LANSocketErrorDetected)
+#else
 Bool LANSocketErrorDetected = FALSE;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(char*, LANnextScreen, nullptr);
+#define LANnextScreen RTS_ENGINE_GLOBAL_REF(LANnextScreen)
+#else
 char *LANnextScreen = nullptr;
+#endif
 
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Int, initialGadgetDelay, 2);
+#define initialGadgetDelay RTS_ENGINE_GLOBAL_REF(initialGadgetDelay)
+#else
 static Int	initialGadgetDelay = 2;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Bool, justEntered, FALSE);
+#define justEntered RTS_ENGINE_GLOBAL_REF(justEntered)
+#else
 static Bool justEntered = FALSE;
+#endif
 
 
 
@@ -289,44 +319,160 @@ void LANPreferences::setStartingCash( const Money & startingCash )
 
 
 // window ids ------------------------------------------------------------------------------
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 14/10/2026 This file's statics are per engine (Common/EngineStatic.h, docs/EMBEDDING.md).
+RTS_ENGINE_GLOBAL(NameKeyType, parentLanLobbyID, NAMEKEY_INVALID);
+#define parentLanLobbyID RTS_ENGINE_GLOBAL_REF(parentLanLobbyID)
+#else
 static NameKeyType parentLanLobbyID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonBackID, NAMEKEY_INVALID);
+#define buttonBackID RTS_ENGINE_GLOBAL_REF(buttonBackID)
+#else
 static NameKeyType buttonBackID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonClearID, NAMEKEY_INVALID);
+#define buttonClearID RTS_ENGINE_GLOBAL_REF(buttonClearID)
+#else
 static NameKeyType buttonClearID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonHostID, NAMEKEY_INVALID);
+#define buttonHostID RTS_ENGINE_GLOBAL_REF(buttonHostID)
+#else
 static NameKeyType buttonHostID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonJoinID, NAMEKEY_INVALID);
+#define buttonJoinID RTS_ENGINE_GLOBAL_REF(buttonJoinID)
+#else
 static NameKeyType buttonJoinID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonDirectConnectID, NAMEKEY_INVALID);
+#define buttonDirectConnectID RTS_ENGINE_GLOBAL_REF(buttonDirectConnectID)
+#else
 static NameKeyType buttonDirectConnectID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, buttonChatID, NAMEKEY_INVALID);
+#define buttonChatID RTS_ENGINE_GLOBAL_REF(buttonChatID)
+#else
 static NameKeyType buttonChatID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, staticToolTipID, NAMEKEY_INVALID);
+#define staticToolTipID RTS_ENGINE_GLOBAL_REF(staticToolTipID)
+#else
 static NameKeyType staticToolTipID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, textEntryPlayerNameID, NAMEKEY_INVALID);
+#define textEntryPlayerNameID RTS_ENGINE_GLOBAL_REF(textEntryPlayerNameID)
+#else
 static NameKeyType textEntryPlayerNameID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, textEntryChatID, NAMEKEY_INVALID);
+#define textEntryChatID RTS_ENGINE_GLOBAL_REF(textEntryChatID)
+#else
 static NameKeyType textEntryChatID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, listboxPlayersID, NAMEKEY_INVALID);
+#define listboxPlayersID RTS_ENGINE_GLOBAL_REF(listboxPlayersID)
+#else
 static NameKeyType listboxPlayersID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(NameKeyType, staticTextGameInfoID, NAMEKEY_INVALID);
+#define staticTextGameInfoID RTS_ENGINE_GLOBAL_REF(staticTextGameInfoID)
+#else
 static NameKeyType staticTextGameInfoID = NAMEKEY_INVALID;
+#endif
 
 
 // Window Pointers ------------------------------------------------------------------------
 static GameWindow *parentLanLobby = nullptr;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, buttonBack, nullptr);
+#define buttonBack RTS_ENGINE_GLOBAL_REF(buttonBack)
+#else
 static GameWindow *buttonBack = nullptr;
+#endif
 static GameWindow *buttonClear = nullptr;
 static GameWindow *buttonHost = nullptr;
 static GameWindow *buttonJoin = nullptr;
 static GameWindow *buttonDirectConnect = nullptr;
 static GameWindow *buttonChat = nullptr;
 static GameWindow *staticToolTip = nullptr;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, textEntryPlayerName, nullptr);
+#define textEntryPlayerName RTS_ENGINE_GLOBAL_REF(textEntryPlayerName)
+#else
 static GameWindow *textEntryPlayerName = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, textEntryChat, nullptr);
+#define textEntryChat RTS_ENGINE_GLOBAL_REF(textEntryChat)
+#else
 static GameWindow *textEntryChat = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(GameWindow*, staticTextGameInfo, nullptr);
+#define staticTextGameInfo RTS_ENGINE_GLOBAL_REF(staticTextGameInfo)
+#else
 static GameWindow *staticTextGameInfo = nullptr;
+#endif
 
 //external declarations of the Gadgets the callbacks can use
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(NameKeyType, listboxChatWindowID, NAMEKEY_INVALID);
+#define listboxChatWindowID RTS_ENGINE_GLOBAL_REF(listboxChatWindowID)
+#else
 NameKeyType listboxChatWindowID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(GameWindow*, listboxChatWindow, nullptr);
+#define listboxChatWindow RTS_ENGINE_GLOBAL_REF(listboxChatWindow)
+#else
 GameWindow *listboxChatWindow = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(GameWindow*, listboxPlayers, nullptr);
+#define listboxPlayers RTS_ENGINE_GLOBAL_REF(listboxPlayers)
+#else
 GameWindow *listboxPlayers = nullptr;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(NameKeyType, listboxGamesID, NAMEKEY_INVALID);
+#define listboxGamesID RTS_ENGINE_GLOBAL_REF(listboxGamesID)
+#else
 NameKeyType listboxGamesID = NAMEKEY_INVALID;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_EXTERN_GLOBAL_DEFINE(GameWindow*, listboxGames, nullptr);
+#define listboxGames RTS_ENGINE_GLOBAL_REF(listboxGames)
+#else
 GameWindow *listboxGames = nullptr;
+#endif
 
 // hack to disable framerate limiter in LAN games
 //static Bool shellmapOn;
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(Bool, useFpsLimit);
+#define useFpsLimit RTS_ENGINE_GLOBAL_REF(useFpsLimit)
+#else
 static Bool useFpsLimit;
+#endif
+#if RTS_ENGINE_CONTEXT
+RTS_ENGINE_GLOBAL(UnicodeString, defaultName);
+#define defaultName RTS_ENGINE_GLOBAL_REF(defaultName)
+#else
 static UnicodeString defaultName;
+#endif
 
 static void playerTooltip(GameWindow *window,
 													WinInstanceData *instData,
