@@ -231,6 +231,11 @@ static void doSetRallyPoint( Object *obj, const Coord3D& pos )
 		// set the rally point
 		exitInterface->setRallyPoint( &pos );
 
+#if RTS_ZEROHOUR
+		// GeneralsX @feature cemlyn007 16/10/2026 Report the rally point to AIDecisionObserver.
+		AIDecisionHook::setRallyPoint( obj, &pos );
+#endif
+
 	}
 
 }
@@ -2022,6 +2027,12 @@ bool GameLogic::onDozerCancelConstruct(MAYBE_UNUSED GameMessage *msg, AIGroupPtr
 	// Check to make sure it is actually under construction
 	if( !building->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION) )
 		return false;
+
+#if RTS_ZEROHOUR
+	// GeneralsX @feature cemlyn007 16/10/2026 Report the cancel to AIDecisionObserver: the player ordered it. The
+	// kill below runs the engine's own cascades, which report nothing of their own as a cancel.
+	AIDecisionHook::cancelBuild( building );
+#endif
 
 	// OK, refund the money to the player, unless it is a rebuilding Hole.
 	if( !building->testStatus(OBJECT_STATUS_RECONSTRUCTING))

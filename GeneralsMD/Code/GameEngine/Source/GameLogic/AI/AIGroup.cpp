@@ -2879,7 +2879,11 @@ void AIGroup::groupToggleOvercharge( CommandSourceType cmdSource )
 
 			obi = (*bmi)->getOverchargeBehaviorInterface();
 			if( obi )
+			{
 				obi->toggle();
+				// GeneralsX @feature cemlyn007 16/10/2026 Report the toggle to AIDecisionObserver.
+				AIDecisionHook::toggleOvercharge( obj );
+			}
 
 		}
 
@@ -3078,7 +3082,13 @@ Bool AIGroup::setWeaponLockForGroup( WeaponSlotType weaponSlot, WeaponLockType l
 	for( i = m_memberList.begin(); i != m_memberList.end(); ++i )
 	{
 		if ((*i)->setWeaponLock( weaponSlot, lockType ))
+		{
 			any = true;
+			// GeneralsX @feature cemlyn007 16/10/2026 Report a permanent switch (MSG_SWITCH_WEAPONS) to
+			// AIDecisionObserver; a temporary lock comes with the attack order that follows it.
+			if( lockType == LOCKED_PERMANENTLY )
+				AIDecisionHook::switchWeapon( *i, nullptr, weaponSlot );
+		}
 	}
 	return any;
 }

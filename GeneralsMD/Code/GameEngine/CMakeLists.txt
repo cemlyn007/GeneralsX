@@ -228,6 +228,7 @@ set(GAMEENGINE_SRC
 #    Include/GameClient/WinInstanceData.h
     Include/GameLogic/AI.h
     Include/GameLogic/AIDecisionObserver.h
+    Include/GameLogic/Decision.h
     Include/GameLogic/AIDock.h
     Include/GameLogic/AIGuard.h
     Include/GameLogic/AIGuardRetaliate.h

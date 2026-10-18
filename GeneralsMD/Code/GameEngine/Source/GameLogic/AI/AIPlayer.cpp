@@ -3087,6 +3087,8 @@ void AIPlayer::newMap()
 	computeCenterAndRadiusOfBase(&m_baseCenter, &m_baseRadius);
 
 	// Build any with the initially built flag.
+	// GeneralsX @feature cemlyn007 16/10/2026 The map's set-up, not anyone's decision, for AIDecisionObserver.
+	AIDecisionMute mapSetUp;
 	for( /* nothing */; info; info = info->getNext() )
 	{
 		AsciiString name = info->getTemplateName();
