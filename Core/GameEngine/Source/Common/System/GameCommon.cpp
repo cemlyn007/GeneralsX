@@ -51,6 +51,17 @@ const char *const TheDifficultyNames[] =
 };
 static_assert(ARRAY_SIZE(TheDifficultyNames) == DIFFICULTY_COUNT + 1, "Incorrect array size");
 
+// GeneralsX @feature cemlyn007 16/10/2026 The names of CellShroudStatus's values, which an embedding host's vocabulary
+// generator reads, so that its shroud state enumeration cannot drift from the engine's.
+const char *const TheCellShroudStatusNames[] =
+{
+	"CLEAR",
+	"FOGGED",
+	"SHROUDED",
+	nullptr
+};
+static_assert(ARRAY_SIZE(TheCellShroudStatusNames) == CELLSHROUD_SHROUDED + 2, "Incorrect array size");
+
 const char *const TheRelationshipNames[] =
 {
 	"ENEMIES",
