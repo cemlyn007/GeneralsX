@@ -587,11 +587,24 @@ static void Release_D3D8_Library()
 	Direct3DCreate8Ptr = nullptr;
 }
 
-// GeneralsX @feature cemlyn007 16/10/2026 Whether the current engine renders headless: its device has no presentable
-// surface, its formats are pinned, and it draws into its off-screen surfaces (dx8wrapper.h).
-static bool Renders_Headless()
+// GeneralsX @feature cemlyn007 16/10/2026 Whether the current engine draws off screen: a headless engine, whose
+// device has no presentable surface, or a window engine given the host's window (DX8Wrapper_PresentWindow), whose
+// device presents into that window only when the host asks. Either way its formats are pinned and it draws into its
+// off-screen surfaces (dx8wrapper.h), so the two draw the same images.
+static bool Draws_Off_Screen()
 {
-	return ::rts::currentEmbedding("the render device").render == ::rts::RenderMode::headless;
+	const ::rts::RenderMode mode = ::rts::currentEmbedding("the render device").render;
+	return mode == ::rts::RenderMode::headless ||
+		(mode == ::rts::RenderMode::window && DX8Wrapper_PresentWindow != nullptr);
+}
+
+// GeneralsX @feature cemlyn007 16/10/2026 The window the device is created on: the host's, for a window engine given
+// one, or the engine's own (null for a headless engine).
+static HWND Device_Window()
+{
+	if (DX8Wrapper_PresentWindow != nullptr)
+		return static_cast<HWND>(DX8Wrapper_PresentWindow);
+	return _Hwnd;
 }
 
 IDirect3DSurface8* DX8Wrapper::_Get_Off_Screen_Render_Target()
@@ -626,6 +639,23 @@ bool DX8Wrapper::Create_Off_Screen_Surfaces()
 		return false;
 	}
 	return true;
+}
+
+// GeneralsX @feature cemlyn007 16/10/2026 A window engine's present: its last image, copied into the back buffer of
+// the swapchain on the host's window (dx8wrapper.h).
+bool DX8Wrapper::Present_Off_Screen_Image()
+{
+	IDirect3DSurface8* const image = W3D_Render_State().OffScreenRenderTarget;
+	if (D3DDevice == nullptr || image == nullptr || DX8Wrapper_PresentWindow == nullptr)
+		return false;
+	IDirect3DSurface8* backBuffer = nullptr;
+	if (FAILED(D3DDevice->GetBackBuffer(0, D3DBACKBUFFER_TYPE_MONO, &backBuffer)) || backBuffer == nullptr)
+		return false;
+	const HRESULT copied = D3DDevice->CopyRects(image, nullptr, 0, backBuffer, nullptr);
+	backBuffer->Release();
+	if (FAILED(copied))
+		return false;
+	return SUCCEEDED(D3DDevice->Present(nullptr, nullptr, nullptr, nullptr));
 }
 
 void DX8Wrapper::Release_Off_Screen_Surfaces()
@@ -1197,7 +1227,12 @@ bool DX8Wrapper::Create_Device()
 	(
 		CurRenderDevice,
 		WW3D_DEVTYPE,
+#if RTS_ENGINE_CONTEXT
+		// GeneralsX @feature cemlyn007 16/10/2026 The host's window, for a window engine (Device_Window).
+		Device_Window(),
+#else
 		_Hwnd,
+#endif
 		Vertex_Processing_Behavior,
 		&_PresentParameters,
 		&D3DDevice
@@ -1220,7 +1255,11 @@ bool DX8Wrapper::Create_Device()
 			(
 				CurRenderDevice,
 				WW3D_DEVTYPE,
+#if RTS_ENGINE_CONTEXT
+				Device_Window(),
+#else
 				_Hwnd,
+#endif
 				Vertex_Processing_Behavior,
 				&_PresentParameters,
 				&D3DDevice
@@ -1247,9 +1286,9 @@ bool DX8Wrapper::Create_Device()
 	DX8_RECORD(D3DDevice, DEVICE);
 
 #if RTS_ENGINE_CONTEXT
-	// GeneralsX @feature cemlyn007 16/10/2026 A headless engine draws into off-screen surfaces of its render size, made
-	// and recorded after the device (dx8wrapper.h).
-	if (Renders_Headless() && !Create_Off_Screen_Surfaces())
+	// GeneralsX @feature cemlyn007 16/10/2026 A headless or window engine draws into off-screen surfaces of its render
+	// size, made and recorded after the device (dx8wrapper.h).
+	if (Draws_Off_Screen() && !Create_Off_Screen_Surfaces())
 	{
 		DX8_RELEASE(D3DDevice);
 		D3DDevice = nullptr;
@@ -1305,10 +1344,10 @@ bool DX8Wrapper::Reset_Device(bool reload_assets)
 		memset(Pixel_Shader_Constants,0,sizeof(Vector4)*MAX_PIXEL_SHADER_CONSTANTS);
 
 #if RTS_ENGINE_CONTEXT
-		// GeneralsX @feature cemlyn007 16/10/2026 A headless engine's off-screen surfaces are released before the reset,
-		// which refuses while they live, and made again after it (dx8wrapper.h).
-		const bool headless = Renders_Headless();
-		if (headless)
+		// GeneralsX @feature cemlyn007 16/10/2026 A headless or window engine's off-screen surfaces are released before
+		// the reset, which refuses while they live, and made again after it (dx8wrapper.h).
+		const bool offScreen = Draws_Off_Screen();
+		if (offScreen)
 			Release_Off_Screen_Surfaces();
 #endif
 		HRESULT hr=_Get_D3D_Device8()->TestCooperativeLevel();
@@ -1320,7 +1359,7 @@ bool DX8Wrapper::Reset_Device(bool reload_assets)
 		else
 			return false;	//device is lost and can't be reset.
 #if RTS_ENGINE_CONTEXT
-		if (headless && !Create_Off_Screen_Surfaces())
+		if (offScreen && !Create_Off_Screen_Surfaces())
 			return false;
 #endif
 
@@ -1734,13 +1773,15 @@ bool DX8Wrapper::Set_Render_Device(int dev, int width, int height, int bits, int
 	** - the depth buffer must use
 	*/
 #if RTS_ENGINE_CONTEXT
-	// GeneralsX @feature cemlyn007 16/10/2026 A headless engine's formats are pinned, whatever the adapter's display
-	// mode, so that its images do not depend on the display (dx8wrapper.h).
-	if (Renders_Headless()) {
+	// GeneralsX @feature cemlyn007 16/10/2026 A headless or window engine's formats are pinned, whatever the adapter's
+	// display mode, so that its images do not depend on the display (dx8wrapper.h). A window engine's back buffer, in
+	// the host's window, is the size and format of its off-screen render target, so a present is a plain copy.
+	if (Draws_Off_Screen()) {
 		DisplayFormat = D3DFMT_X8R8G8B8;
 		BitDepth = 32;
 		_PresentParameters.BackBufferFormat = OFF_SCREEN_RENDER_TARGET_FORMAT;
 		_PresentParameters.AutoDepthStencilFormat = OFF_SCREEN_DEPTH_FORMAT;
+		_PresentParameters.hDeviceWindow = Device_Window();
 	} else
 #endif
 	if (IsWindowed) {
