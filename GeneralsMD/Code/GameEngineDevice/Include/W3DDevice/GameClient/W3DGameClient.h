@@ -38,6 +38,7 @@
 
 // USER INCLUDES //////////////////////////////////////////////////////////////
 #include <cstdio>
+#include "Common/FatalEngineError.h"	// GeneralsX @feature cemlyn007 15/10/2026 ReleaseCrashNoReturn
 
 #include "GameClient/GameClient.h"
 #include "W3DDevice/GameClient/W3DParticleSys.h"
@@ -173,8 +174,13 @@ inline Mouse *W3DGameClient::createMouse()
 	if (sdlEngine && sdlEngine->getSDLWindow()) {
 		return NEW SDL3Mouse(sdlEngine->getSDLWindow());
 	}
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 15/10/2026 A crash path, so it ends in the FaultSink (Common/EngineFault.h)
+	ReleaseCrashNoReturn("W3DGameClient::createMouse() requires SDL3GameEngine with an initialized SDL window");
+#else
 	fprintf(stderr, "FATAL: W3DGameClient::createMouse() requires SDL3GameEngine with an initialized SDL window\n");
 	std::abort();
+#endif
 #else
 	// Windows: W3DMouse (wraps Win32Mouse with 3D cursor)
 	Win32Mouse * mouse = NEW W3DMouse;

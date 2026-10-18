@@ -18,6 +18,9 @@
 
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
+// GeneralsX @refactor cemlyn007 15/10/2026 Not with RTS_ENGINE_CONTEXT (see Common/WorkingDirectory.h).
+#if !RTS_ENGINE_CONTEXT
+
 #ifndef _WIN32
 #include "file_compat.h"
 #include "module_compat.h"
@@ -137,3 +140,5 @@ Bool WorkingDirectory::hasSetWorkingDirectory()
 }
 
 } // namespace rts
+
+#endif

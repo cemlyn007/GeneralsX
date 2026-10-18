@@ -441,7 +441,18 @@ AsciiString Version::buildAsciiGitCommitTime()
 	const Int len = 19;
 	AsciiString str;
 	Char* buf = str.getBufferForRead(len);
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @bugfix cemlyn007 16/10/2026 gmtime returns the C library's one process-wide buffer, which engines
+	// starting on two threads at once would both write
+	tm timeBuffer;
+#ifdef _WIN32
+	tm* time = gmtime_s(&timeBuffer, &GitCommitTimeStamp) == 0 ? &timeBuffer : nullptr;
+#else
+	tm* time = gmtime_r(&GitCommitTimeStamp, &timeBuffer);
+#endif
+#else
 	tm* time = gmtime(&GitCommitTimeStamp);
+#endif
 	strftime(buf, len+1, "%Y-%m-%d %H:%M:%S", time);
 	return str;
 }
@@ -451,7 +462,18 @@ UnicodeString Version::buildUnicodeGitCommitTime()
 	const Int len = 19;
 	UnicodeString str;
 	WideChar* buf = str.getBufferForRead(len);
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @bugfix cemlyn007 16/10/2026 gmtime returns the C library's one process-wide buffer, which engines
+	// starting on two threads at once would both write
+	tm timeBuffer;
+#ifdef _WIN32
+	tm* time = gmtime_s(&timeBuffer, &GitCommitTimeStamp) == 0 ? &timeBuffer : nullptr;
+#else
+	tm* time = gmtime_r(&GitCommitTimeStamp, &timeBuffer);
+#endif
+#else
 	tm* time = gmtime(&GitCommitTimeStamp);
+#endif
 	wcsftime(buf, len+1, L"%Y-%m-%d %H:%M:%S", time);
 	return str;
 }

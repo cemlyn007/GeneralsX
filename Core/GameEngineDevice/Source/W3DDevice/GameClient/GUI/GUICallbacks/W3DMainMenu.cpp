@@ -411,7 +411,14 @@ void W3DClockDraw( GameWindow *window, WinInstanceData *instData )
 	time_t longTime;
 	struct tm *curtime;
 	time(&longTime);
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @bugfix cemlyn007 16/10/2026 localtime returns the C library's one process-wide buffer, which engines on
+	// two threads would both write
+	struct tm localTime;
+	curtime = localtime_r(&longTime, &localTime);
+#else
 	curtime = localtime(&longTime);
+#endif
 	strftime(datestr, 256, "%H:%M:%S", curtime);
 	UnicodeString temp;
 	temp.translate(datestr);

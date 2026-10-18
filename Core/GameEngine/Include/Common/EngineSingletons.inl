@@ -42,11 +42,11 @@
 // to regenerate Common/EngineSingletonMacros.h and wrap the new names' upstream extern
 // declarations and definitions in `#if !RTS_ENGINE_CONTEXT`. `... check` verifies both.
 //
-// Not listed, and so process-global: TheMemoryPoolFactory, TheDynamicMemoryAllocator, the debug
-// globals, the constant name and field-parse tables, and the others the script's PROCESS_GLOBAL table
-// names with a reason.
+// Not listed, and so process-global: the debug globals, the constant name and field-parse tables, and the
+// others the script's PROCESS_GLOBAL table names with a reason.
 // GeneralsX @refactor cemlyn007 14/10/2026 TheNameKeyGenerator, TheVersion and the critical-section pointers are
 // per engine (docs/EMBEDDING.md).
+// GeneralsX @refactor cemlyn007 15/10/2026 So is the memory manager (docs/EMBEDDING.md).
 
 // Common: engine core, file systems, INI stores and players
 RTS_ENGINE_SINGLETON(ActionManager, TheActionManager)
@@ -55,6 +55,7 @@ RTS_ENGINE_SINGLETON(AudioManager, TheAudio)
 RTS_ENGINE_SINGLETON(BuildAssistant, TheBuildAssistant)
 RTS_ENGINE_SINGLETON(CommandList, TheCommandList)
 RTS_ENGINE_SINGLETON(DamageFXStore, TheDamageFXStore)
+RTS_ENGINE_SINGLETON(DynamicMemoryAllocator, TheDynamicMemoryAllocator)
 RTS_ENGINE_SINGLETON(FileSystem, TheFileSystem)
 RTS_ENGINE_SINGLETON(FramePacer, TheFramePacer)
 RTS_ENGINE_SINGLETON(FunctionLexicon, TheFunctionLexicon)
@@ -63,6 +64,7 @@ RTS_ENGINE_SINGLETON(GameLODManager, TheGameLODManager)
 RTS_ENGINE_SINGLETON(GameState, TheGameState)
 RTS_ENGINE_SINGLETON(GameStateMap, TheGameStateMap)
 RTS_ENGINE_SINGLETON(LocalFileSystem, TheLocalFileSystem)
+RTS_ENGINE_SINGLETON(MemoryPoolFactory, TheMemoryPoolFactory)
 RTS_ENGINE_SINGLETON(MessageStream, TheMessageStream)
 RTS_ENGINE_SINGLETON(ModuleFactory, TheModuleFactory)
 RTS_ENGINE_SINGLETON(NameKeyGenerator, TheNameKeyGenerator)

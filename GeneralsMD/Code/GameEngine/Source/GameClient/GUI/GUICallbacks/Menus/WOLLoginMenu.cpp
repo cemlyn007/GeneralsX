@@ -74,6 +74,15 @@
 #include "GameNetwork/GameSpyOverlay.h"
 
 #include "GameNetwork/WOLBrowser/WebBrowser.h"
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 15/10/2026 Its login preferences file is opened and closed through the engine's file layer (Common/EngineFiles.h)
+#include "Common/EngineFiles.h"
+#define WOLLOGIN_OPEN(name, mode) rts::openEngineFile(name, mode)
+#define WOLLOGIN_CLOSE(file) rts::closeEngineFile(file)
+#else
+#define WOLLOGIN_OPEN(name, mode) fopen(name, mode)
+#define WOLLOGIN_CLOSE(file) fclose(file)
+#endif
 
 
 #ifdef ALLOW_NON_PROFILED_LOGIN
@@ -243,7 +252,7 @@ Bool GameSpyLoginPreferences::write()
 	if (m_filename.isEmpty())
 		return false;
 
-	FILE *fp = fopen(m_filename.str(), "w");
+	FILE *fp = WOLLOGIN_OPEN(m_filename.str(), "w");
 	if (fp)
 	{
 		fprintf(fp, "lastEmail = %s\n",   ((*this)["lastEmail"].str()));
@@ -283,7 +292,7 @@ Bool GameSpyLoginPreferences::write()
 			++nickIt;
 		}
 
-		fclose(fp);
+		WOLLOGIN_CLOSE(fp);
 		return true;
 	}
 	return false;

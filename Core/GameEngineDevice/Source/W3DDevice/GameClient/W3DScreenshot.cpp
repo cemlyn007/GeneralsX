@@ -24,9 +24,19 @@
 #include "WW3D2/surfaceclass.h"
 #include "WWLib/mpsc_intrusive_queue.h"
 #include <stb_image_write.h>
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 15/10/2026 A screenshot is written into a file opened through the engine's file layer
+// (Common/EngineFiles.h).
+#include "Common/EngineFiles.h"
+#endif
 
+#if RTS_ENGINE_CONTEXT
+#include "Common/EngineThread.h" // GeneralsX @feature cemlyn007 15/10/2026 rts::startEngineThread
+#endif
 #ifndef _WIN32
+#if !RTS_ENGINE_CONTEXT
 #include <thread>
+#endif
 #include <filesystem>
 #endif
 
@@ -70,7 +80,14 @@ RTS_ENGINE_GLOBAL(MPSCIntrusiveQueue<ScreenshotWrittenMessage>, s_screenshotWrit
 static MPSCIntrusiveQueue<ScreenshotWrittenMessage> s_screenshotWrittenQueue;
 #endif
 
-#ifdef _WIN32
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 15/10/2026 Started through the engine's ThreadStarter (Common/EngineThread.h), which owns
+// `data`. The work is short and waits for nothing, so the thread checks for a stop request before each part of it.
+static void screenshotThreadFunc(ScreenshotThreadData* data, const std::stop_token& stop)
+{
+	if (stop.stop_requested())
+		return;
+#elif defined(_WIN32)
 static DWORD WINAPI screenshotThreadFunc(LPVOID param)
 {
 	ScreenshotThreadData* data = static_cast<ScreenshotThreadData*>(param);
@@ -132,6 +149,32 @@ static void screenshotThreadFunc(ScreenshotThreadData* data)
 	}
 
 	int success = 0;
+#if RTS_ENGINE_CONTEXT
+	if (stop.stop_requested())
+	{
+		delete[] image;
+		return;
+	}
+	if (FILE* const file = rts::openEngineFile(pathname, "wb"))
+	{
+		const auto writeToFile = [](void* context, void* bytes, int size) {
+			fwrite(bytes, 1, static_cast<size_t>(size), static_cast<FILE*>(context));
+		};
+		switch (data->format)
+		{
+			case SCREENSHOT_JPEG:
+				success = stbi_write_jpg_to_func(writeToFile, file, width, height, 3, image, data->quality);
+				break;
+			case SCREENSHOT_PNG:
+				success = stbi_write_png_to_func(writeToFile, file, width, height, 3, image, width * 3);
+				break;
+		}
+		if (ferror(file))
+			success = 0;
+		if (rts::closeEngineFile(file) != 0)
+			success = 0;
+	}
+#else
 	switch (data->format)
 	{
 		case SCREENSHOT_JPEG:
@@ -141,6 +184,7 @@ static void screenshotThreadFunc(ScreenshotThreadData* data)
 			success = stbi_write_png(pathname, width, height, 3, image, width * 3);
 			break;
 	}
+#endif
 
 	if (success)
 	{
@@ -154,9 +198,11 @@ static void screenshotThreadFunc(ScreenshotThreadData* data)
 	}
 
 	delete[] image;
+#if !RTS_ENGINE_CONTEXT
 	delete data;
+#endif
 
-#ifdef _WIN32
+#if defined(_WIN32) && !RTS_ENGINE_CONTEXT
 	return success;
 #endif
 }
@@ -247,7 +293,12 @@ void W3D_TakeCompressedScreenshot(ScreenshotFormat format, Int jpegQuality)
 	surfaceCopy->Release_Ref();
 	surfaceCopy = nullptr;
 
-#ifdef _WIN32
+#if RTS_ENGINE_CONTEXT
+	const std::shared_ptr<ScreenshotThreadData> ownedThreadData(threadData);
+	rts::startEngineThread("screenshot", [ownedThreadData](std::stop_token stop) {
+		screenshotThreadFunc(ownedThreadData.get(), stop);
+	});
+#elif defined(_WIN32)
 	const HANDLE hThread = CreateThread(nullptr, 0, screenshotThreadFunc, threadData, 0, nullptr);
 	if (hThread)
 	{

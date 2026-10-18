@@ -33,6 +33,10 @@
 #include "Common/GameState.h"
 #include "Common/Snapshot.h"
 #include "Common/XferLoad.h"
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 15/10/2026 Its file is opened and closed through the engine's file layer (Common/EngineFiles.h)
+#include "Common/EngineFiles.h"
+#endif
 
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
@@ -80,7 +84,11 @@ void XferLoad::open( AsciiString identifier )
 	Xfer::open( identifier );
 
 	// open the file
+#if RTS_ENGINE_CONTEXT
+	m_fileFP = rts::openEngineFile( identifier.str(), "rb" );
+#else
 	m_fileFP = fopen( identifier.str(), "rb" );
+#endif
 	if( m_fileFP == nullptr )
 	{
 
@@ -107,7 +115,11 @@ void XferLoad::close()
 	}
 
 	// close the file
+#if RTS_ENGINE_CONTEXT
+	rts::closeEngineFile( m_fileFP );
+#else
 	fclose( m_fileFP );
+#endif
 	m_fileFP = nullptr;
 
 	// erase the filename

@@ -203,7 +203,9 @@ D3DXLoadSurfaceFromSurface(
 	gli::texture2d texSrc(imageFormat, gli::extent2d(descSrc.Width, descSrc.Height), 2);
 
 	// Copy the data to level 0
-	memcpy(texSrc.data(), srcRect.pBits, texSrc.size());
+	// GeneralsX @bugfix cemlyn007 16/10/2026 Copy level 0's bytes only: the whole two-level texture's size read a
+	// quarter beyond the source surface (found by AddressSanitizer on the device-wrapper ledger test's fake device).
+	memcpy(texSrc.data(), srcRect.pBits, texSrc.size(0));
 	// Generate mip 1 from level 0
 	gli::texture2d mipMap = gli::generate_mipmaps(texSrc, gli::filter::FILTER_LINEAR);
 

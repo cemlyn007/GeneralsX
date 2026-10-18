@@ -951,10 +951,12 @@ Bool WorldHeightMap::ParseSizeOnly(DataChunkInput &file, DataChunkInfo *info, vo
 	}
 
 	m_dataSize = file.readInt();
-	m_data = MSGNEW("WorldHeightMap_ParseSizeOnly") UnsignedByte[m_dataSize];
+	// GeneralsX @bugfix cemlyn007 15/10/2026 Refuse the size before allocating for it: the throw leaves the constructor,
+	// so no destructor frees m_data, and a corrupt map leaked it.
 	if (m_dataSize <= 0 || (m_dataSize != (m_width*m_height))) {
 		throw ERROR_CORRUPT_FILE_FORMAT	;
 	}
+	m_data = MSGNEW("WorldHeightMap_ParseSizeOnly") UnsignedByte[m_dataSize];
 	file.readArrayOfBytes((char *)m_data, m_dataSize);
 	// Resize me.
 	if (info->version == K_HEIGHT_MAP_VERSION_1) {

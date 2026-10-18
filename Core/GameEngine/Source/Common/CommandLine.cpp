@@ -42,6 +42,11 @@
 #include "GameNetwork/NetworkDefs.h"
 
 #include <atomic>
+#if RTS_ENGINE_CONTEXT
+#include <string>
+
+#include "Common/InvalidInputData.h" // GeneralsX @bugfix cemlyn007 16/10/2026 rts::InvalidInputData
+#endif
 
 
 
@@ -438,8 +443,11 @@ Int parseHeadless(char *args[], int num)
 	// mode so that ignoringAsserts() works correctly throughout the entire process lifetime,
 	// including during shutdown after TheGlobalData has been destroyed.
 	// GeneralsX @feature cemlyn007 28/09/2026 Atomic (see dx8wrapper.cpp; PLAN-023 Phase 5b).
+	// GeneralsX @refactor cemlyn007 15/10/2026 With RTS_ENGINE_CONTEXT there is no such switch (see dx8wrapper.cpp).
+#if !RTS_ENGINE_CONTEXT
 	extern std::atomic<bool> DX8Wrapper_IsWindowed;
 	DX8Wrapper_IsWindowed = false;
+#endif
 
 	return 1;
 }
@@ -471,17 +479,29 @@ Int parseJobs(char *args[], int num)
 		if (TheGlobalData->m_simulateReplayJobs < SIMULATE_REPLAYS_SEQUENTIAL || TheGlobalData->m_simulateReplayJobs == 0)
 		{
 			printf("Invalid number of jobs: %d\n", TheGlobalData->m_simulateReplayJobs);
+#if RTS_ENGINE_CONTEXT
+			// GeneralsX @bugfix cemlyn007 16/10/2026 GeneralsX never ends the process: a bad command line is the host's
+			// bad input, which it catches (Common/InvalidInputData.h); the game executable exits with 1 for it, as here
+			throw rts::InvalidInputData("the command line",
+				"invalid number of jobs: " + std::to_string(TheGlobalData->m_simulateReplayJobs));
+#else
 			exit(1);
+#endif
 		}
 		return 2;
 	}
 	return 1;
 }
 
+// GeneralsX @refactor cemlyn007 15/10/2026 With RTS_ENGINE_CONTEXT neither changes the working directory: the asset root
+// they chose is the engine's EmbeddingConfig::assetRoot, which its host (the game executable reads both from its command
+// line) settles before the engine starts (Common/EngineFiles.h).
 Int parseUseCwd(char *[], int)
 {
 	// -useCwd restores the startup working directory.
+#if !RTS_ENGINE_CONTEXT
 	rts::WorkingDirectory::setStartupWorkingDirectory();
+#endif
 	return 1;
 }
 
@@ -490,7 +510,9 @@ Int parseSetCwd(char *args[], int num)
 	// -setCwd <path> overrides the working directory.
 	if (num > 1)
 	{
+#if !RTS_ENGINE_CONTEXT
 		rts::WorkingDirectory::setCustomWorkingDirectory(args[1]);
+#endif
 		return 2;
 	}
 	return 1;
@@ -1488,7 +1510,7 @@ void CommandLine::parseCommandLineForStartup()
 
 	// GeneralsX @bugfix fbraz 15/09/2026 Restrict default executable working directory fallback to Windows
 	// On POSIX/Linux/Flatpak, binaries reside in system paths (/app/bin) while game assets reside in CWD/data dirs.
-#ifdef _WIN32
+#if defined(_WIN32) && !RTS_ENGINE_CONTEXT
 	if (!rts::WorkingDirectory::hasSetWorkingDirectory())
 		rts::WorkingDirectory::setExecutableWorkingDirectory();
 #endif

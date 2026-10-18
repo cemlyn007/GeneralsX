@@ -181,6 +181,11 @@ class AsciiString;
 		any args to DebugCrash due to the varargs nature of it.
 		We'll just let it slide in this case...
 	*/
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @refactor cemlyn007 15/10/2026 No "ignore this crash from now on" flag: it was a static per call
+	// site and a process-wide pointer to it, state no engine may share (docs/EMBEDDING.md).
+	#define DEBUG_CRASH(m)	do { { DebugCrash m ; } } while (0)
+#else
 	DEBUG_EXTERN_C char* TheCurrentIgnoreCrashPtr;
 
 	#define DEBUG_CRASH(m)	\
@@ -194,6 +199,7 @@ class AsciiString;
 				} \
 			} \
 		} while (0)
+#endif
 
 	#define DEBUG_ASSERTCRASH(c, m)		do { { if (!(c)) DEBUG_CRASH(m); } } while (0)
 
@@ -213,6 +219,11 @@ class AsciiString;
 
 DEBUG_EXTERN_C void ReleaseCrash(const char* reason);
 DEBUG_EXTERN_C void ReleaseCrashLocalized(const AsciiString& p, const AsciiString& m);
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 15/10/2026 The assertion crash: what an assertion dialog's Abort does (DebugCrash,
+// WWDebug_Assert_Fail), a crash path that ends in the FaultSink as ReleaseCrash does (Common/EngineFault.h).
+DEBUG_EXTERN_C void AssertionCrash(const char* message);
+#endif
 
 #define RELEASE_CRASH(m)				do { ReleaseCrash(m); } while (0)
 #define RELEASE_CRASHLOCALIZED(p, m)		do { ReleaseCrashLocalized(p, m); } while (0)

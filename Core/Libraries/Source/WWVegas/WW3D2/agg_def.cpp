@@ -355,6 +355,13 @@ AggregateDefClass::Load_Assets (const char *passet_name)
 	// Param OK?
 	if (passet_name != nullptr) {
 
+#if RTS_ENGINE_CONTEXT
+		// GeneralsX @feature cemlyn007 15/10/2026 The asset is named relative to the engine's asset root, not the working
+		// directory, and the asset manager finds it through the file factory, which reports a missing one itself.
+		StringClass assetFile (passet_name);
+		assetFile += ".w3d";
+		retval = WW3DAssetManager::Get_Instance()->Load_3D_Assets (assetFile);
+#else
 		// Determine what the current working directory is
 		char path[MAX_PATH];
 		// GeneralsX @build BenderAI 10/02/2026 - Remove :: for macros
@@ -374,6 +381,7 @@ AggregateDefClass::Load_Assets (const char *passet_name)
 		if (GetFileAttributes (path) != 0xFFFFFFFF) {
 			retval = WW3DAssetManager::Get_Instance()->Load_3D_Assets (path);
 		}
+#endif
 	}
 
 	// Return the true/false result code

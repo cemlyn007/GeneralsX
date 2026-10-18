@@ -56,6 +56,26 @@
 //#include "wlib/wstring.h"
 
 #include "DownloadDebug.h"
+#if RTS_ENGINE_CONTEXT
+#include "Common/EngineThread.h" // GeneralsX @feature cemlyn007 15/10/2026 rts::startEngineThread
+#include <string>
+// GeneralsX @feature cemlyn007 15/10/2026 Its download files are opened, closed, moved and removed through the engine's file layer, so that it writes only under the engine's user data root (Common/EngineFiles.h)
+#include "Common/EngineFiles.h"
+#include "Common/EngineCLibrary.h" // GeneralsX @bugfix cemlyn007 16/10/2026 rts::lookUpHostAddresses
+#define FTP_OPEN(name, mode) rts::openEngineFile(name, mode)
+#define FTP_CLOSE(file) rts::closeEngineFile(file)
+// GeneralsX @feature cemlyn007 16/10/2026 Its sockets are opened, accepted and closed through the engine's socket layer, which records each in the engine's ResourceLedger (Common/EngineSockets.h)
+#include "Common/EngineSockets.h"
+#define FTP_SOCKET(what) rts::openEngineSocket(AF_INET, SOCK_STREAM, 0, what)
+#define FTP_ACCEPT(listener) rts::acceptEngineSocket(listener, nullptr, nullptr, "FTP data")
+#define FTP_CLOSESOCKET(sock) rts::closeEngineSocket(sock)
+#else
+#define FTP_OPEN(name, mode) fopen(name, mode)
+#define FTP_CLOSE(file) fclose(file)
+#define FTP_SOCKET(what) socket(AF_INET, SOCK_STREAM, 0)
+#define FTP_ACCEPT(listener) accept(listener, nullptr, nullptr)
+#define FTP_CLOSESOCKET(sock) closesocket(sock)
+#endif
 
 // umm... what?? BGC 3/27/03
 //#ifndef RTS_DEBUG
@@ -225,7 +245,7 @@ Cftp::~Cftp()
 
 	if (m_pfLocalFile)
 	{
-		fclose(m_pfLocalFile);
+		FTP_CLOSE(m_pfLocalFile);
 		m_pfLocalFile = nullptr;
 	}
 }
@@ -235,13 +255,13 @@ void Cftp::CloseSockets()
 
 	if( m_iDataSocket )
 	{
-		closesocket( m_iDataSocket );
+		FTP_CLOSESOCKET( m_iDataSocket );
 		m_iDataSocket=0;
 	}
 
 	if( m_iCommandSocket )
 	{
-		closesocket( m_iCommandSocket );
+		FTP_CLOSESOCKET( m_iCommandSocket );
 		m_iCommandSocket=0;
 	}
 
@@ -270,6 +290,26 @@ void Cftp::ZeroStuff()
 }
 
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 15/10/2026 The lookup runs on a thread started through the engine's ThreadStarter
+// (Common/EngineThread.h), with its own copy of the host name.
+// GeneralsX @feature cemlyn007 16/10/2026 It asks the name servers through the engine's socket layer
+// (rts::resolveEngineHostName) instead of gethostbyname, which cannot be interrupted, so a stop request ends the lookup
+// within a poll interval; the thread then leaves the results alone.
+static void gethostbynameThreadBody( const std::string& name, const std::stop_token& stop )
+{
+	const std::optional<in_addr> address = rts::resolveEngineHostName( name.c_str(), stop );
+	if (stop.stop_requested())
+		return;
+
+	if (address)
+		gThreadAddress.sin_addr = *address;
+	else
+		memcpy((char *)&(gThreadAddress.sin_addr),"",strlen("")+1);
+
+	gThreadFlag = 1;
+}
+#else
 DWORD WINAPI gethostbynameA( void * szName )
 {
 	HOSTENT *he = gethostbyname( (const char *)szName );
@@ -284,6 +324,7 @@ DWORD WINAPI gethostbynameA( void * szName )
 	gThreadFlag = 1;
 	return 0;
 }
+#endif
 
 
 int Cftp::AsyncGetHostByName(char * szName, struct sockaddr_in &address )
@@ -293,9 +334,7 @@ int Cftp::AsyncGetHostByName(char * szName, struct sockaddr_in &address )
 #else
 	static int            stat = 0;
 #endif
-#if RTS_ENGINE_CONTEXT
-	RTS_ENGINE_STATIC(unsigned long, threadid);
-#else
+#if !RTS_ENGINE_CONTEXT
 	static unsigned long  threadid;
 #endif
 
@@ -305,10 +344,17 @@ int Cftp::AsyncGetHostByName(char * szName, struct sockaddr_in &address )
 		gThreadFlag = 0;
       memset(&gThreadAddress,0,sizeof(gThreadAddress));
 
+#if RTS_ENGINE_CONTEXT
+		rts::startEngineThread( "FTP host lookup", [name = std::string(szName)]( std::stop_token stop )
+		{
+			gethostbynameThreadBody( name, stop );
+		} );
+#else
 		if( CreateThread( nullptr, 0, gethostbynameA, szName, 0, &threadid ) == nullptr )
 		{
 			return( FTP_FAILED );
 		}
+#endif
 		stat = 1;
 	}
 	if( stat == 1 )
@@ -408,7 +454,7 @@ HRESULT  Cftp::ConnectToServer(LPCSTR szServerName)
 
 		/* Open a socket. */
 
-		m_iCommandSocket = socket( AF_INET, SOCK_STREAM, 0 );
+		m_iCommandSocket = FTP_SOCKET( "FTP command" );
 
 		if( m_iCommandSocket < 0 )
 		{
@@ -444,7 +490,7 @@ HRESULT  Cftp::ConnectToServer(LPCSTR szServerName)
 			if( error != WSAEISCONN )
 			{
             ////////DBGMSG("Connect failed");
-				closesocket( m_iCommandSocket );
+				FTP_CLOSESOCKET( m_iCommandSocket );
 				return( FTP_FAILED );
 			}
 		}
@@ -467,7 +513,7 @@ HRESULT  Cftp::ConnectToServer(LPCSTR szServerName)
 			return(FTP_TRYING);
 		if (FD_ISSET(m_iCommandSocket, &eset)) {
 			// OK, the exception flag is set, guess we couldn't connect....
-			closesocket( m_iCommandSocket );
+			FTP_CLOSESOCKET( m_iCommandSocket );
 			return( FTP_FAILED );
 		}
 		if (FD_ISSET(m_iCommandSocket, &wset)) {
@@ -1041,10 +1087,14 @@ unsigned long MyIPAddress( int sockfd )
 {
 
 	int		 test = 99;
+#if !RTS_ENGINE_CONTEXT
 	int i;
+#endif
 	char pBuffer[ 256 ];
+#if !RTS_ENGINE_CONTEXT
 	char * pAddr;
 	struct hostent * pHE;
+#endif
 	unsigned long ip;
 	struct sockaddr_in sin;
 
@@ -1076,6 +1126,37 @@ unsigned long MyIPAddress( int sockfd )
 
 		/* Look up the machine in "DNS" or whatever. */
 
+#if RTS_ENGINE_CONTEXT
+		// GeneralsX @bugfix cemlyn007 16/10/2026 gethostbyname returns the C library's one process-wide result, which
+		// engines on two threads would both write; the lookup returns a list of this caller's own
+		// (Common/EngineCLibrary.h). Each address is read as the four bytes it is.
+		const std::vector<in_addr> addresses = rts::lookUpHostAddresses( pBuffer );
+
+		if( addresses.empty() )
+		{
+			return( FTP_FAILED );
+		}
+
+		/* Find a good IP address. */
+
+		ip = 0;
+
+		for( const in_addr& address : addresses )
+		{
+
+			ip = address.s_addr;
+
+			if( ( ip != 0 ) && ( ip != inet_addr( "127.0.0.1" ) ) )
+			{
+				break;
+			}
+			else
+			{
+				ip = 0;
+			}
+
+		}
+#else
 		pHE = gethostbyname( pBuffer );
 
 		if( pHE == nullptr )
@@ -1104,6 +1185,7 @@ unsigned long MyIPAddress( int sockfd )
 			}
 
 		}
+#endif
 	}
 
 	if( ip == 0 )
@@ -1147,7 +1229,7 @@ int Cftp::SendNewPort()
 	if( m_sendNewPortStatus == 0 )
 	{
 
-		m_iDataSocket = socket( AF_INET, SOCK_STREAM, 0 );
+		m_iDataSocket = FTP_SOCKET( "FTP data listener" );
 
 		if( m_iDataSocket < 0 )
 		{
@@ -1282,7 +1364,7 @@ int Cftp::OpenDataConnection()
 		return( FTP_FAILED );
 	}
 
-	if( ( iNewSocket = accept( m_iDataSocket, nullptr, nullptr ) ) < 0 )
+	if( ( iNewSocket = FTP_ACCEPT( m_iDataSocket ) ) < 0 )
 	{
 		if( WSAGetLastError() != (WSAEWOULDBLOCK ) )
 		{
@@ -1294,6 +1376,11 @@ int Cftp::OpenDataConnection()
 		}
 	}
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @bugfix cemlyn007 16/10/2026 The listener is closed once it has given its one data connection: upstream
+	// dropped it open, so every transfer leaked a socket (each SendNewPort opens a new listener).
+	FTP_CLOSESOCKET( m_iDataSocket );
+#endif
 	m_iDataSocket = iNewSocket;
 
 	return( FTP_SUCCEEDED );
@@ -1319,7 +1406,7 @@ int Cftp::OpenDataConnection()
 
 void Cftp::CloseDataConnection()
 {
-	closesocket( m_iDataSocket );
+	FTP_CLOSESOCKET( m_iDataSocket );
 	m_iDataSocket = 0;
 }
 
@@ -1343,7 +1430,7 @@ HRESULT  Cftp::DisconnectFromServer()
 	// Make the download file read-only so it's still there the next time
 	// we're run.
 
-	closesocket( m_iCommandSocket );
+	FTP_CLOSESOCKET( m_iCommandSocket );
 	return( FTP_SUCCEEDED );
 }
 
@@ -1459,14 +1546,14 @@ HRESULT  Cftp::GetNextFileBlock( LPCSTR szLocalFileName, int * piTotalRead )
 	{
 		if( m_iFilePos == 0 )
 		{
-			if( ( m_pfLocalFile = fopen( downloadfilename, "wb" ) ) == nullptr )
+			if( ( m_pfLocalFile = FTP_OPEN( downloadfilename, "wb" ) ) == nullptr )
 			{
 				return( FTP_FAILED );
 			}
 		}
 		else
 		{
-			if( ( m_pfLocalFile = fopen( downloadfilename, "ab" ) ) == nullptr )
+			if( ( m_pfLocalFile = FTP_OPEN( downloadfilename, "ab" ) ) == nullptr )
 			{
 				return( FTP_FAILED );
 			}
@@ -1545,8 +1632,8 @@ HRESULT  Cftp::GetNextFileBlock( LPCSTR szLocalFileName, int * piTotalRead )
 		if ((res == FTP_FAILED) || (iReply == 502))  // unsupported command
 		{
 			m_iFilePos=0;
-			fclose(m_pfLocalFile);
-			m_pfLocalFile = fopen( downloadfilename, "wb" );
+			FTP_CLOSE(m_pfLocalFile);
+			m_pfLocalFile = FTP_OPEN( downloadfilename, "wb" );
 		}
 		else if( ( res != FTP_SUCCEEDED ) ||
 			( iReply != FTPREPLY_RESTARTOK ) )
@@ -1653,7 +1740,7 @@ HRESULT  Cftp::GetNextFileBlock( LPCSTR szLocalFileName, int * piTotalRead )
 	// everything is handled above.
 	if( m_iStatus == FTPSTAT_FILEDATACLOSED )	{
 		CloseDataConnection();
-		fclose( m_pfLocalFile );
+		FTP_CLOSE( m_pfLocalFile );
 		m_pfLocalFile = nullptr;
 
 		/*
@@ -1664,6 +1751,23 @@ HRESULT  Cftp::GetNextFileBlock( LPCSTR szLocalFileName, int * piTotalRead )
 		char downloadfilename[256];
 		GetDownloadFilename(m_szLocalFileName, downloadfilename, ARRAY_SIZE(downloadfilename));
 
+#if RTS_ENGINE_CONTEXT
+		{
+			const std::filesystem::path from = rts::resolveEnginePath(downloadfilename);
+			const std::filesystem::path to = rts::resolveEnginePath(m_szLocalFileName);
+			if (!rts::isEngineWritablePath(from) || !rts::isEngineWritablePath(to))
+				return( FTP_FAILED );
+			std::error_code error;
+			std::filesystem::create_directories(to.parent_path(), error);
+			std::filesystem::rename(from, to, error);
+			if (error) {
+				std::filesystem::remove(to, error);
+				std::filesystem::rename(from, to, error);
+				if (error)
+					return( FTP_FAILED );
+			}
+		}
+#else
 		// Make sure the path exists for the new file
 		char curdir[256];
 		_getcwd(curdir,256);
@@ -1683,6 +1787,7 @@ HRESULT  Cftp::GetNextFileBlock( LPCSTR szLocalFileName, int * piTotalRead )
 				return( FTP_FAILED );
 			}
 		}
+#endif
 
 		// Send a bogus command.  If the firewall has closed our ftp command channel connection this
 		// will allow us to detect it.  (Obviously the data channel is closed or we wouldn't be here)
@@ -1745,7 +1850,7 @@ HRESULT  Cftp::FileRecoveryPosition( LPCSTR szLocalFileName, LPCSTR szRegistryRo
 	char downloadfilename[256];
 	GetDownloadFilename(szLocalFileName, downloadfilename, ARRAY_SIZE(downloadfilename));
 
-	FILE *testfp = fopen( downloadfilename, "rb" );
+	FILE *testfp = FTP_OPEN( downloadfilename, "rb" );
 	if( testfp == nullptr )
 	{
 		m_iFilePos = 0;
@@ -1754,7 +1859,7 @@ HRESULT  Cftp::FileRecoveryPosition( LPCSTR szLocalFileName, LPCSTR szRegistryRo
 
 	fseek( testfp, 0, SEEK_END );
 	m_iFilePos = ftell( testfp );
-	fclose( testfp );
+	FTP_CLOSE( testfp );
 
 	return( m_iFilePos );
 }
@@ -1813,7 +1918,7 @@ HRESULT  Cftp::FileRecoveryPosition( LPCSTR szLocalFileName, LPCSTR szRegistryRo
 	if( strcmp( szLocalFileName, (const char *)regfilename ) == 0 )
 	{
 		// File previously downloaded
-		testfp = fopen( FTP_TEMPFILENAME, "rb" );
+		testfp = FTP_OPEN( FTP_TEMPFILENAME, "rb" );
 
 		if( testfp == nullptr )
 		{
@@ -1826,7 +1931,7 @@ HRESULT  Cftp::FileRecoveryPosition( LPCSTR szLocalFileName, LPCSTR szRegistryRo
 
 		m_iFilePos = ftell( testfp );
 
-		fclose( testfp );
+		FTP_CLOSE( testfp );
 
 		RegCloseKey(hkey);
 		return( m_iFilePos );

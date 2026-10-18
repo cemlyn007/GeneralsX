@@ -24,6 +24,15 @@
 #include "Lib/BaseTypeCore.h"
 #include "NoxCompress.h"
 #include "CompLibHeader/lzhl.h"
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 15/10/2026 Its files are opened and closed through the engine's file layer (Common/EngineFiles.h)
+#include "Common/EngineFiles.h"
+#define NOXCOMPRESS_OPEN(name, mode) rts::openEngineFile(name, mode)
+#define NOXCOMPRESS_CLOSE(file) rts::closeEngineFile(file)
+#else
+#define NOXCOMPRESS_OPEN(name, mode) fopen(name, mode)
+#define NOXCOMPRESS_CLOSE(file) fclose(file)
+#endif
 
 
 #define BLOCKSIZE 500000
@@ -48,7 +57,7 @@ Bool DecompressFile		(char *infile, char *outfile)
 	if (( infile == nullptr ) || ( outfile == nullptr ))
 		return FALSE;
 
-	inFilePtr = fopen( infile, "rb" );
+	inFilePtr = NOXCOMPRESS_OPEN( infile, "rb" );
 	if ( inFilePtr )
 	{
 		// Allocate the appropriate amount of memory
@@ -77,7 +86,7 @@ Bool DecompressFile		(char *infile, char *outfile)
 		// Read in a big chunk o file
 		NoxRead(inBlock, 1, compressedSize, inFilePtr);
 
-		fclose(inFilePtr);
+		NOXCOMPRESS_CLOSE(inFilePtr);
 
 		// Decompress
 		srcSz = compressedSize;
@@ -102,11 +111,11 @@ Bool DecompressFile		(char *infile, char *outfile)
 
 		Bool success = FALSE;
 		LZHLDestroyDecompressor(decompress);
-		outFilePtr = fopen(outfile, "wb");
+		outFilePtr = NOXCOMPRESS_OPEN(outfile, "wb");
 		if (outFilePtr)
 		{
 			fwrite (outBlock, rawSize, 1, outFilePtr);
-			fclose(outFilePtr);
+			NOXCOMPRESS_CLOSE(outFilePtr);
 			success = TRUE;
 		}
 
@@ -136,7 +145,7 @@ Bool CompressFile			(char *infile, char *outfile)
 		return FALSE;
 
 	// Allocate the appropriate amount of memory
-	inFilePtr = fopen( infile, "rb" );
+	inFilePtr = NOXCOMPRESS_OPEN( infile, "rb" );
 	if ( inFilePtr )
 	{
 		// Get size of file.
@@ -158,7 +167,7 @@ Bool CompressFile			(char *infile, char *outfile)
 		// Read in a big chunk o file
 		NoxRead(inBlock, 1, rawSize, inFilePtr);
 
-		fclose(inFilePtr);
+		NOXCOMPRESS_CLOSE(inFilePtr);
 
 		// Compress
 		compressor = LZHLCreateCompressor();
@@ -171,13 +180,13 @@ Bool CompressFile			(char *infile, char *outfile)
 
 		Bool success = FALSE;
 		LZHLDestroyCompressor(compressor);
-		outFilePtr = fopen(outfile, "wb");
+		outFilePtr = NOXCOMPRESS_OPEN(outfile, "wb");
 		if (outFilePtr)
 		{
 			// write out the uncompressed size first.
 			fwrite(&rawSize, sizeof(UnsignedInt), 1, outFilePtr);
 			fwrite(outBlock, compressedSize, 1, outFilePtr);
-			fclose(outFilePtr);
+			NOXCOMPRESS_CLOSE(outFilePtr);
 			success = TRUE;
 		}
 

@@ -99,6 +99,8 @@ public:
 	virtual WebBrowser *createWebBrowser(void);
 	virtual ParticleSystemManager* createParticleSystemManager(Bool dummy);
 	virtual AudioManager *createAudioManager(Bool dummy);
+	// GeneralsX @refactor cemlyn007 15/10/2026 The audio manager createAudioManager returns, made without an engine.
+	static AudioManager *makeAudioManager(Bool dummy);
 
 	// SDL3 specific
 	virtual SDL_Window* getSDLWindow(void) const { return m_SDLWindow; }

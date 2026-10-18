@@ -25,6 +25,10 @@
 #include "Common/GameAudio.h"
 #include <AL/al.h>
 #include <AL/alc.h>
+#if RTS_ENGINE_CONTEXT
+#include "Common/EmbeddingContract.h"
+#include <optional>
+#endif
 
 class AudioEventRTS;
 class DynamicAudioEventRTS;
@@ -257,6 +261,16 @@ protected:
 	ALCdevice *m_alcDevice = nullptr;
 	ALCcontext *m_alcContext = nullptr;
 	OpenALAudioStream* m_binkAudio = nullptr;
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 15/10/2026 The device and context are recorded in the engine's
+	// ResourceLedger while they are open, so that the host can release them without running this
+	// manager's code (a faulted engine). closeDevice forgets each record as it releases its handle.
+	rts::ResourceLedger *m_ledger = nullptr;
+	std::optional<rts::ResourceLedger::Id> m_alcDeviceRecord;
+	std::optional<rts::ResourceLedger::Id> m_alcContextRecord;
+	// GeneralsX @feature cemlyn007 15/10/2026 The engine whose threads the context is bound to (see openDevice).
+	rts::EngineContext *m_threadBoundEngine = nullptr;
+#endif
 };
 
 // GeneralsX @feature cemlyn007 28/09/2026 Device-free OpenAL audio manager (PLAN-023 Phase 0)

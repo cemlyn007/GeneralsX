@@ -53,6 +53,8 @@
 #include "surfaceclass.h"
 #include "formconv.h"
 #include "dx8wrapper.h"
+// GeneralsX @feature cemlyn007 16/10/2026 Every reference this file takes on a D3D8 surface, and every release of one,
+// goes through the device-wrapper layer's record (dx8ledger.h, included by dx8wrapper.h).
 #include "WWMath/vector2i.h"
 #include "colorspace.h"
 #include "WWLib/bound.h"
@@ -193,7 +195,7 @@ SurfaceClass::SurfaceClass(IDirect3DSurface8 *d3d_surface)	:
 SurfaceClass::~SurfaceClass()
 {
 	if (D3DSurface) {
-		D3DSurface->Release();
+		DX8_RELEASE(D3DSurface);
 		D3DSurface = nullptr;
 	}
 }
@@ -717,7 +719,7 @@ void SurfaceClass::Attach (IDirect3DSurface8 *surface)
 	//	Lock a reference onto the object
 	//
 	if (D3DSurface != nullptr) {
-		D3DSurface->AddRef ();
+		DX8_ADD_REF(D3DSurface, SURFACE);
 	}
 }
 
@@ -743,7 +745,7 @@ void SurfaceClass::Detach ()
 	//	Release the hold we have on the D3D object
 	//
 	if (D3DSurface != nullptr) {
-		D3DSurface->Release ();
+		DX8_RELEASE(D3DSurface);
 	}
 
 	D3DSurface = nullptr;

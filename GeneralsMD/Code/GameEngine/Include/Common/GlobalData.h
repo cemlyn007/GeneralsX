@@ -618,7 +618,11 @@ public:
 	// GameEngine::init reads <dir>/SagePatch.ini, both overriding GameData, so a host that wants
 	// identical play across engines must seed the directory (as rlgenerals does for its automatic
 	// per-engine ones) or accept that an empty or differently-seeded directory changes gameplay settings.
+	// GeneralsX @refactor cemlyn007 15/10/2026 Not with RTS_ENGINE_CONTEXT: there the directory is the engine's user data
+	// root (EmbeddingConfig::userDataRoot), fixed when its context is made.
+#if !RTS_ENGINE_CONTEXT
 	Bool setPath_UserData(const AsciiString &dir);
+#endif
 
 private:
 
@@ -635,7 +639,9 @@ private:
 	// this is private, since we read the info from Windows and cache it for
 	// future use. No one is allowed to change it, ever. (srj)
 	AsciiString m_userDataDir;
+#if !RTS_ENGINE_CONTEXT
 	AsciiString BuildUserDataPathFromRegistry();
+#endif
 
 #if RTS_ENGINE_CONTEXT
 	// GeneralsX @feature cemlyn007 28/09/2026 The original instance is per engine (PLAN-023 Phase 2's

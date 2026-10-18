@@ -49,6 +49,8 @@
 #include "ww3d.h"
 #include "assetmgr.h"
 #include "dx8wrapper.h"
+// GeneralsX @feature cemlyn007 16/10/2026 Every reference this file takes on a D3D8 object, and every release of one,
+// goes through the device-wrapper layer's record (dx8ledger.h, included by dx8wrapper.h).
 #include "dx8caps.h"
 #include "missingtexture.h"
 #include "WWLib/TARGA.h"
@@ -428,8 +430,9 @@ IDirect3DTexture8* Load_Compressed_Texture(
 		IDirect3DSurface8* d3d_surface=nullptr;
 		WWASSERT(d3d_texture);
 		DX8_ErrorCode(d3d_texture->GetSurfaceLevel(level/*-reduction_factor*/,&d3d_surface));
+		DX8_RECORD(d3d_surface, SURFACE);
 		dds_file.Copy_Level_To_Surface(level,d3d_surface);
-		d3d_surface->Release();
+		DX8_RELEASE(d3d_surface);
 	}
 	return d3d_texture;
 }
@@ -708,7 +711,7 @@ IDirect3DTexture8* TextureLoader::Load_Thumbnail(const StringClass& filename, co
 		TextureBaseClass::MIP_LEVELS_ALL,
 		D3DPOOL_DEFAULT);
 	DX8CALL(UpdateTexture(sysmem_texture,d3d_texture));
-	sysmem_texture->Release();
+	DX8_RELEASE(sysmem_texture);
 
 	WWDEBUG_SAY(("Created non-managed texture (%s)",filename));
 	return d3d_texture;
@@ -737,7 +740,8 @@ IDirect3DSurface8* TextureLoader::Load_Surface_Immediate(
 		if (comp_tex) {
 			IDirect3DSurface8* d3d_surface=nullptr;
 			DX8_ErrorCode(comp_tex->GetSurfaceLevel(0,&d3d_surface));
-			comp_tex->Release();
+			DX8_RECORD(d3d_surface, SURFACE);
+			DX8_RELEASE(comp_tex);
 			return d3d_surface;
 		}
 	}
@@ -1228,7 +1232,7 @@ void TextureLoader::Load_Thumbnail(TextureBaseClass *tc)
 	}
 
 	// release our reference to thumbnail texture
-	d3d_texture->Release();
+	DX8_RELEASE(d3d_texture);
 	d3d_texture = nullptr;
 }
 
@@ -1350,7 +1354,7 @@ void TextureLoadTaskClass::Abandon_Load()
 		return;
 	}
 	Unlock_Surfaces();
-	D3DTexture->Release();
+	DX8_RELEASE(D3DTexture);
 	D3DTexture = nullptr;
 	State = STATE_NONE;
 }
@@ -1586,7 +1590,7 @@ void TextureLoadTaskClass::Apply(bool initialize)
 	// GeneralsX @bugfix fbraz 04/05/2026 Avoid null dereference if task lost its texture association mid-flight.
 	if (Texture == nullptr)
 	{
-		D3DTexture->Release();
+		DX8_RELEASE(D3DTexture);
 		D3DTexture = nullptr;
 		return;
 	}
@@ -1598,7 +1602,7 @@ void TextureLoadTaskClass::Apply(bool initialize)
 
 	Texture->Apply_New_Surface(D3DTexture, initialize);
 
-	D3DTexture->Release();
+	DX8_RELEASE(D3DTexture);
 	D3DTexture = nullptr;
 }
 
@@ -2002,7 +2006,7 @@ void TextureLoadTaskClass::Unlock_Surfaces()
 #ifndef USE_MANAGED_TEXTURES
 	IDirect3DTexture8* tex = DX8Wrapper::_Create_DX8_Texture(Width, Height, Format, Texture->MipLevelCount,D3DPOOL_DEFAULT);
 	DX8CALL(UpdateTexture(Peek_D3D_Texture(),tex));
-	Peek_D3D_Texture()->Release();
+	DX8_RELEASE(Peek_D3D_Texture());
 	D3DTexture=tex;
 	WWDEBUG_SAY(("Created non-managed texture (%s)",Texture->Get_Full_Path()));
 #endif
@@ -2390,7 +2394,7 @@ void CubeTextureLoadTaskClass::Unlock_Surfaces()
 		D3DPOOL_DEFAULT
 	);
 	DX8CALL(UpdateTexture(Peek_D3D_Volume_Texture(),tex));
-	Peek_D3D_Volume_Texture()->Release();
+	DX8_RELEASE(Peek_D3D_Volume_Texture());
 	D3DTexture=tex;
 	WWDEBUG_SAY(("Created non-managed texture (%s)",Texture->Get_Full_Path()));
 #endif
@@ -2696,7 +2700,7 @@ void VolumeTextureLoadTaskClass::Unlock_Surfaces()
 #ifndef USE_MANAGED_TEXTURES
 	IDirect3DTexture8* tex = DX8Wrapper::_Create_DX8_Volume_Texture(Width, Height, Depth, Format, Texture->MipLevelCount,D3DPOOL_DEFAULT);
 	DX8CALL(UpdateTexture(Peek_D3D_Volume_Texture(),tex));
-	Peek_D3D_Volume_Texture()->Release();
+	DX8_RELEASE(Peek_D3D_Volume_Texture());
 	D3DTexture=tex;
 	WWDEBUG_SAY(("Created non-managed texture (%s)",Texture->Get_Full_Path()));
 #endif

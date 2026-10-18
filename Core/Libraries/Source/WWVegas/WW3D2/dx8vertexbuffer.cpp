@@ -450,7 +450,8 @@ DX8VertexBufferClass::~DX8VertexBufferClass()
 	_DX8VertexBufferCount--;
 	WWDEBUG_SAY(("Current vertex buffer count: %d",_DX8VertexBufferCount));
 #endif
-	VertexBuffer->Release();
+	// GeneralsX @feature cemlyn007 16/10/2026 The buffer's record is forgotten as it is released (dx8ledger.h).
+	DX8_RELEASE(VertexBuffer);
 }
 
 // ----------------------------------------------------------------------------
@@ -495,6 +496,8 @@ void DX8VertexBufferClass::Create_Vertex_Buffer(UsageType usage)
 		(usage&USAGE_DYNAMIC) ? D3DPOOL_DEFAULT : D3DPOOL_MANAGED,
 		&VertexBuffer);
 	if (SUCCEEDED(ret)) {
+		// GeneralsX @feature cemlyn007 16/10/2026 Recorded (dx8ledger.h).
+		DX8_RECORD(VertexBuffer, VERTEX_BUFFER);
 		return;
 	}
 
@@ -521,6 +524,7 @@ void DX8VertexBufferClass::Create_Vertex_Buffer(UsageType usage)
 
 	if (SUCCEEDED(ret)) {
 		WWDEBUG_SAY(("...Vertex buffer creation successful"));
+		DX8_RECORD(VertexBuffer, VERTEX_BUFFER);
 	}
 
 	// If it still fails it is fatal

@@ -342,6 +342,8 @@ DX8IndexBufferClass::DX8IndexBufferClass(unsigned short index_count_,UsageType u
 		&index_buffer);
 
 	if (SUCCEEDED(ret)) {
+		// GeneralsX @feature cemlyn007 16/10/2026 Recorded (dx8ledger.h).
+		DX8_RECORD(index_buffer, INDEX_BUFFER);
 		return;
 	}
 
@@ -365,6 +367,7 @@ DX8IndexBufferClass::DX8IndexBufferClass(unsigned short index_count_,UsageType u
 
 	if (SUCCEEDED(ret)) {
 		WWDEBUG_SAY(("...Index buffer creation successful"));
+		DX8_RECORD(index_buffer, INDEX_BUFFER);
 	}
 
 	// If it still fails it is fatal
@@ -375,7 +378,8 @@ DX8IndexBufferClass::DX8IndexBufferClass(unsigned short index_count_,UsageType u
 
 DX8IndexBufferClass::~DX8IndexBufferClass()
 {
-	index_buffer->Release();
+	// GeneralsX @feature cemlyn007 16/10/2026 The buffer's record is forgotten as it is released (dx8ledger.h).
+	DX8_RELEASE(index_buffer);
 }
 
 // ----------------------------------------------------------------------------

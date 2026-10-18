@@ -479,6 +479,10 @@ bool Profile::SimpleMatch(const char *str, const char *pattern)
   return *str==*pattern;
 }
 
+// GeneralsX @bugfix cemlyn007 16/10/2026 With RTS_ENGINE_CONTEXT no engine registers code to run at the process's
+// exit, when its engine may be gone or abandoned after a fault (banned symbol rule "process-wide C library state"), so
+// the profiler writes no results at exit. Nothing in an engine build uses the profiler.
+#if !RTS_ENGINE_CONTEXT
 static void ProfileShutdown()
 {
 #ifdef RTS_PROFILE_LEGACY
@@ -491,9 +495,5 @@ static void ProfileShutdown()
   cmd.RunResultFunctions();
 }
 
-#if RTS_ENGINE_CONTEXT
-RTS_ENGINE_EXTERN_GLOBAL_DEFINE(int, profileTracerInit, atexit(ProfileShutdown));
-#define profileTracerInit RTS_ENGINE_GLOBAL_REF(profileTracerInit)
-#else
 int profileTracerInit=atexit(ProfileShutdown);
 #endif

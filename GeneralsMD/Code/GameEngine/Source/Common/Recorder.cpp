@@ -50,6 +50,7 @@
 #include "Common/OptionPreferences.h"
 #include "Common/version.h"
 #include "Lib/PathUtil.h"
+#include "Common/InvalidInputData.h"	// GeneralsX @feature cemlyn007 15/10/2026 A corrupt replay is the host's bad input
 
 
 constexpr const char s_genrep[] = "GENREP";
@@ -840,6 +841,16 @@ void RecorderClass::writeArgument(GameMessageArgumentDataType type, const GameMe
  * Read in a replay header, for (1) populating a replay listbox or (2) starting playback.  In
  * case (2), set FILE *m_file.
  */
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 15/10/2026 A replay the host plays back whose data is invalid is the host's bad input
+// (Common/InvalidInputData.h). Reading a header for a listing (the replay menu) still only reports the failure.
+static void refuseReplayForPlayback(Bool forPlayback, const AsciiString& path, const char* reason)
+{
+	if (forPlayback)
+		throw rts::InvalidInputData(path.str(), reason);
+}
+#endif
+
 Bool RecorderClass::readReplayHeader(ReplayHeader& header, const AsciiString& filename, Bool forPlayback)
 {
 	header.filename = getReplayPathForRead(filename);
@@ -861,6 +872,9 @@ Bool RecorderClass::readReplayHeader(ReplayHeader& header, const AsciiString& fi
 		DEBUG_LOG(("RecorderClass::readReplayHeader - replay file did not have GENREP at the start."));
 		m_file->close();
 		m_file = nullptr;
+#if RTS_ENGINE_CONTEXT
+		refuseReplayForPlayback(forPlayback, header.filename, "the file is not a replay (no GENREP header)");
+#endif
 		return FALSE;
 	}
 
@@ -912,6 +926,9 @@ Bool RecorderClass::readReplayHeader(ReplayHeader& header, const AsciiString& fi
 		DEBUG_LOG(("RecorderClass::readReplayHeader - replay file did not have a valid GameInfo string."));
 		m_file->close();
 		m_file = nullptr;
+#if RTS_ENGINE_CONTEXT
+		refuseReplayForPlayback(forPlayback, header.filename, "the replay's game options are invalid");
+#endif
 		return FALSE;
 	}
 	m_gameInfo.startGame(0);
@@ -925,6 +942,9 @@ Bool RecorderClass::readReplayHeader(ReplayHeader& header, const AsciiString& fi
 		m_gameInfo.reset();
 		m_file->close();
 		m_file = nullptr;
+#if RTS_ENGINE_CONTEXT
+		refuseReplayForPlayback(forPlayback, header.filename, "the replay's local player slot is invalid");
+#endif
 		return FALSE;
 	}
 	// TheSuperHackers @bugfix bobtista 17/09/2026 Preserve the recorded local slot, including -1 for no local player.
@@ -1142,10 +1162,24 @@ void RecorderClass::handleCRCMessage(UnsignedInt newCRC, Int playerIndex, Bool f
 Bool RecorderClass::replayMatchesGameVersion(AsciiString filename)
 {
 	ReplayHeader header;
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 15/10/2026 Only asking: a replay with invalid data does not match
+	try
+	{
+		if ( readReplayHeader( header, filename, TRUE ) )
+		{
+			return replayMatchesGameVersion( header );
+		}
+	}
+	catch (const rts::InvalidInputData&)
+	{
+	}
+#else
 	if ( readReplayHeader( header, filename, TRUE ) )
 	{
 		return replayMatchesGameVersion( header );
 	}
+#endif
 	return FALSE;
 }
 

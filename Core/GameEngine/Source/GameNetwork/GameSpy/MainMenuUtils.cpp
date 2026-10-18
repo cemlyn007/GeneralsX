@@ -54,6 +54,12 @@
 
 #include "WWDownload/Registry.h"
 #include "WWDownload/urlBuilder.h"
+#if RTS_ENGINE_CONTEXT
+#include "Common/EngineThread.h" // GeneralsX @feature cemlyn007 15/10/2026 rts::startEngineThread
+#include "Common/EngineSockets.h" // GeneralsX @feature cemlyn007 16/10/2026 rts::resolveEngineHostName
+// GeneralsX @feature cemlyn007 15/10/2026 Its files are opened and closed through the engine's file layer (Common/EngineFiles.h)
+#include "Common/EngineFiles.h"
+#endif
 
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -134,7 +140,8 @@ RTS_ENGINE_GLOBAL(Bool, s_asyncDNSLookupInProgress, FALSE);
 static Bool s_asyncDNSLookupInProgress = FALSE;
 #endif
 #if RTS_ENGINE_CONTEXT
-RTS_ENGINE_GLOBAL(HANDLE, s_asyncDNSThreadHandle, nullptr);
+// GeneralsX @feature cemlyn007 15/10/2026 The lookup thread, started through the engine's ThreadStarter
+RTS_ENGINE_GLOBAL(std::shared_ptr<rts::EngineThread>, s_asyncDNSThreadHandle);
 #define s_asyncDNSThreadHandle RTS_ENGINE_GLOBAL_REF(s_asyncDNSThreadHandle)
 #else
 static HANDLE s_asyncDNSThreadHandle = nullptr;
@@ -211,6 +218,11 @@ static void noPatchBeforeOnlineCallback()
 
 static Bool hasWriteAccess()
 {
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 15/10/2026 The probe asked whether the game directory, the working directory upstream, can be
+	// written for a patch. With RTS_ENGINE_CONTEXT that is the engine's asset root, which is read-only (Common/EngineFiles.h).
+	return false;
+#else
 	const char* filename = "PatchAccessTest.txt";
 
 	remove(filename);
@@ -236,6 +248,7 @@ static Bool hasWriteAccess()
 	}
 
 	return true;
+#endif
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -445,11 +458,19 @@ static GHTTPBool configCallback( GHTTPRequest request, GHTTPResult result,
 
 	AsciiString fname;
 	fname.format("%sGeneralsOnline/Config.txt", TheGlobalData->getPath_UserData().str());
+#if RTS_ENGINE_CONTEXT
+	FILE *fp = rts::openEngineFile(fname.str(), "wb");
+#else
 	FILE *fp = fopen(fname.str(), "wb");
+#endif
 	if (fp)
 	{
 		fwrite(configBuffer, bufferLen, 1, fp);
+#if RTS_ENGINE_CONTEXT
+		rts::closeEngineFile(fp);
+#else
 		fclose(fp);
+#endif
 	}
 
 	--checksLeftBeforeOnline;
@@ -500,12 +521,20 @@ static GHTTPBool configHeadCallback( GHTTPRequest request, GHTTPResult result,
 				Int fileLen = 0;
 				AsciiString fname;
 				fname.format("%sGeneralsOnline/Config.txt", TheGlobalData->getPath_UserData().str());
+#if RTS_ENGINE_CONTEXT
+				FILE *fp = rts::openEngineFile(fname.str(), "rb");
+#else
 				FILE *fp = fopen(fname.str(), "rb");
+#endif
 				if (fp)
 				{
 					fseek(fp, 0, SEEK_END);
 					fileLen = ftell(fp);
+#if RTS_ENGINE_CONTEXT
+					rts::closeEngineFile(fp);
+#else
 					fclose(fp);
+#endif
 				}
 
 				if (serverLen == fileLen)
@@ -524,13 +553,21 @@ static GHTTPBool configHeadCallback( GHTTPRequest request, GHTTPResult result,
 
 					AsciiString fname;
 					fname.format("%sGeneralsOnline/Config.txt", TheGlobalData->getPath_UserData().str());
+#if RTS_ENGINE_CONTEXT
+					FILE *fp = rts::openEngineFile(fname.str(), "rb");
+#else
 					FILE *fp = fopen(fname.str(), "rb");
+#endif
 					if (fp)
 					{
 						configBuffer = NEW char[fileLen];
 						fread(configBuffer, fileLen, 1, fp);
 						configBuffer[fileLen-1] = 0;
+#if RTS_ENGINE_CONTEXT
+						rts::closeEngineFile(fp);
+#else
 						fclose(fp);
+#endif
 
 						DEBUG_LOG(("Got Config before going online"));
 
@@ -778,6 +815,24 @@ void CheckNumPlayersOnline()
 
 ///////////////////////////////////////////////////////////////////////////////////////
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 15/10/2026 The lookup runs on a thread started through the engine's ThreadStarter
+// (Common/EngineThread.h), with its own copy of the host name (the caller's is a local array).
+// GeneralsX @feature cemlyn007 16/10/2026 It asks the name servers through the engine's socket layer
+// (rts::resolveEngineHostName) instead of gethostbyname, which cannot be interrupted, so a stop request ends the lookup
+// within a poll interval; the thread then leaves the results alone.
+static void asyncGethostbynameThreadBody( const std::string& name, const std::stop_token& stop )
+{
+	const std::optional<in_addr> address = rts::resolveEngineHostName( name.c_str(), stop );
+	if (stop.stop_requested())
+	{
+		return;
+	}
+
+	s_asyncDNSThreadSucceeded = address ? TRUE : FALSE;
+	s_asyncDNSThreadDone = TRUE;
+}
+#else
 DWORD WINAPI asyncGethostbynameThreadFunc( void * szName )
 {
 	HOSTENT *he = gethostbyname( (const char *)szName );
@@ -794,6 +849,7 @@ DWORD WINAPI asyncGethostbynameThreadFunc( void * szName )
 	s_asyncDNSThreadDone = TRUE;
 	return 0;
 }
+#endif
 
 ///////////////////////////////////////////////////////////////////////////////////////
 
@@ -804,9 +860,7 @@ int asyncGethostbyname(char * szName)
 #else
 	static int            stat = 0;
 #endif
-#if RTS_ENGINE_CONTEXT
-	RTS_ENGINE_STATIC(unsigned long, threadid);
-#else
+#if !RTS_ENGINE_CONTEXT
 	static unsigned long  threadid;
 #endif
 
@@ -814,7 +868,14 @@ int asyncGethostbyname(char * szName)
 	{
 		/* Kick off gethostname thread */
 		s_asyncDNSThreadDone = FALSE;
+#if RTS_ENGINE_CONTEXT
+		s_asyncDNSThreadHandle = rts::startEngineThread( "async DNS lookup", [name = std::string(szName)]( std::stop_token stop )
+		{
+			asyncGethostbynameThreadBody( name, stop );
+		} );
+#else
 		s_asyncDNSThreadHandle = CreateThread( nullptr, 0, asyncGethostbynameThreadFunc, szName, 0, &threadid );
+#endif
 
 		if( s_asyncDNSThreadHandle == nullptr )
 		{
@@ -888,9 +949,15 @@ void StopAsyncDNSCheck()
 {
 	if (s_asyncDNSThreadHandle)
 	{
+#if RTS_ENGINE_CONTEXT
+		// GeneralsX @feature cemlyn007 15/10/2026 A thread is never terminated: it is asked to stop, and leaves the
+		// lookup's results alone when its lookup returns
+		s_asyncDNSThreadHandle->requestStop();
+#else
 		MAYBE_UNUSED Int res = TerminateThread(s_asyncDNSThreadHandle, 0);
 		(void)res;
 		DEBUG_ASSERTCRASH(res, ("Could not terminate the Async DNS Lookup thread!"));	// Thread still not killed!
+#endif
 	}
 	s_asyncDNSThreadHandle = nullptr;
 	s_asyncDNSLookupInProgress = FALSE;

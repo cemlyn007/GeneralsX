@@ -13,6 +13,17 @@
 #include <direct.h>
 #endif
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 15/10/2026 The registry file is the engine's own, in its user data root, and is opened through
+// the engine's file layer (Common/EngineFiles.h), so that an engine never reads or writes the user's real registry file.
+#include "Common/EngineFiles.h"
+#define REGISTRYINI_OPEN(name, mode) rts::openEngineFile(name, mode)
+#define REGISTRYINI_CLOSE(file) rts::closeEngineFile(file)
+#else
+#define REGISTRYINI_OPEN(name, mode) fopen(name, mode)
+#define REGISTRYINI_CLOSE(file) fclose(file)
+#endif
+
 namespace {
 	typedef std::map<std::string, std::string> RegistryIniSection;
 	typedef std::map<std::string, RegistryIniSection> RegistryIniData;
@@ -55,6 +66,9 @@ namespace {
 
 	std::string GetRegistryIniDirectory()
 	{
+	#if RTS_ENGINE_CONTEXT
+		return rts::engineUserDataRoot().string();
+	#endif
 	#ifdef _WIN32
 		const char *appData = getenv("APPDATA");
 		if (appData != nullptr && appData[0] != '\0') {
@@ -102,12 +116,12 @@ namespace {
 			return false;
 		}
 
-		FILE *file = fopen(GetRegistryIniPath().c_str(), "a");
+		FILE *file = REGISTRYINI_OPEN(GetRegistryIniPath().c_str(), "a");
 		if (file == nullptr) {
 			return false;
 		}
 
-		fclose(file);
+		REGISTRYINI_CLOSE(file);
 		return true;
 	}
 
@@ -316,7 +330,7 @@ namespace {
 			return false;
 		}
 
-		FILE *file = fopen(GetRegistryIniPath().c_str(), "r");
+		FILE *file = REGISTRYINI_OPEN(GetRegistryIniPath().c_str(), "r");
 		if (file == nullptr) {
 			return false;
 		}
@@ -359,7 +373,7 @@ namespace {
 			data[currentSection][key] = value;
 		}
 
-		fclose(file);
+		REGISTRYINI_CLOSE(file);
 		return true;
 	}
 
@@ -369,7 +383,7 @@ namespace {
 			return false;
 		}
 
-		FILE *file = fopen(GetRegistryIniPath().c_str(), "w");
+		FILE *file = REGISTRYINI_OPEN(GetRegistryIniPath().c_str(), "w");
 		if (file == nullptr) {
 			return false;
 		}
@@ -382,7 +396,7 @@ namespace {
 			fprintf(file, "\n");
 		}
 
-		fclose(file);
+		REGISTRYINI_CLOSE(file);
 		return true;
 	}
 }

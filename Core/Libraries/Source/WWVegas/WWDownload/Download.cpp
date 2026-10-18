@@ -19,6 +19,11 @@
 // Download.cpp : Implementation of CDownload
 #include "DownloadDebug.h"
 #include "Download.h"
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 15/10/2026 Its download directory and files are resolved through the engine's file layer
+// (Common/EngineFiles.h): a relative one lies under the read-only asset root, where nothing is made.
+#include "Common/EngineFiles.h"
+#endif
 // GeneralsX @refactor BenderAI 10/02/2026
 // Added platform guards for Windows-specific headers
 #include "WWLib/stringex.h"
@@ -77,7 +82,12 @@ HRESULT CDownload::DownloadFile(LPCSTR server, LPCSTR username, LPCSTR password,
 	}
 
 	// Make sure we have a download directory
+#if RTS_ENGINE_CONTEXT
+	if (rts::isEngineWritablePath(rts::resolveEnginePath("download")))
+		_mkdir(rts::resolveEnginePath("download").c_str());
+#else
 	_mkdir("download");
+#endif
 
 	// Copy parameters to member variables.
 	strlcpy( m_Server, server, sizeof( m_Server ) );
@@ -292,7 +302,11 @@ HRESULT CDownload::PumpMessages()
 			//
 			// We identify patches because they are written into the patches folder.
 			struct _stat statdata;
+#if RTS_ENGINE_CONTEXT
+			if (	(_stat(rts::resolveEnginePath(m_LocalFile).c_str(), &statdata) == 0) &&
+#else
 			if (	(_stat(m_LocalFile, &statdata) == 0) &&
+#endif
 					(statdata.st_size == m_FileSize) &&
 					(_strnicmp(m_LocalFile, "patches\\", strlen("patches\\"))==0)) {
 				// OK, no need to download this again....
