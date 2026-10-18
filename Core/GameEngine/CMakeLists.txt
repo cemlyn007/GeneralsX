@@ -39,6 +39,7 @@ set(GAMEENGINE_SRC
     Include/Common/EngineContextFields.inl
     Include/Common/EngineFiles.h
     Include/Common/EngineSockets.h
+    Include/Common/EngineTestHooks.h
     Include/Common/EngineCLibrary.h
     Include/Common/RealTimeStopwatch.h
     Include/Common/EngineSingletonMacros.h
@@ -627,6 +628,7 @@ set(GAMEENGINE_SRC
     Source/Common/INI/INIWebpageURL.cpp
     Source/Common/Language.cpp
     Source/Common/MessageStream.cpp
+    Source/Common/EngineTestHooks.cpp
     Source/Common/MiniLog.cpp
 #    Source/Common/MultiplayerSettings.cpp
 #    Source/Common/NameKeyGenerator.cpp
