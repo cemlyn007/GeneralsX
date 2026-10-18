@@ -428,7 +428,11 @@ void DebugInit(int flags)
 
 		// TheSuperHackers @info Debug initialization can happen very early.
 		// Determine the client instance id before creating the log file with an instance specific name.
+		// GeneralsX @refactor cemlyn007 16/10/2026 With RTS_ENGINE_CONTEXT the host parses its engine's command line
+		// (CommandLine.h) before it starts the engine, so there is none to parse here.
+#if !RTS_ENGINE_CONTEXT
 		CommandLine::parseCommandLineForStartup();
+#endif
 
 		if (!rts::ClientInstance::initialize())
 			return;

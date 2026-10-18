@@ -1420,6 +1420,11 @@ static const CommandLineParam paramsForEngineInit[] =
 
 };
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @refactor cemlyn007 16/10/2026 The arguments the host gave parseCommandLineForStartup (CommandLine.h)
+static void parseCommandLine(const CommandLineParam* params, int numParams, BoolVector &parsedArguments, int argc, char **argv)
+{
+#else
 static void parseCommandLine(const CommandLineParam* params, int numParams, BoolVector &parsedArguments)
 {
 	// Startup parsing can run from static constructors, before WinMain.
@@ -1429,6 +1434,7 @@ static void parseCommandLine(const CommandLineParam* params, int numParams, Bool
 #endif
 	int argc = __argc;
 	char **argv = __argv;
+#endif
 	if (argc > 0)
 	{
 		// Skip the first argument which is the executable file name.
@@ -1495,7 +1501,11 @@ void createGlobalData()
 		TheWritableGlobalData = NEW GlobalData;
 }
 
+#if RTS_ENGINE_CONTEXT
+void CommandLine::parseCommandLineForStartup(int argc, char** argv)
+#else
 void CommandLine::parseCommandLineForStartup()
+#endif
 {
 	// We need the GlobalData initialized before parsing the command line.
 	// Note that this function is potentially called multiple times and only initializes the first time.
@@ -1504,9 +1514,18 @@ void CommandLine::parseCommandLineForStartup()
 	if (TheGlobalData->m_commandLineData.m_hasParsedCommandLineForStartup)
 		return;
 	TheWritableGlobalData->m_commandLineData.m_hasParsedCommandLineForStartup = true;
+#if RTS_ENGINE_CONTEXT
+	TheWritableGlobalData->m_commandLineData.m_argc = argc;
+	TheWritableGlobalData->m_commandLineData.m_argv = argv;
+#endif
 
+#if RTS_ENGINE_CONTEXT
+	parseCommandLine(paramsForStartup, ARRAY_SIZE(paramsForStartup),
+		TheWritableGlobalData->m_commandLineData.m_parsedArguments, argc, argv);
+#else
 	parseCommandLine(paramsForStartup, ARRAY_SIZE(paramsForStartup),
 		TheWritableGlobalData->m_commandLineData.m_parsedArguments);
+#endif
 
 	// GeneralsX @bugfix fbraz 15/09/2026 Restrict default executable working directory fallback to Windows
 	// On POSIX/Linux/Flatpak, binaries reside in system paths (/app/bin) while game assets reside in CWD/data dirs.
@@ -1526,6 +1545,12 @@ void CommandLine::parseCommandLineForEngineInit()
 		("parseCommandLineForEngineInit is expected to be called once only\n"));
 	TheWritableGlobalData->m_commandLineData.m_hasParsedCommandLineForEngineInit = true;
 
+#if RTS_ENGINE_CONTEXT
+	parseCommandLine(paramsForEngineInit, ARRAY_SIZE(paramsForEngineInit),
+		TheWritableGlobalData->m_commandLineData.m_parsedArguments,
+		TheGlobalData->m_commandLineData.m_argc, TheGlobalData->m_commandLineData.m_argv);
+#else
 	parseCommandLine(paramsForEngineInit, ARRAY_SIZE(paramsForEngineInit),
 		TheWritableGlobalData->m_commandLineData.m_parsedArguments);
+#endif
 }

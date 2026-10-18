@@ -828,7 +828,12 @@ Int APIENTRY WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance,
 		// initialize the memory manager early
 		initMemoryManager();
 
+#if RTS_ENGINE_CONTEXT
+		// GeneralsX @refactor cemlyn007 16/10/2026 The executable gives its engine its own command line (CommandLine.h)
+		CommandLine::parseCommandLineForStartup(__argc, __argv);
+#else
 		CommandLine::parseCommandLineForStartup();
+#endif
 
 
 		#ifdef RTS_DEBUG
