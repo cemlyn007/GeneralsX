@@ -113,3 +113,14 @@ RTS_ENGINE_CONTEXT_POINTER(WW3DState, ww3dState)
 // the window outlives the engine (PLAN-023 Phase 8, stage RR2a-2).
 RTS_ENGINE_CONTEXT_VALUE(::SDL_Window*, sdl3Window, nullptr)
 RTS_ENGINE_CONTEXT_VALUE(void*, applicationHWnd, nullptr)
+
+// GeneralsX @feature cemlyn007 16/10/2026 The playback's checksum mismatch latch: the frame of the first logic
+// checksum a replay holds that disagreed with this engine's live simulation (RecorderClass::handleCRCMessage), or -1
+// while none has. Each playback starts with it cleared (RecorderClass::playbackFile), and a host stops running frames
+// once it is set.
+RTS_ENGINE_CONTEXT_VALUE(std::int64_t, playbackMismatchFrame, -1)
+
+// GeneralsX @feature cemlyn007 16/10/2026 Test-only: how many of this engine's next scratch-pad map deletes fail, as
+// a delete the file system refused does, leaving the file in place (GameStateMap::clearScratchPadMaps). A host's test
+// sets it to check that a scratch-pad map whose delete failed is kept and retried.
+RTS_ENGINE_CONTEXT_VALUE(std::int32_t, failingScratchMapDeletes, 0)

@@ -192,12 +192,19 @@ namespace
 	}
 #endif
 
+	// GeneralsX @bugfix cemlyn007 17/10/2026 Nothing is reported while a game's data is cleared: the units that go
+	// idle as the game is torn down are making no decision of the game, and their reports landed among the next game's.
+	Bool clearingGameData()
+	{
+		return TheGameLogic != nullptr && TheGameLogic->isClearingGameData();
+	}
+
 	Bool active()
 	{
 #if RTS_ENGINE_CONTEXT
-		return decisionSink() != nullptr && observerState().muted == 0;
+		return decisionSink() != nullptr && observerState().muted == 0 && !clearingGameData();
 #else
-		return s_observer != nullptr && s_muted == 0;
+		return s_observer != nullptr && s_muted == 0 && !clearingGameData();
 #endif
 	}
 

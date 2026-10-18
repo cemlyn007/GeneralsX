@@ -3142,6 +3142,21 @@ inline void GameLogic::validateSleepyUpdate() const
 }
 
 // ------------------------------------------------------------------------------------------------
+#if RTS_ENGINE_CONTEXT
+void GameLogic::forgetUpdateModulesOfAFailedLoad()
+{
+	for (std::vector<UpdateModulePtr>::iterator it = m_sleepyUpdates.begin(); it != m_sleepyUpdates.end(); ++it)
+	{
+		(*it)->friend_setIndexInLogic(-1);
+	}
+	m_sleepyUpdates.clear();
+#ifdef ALLOW_NONSLEEPY_UPDATES
+	m_normalUpdates.clear();
+#endif
+	m_curUpdateModule = nullptr;
+}
+#endif
+
 void GameLogic::eraseSleepyUpdate(Int i)
 {
 	USE_PERF_TIMER(SleepyMaintenance)
