@@ -391,6 +391,20 @@ public:
 	// modules hide their shadows to match. endViewLook puts every look back as it was.
 	void beginViewLook( const Player *viewer );
 	void endViewLook();
+	// GeneralsX @feature cemlyn007 21/10/2026 The index of the player whose view is being drawn, between beginViewLook and
+	// endViewLook, or -1
+	Int getViewLookPlayerIndex() const { return m_inViewLook ? m_viewLookPlayerIndex : -1; }
+
+	// GeneralsX @feature cemlyn007 21/10/2026 The team colour a player sees the drawable in, and whether it sees it
+	// garrisoned, where GeneralsX works them out for its local player alone and bakes them into the model: a disguise's
+	// colour (StealthUpdate::changeVisualDisguise) and a garrison's colour and garrisoned model
+	// (GarrisonContain::recalcApparentControllingPlayer). Each is recorded when GeneralsX would set it, as GeneralsX would
+	// set it for that player were it the local player. setIndicatorColor forgets them all, since the drawable then looks
+	// the same to every player. A model draw draws a variant of its model in the views of the players who see another
+	// look than its own (W3DModelDraw::syncViewLookVariant), which the client tick keeps up to date (syncViewLookVariants).
+	void setPlayerLook( Int playerIndex, Color color, Bool garrisoned );
+	Bool getPlayerLook( Int playerIndex, Color *color, Bool *garrisoned ) const;
+	void syncViewLookVariants();
 #endif
 
 	void setShadowsEnabled(Bool enable);
@@ -729,6 +743,16 @@ private:
 	};
 	ViewLookSaved	m_viewLookSaved;
 	Bool					m_inViewLook = FALSE;	///< between beginViewLook and endViewLook
+	Int						m_viewLookPlayerIndex = -1;	///< GeneralsX @feature cemlyn007 21/10/2026 beginViewLook's viewer
+
+	// GeneralsX @feature cemlyn007 21/10/2026 Each player's look (setPlayerLook), made when the first is recorded
+	struct PlayerLook
+	{
+		Color color = 0;
+		Bool garrisoned = FALSE;
+		Bool recorded = FALSE;
+	};
+	PlayerLook*		m_playerLooks = nullptr;
 #endif
 
 	DrawableLocoInfo*	m_locoInfo;	// lazily allocated

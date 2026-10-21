@@ -90,6 +90,10 @@ public:
 	// the draw (endViewLook). Neither changes anything but what the draw shows.
 	virtual void beginViewLook(Bool hidden, Bool fullyObscured) {}
 	virtual void endViewLook() {}
+	// GeneralsX @feature cemlyn007 21/10/2026 For the client tick of an engine that draws on demand: make, change or drop
+	// the variant this module draws in the views of players who see its drawable with another look
+	// (Drawable::setPlayerLook)
+	virtual void syncViewLookVariant() {}
 #endif
 
 	virtual Bool isVisible() const { return true; }	///< for limiting tree sway, etc to visible objects

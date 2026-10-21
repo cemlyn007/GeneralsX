@@ -614,6 +614,12 @@ Drawable::~Drawable()
 
 	m_ambientSound.Clear();
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 Each player's look (setPlayerLook)
+	delete [] m_playerLooks;
+	m_playerLooks = nullptr;
+#endif
+
   clearCustomSoundAmbient( false );
 
 	/// @todo this is nasty, we need a real general effects system
@@ -2681,6 +2687,7 @@ void Drawable::beginViewLook( const Player *viewer )
 	m_viewLookSaved.hiddenByStealth = m_hiddenByStealth;
 	m_viewLookSaved.fullyObscuredByShroud = m_drawableFullyObscuredByShroud;
 	m_inViewLook = TRUE;
+	m_viewLookPlayerIndex = viewer != nullptr ? viewer->getPlayerIndex() : -1;
 	if (viewer == nullptr || isDrawableEffectivelyHidden())
 		return;
 
@@ -2722,6 +2729,38 @@ void Drawable::endViewLook()
 	m_hiddenByStealth = m_viewLookSaved.hiddenByStealth;
 	m_drawableFullyObscuredByShroud = m_viewLookSaved.fullyObscuredByShroud;
 	m_inViewLook = FALSE;
+	m_viewLookPlayerIndex = -1;
+}
+
+//-------------------------------------------------------------------------------------------------
+// GeneralsX @feature cemlyn007 21/10/2026 See Drawable.h
+//-------------------------------------------------------------------------------------------------
+void Drawable::setPlayerLook( Int playerIndex, Color color, Bool garrisoned )
+{
+	if (playerIndex < 0 || playerIndex >= MAX_PLAYER_COUNT)
+		return;
+	if (m_playerLooks == nullptr)
+		m_playerLooks = new PlayerLook[MAX_PLAYER_COUNT];
+	m_playerLooks[playerIndex].color = color;
+	m_playerLooks[playerIndex].garrisoned = garrisoned;
+	m_playerLooks[playerIndex].recorded = TRUE;
+}
+
+//-------------------------------------------------------------------------------------------------
+Bool Drawable::getPlayerLook( Int playerIndex, Color *color, Bool *garrisoned ) const
+{
+	if (m_playerLooks == nullptr || playerIndex < 0 || playerIndex >= MAX_PLAYER_COUNT || !m_playerLooks[playerIndex].recorded)
+		return FALSE;
+	*color = m_playerLooks[playerIndex].color;
+	*garrisoned = m_playerLooks[playerIndex].garrisoned;
+	return TRUE;
+}
+
+//-------------------------------------------------------------------------------------------------
+void Drawable::syncViewLookVariants()
+{
+	for (DrawModule** dm = getDrawModules(); *dm; ++dm)
+		(*dm)->syncViewLookVariant();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -4322,6 +4361,12 @@ void Drawable::replaceModelConditionStateInDrawable()
 //-------------------------------------------------------------------------------------------------
 void Drawable::setIndicatorColor(Color color)
 {
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 The drawable now looks the same to every player (setPlayerLook)
+	if (m_playerLooks != nullptr)
+		for (Int i = 0; i < MAX_PLAYER_COUNT; ++i)
+			m_playerLooks[i].recorded = FALSE;
+#endif
 	for (DrawModule** dm = getDrawModules(); *dm; ++dm)
 	{
 		ObjectDrawInterface* di = (*dm)->getObjectDrawInterface();

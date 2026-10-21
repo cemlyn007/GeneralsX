@@ -225,9 +225,10 @@ public:
 	virtual Bool copyToRGB( UnsignedByte *out, Int outW, Int outH ) { return FALSE; }
 #if RTS_ENGINE_CONTEXT
 	// GeneralsX @feature cemlyn007 21/10/2026 copyToRGB as a player sees the radar: for the length of the read, the
-	// player is the viewing player (the context's viewingPlayer), so that its blips are the ones the player may see, and
-	// the radar's shroud is the player's. The observed or local player's shroud and blips are put back after it. A
-	// player index of -1 reads the radar as the observed or local player sees it.
+	// player is the viewing player (the context's viewingPlayer), so that its blips are the ones the player may see, in
+	// the colours the player sees them in, and the radar's shroud is the player's. The observed or local player's
+	// shroud, blips and colours are put back after it. A player index of -1 reads the radar as the observed or local
+	// player sees it.
 	Bool copyToRGBForPlayer( Int playerIndex, UnsignedByte *out, Int outW, Int outH );
 #endif
 
@@ -267,6 +268,11 @@ protected:
 
 	void linkRadarObject( RadarObject *newObj, RadarObject **list );
 	void assignObjectColorToRadarObject( RadarObject *radarObj, Object *obj );
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 Colours again, for the observed or local player, the blips whose colour
+	// depends on who sees them: disguised units and containers such as garrisons (assignObjectColorToRadarObject)
+	void recolorViewerDependentObjects();
+#endif
 
 	Bool m_radarHidden[MAX_PLAYER_COUNT]; ///< true when radar is not visible
 	Bool m_radarForceOn[MAX_PLAYER_COUNT]; ///< true when radar is forced to be on

@@ -1569,11 +1569,27 @@ Bool Radar::copyToRGBForPlayer( Int playerIndex, UnsignedByte *out, Int outW, In
 		return copyToRGB( out, outW, outH );
 	rts::ctx()->viewingPlayer = playerIndex;
 	ThePartitionManager->refreshRadarShroudForPlayer( playerIndex );
+	recolorViewerDependentObjects();
 	const Bool copied = copyToRGB( out, outW, outH );
 	rts::ctx()->viewingPlayer = -1;
 	ThePartitionManager->refreshRadarShroudForPlayer( rts::getObservedOrLocalPlayer()->getPlayerIndex() );
+	recolorViewerDependentObjects();
 	refreshObjects();
 	return copied;
+}
+
+// ------------------------------------------------------------------------------------------------
+// GeneralsX @feature cemlyn007 21/10/2026 See Radar.h
+// ------------------------------------------------------------------------------------------------
+void Radar::recolorViewerDependentObjects()
+{
+	for( RadarObject *list : { m_objectList, m_localObjectList } )
+		for( RadarObject *radarObj = list; radarObj; radarObj = radarObj->friend_getNext() )
+		{
+			Object *obj = radarObj->friend_getObject();
+			if( obj != nullptr && ( obj->isKindOf( KINDOF_DISGUISER ) || obj->getContain() != nullptr ) )
+				assignObjectColorToRadarObject( radarObj, obj );
+		}
 }
 #endif
 

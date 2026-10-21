@@ -1206,6 +1206,33 @@ const Player* GarrisonContain::getApparentControllingPlayer( const Player* obser
 	return myPlayer;
 }
 
+#if RTS_ENGINE_CONTEXT
+//-------------------------------------------------------------------------------------------------
+// GeneralsX @feature cemlyn007 21/10/2026 recalcApparentControllingPlayer's garrisoned model and team colour, for each
+// player rather than the observed or local player alone (GarrisonContain.h)
+//-------------------------------------------------------------------------------------------------
+void GarrisonContain::recordPlayerLooks( Drawable *draw )
+{
+	const Object *self = getObject();
+	const Bool night = TheGlobalData->m_timeOfDay == TIME_OF_DAY_NIGHT;
+	const Bool occupantDetected = getContainCount() > 0
+		&& getContainList().front()->getStatusBits().test( OBJECT_STATUS_DETECTED );
+	for( Int i = 0; i < ThePlayerList->getPlayerCount(); ++i )
+	{
+		const Player *viewer = ThePlayerList->getNthPlayer( i );
+		const Player *apparent = getApparentControllingPlayer( viewer );
+		const Bool garrisoned = getContainCount() > 0
+			&& ( occupantDetected || apparent == self->getControllingPlayer() );
+		Color color;
+		if( apparent )
+			color = night ? apparent->getPlayerNightColor() : apparent->getPlayerColor();
+		else
+			color = night ? self->getNightIndicatorColor() : self->getIndicatorColor();
+		draw->setPlayerLook( viewer->getPlayerIndex(), color, garrisoned );
+	}
+}
+#endif
+
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
 void GarrisonContain::recalcApparentControllingPlayer()
@@ -1286,6 +1313,10 @@ void GarrisonContain::recalcApparentControllingPlayer()
 			else
 				draw->setIndicatorColor( controller->getPlayerColor() );
 		}
+#if RTS_ENGINE_CONTEXT
+		// GeneralsX @feature cemlyn007 21/10/2026 And the colour and model each player sees it with (GarrisonContain.h)
+		recordPlayerLooks( draw );
+#endif
 
 		// now that we have an object inside us, we need to get all the garrison point positions
 		// if we don't already have them.

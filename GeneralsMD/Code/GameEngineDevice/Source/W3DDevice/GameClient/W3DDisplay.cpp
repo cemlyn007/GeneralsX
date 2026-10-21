@@ -2517,6 +2517,8 @@ void W3DDisplay::tickClient()
 	for (Drawable *draw = TheGameClient->firstDrawable(); draw != nullptr; )
 	{
 		Drawable *next = draw->getNextDrawable();
+		// GeneralsX @feature cemlyn007 21/10/2026 The variants of the looks players see it with (Drawable::setPlayerLook)
+		draw->syncViewLookVariants();
 		draw->draw();
 		draw->advanceIconsForClientTick();
 		draw = next;

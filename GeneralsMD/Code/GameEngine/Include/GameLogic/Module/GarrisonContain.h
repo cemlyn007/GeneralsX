@@ -179,6 +179,11 @@ protected:
 	void healObjects();	///< heal all the objects within me
 	void healSingleObject( Object *obj, Real frames );	///< heal just one of the objects within me
 	void moveObjectsWithMe();				///< translates all the garrisoned object to this->getObject()->getPosition()
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 Records on the drawable the colour and model each player sees it with, as
+	// GeneralsX would draw it for that player as its local player (Drawable::setPlayerLook)
+	void recordPlayerLooks( Drawable *draw );
+#endif
 
 private:
 

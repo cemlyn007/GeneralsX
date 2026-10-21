@@ -149,6 +149,11 @@ RTS_ENGINE_CONTEXT_VALUE(bool, playerViews, false)
 // sees it. No logic runs while it is set.
 RTS_ENGINE_CONTEXT_VALUE(std::int32_t, viewingPlayer, -1)
 
+// GeneralsX @feature cemlyn007 21/10/2026 Set while a model draw makes the look variant it draws in the views of players
+// who see its drawable with another team colour or garrisoned model (W3DModelDraw::syncViewLookVariant), so that the
+// variant knows from its construction on that it makes no particle systems, track marks or sounds of its own.
+RTS_ENGINE_CONTEXT_VALUE(bool, makingViewLookVariant, false)
+
 // GeneralsX @feature cemlyn007 21/10/2026 Set by a host whose cameras are its own: a map script's camera actions (moves,
 // pans, zooms, rotations, pitches, shakes, follows and the scripted camera's modifiers) then move no camera
 // (ScriptActions::executeAction).
