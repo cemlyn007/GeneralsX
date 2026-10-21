@@ -57,6 +57,30 @@
 #define GAMESTATEMAP_CLOSE(file) fclose(file)
 #endif
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 21/10/2026 Give a loaded skirmish whose local IP is a human slot's a local IP no slot holds
+static Bool isHeldByASlot( const GameInfo *info, UnsignedInt ip )
+{
+	for( Int i = 0; i < MAX_SLOTS; ++i )
+	{
+		const GameSlot *slot = info->getConstSlot( i );
+		if( slot != nullptr && slot->isPlayer( ip ) )
+			return TRUE;
+	}
+	return FALSE;
+}
+
+static void anchorLoadedSkirmish( GameInfo *info )
+{
+	if( !isHeldByASlot( info, info->getLocalIP() ) )
+		return;
+	UnsignedInt anchorIP = 0xFFFFFFFFu;
+	while( isHeldByASlot( info, anchorIP ) )
+		--anchorIP;
+	info->setLocalIP( anchorIP );
+}
+#endif
+
 // GLOBALS ////////////////////////////////////////////////////////////////////////////////////////
 #if !RTS_ENGINE_CONTEXT
 GameStateMap *TheGameStateMap = nullptr;
@@ -518,6 +542,13 @@ void GameStateMap::xfer( Xfer *xfer )
 			TheSkirmishGameInfo->reset();
 		}
 		xfer->xferSnapshot(TheSkirmishGameInfo);
+#if RTS_ENGINE_CONTEXT
+		// GeneralsX @feature cemlyn007 21/10/2026 With the host's anchor (anchoredLocalPlayer), a save whose local IP is a
+		// human slot's, as every save made before the host anchored its local player is, loads anchored as well: its local
+		// IP becomes one no slot holds before the player list is made, so no slot is the local player (anchorLoadedSkirmish)
+		if( xfer->getXferMode() == XFER_LOAD && rts::ctx()->anchoredLocalPlayer )
+			anchorLoadedSkirmish( TheSkirmishGameInfo );
+#endif
 	}
 	else
 	{

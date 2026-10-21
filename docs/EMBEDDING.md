@@ -250,7 +250,11 @@ always-revealed ReplayObserver its local player as its player list is made
 `startNewGame` caches about the local player is then the ReplayObserver's,
 live and in playback alike. A skirmish's replay records the local slot its
 game info names, -1 for none, rather than slot 0. A game whose info names a
-local slot plays as it does without the switch.
+local slot plays as it does without the switch. A save keeps its game info's
+local IP, so a load names no local slot again. A save made without the switch,
+whose local IP is its human slots' (`GameStateMap::xfer`), is given a local IP
+no slot holds as it loads, before its player list is made, so it too loads
+with the ReplayObserver as its local player and every human slot alike.
 
 Such a host posts several players' messages on one message stream. The
 stream drops a `MSG_DESTROY_SELECTED_GROUP` that the next message makes
@@ -480,8 +484,13 @@ made to it. Each simulation tests shroud for its own player and draws from
 its own client random stream, so its particles are those GeneralsX shows the
 player whose view it is, and no player's emission shifts another's. The tick
 updates every simulation, and a draw renders the one that
-`ParticleSimulationScope` makes current. A loaded game's particle systems are
-the watcher's only. A reset lets go of the textures the last draw left on each
+`ParticleSimulationScope` makes current. A load restores its particle systems
+into the watcher's simulation, and copies each of them, with its ID and its
+particles, into every player's (`copyLoadedSystemsToSimulations`), where the
+load's post-processing links each copy to the masters, slaves and controlling
+particles of its own simulation. The copying changes no client random stream,
+and each restored system that is neither a slave nor driven by a particle then
+copies its changes, as a system made outside an update does. A reset lets go of the textures the last draw left on each
 simulation's point group and streaks, so none outlives the render device.
 
 A playback that follows the replay's camera shows the 3D camera the replay

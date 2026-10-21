@@ -692,6 +692,10 @@ public:
 	// player's simulation that each of its changes is made to (ParticleSystemManager::beginSimulations)
 	void setMirrored( Bool mirrored ) { m_isMirrored = mirrored; }
 	Bool isMirrored() const { return m_isMirrored; }
+	// GeneralsX @feature cemlyn007 21/10/2026 Whether one of this simulation's particles drives this system, and the
+	// simulation it belongs to (ParticleSystemManager::copyLoadedSystemsToSimulations)
+	Bool isControlledByParticle() const { return m_controlParticle != nullptr; }
+	ParticleSystemManager *getOwner() const { return m_owner; }
 	template <typename Change>
 	void changeMirrors( const Change &change )
 	{
@@ -890,6 +894,9 @@ protected:
 	void updateOwnSystems();
 	void resetOwnSystems();
 	ParticleSystem *createOwnSystem( const ParticleSystemTemplate *sysTemplate, Bool createSlaves );
+	void copyLoadedSystemsToSimulations();
+	void mirrorLoadedSystems();
+	std::vector<ParticleSystemID> m_loadedSystemIDs;	///< the systems the last load restored, in the order it restored them
 	std::vector<ParticleSystemManager *> m_simulations;	///< the players' simulations, owned by the watcher's
 	ParticleSystemManager *m_templateSource = nullptr;		///< for a player's simulation, the watcher's, whose templates it uses
 	UnsignedInt m_clientRandomStream[6] = {};						///< the simulation's own client random stream

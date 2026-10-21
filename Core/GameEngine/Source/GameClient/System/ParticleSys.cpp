@@ -38,6 +38,11 @@
 #include "Common/GameLOD.h"
 #include "Common/RandomValue.h"	// GeneralsX @feature cemlyn007 21/10/2026 The simulations' streams
 #include "Common/Xfer.h"
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 21/10/2026 Copying a load's particle systems (copyLoadedSystemsToSimulations)
+#include "Common/XferLoad.h"
+#include "Common/XferSave.h"
+#endif
 
 #include "GameClient/Drawable.h"
 #include "GameClient/DebugDisplay.h"
@@ -728,7 +733,14 @@ void Particle::loadPostProcess()
 		ParticleSystem *system;
 
 		// find system
+#if RTS_ENGINE_CONTEXT
+		// GeneralsX @feature cemlyn007 21/10/2026 In the particle's own simulation, which a copy of a load's systems in a
+		// player's simulation is not the current one for (ParticleSystemManager::copyLoadedSystemsToSimulations)
+		ParticleSystemManager *simulation = m_system->getOwner() != nullptr ? m_system->getOwner() : TheParticleSystemManager;
+		system = simulation->findParticleSystem( m_systemUnderControlID );
+#else
 		system = TheParticleSystemManager->findParticleSystem( m_systemUnderControlID );
+#endif
 
 		// set us as the control particle for this system
 		system->setControlParticle( this );
@@ -2711,7 +2723,12 @@ void ParticleSystem::loadPostProcess()
 		}
 
 		// assign system
+#if RTS_ENGINE_CONTEXT
+		// GeneralsX @feature cemlyn007 21/10/2026 In this system's own simulation (see Particle::loadPostProcess)
+		m_slaveSystem = (m_owner != nullptr ? m_owner : TheParticleSystemManager)->findParticleSystem( m_slaveSystemID );
+#else
 		m_slaveSystem = TheParticleSystemManager->findParticleSystem( m_slaveSystemID );
+#endif
 
 		// sanity
 		if( m_slaveSystem == nullptr || m_slaveSystem->isDestroyed() == TRUE )
@@ -2738,7 +2755,12 @@ void ParticleSystem::loadPostProcess()
 		}
 
 		// assign system
+#if RTS_ENGINE_CONTEXT
+		// GeneralsX @feature cemlyn007 21/10/2026 In this system's own simulation (see Particle::loadPostProcess)
+		m_masterSystem = (m_owner != nullptr ? m_owner : TheParticleSystemManager)->findParticleSystem( m_masterSystemID );
+#else
 		m_masterSystem = TheParticleSystemManager->findParticleSystem( m_masterSystemID );
+#endif
 
 		// sanity
 		if( m_masterSystem == nullptr || m_masterSystem->isDestroyed() == TRUE )
@@ -3625,6 +3647,10 @@ void ParticleSystemManager::xfer( Xfer *xfer )
 	else
 	{
 		DEBUG_ASSERTCRASH(m_allParticleSystemList.empty(), ("ParticleSystemManager: particle systems list is expected empty at start of xfer-load."));
+#if RTS_ENGINE_CONTEXT
+		// GeneralsX @feature cemlyn007 21/10/2026 Which systems this load restores (copyLoadedSystemsToSimulations)
+		m_loadedSystemIDs.clear();
+#endif
 
 		const ParticleSystemTemplate *systemTemplate;
 
@@ -3668,7 +3694,14 @@ void ParticleSystemManager::xfer( Xfer *xfer )
 			}
 
 			friend_addParticleSystem(system);
+#if RTS_ENGINE_CONTEXT
+			m_loadedSystemIDs.push_back(system->getSystemID());
+#endif
 		}
+#if RTS_ENGINE_CONTEXT
+		// GeneralsX @feature cemlyn007 21/10/2026 Every player's simulation gets the systems the load restored
+		copyLoadedSystemsToSimulations();
+#endif
 
 	}
 
@@ -3679,7 +3712,10 @@ void ParticleSystemManager::xfer( Xfer *xfer )
 // ------------------------------------------------------------------------------------------------
 void ParticleSystemManager::loadPostProcess()
 {
-
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 The systems the load restored change their copies too
+	mirrorLoadedSystems();
+#endif
 }
 
 #if RTS_ENGINE_CONTEXT
@@ -3708,6 +3744,137 @@ void ParticleSystemManager::beginSimulations( const std::vector<Int> &playerIndi
 		SeedClientRandomStream(GetGameLogicRandomSeed(), simulation->m_clientRandomStream);
 		m_simulations.push_back(simulation);
 	}
+}
+
+namespace
+{
+
+// ------------------------------------------------------------------------------------------------
+// GeneralsX @feature cemlyn007 21/10/2026 XferSave into memory, for ParticleSystemManager::copyLoadedSystemsToSimulations
+// ------------------------------------------------------------------------------------------------
+class ParticleCopyWriter : public XferSave
+{
+public:
+	virtual void open( AsciiString identifier ) override { Xfer::open( identifier ); }
+	virtual void close() override {}
+	virtual Int beginBlock() override
+	{
+		m_blockStarts.push_back( m_bytes.size() );
+		XferBlockSize blockSize = 0;
+		xferImplementation( &blockSize, sizeof( blockSize ) );
+		return XFER_OK;
+	}
+	virtual void endBlock() override
+	{
+		const size_t start = m_blockStarts.back();
+		m_blockStarts.pop_back();
+		const XferBlockSize blockSize = (XferBlockSize)(m_bytes.size() - start - sizeof( XferBlockSize ));
+		memcpy( &m_bytes[start], &blockSize, sizeof( blockSize ) );
+	}
+	virtual void skip( Int dataSize ) override { m_bytes.resize( m_bytes.size() + dataSize ); }
+	const std::vector<UnsignedByte> &bytes() const { return m_bytes; }
+
+protected:
+	virtual void xferImplementation( void *data, Int dataSize ) override
+	{
+		const UnsignedByte *first = static_cast<const UnsignedByte *>( data );
+		m_bytes.insert( m_bytes.end(), first, first + dataSize );
+	}
+
+private:
+	std::vector<UnsignedByte> m_bytes;
+	std::vector<size_t> m_blockStarts;
+};
+
+// ------------------------------------------------------------------------------------------------
+// GeneralsX @feature cemlyn007 21/10/2026 XferLoad from what a ParticleCopyWriter wrote; what it reads is post-processed
+// with the rest of the load
+// ------------------------------------------------------------------------------------------------
+class ParticleCopyReader : public XferLoad
+{
+public:
+	explicit ParticleCopyReader( const std::vector<UnsignedByte> &bytes ) : m_bytes( bytes ) {}
+	virtual void open( AsciiString identifier ) override { Xfer::open( identifier ); }
+	virtual void close() override {}
+	virtual Int beginBlock() override
+	{
+		XferBlockSize blockSize = 0;
+		xferImplementation( &blockSize, sizeof( blockSize ) );
+		return blockSize;
+	}
+	virtual void endBlock() override {}
+	virtual void skip( Int dataSize ) override { take( dataSize ); }
+
+protected:
+	virtual void xferImplementation( void *data, Int dataSize ) override
+	{
+		memcpy( data, take( dataSize ), dataSize );
+	}
+
+private:
+	const UnsignedByte *take( Int dataSize )
+	{
+		if( dataSize < 0 || m_next + dataSize > m_bytes.size() )
+			throw XFER_READ_ERROR;
+		const UnsignedByte *taken = m_bytes.data() + m_next;
+		m_next += dataSize;
+		return taken;
+	}
+
+	const std::vector<UnsignedByte> &m_bytes;
+	size_t m_next = 0;
+};
+
+}
+
+// ------------------------------------------------------------------------------------------------
+// GeneralsX @feature cemlyn007 21/10/2026 A load restores its particle systems into the watcher's simulation, and
+// GeneralsX would restore them for whoever is its local player. So each player's simulation gets a copy of each of them,
+// with the same ID and its particles, as if it had copied them as they were made; the copy changes no client random
+// stream. The copies are post-processed with the rest of the load, which links each to its master, slaves and
+// controlling particle in its own simulation (ParticleSystem::loadPostProcess, Particle::loadPostProcess).
+// ------------------------------------------------------------------------------------------------
+void ParticleSystemManager::copyLoadedSystemsToSimulations()
+{
+	if (m_simulations.empty() || m_loadedSystemIDs.empty())
+		return;
+
+	ParticleCopyWriter writer;
+	for (ParticleSystemID id : m_loadedSystemIDs)
+		writer.xferSnapshot( findParticleSystem(id) );
+
+	UnsignedInt clientStream[6];
+	memcpy(clientStream, rts::ctx()->gameClientSeed, sizeof(clientStream));
+	for (ParticleSystemManager *simulation : m_simulations)
+	{
+		ParticleSimulationScope scope(simulation, FALSE);
+		ParticleCopyReader reader(writer.bytes());
+		for (ParticleSystemID id : m_loadedSystemIDs)
+		{
+			ParticleSystem *copy = newInstance(ParticleSystem)( findParticleSystem(id)->getTemplate(), INVALID_PARTICLE_SYSTEM_ID, FALSE );
+			reader.xferSnapshot( copy );
+			simulation->friend_addParticleSystem( copy );
+		}
+	}
+	memcpy(rts::ctx()->gameClientSeed, clientStream, sizeof(clientStream));
+}
+
+// ------------------------------------------------------------------------------------------------
+// GeneralsX @feature cemlyn007 21/10/2026 Once the load's systems are linked, each that is neither a slave nor driven
+// by a particle is marked so that its changes are copied to its copies, as a system made outside an update is
+// ------------------------------------------------------------------------------------------------
+void ParticleSystemManager::mirrorLoadedSystems()
+{
+	if (!m_simulations.empty())
+	{
+		for (ParticleSystemID id : m_loadedSystemIDs)
+		{
+			ParticleSystem *system = findParticleSystem(id);
+			if (system != nullptr && system->getMaster() == nullptr && !system->isControlledByParticle())
+				system->setMirrored(TRUE);
+		}
+	}
+	m_loadedSystemIDs.clear();
 }
 
 // ------------------------------------------------------------------------------------------------
