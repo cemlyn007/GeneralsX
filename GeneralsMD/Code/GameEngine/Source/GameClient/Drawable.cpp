@@ -445,6 +445,10 @@ Drawable::Drawable( const ThingTemplate *thingTemplate, DrawableStatusBits statu
 	m_timeToFade = 0;
 
 	m_shroudClearFrame = InvalidShroudClearFrame;
+#if RTS_ENGINE_CONTEXT
+	for (i = 0; i < MAX_PLAYER_COUNT; ++i)
+		m_shroudClearFrameFor[i] = InvalidShroudClearFrame;
+#endif
 
 	for (i = 0; i < NUM_DRAWABLE_MODULE_TYPES; ++i)
 		m_modules[i] = nullptr;
@@ -2657,6 +2661,34 @@ void Drawable::setStealthLook(StealthLookType look)
 }
 
 
+#if RTS_ENGINE_CONTEXT
+//-------------------------------------------------------------------------------------------------
+// GeneralsX @feature cemlyn007 21/10/2026 GameClient::update's fully-obscured test, for the given player rather than the
+// observed or local one, with that player's shroud-clear frame (Drawable.h)
+//-------------------------------------------------------------------------------------------------
+Bool Drawable::isFullyObscuredByShroudFor( Int playerIndex )
+{
+#if ENABLE_CONFIGURABLE_SHROUD
+	if (!TheGlobalData->m_shroudOn)
+		return getFullyObscuredByShroud();
+#endif
+	Object *object = getObject();
+	if (object == nullptr || playerIndex < 0 || playerIndex >= MAX_PLAYER_COUNT)
+		return getFullyObscuredByShroud();
+	ObjectShroudStatus ss = object->getShroudedStatus(playerIndex);
+	const UnsignedInt clearFrame = m_shroudClearFrameFor[playerIndex];
+	if (ss >= OBJECTSHROUD_FOGGED && clearFrame != InvalidShroudClearFrame)
+	{
+		UnsignedInt limit = 2*LOGICFRAMES_PER_SECOND;
+		if (object->isEffectivelyDead())
+			limit += 3*LOGICFRAMES_PER_SECOND;
+		if (TheGameLogic->getFrame() < limit + clearFrame)
+			ss = OBJECTSHROUD_CLEAR;
+	}
+	return ss >= OBJECTSHROUD_FOGGED;
+}
+#endif
+
 //-------------------------------------------------------------------------------------------------
 /** default draw is to just call the database defined draw */
 //-------------------------------------------------------------------------------------------------
@@ -3318,6 +3350,121 @@ void Drawable::drawHealing(const IRegion2D* healthBarRegion)
 	}
 
 }
+
+#if RTS_ENGINE_CONTEXT
+// ------------------------------------------------------------------------------------------------
+// GeneralsX @feature cemlyn007 21/10/2026 See Drawable.h. Each test is the one its draw function makes, with the drawable
+// taken to be on screen.
+// ------------------------------------------------------------------------------------------------
+void Drawable::advanceIconsForClientTick()
+{
+	if( !TheGameLogic->getDrawIconUI() || TheScriptEngine->getFade() != ScriptEngine::FADE_NONE )
+		return;
+	const Object *obj = getObject();
+	if( obj == nullptr || obj->isEffectivelyDead() || obj->isKindOf( KINDOF_IGNORED_IN_GUI ) )
+		return;
+
+	const UnsignedInt now = TheGameLogic->getFrame();
+
+	if( !obj->isKindOf( KINDOF_NO_HEAL_ICON ) && !obj->getStatusBits().test( OBJECT_STATUS_SOLD ) )
+	{
+		Bool showHealing = FALSE;
+		BodyModuleInterface *body = obj->getBodyModule();
+		if( body->getHealth() != body->getMaxHealth() && now > HEALING_ICON_DISPLAY_TIME &&
+				now - body->getLastHealingTimestamp() <= HEALING_ICON_DISPLAY_TIME )
+			showHealing = TRUE;
+		DrawableIconType typeIndex = ICON_DEFAULT_HEAL;
+		if( isKindOf( KINDOF_STRUCTURE ) )
+			typeIndex = ICON_STRUCTURE_HEAL;
+		else if( isKindOf( KINDOF_VEHICLE ) )
+			typeIndex = ICON_VEHICLE_HEAL;
+		if( showHealing )
+		{
+			if( getIconInfo()->m_icon[ typeIndex ] == nullptr )
+				getIconInfo()->m_icon[ typeIndex ] = newInstance(Anim2D)( s_animationTemplates[ typeIndex ], TheAnim2DCollection );
+		}
+		else
+		{
+			killIcon(typeIndex);
+		}
+	}
+
+	if( obj->testWeaponSetFlag( WEAPONSET_CARBOMB ) && obj->getControllingPlayer() == rts::getObservedOrLocalPlayer() )
+	{
+		if( !getIconInfo()->m_icon[ ICON_CARBOMB ] )
+			getIconInfo()->m_icon[ ICON_CARBOMB ] = newInstance(Anim2D)( s_animationTemplates[ ICON_CARBOMB ], TheAnim2DCollection );
+		getIconInfo()->m_keepTillFrame[ ICON_CARBOMB ] = FOREVER;
+	}
+	else
+	{
+		killIcon(ICON_CARBOMB);
+	}
+
+	RTS_ENGINE_STATIC(NameKeyType, key_StickyBombUpdate, NAMEKEY( "StickyBombUpdate" ));
+	StickyBombUpdate *update = (StickyBombUpdate*)obj->findUpdateModule( key_StickyBombUpdate );
+	if( update && update->getTargetObject() )
+	{
+		if( update->isTimedBomb() )
+		{
+			if( !getIconInfo()->m_icon[ ICON_BOMB_TIMED ] )
+			{
+				getIconInfo()->m_icon[ ICON_BOMB_REMOTE ] = newInstance(Anim2D)( s_animationTemplates[ ICON_BOMB_REMOTE ], TheAnim2DCollection );
+				getIconInfo()->m_icon[ ICON_BOMB_TIMED ] = newInstance(Anim2D)( s_animationTemplates[ ICON_BOMB_TIMED ], TheAnim2DCollection );
+				UnsignedInt dieFrame = update->getDetonationFrame();
+				UnsignedInt seconds = REAL_TO_INT_CEIL( (dieFrame - now) * SECONDS_PER_LOGICFRAME_REAL);
+				UnsignedInt numFrames = getIconInfo()->m_icon[ ICON_BOMB_TIMED ]->getAnimTemplate()->getNumFrames();
+				if (seconds > numFrames - 1)
+					seconds = numFrames - 1;
+				getIconInfo()->m_icon[ ICON_BOMB_TIMED ]->setMinFrame(numFrames - seconds - 1);
+				getIconInfo()->m_icon[ ICON_BOMB_TIMED ]->reset();
+			}
+			getIconInfo()->m_keepTillFrame[ ICON_BOMB_REMOTE ] = now + 1;
+			getIconInfo()->m_keepTillFrame[ ICON_BOMB_TIMED ] = now + 1;
+		}
+		else
+		{
+			if( !getIconInfo()->m_icon[ ICON_BOMB_REMOTE ] )
+				getIconInfo()->m_icon[ ICON_BOMB_REMOTE ] = newInstance(Anim2D)( s_animationTemplates[ ICON_BOMB_REMOTE ], TheAnim2DCollection );
+			getIconInfo()->m_keepTillFrame[ ICON_BOMB_REMOTE ] = now + 1;
+		}
+	}
+	if( hasIconInfo() )
+	{
+		if( getIconInfo()->m_keepTillFrame[ ICON_BOMB_TIMED ] <= now )
+			killIcon(ICON_BOMB_TIMED);
+		if( getIconInfo()->m_keepTillFrame[ ICON_BOMB_REMOTE ] <= now )
+			killIcon(ICON_BOMB_REMOTE);
+	}
+
+	if( obj->testWeaponBonusCondition( WEAPONBONUSCONDITION_ENTHUSIASTIC ) == TRUE )
+	{
+		DrawableIconType iconIndex = ICON_ENTHUSIASTIC;
+		if( obj->testWeaponBonusCondition( WEAPONBONUSCONDITION_SUBLIMINAL ) == TRUE )
+			iconIndex = ICON_ENTHUSIASTIC_SUBLIMINAL;
+		if( getIconInfo()->m_icon[ iconIndex ] == nullptr )
+			getIconInfo()->m_icon[ iconIndex ] = newInstance(Anim2D)( s_animationTemplates[ iconIndex ], TheAnim2DCollection );
+	}
+	else
+	{
+		killIcon(ICON_ENTHUSIASTIC);
+		killIcon(ICON_ENTHUSIASTIC_SUBLIMINAL);
+	}
+
+	if( obj->isDisabledByType( DISABLED_HACKED )
+		|| obj->isDisabledByType( DISABLED_PARALYZED )
+		|| obj->isDisabledByType( DISABLED_EMP )
+		|| obj->isDisabledByType( DISABLED_SUBDUED )
+		|| obj->isDisabledByType( DISABLED_UNDERPOWERED ) )
+	{
+		if( getIconInfo()->m_icon[ ICON_DISABLED ] == nullptr )
+			getIconInfo()->m_icon[ ICON_DISABLED ] = newInstance(Anim2D)( s_animationTemplates[ ICON_DISABLED ], TheAnim2DCollection );
+	}
+	else
+	{
+		killIcon(ICON_DISABLED);
+	}
+}
+#endif
 
 // ------------------------------------------------------------------------------------------------
 /** This enthusiastic effect is TEMPORARY for the multiplayer test */

@@ -299,6 +299,25 @@ void Animatable3DObjClass::Render(RenderInfoClass & rinfo)
 	}
 }
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 21/10/2026 Render's update of the animation and hierarchy, for the client tick of an
+// engine that draws on demand
+void Animatable3DObjClass::Advance_Client_Tick()
+{
+	if (HTree == nullptr) return;
+
+	if (Is_Not_Hidden_At_All() == false) {
+		return;
+	}
+
+	const bool isSingleAnim = CurMotionMode == SINGLE_ANIM && ModeAnim.AnimMode != ANIM_MODE_MANUAL;
+
+	if (isSingleAnim || !Is_Hierarchy_Valid() || Are_Sub_Object_Transforms_Dirty()) {
+		Update_Sub_Object_Transforms();
+	}
+}
+#endif
+
 /***********************************************************************************************
  * Animatable3DObjClass::Special_Render -- "special render" function for animatables           *
  *                                                                                             *

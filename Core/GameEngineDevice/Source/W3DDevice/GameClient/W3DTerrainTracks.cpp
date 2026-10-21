@@ -44,6 +44,7 @@
 //-----------------------------------------------------------------------------
 
 #include "W3DDevice/GameClient/W3DTerrainTracks.h"
+#include "Common/EngineDrawing.h"	// GeneralsX @bugfix cemlyn007 21/10/2026 Drawing on demand
 #include "W3DDevice/GameClient/HeightMap.h"
 #include "Common/PerfTimer.h"
 #include "Common/GlobalData.h"
@@ -798,6 +799,21 @@ Try improving the fit to vertical surfaces like cliffs.
 	TerrainTracksRenderObjClass *mod=m_usedModules;
 	if (!mod)
 		return;	//nothing to render
+
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @bugfix cemlyn007 21/10/2026 For an engine that draws on demand, the edges to draw are counted from this
+	// draw's visible tracks. The tracks' Render calls count them only after the terrain has flushed, so the count was the
+	// previous draw's, and whether a draw showed its tracks depended on what was drawn before (Common/EngineDrawing.h).
+	if (rts::drawsOnDemand())
+	{
+		m_edgesToFlush = 0;
+		for (TerrainTracksRenderObjClass *counted = m_usedModules; counted; counted = counted->m_nextSystem)
+		{
+			if (TheGlobalData->m_makeTrackMarks && counted->m_activeEdgeCount >= 2 && counted->Is_Really_Visible())
+				m_edgesToFlush += counted->m_activeEdgeCount;
+		}
+	}
+#endif
 
 	Int	trackStartIndex;
 	Real distanceFade;

@@ -566,8 +566,15 @@ GameMessageDisposition LookAtTranslator::translateGameMessage(const GameMessage 
 				msg->appendIntegerArgument( (Int)TheMouse->getMouseCursor() );
 				msg->appendPixelArgument( m_currentPos );
 				// TheSuperHackers @tweak Save 3D camera position and direction to recover optimal playback precision
-				msg->appendLocationArgument( TheTacticalView->get3DCameraPosition() );
-				msg->appendLocationArgument( TheTacticalView->get3DCameraDirection() );
+				// GeneralsX @bugfix cemlyn007 21/10/2026 Only an engine that builds its 3D camera saves it. A headless engine
+				// with no rendering never builds it (W3DView::updateCameraTransform), so it saved the camera at the origin
+				// looking down, which playback then showed as it is, a black image. Without it, playback builds the camera
+				// from the pivot, angle, pitch and zoom above.
+				if (!TheGlobalData->m_headless || TheGlobalData->m_headlessRender)
+				{
+					msg->appendLocationArgument( TheTacticalView->get3DCameraPosition() );
+					msg->appendLocationArgument( TheTacticalView->get3DCameraDirection() );
+				}
 			}
 			break;
 		}

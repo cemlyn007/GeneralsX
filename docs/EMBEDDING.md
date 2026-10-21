@@ -431,6 +431,62 @@ buffer and presents it when the host asks. Its own window handles stay null,
 so it makes no SDL call and pumps no events. A window engine with no present
 window, such as the game's executable's, keeps upstream's window path.
 
+### Drawing on demand
+
+A host that sets the context's `onDemandDrawing` draws a render engine's
+images only when it asks for them (`Common/EngineDrawing.h`,
+`rts::drawsOnDemand`, which also needs `m_headless` and `m_headlessRender`).
+`GameClient::update` then draws nothing. Instead, after each logic frame,
+`GameEngine::update` runs the display's client tick (`Display::tickClient`,
+`W3DDisplay::tickClient`), which advances, once and whether or not anything is
+drawn, everything a draw used to advance:
+
+- WW3D's clock: the logic frame time, the sync time and the client tick count
+  that the ping-pong particle buffers follow (`WW3D::Count_Client_Tick`);
+- the cameras, through `updateViews`, without the drawable loop that each
+  view's update ran;
+- every drawable's draw modules and icons, once, whichever views can see it,
+  and its shroud-clear frame for the watcher and for every slot's player;
+- the particle simulations (below), the field-particle count they read, and
+  the scene's per-frame updates: lights, W3D emitters, model hierarchies,
+  spheres and rings, and the registration of meshes for rendering;
+- the texture mappers, the projected and volumetric shadows' caches, the
+  terrain shroud's fade over the whole map, the trees' sway and toppling, the
+  terrain and water tracks, the dynamic LOD and the cinematic text's
+  countdown.
+
+A draw (`W3DDisplay::draw`) then renders the state the tick left. It freezes
+WW3D's frame times while it renders, and steps nothing, so two draws at one
+frame are the same and an image does not depend on which views were drawn
+before, at that frame or at earlier ones. A draw also leaves out what made it
+depend on the draws before it: the camera-locked drawable is drawn with the
+rest of the scene, not hidden and drawn again alone; terrain tracks are
+flushed from the tracks that are visible now; shadow volumes are rebuilt
+exactly every time; and the terrain shader resets the sampler states it set.
+No cursor pick is made.
+
+Such an engine simulates particles though it is headless. The manager is the
+watcher's simulation. When a game starts, `beginSimulations` gives each
+slot's player a simulation of its own (`newSimulation`), which copies every
+particle system made in the watcher's, with the same ID, and every change
+made to it. Each simulation tests shroud for its own player and draws from
+its own client random stream, so its particles are those GeneralsX shows the
+player whose view it is, and no player's emission shifts another's. The tick
+updates every simulation, and a draw renders the one that
+`ParticleSimulationScope` makes current. A loaded game's particle systems are
+the watcher's only. A reset lets go of the textures the last draw left on each
+simulation's point group and streaks, so none outlives the render device.
+
+A playback that follows the replay's camera shows the 3D camera the replay
+holds as it is, since the tick builds no camera over it before a draw. An
+engine with no rendering builds no 3D camera, so the replay camera it records
+holds none (`LookAtXlat`). Playback leaves out a recorded 3D camera at the
+origin too, as such an engine recorded before, and builds the camera from the
+pivot, angle, pitch and zoom (`GameLogic::onSetReplayCamera`).
+
+A window engine draws the same way, and `Present_Off_Screen_Image` presents
+the last image drawn, whichever view it was drawn for.
+
 ### The clock
 
 Logic code reads no clock. Every seeding names its seed: an engine starts on

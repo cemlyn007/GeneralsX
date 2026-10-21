@@ -84,9 +84,22 @@ class TextureMapperClass : public RefCountClass
 		};
 
 		TextureMapperClass(unsigned int stage=0);
+#if RTS_ENGINE_CONTEXT
+		TextureMapperClass(const TextureMapperClass & src) : Stage(src.Stage) { Link_For_Client_Tick(); }
+
+		virtual ~TextureMapperClass() override { Unlink_For_Client_Tick(); }
+
+		// GeneralsX @feature cemlyn007 21/10/2026 For the client tick of an engine that draws on demand
+		// (Common/EngineDrawing.h): a time-variant mapper advances its animation by the time since it was last applied, so
+		// how often it was drawn changed where it got to. The tick advances every mapper of the engine once per logic
+		// frame, and a draw at the same time then advances none.
+		static void							Advance_All_For_Client_Tick();
+		virtual void						Advance_Client_Tick();
+#else
 		TextureMapperClass(const TextureMapperClass & src) : Stage(src.Stage) { }
 
 		virtual ~TextureMapperClass() override { }
+#endif
 
 		virtual int								Mapper_ID() const { return MAPPER_ID_UNKNOWN;}
 
@@ -105,6 +118,13 @@ class TextureMapperClass : public RefCountClass
 
 	protected:
 		unsigned int							Stage;
+#if RTS_ENGINE_CONTEXT
+	private:
+		void										Link_For_Client_Tick();
+		void										Unlink_For_Client_Tick();
+		TextureMapperClass *					ClientTickPrev = nullptr;
+		TextureMapperClass *					ClientTickNext = nullptr;
+#endif
 };
 
 /*
@@ -517,8 +537,14 @@ public:
 	virtual TextureMapperClass *Clone() const override { return NEW_REF( BumpEnvTextureMapperClass, (*this)); }
 
 	virtual void Apply(int uv_array_index) override;
+#if RTS_ENGINE_CONTEXT
+	virtual void Advance_Client_Tick() override;	// GeneralsX @feature cemlyn007 21/10/2026 (TextureMapperClass)
+#endif
 
 protected:
+#if RTS_ENGINE_CONTEXT
+	void Advance_Bump_Angle();	// GeneralsX @refactor cemlyn007 21/10/2026 Apply's angle step
+#endif
 
 	unsigned int	LastUsedSyncTime;		// Sync time last used to update offset
 	float				CurrentAngle;

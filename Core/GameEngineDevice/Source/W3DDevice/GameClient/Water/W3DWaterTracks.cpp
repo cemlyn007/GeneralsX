@@ -45,6 +45,7 @@
 
 #include "W3DDevice/GameClient/HeightMap.h"
 #include "W3DDevice/GameClient/W3DWaterTracks.h"
+#include "Common/EngineDrawing.h"	// GeneralsX @feature cemlyn007 21/10/2026 Drawing on demand
 #if RTS_ENGINE_CONTEXT
 // GeneralsX @feature cemlyn007 15/10/2026 Its tracks file is opened and closed through the engine's file layer (Common/EngineFiles.h)
 #include "Common/EngineFiles.h"
@@ -872,6 +873,21 @@ void TestWaterUpdate();
 #endif
 void setFPMode();
 
+#if RTS_ENGINE_CONTEXT
+//=============================================================================
+// WaterTracksRenderSystem::advance
+//=============================================================================
+// GeneralsX @feature cemlyn007 21/10/2026 The tracks' logic frame, which flush makes for every other engine, for the
+// client tick of an engine that draws on demand (Common/EngineDrawing.h)
+//=============================================================================
+void WaterTracksRenderSystem::advance()
+{
+	if (!TheGlobalData->m_showSoftWaterEdge || TheWaterTransparency->m_transparentWaterDepth ==0 )
+		return;
+	update();
+}
+#endif
+
 //=============================================================================
 // WaterTracksRenderSystem::flush
 //=============================================================================
@@ -895,6 +911,11 @@ Try improving the fit to vertical surfaces like cliffs.
 		TestWaterUpdate();
 #endif
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 An engine that draws on demand updates its tracks in its client tick
+	// (advance), so a draw only draws them (Common/EngineDrawing.h)
+	if (!rts::drawsOnDemand())
+#endif
 	update();	//update positions of all the tracks
 
 	rinfo.Camera.Apply();

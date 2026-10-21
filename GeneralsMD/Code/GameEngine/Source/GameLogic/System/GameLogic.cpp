@@ -92,6 +92,7 @@
 #include "GameClient/MapUtil.h"
 #include "GameClient/Mouse.h"
 #include "GameClient/ParticleSys.h"
+#include "Common/EngineDrawing.h"	// GeneralsX @feature cemlyn007 21/10/2026 Drawing on demand
 #include "GameClient/TerrainVisual.h"
 #include "GameClient/View.h"
 #include "GameClient/CampaignManager.h"
@@ -1670,6 +1671,23 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 	// update the player list to match the new map.
 	TheTeamFactory->reset();
 	ThePlayerList->newGame();
+
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 An engine that draws on demand simulates particles once for the watcher (its
+	// local player) and once for each slot's player (ParticleSystemManager::beginSimulations)
+	if (rts::drawsOnDemand())
+	{
+		std::vector<Int> slotPlayers;
+		for (Int slot = 0; slot < MAX_SLOTS; ++slot)
+		{
+			AsciiString slotPlayerName;
+			slotPlayerName.format("player%d", slot);
+			if (Player *slotPlayer = ThePlayerList->findPlayerWithNameKey(TheNameKeyGenerator->nameToKey(slotPlayerName)))
+				slotPlayers.push_back(slotPlayer->getPlayerIndex());
+		}
+		TheParticleSystemManager->beginSimulations(slotPlayers);
+	}
+#endif
 
 	// update the loadscreen
 	updateLoadProgress(LOAD_PROGRESS_POST_PLAYER_LIST_RESET);

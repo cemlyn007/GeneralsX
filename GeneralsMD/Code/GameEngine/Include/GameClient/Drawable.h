@@ -377,6 +377,13 @@ public:
 
 	void setShroudClearFrame( UnsignedInt frame )  { m_shroudClearFrame = frame; }
 	UnsignedInt getShroudClearFrame() { return m_shroudClearFrame; }
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 The shroud-clear frame and fully-obscured test as a given player sees the
+	// drawable, for that player's particle simulation (ParticleSystemManager::beginSimulations): GameClient::update's test
+	// for its local player, with that player's own shroud-clear frame, which the client tick notes
+	void setShroudClearFrameFor( Int playerIndex, UnsignedInt frame ) { m_shroudClearFrameFor[playerIndex] = frame; }
+	Bool isFullyObscuredByShroudFor( Int playerIndex );
+#endif
 
 	void setShadowsEnabled(Bool enable);
 	Bool getShadowsEnabled() const { return BitIsSet(m_status, DRAWABLE_STATUS_SHADOWS); }
@@ -415,6 +422,14 @@ public:
 	void updateDrawable();														///< update the drawable
 
 	void drawIconUI();													///< draw "icon"(s) needed on drawable (health bars, veterency, etc)
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 What drawIconUI decides for its animated icons (healing, enthusiasm, bombs,
+	// disabled): making each one its object's state calls for, and removing each one it no longer does, as a draw would if
+	// the drawable were on screen, for the client tick of an engine that draws on demand (Common/EngineDrawing.h). Its
+	// draws then find each icon already made or removed, so when an icon's animation starts does not depend on when the
+	// drawable was first drawn.
+	void advanceIconsForClientTick();
+#endif
 
 	void startAmbientSound( Bool onlyIfPermanent = false );
 	void stopAmbientSound();
@@ -691,6 +706,9 @@ private:
 	UnsignedInt		m_timeToFade;						///< how slowly am I fading
 
 	UnsignedInt		m_shroudClearFrame;						///< Last frame the local player saw this drawable "OBJECTSHROUD_CLEAR"
+#if RTS_ENGINE_CONTEXT
+	UnsignedInt		m_shroudClearFrameFor[MAX_PLAYER_COUNT];	///< GeneralsX @feature cemlyn007 21/10/2026 the same, per player
+#endif
 
 	DrawableLocoInfo*	m_locoInfo;	// lazily allocated
 

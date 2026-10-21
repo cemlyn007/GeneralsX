@@ -79,6 +79,8 @@
 #include "Common/EngineFault.h"	// GeneralsX @feature cemlyn007 15/10/2026 The catch-alls end in the FaultSink
 #include "Common/EngineTestHooks.h"	// GeneralsX @feature cemlyn007 16/10/2026 A host's tests' hooks
 #include "Common/InvalidInputData.h"	// GeneralsX @feature cemlyn007 15/10/2026 The host's bad input, no fault
+#include "Common/EngineDrawing.h"	// GeneralsX @feature cemlyn007 21/10/2026 Drawing on demand
+#include "GameClient/Display.h"	// GeneralsX @feature cemlyn007 21/10/2026 The client tick
 #include "Common/Registry.h"
 #include "Common/GameCommon.h"	// FOR THE ALLOW_DEBUG_CHEATS_IN_RELEASE #define
 #if RTS_ENGINE_CONTEXT
@@ -869,7 +871,13 @@ void GameEngine::init()
 		initSubsystem(TheCaveSystem,"TheCaveSystem", MSGNEW("GameEngineSubsystem") CaveSystem(), nullptr);
 		initSubsystem(TheRankInfoStore,"TheRankInfoStore", MSGNEW("GameEngineSubsystem") RankInfoStore(), &xferCRC, nullptr, "Data\\INI\\Rank");
 		initSubsystem(ThePlayerTemplateStore,"ThePlayerTemplateStore", MSGNEW("GameEngineSubsystem") PlayerTemplateStore(), &xferCRC, "Data\\INI\\Default\\PlayerTemplate", "Data\\INI\\PlayerTemplate");
+#if RTS_ENGINE_CONTEXT
+		// GeneralsX @feature cemlyn007 21/10/2026 An engine that draws on demand simulates and draws particles, though it is
+		// headless (Common/EngineDrawing.h)
+		initSubsystem(TheParticleSystemManager,"TheParticleSystemManager", createParticleSystemManager(TheGlobalData->m_headless && !rts::drawsOnDemand()), nullptr);
+#else
 		initSubsystem(TheParticleSystemManager,"TheParticleSystemManager", createParticleSystemManager(TheGlobalData->m_headless), nullptr);
+#endif
 
 	#ifdef DUMP_PERF_STATS///////////////////////////////////////////////////////////////////////////
 	GetPrecisionTimer(&endTime64);//////////////////////////////////////////////////////////////////
@@ -1303,6 +1311,15 @@ void GameEngine::update()
 			{
 				TheGameClient->step();
 			}
+
+#if RTS_ENGINE_CONTEXT
+			// GeneralsX @feature cemlyn007 21/10/2026 An engine that draws on demand advances its client here, once per
+			// logic frame, in place of the draw GameClient::update makes (Common/EngineDrawing.h)
+			if (rts::drawsOnDemand() && TheGameLogic->hasUpdated())
+			{
+				TheDisplay->tickClient();
+			}
+#endif
 		}
 	}
 }

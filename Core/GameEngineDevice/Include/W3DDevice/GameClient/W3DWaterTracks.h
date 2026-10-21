@@ -112,6 +112,11 @@ public:
 
 	void flush (RenderInfoClass & rinfo);	///<draw all tracks that were requested for rendering.
 	void update();	///<update the state of all edges (fade alpha, remove old, etc.)
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 The tracks' logic frame, for the client tick of an engine that draws on
+	// demand (Common/EngineDrawing.h)
+	void advance();
+#endif
 
 	void init();	///< pre-allocate track objects
 	void shutdown();		///< release all pre-allocated track objects, called by destructor

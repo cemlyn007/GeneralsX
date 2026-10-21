@@ -2478,7 +2478,17 @@ bool GameLogic::onSetReplayCamera(MAYBE_UNUSED GameMessage *msg)
 			const Coord2D scroll = {0, 0};
 			TheTacticalView->userScrollBy(&scroll);
 
+#if RTS_ENGINE_CONTEXT
+			// GeneralsX @bugfix cemlyn007 21/10/2026 A headless engine with no rendering never built the 3D camera it
+			// recorded, which it saved at the origin (LookAtXlat), so such a camera is left out and the pivot, angle,
+			// pitch and zoom above build the camera instead
+			const Bool recordedA3DCamera = msg->getArgumentCount() >= 8 &&
+				(msg->getArgument( 6 )->location.x != 0.0f || msg->getArgument( 6 )->location.y != 0.0f ||
+					msg->getArgument( 6 )->location.z != 0.0f);
+			if (recordedA3DCamera)
+#else
 			if (msg->getArgumentCount() >= 8)
+#endif
 			{
 				// TheSuperHackers @feature Override all the settings above with real camera position and view direction.
 				// This ensures that the camera looks EXACTLY like it was at the time of recording, no matter how the

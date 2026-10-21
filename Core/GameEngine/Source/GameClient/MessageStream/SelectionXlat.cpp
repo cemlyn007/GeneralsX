@@ -27,6 +27,7 @@
 // Author: Michael S. Booth, January 2001
 
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
+#include "Common/EngineDrawing.h"	// GeneralsX @feature cemlyn007 21/10/2026 Drawing on demand
 
 #include "Common/ActionManager.h"
 #include "Common/GameAudio.h"
@@ -581,7 +582,14 @@ GameMessageDisposition SelectionTranslator::onRawMousePosition(MAYBE_UNUSED cons
 		//      when we're not in force attackable mode!
 		UnsignedInt pickType = getPickTypesForContext( true /*TheInGameUI->isInForceAttackMode()*/ );
 
+#if RTS_ENGINE_CONTEXT
+		// GeneralsX @feature cemlyn007 21/10/2026 An engine that draws on demand has no cursor over its views, and picking
+		// tests the visibility its last draw left, so a moused-over drawable (and the health bar and icons it shows) would
+		// depend on which views were drawn last (Common/EngineDrawing.h)
+		Drawable *underCursor = rts::drawsOnDemand() ? nullptr : TheTacticalView->pickDrawable( &pixel, TheInGameUI->isInForceAttackMode(), (PickType) pickType );
+#else
 		Drawable *underCursor = TheTacticalView->pickDrawable( &pixel, TheInGameUI->isInForceAttackMode(), (PickType) pickType );
+#endif
 		Object *objUnderCursor = underCursor ? underCursor->getObject() : nullptr;
 
 		if( objUnderCursor && (!objUnderCursor->isEffectivelyDead() || objUnderCursor->isKindOf( KINDOF_ALWAYS_SELECTABLE )) )

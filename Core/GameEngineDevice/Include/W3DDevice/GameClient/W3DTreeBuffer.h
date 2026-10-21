@@ -200,6 +200,11 @@ public:
 	void setBounds(const Region2D &bounds) {m_bounds = bounds;}
 	/// Draws the trees.  Uses camera for culling.
 	void drawTrees(CameraClass * camera, RefRenderObjListIterator *pDynamicLightsIterator);
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 The trees' logic frame of sway, toppling, sinking and pushing aside, for the
+	// client tick of an engine that draws on demand (Common/EngineDrawing.h)
+	void advance(RefRenderObjListIterator *pDynamicLightsIterator);
+#endif
 	/// Called when the view changes, and sort key needs to be recalculated.
 	/// Normally sortKey gets calculated when a tree becomes visible.
 	void doFullUpdate() {m_updateAllKeys = true;};
@@ -281,6 +286,7 @@ protected:
 	Int  getPartitionBucket(const Coord3D &pos) const;
 
 	void updateTopplingTree(TTree *tree, Real timeScale);
+	void advanceToppledAndPushedTrees(Real timeScale);	// GeneralsX @refactor cemlyn007 21/10/2026 drawTrees' tree update
 	void applyTopplingForce( TTree *tree, const Coord3D* toppleDirection, Real toppleSpeed,
 																			 UnsignedInt options );
 

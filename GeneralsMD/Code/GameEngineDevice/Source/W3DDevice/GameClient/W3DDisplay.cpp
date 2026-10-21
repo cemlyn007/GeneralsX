@@ -105,6 +105,7 @@ static void drawFramerateBar();
 #include "WW3D2/dx8webbrowser.h"
 #include "WW3D2/mesh.h"
 #include "WW3D2/hlod.h"
+#include "WW3D2/mapper.h"	// GeneralsX @feature cemlyn007 21/10/2026 The client tick
 #include "WW3D2/meshmatdesc.h"
 #include "WW3D2/meshmdl.h"
 #include "WW3D2/rddesc.h"
@@ -121,6 +122,13 @@ static void drawFramerateBar();
 #include "Common/ApplicationWindow.h"
 // GeneralsX @bugfix cemlyn007 01/10/2026 The draw clock (PLAN-023 Phase 8, stage RR3).
 #include "W3DDevice/GameClient/W3DDrawClock.h"
+#include "Common/EngineDrawing.h"	// GeneralsX @feature cemlyn007 21/10/2026 Drawing on demand
+#include "W3DDevice/GameClient/W3DTreeBuffer.h"	// GeneralsX @feature cemlyn007 21/10/2026 The client tick
+#include "W3DDevice/GameClient/W3DWaterTracks.h"	// GeneralsX @feature cemlyn007 21/10/2026 The client tick
+#include "W3DDevice/GameClient/W3DParticleSys.h"	// GeneralsX @feature cemlyn007 21/10/2026 The client tick
+#include "Common/GameUtility.h"	// GeneralsX @feature cemlyn007 21/10/2026 The client tick
+#include "W3DDevice/GameClient/W3DVolumetricShadow.h"	// GeneralsX @feature cemlyn007 21/10/2026 The client tick
+#include "GameLogic/Object.h"	// GeneralsX @feature cemlyn007 21/10/2026 The client tick
 
 
 // DEFINE AND ENUMS ///////////////////////////////////////////////////////////
@@ -446,6 +454,7 @@ W3DDisplay::W3DDisplay()
 //=============================================================================
 W3DDisplay::~W3DDisplay()
 {
+
 #ifdef PROFILER_ENABLED
 	delete m_profilerFrameCapture;
 	m_profilerFrameCapture = nullptr;
@@ -2067,6 +2076,14 @@ void W3DDisplay::draw()
 	W3D_UpdateScreenshotMessages();
 
 	updateAverageFPS();
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 An engine that draws on demand sets its dynamic LOD, which particle creation
+	// and slow deaths read, in its client tick (tickClient), so a draw does not change it
+	if (rts::drawsOnDemand())
+	{
+	}
+	else
+#endif
 	if (TheGlobalData->m_enableDynamicLOD && TheGameLogic->getShowDynamicLOD())
 	{
 		DynamicGameLODLevel lod=TheGameLODManager->findDynamicLODLevel(m_averageFPS);
@@ -2146,7 +2163,25 @@ AGAIN:
 	/// @todo: I'm assuming the first view is our main 3D view.
 	W3DView *primaryW3DView=(W3DView *)getFirstView();
 
-	if (!freezeTime && TheScriptEngine->isTimeFast())
+	// GeneralsX @feature cemlyn007 21/10/2026 A draw of an engine that draws on demand renders the state its client
+	// tick left (tickClient): it advances no clock, camera, drawable, particle, countdown or counter, and passes no time
+	// to what renders, so two draws at one frame are identical (Common/EngineDrawing.h).
+#if RTS_ENGINE_CONTEXT
+	const Bool onDemand = rts::drawsOnDemand();
+#else
+	const Bool onDemand = FALSE;
+#endif
+	if (onDemand)
+	{
+		freezeTime = FALSE;
+	}
+	const WW3D::FrameTimes frameTimesBeforeDraw = WW3D::Get_Frame_Times();
+	if (onDemand)
+	{
+		WW3D::Set_Frame_Times(WW3D::FrameTimes());
+	}
+
+	if (!onDemand && !freezeTime && TheScriptEngine->isTimeFast())
 	{
 		primaryW3DView->updateCameraMovements();  // Update camera motion effects.
 		return;
@@ -2160,7 +2195,7 @@ AGAIN:
 	if(TheGlobalData->m_loadScreenRender != TRUE)
 	{
 
-		if (TheTerrainTracksRenderObjClassSystem)
+		if (TheTerrainTracksRenderObjClassSystem && !onDemand)
 			TheTerrainTracksRenderObjClassSystem->update();
 
 		//Shroud data is needed to render all other views, so handle this first.
@@ -2186,17 +2221,20 @@ AGAIN:
 	// A draw with no logic update passes zero, so LogicFrameTimeMs, which the draw path's own animations
 	// (cloud scroll, rings, spheres) multiply once per draw, holds them still too.
 	const Bool renderHeadless = TheGlobalData->m_headless && TheGlobalData->m_headlessRender;
+	if (!onDemand)
+	{
 	WW3D::Update_Logic_Frame_Time(!renderHeadless || TheGameLogic->hasUpdated() ? TheFramePacer->getLogicTimeStepMilliseconds() : 0.0f);
 
 	// TheSuperHackers @info This binds the WW3D update to the logic update.
 	WW3D::Sync(TheGameLogic->hasUpdated());
+	}
 
 	// GeneralsX @bugfix cemlyn007 01/10/2026 The letterbox fade's clock: the draw clock (logic-frame time for an
 	// embedding host's image observations, W3DDrawClock.h), set at every draw, so a local (PLAN-023 Phase 8, stage
 	// RR3).
 	const Int now = W3D_DRAW_CLOCK_MS();
 
-	if (TheTacticalView->getTimeMultiplier()>1)
+	if (!onDemand && TheTacticalView->getTimeMultiplier()>1)
 	{
 		Int& timeMultiplierCounter = m_timeMultiplierCounter;	// GeneralsX @refactor cemlyn007 01/10/2026 (RR3)
 		timeMultiplierCounter--;
@@ -2223,8 +2261,11 @@ AGAIN:
 		{	//Checking if we have the device before updating views because the heightmap crashes otherwise while
 			//trying to refresh the visible terrain geometry.
 //			if(TheGlobalData->m_loadScreenRender != TRUE)
+			if (!onDemand)
+			{
 				updateViews();
      		TheParticleSystemManager->update();//LORENZEN AND WILCZYNSKI MOVED THIS FROM ITS NATIVE POSITION, ABOVE
+			}
                                            //FOR THE PURPOSE OF LETTING THE PARTICLE SYSTEM LOOK UP THE RENDER OBJECT"S
                                            //TRANSFORM MATRIX, WHILE IT IS STILL VALID (HAVING DONE ITS CLIENT TRANSFORMS
                                            //BUT NOT YET RESETTING TOT HE LOGICAL TRANSFORM)
@@ -2239,7 +2280,10 @@ AGAIN:
 
 			//Can't render into textures while rendering to screen so these textures need to be updated
 			//before we enter main rendering loop.
-			if (TheW3DProjectedShadowManager)
+			// GeneralsX @feature cemlyn007 21/10/2026 An engine that draws on demand makes its projected shadows' textures
+			// in its client tick, so a shadow is made from its model's pose at the same frame whichever frames are drawn
+			// (Common/EngineDrawing.h)
+			if (TheW3DProjectedShadowManager && !onDemand)
 				TheW3DProjectedShadowManager->updateRenderTargetTextures();
 		}
 
@@ -2335,7 +2379,8 @@ AGAIN:
 						width = ( TheDisplay->getWidth() - displayString->getWidth() ) / 2;
 					displayString->draw( width, height, color, backColor );
 
-					m_cinematicTextFrames--;
+					if (!onDemand)
+						m_cinematicTextFrames--;
 				}
 
 				if ( m_debugDisplayCallback )
@@ -2393,12 +2438,123 @@ AGAIN:
 
 	} while (freezeTime && !TheTacticalView->isCameraMovementFinished());
 
+	if (onDemand)
+	{
+		WW3D::Set_Frame_Times(frameTimesBeforeDraw);
+	}
+
 #ifdef EXTENDED_STATS
 	if (DX8Wrapper::stats.m_disableOverhead) {
 		goto AGAIN;
 	}
 #endif
 }
+
+#if RTS_ENGINE_CONTEXT
+// W3DDisplay::tickClient =====================================================
+// GeneralsX @feature cemlyn007 21/10/2026 The client tick of an engine that draws on demand (Common/EngineDrawing.h).
+// GameEngine::update runs it after each logic frame, whether or not anything is drawn. It advances, once and in the
+// order draw() does for every other engine, everything a draw advanced: WW3D's clock and the terrain tracks, every
+// view's camera, every drawable's draw modules (whichever views could see them), the particle simulation and the field
+// particles it counts, the shroud-clear frame of every drawable its player sees clear, the scene's per-frame updates
+// and model, sphere and ring animation, the trees, the water tracks and the cinematic text's countdown. draw() then
+// renders only.
+//=============================================================================
+void W3DDisplay::tickClient()
+{
+	if (TheGlobalData->m_loadScreenRender == TRUE)
+		return;
+
+	const Bool freezeTime = TheFramePacer->isTimeFrozen() || TheFramePacer->isGameHalted();
+	W3DView *primaryW3DView = (W3DView *)getFirstView();
+	if (primaryW3DView == nullptr)
+		return;
+
+	if (!freezeTime && TheScriptEngine->isTimeFast())
+	{
+		primaryW3DView->updateCameraMovements();
+		return;
+	}
+
+	if (TheGlobalData->m_enableDynamicLOD && TheGameLogic->getShowDynamicLOD())
+		TheGameLODManager->setDynamicLODLevel(TheGameLODManager->findDynamicLODLevel(m_averageFPS));
+	else
+		TheGameLODManager->setDynamicLODLevel(DYNAMIC_GAME_LOD_VERY_HIGH);
+
+	if (TheTerrainTracksRenderObjClassSystem)
+		TheTerrainTracksRenderObjClassSystem->update();
+
+	WW3D::Update_Logic_Frame_Time(TheFramePacer->getLogicTimeStepMilliseconds());
+	WW3D::Sync(true);
+	WW3D::Count_Client_Tick();
+
+	if (TheTacticalView->getTimeMultiplier()>1)
+	{
+		Int& timeMultiplierCounter = m_timeMultiplierCounter;
+		timeMultiplierCounter--;
+		if (timeMultiplierCounter>1)
+			return;
+		timeMultiplierCounter = TheTacticalView->getTimeMultiplier();
+	}
+
+	IDirect3DDevice8 *const device = DX8Wrapper::_Get_D3D_Device8();
+	if (device == nullptr || device->TestCooperativeLevel() != D3D_OK)
+		return;
+
+	updateViews();
+
+	for (Drawable *draw = TheGameClient->firstDrawable(); draw != nullptr; )
+	{
+		Drawable *next = draw->getNextDrawable();
+		draw->draw();
+		draw->advanceIconsForClientTick();
+		draw = next;
+	}
+
+	ParticleSystemManager *const particles = TheParticleSystemManager;
+	static_cast<W3DParticleSystemManager *>(particles)->countFieldParticlesInView(*primaryW3DView->get3DCamera());
+	for (Int i = 0; i < particles->getSimulationCount(); ++i)
+		static_cast<W3DParticleSystemManager *>(particles->getSimulation(i))->countFieldParticlesInView(*primaryW3DView->get3DCamera());
+	particles->update();
+
+	const Int localPlayerIndex = rts::getObservedOrLocalPlayerIndex_Safe();
+	const UnsignedInt frame = TheGameLogic->getFrame();
+	for (Drawable *draw = TheGameClient->firstDrawable(); draw != nullptr; draw = draw->getNextDrawable())
+	{
+		if (draw->isDrawableEffectivelyHidden())
+			continue;
+		Object *object = draw->getObject();
+		if (object == nullptr)
+			continue;
+		if (object->getShroudedStatus(localPlayerIndex) == OBJECTSHROUD_CLEAR)
+			draw->setShroudClearFrame(frame);
+		for (Int i = 0; i < particles->getSimulationCount(); ++i)
+		{
+			const Int player = particles->getSimulation(i)->getLocalPlayerIndex();
+			if (object->getShroudedStatus(player) == OBJECTSHROUD_CLEAR)
+				draw->setShroudClearFrameFor(player, frame);
+		}
+	}
+
+	m_3DScene->tickClient();
+	TextureMapperClass::Advance_All_For_Client_Tick();
+
+	if (TheW3DProjectedShadowManager)
+		TheW3DProjectedShadowManager->updateRenderTargetTextures();
+	if (TheW3DVolumetricShadowManager)
+		TheW3DVolumetricShadowManager->tickClient();
+
+	if (TheTerrainRenderObject && TheTerrainRenderObject->getMap() && TheTerrainRenderObject->getShroud())
+		TheTerrainRenderObject->getShroud()->advanceFade();
+	if (TheTerrainRenderObject)
+		TheTerrainRenderObject->advanceTrees();
+	if (TheWaterTracksRenderSystem)
+		TheWaterTracksRenderSystem->advance();
+
+	if (m_cinematicText != AsciiString::TheEmptyString && m_cinematicTextFrames != 0)
+		m_cinematicTextFrames--;
+}
+#endif
 
 #define LETTER_BOX_FADE_TIME	1000.0f		///1000 ms.
 

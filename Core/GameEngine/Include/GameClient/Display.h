@@ -131,6 +131,11 @@ public:
 	virtual Bool isBatching() const { return m_isBatching; }	///< returns true if currently batching 2D draw operations.
 
 	virtual void step() {}; ///< Do one fixed time step
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 Advance the client by one logic frame, for an engine that draws on demand
+	// (Common/EngineDrawing.h)
+	virtual void tickClient() {}
+#endif
 	virtual void draw() override;																		///< Redraw the entire display
 	virtual void setTimeOfDay( TimeOfDay tod ) = 0;								///< Set the time of day for this display
 	virtual void createLightPulse( const Coord3D *pos, const RGBColor *color, Real innerRadius,Real attenuationWidth,

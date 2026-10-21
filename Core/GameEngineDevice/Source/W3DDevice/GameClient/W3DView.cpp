@@ -40,6 +40,7 @@
 // USER INCLUDES //////////////////////////////////////////////////////////////////////////////////
 #include "Lib/BaseType.h"
 
+#include "Common/EngineDrawing.h"	// GeneralsX @feature cemlyn007 21/10/2026 Drawing on demand
 #include "Common/BuildAssistant.h"
 #include "Common/FramePacer.h"
 #include "Common/GameUtility.h"
@@ -1721,6 +1722,13 @@ void W3DView::update()
 	TheTerrainVisual->updateSeismicSimulations();
 #endif
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 An engine that draws on demand advances every drawable's draw modules
+	// once per logic frame in its client tick, whichever views can see them (W3DDisplay::tickClient)
+	if (rts::drawsOnDemand())
+		return;
+#endif
+
 	Region3D axisAlignedRegion;
 	getAxisAlignedViewRegion(axisAlignedRegion);
 
@@ -1879,6 +1887,15 @@ void W3DView::draw()
 	Bool doExtraRender = false;
 	CustomScenePassModes customScenePassMode  = SCENE_PASS_DEFAULT;
 	Bool preRenderResult = false;
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 A draw of an engine that draws on demand renders the drawable the camera is
+	// locked on with the rest of the scene. Hiding it for the scene and showing it again to draw it alone capped its
+	// track marks and deselected it at every draw, so the track marks depended on which frames were drawn
+	// (Common/EngineDrawing.h).
+	const Bool drawsCameraLockApart = !rts::drawsOnDemand();
+#else
+	const Bool drawsCameraLockApart = TRUE;
+#endif
 
 	if (m_viewFilterMode &&
 			m_viewFilter > FT_NULL_FILTER &&
@@ -1886,7 +1903,7 @@ void W3DView::draw()
 	{
 		// Most likely will redirect rendering to a texture.
 		preRenderResult=W3DShaderManager::filterPreRender(m_viewFilter, skipRender, customScenePassMode);
-		if (!skipRender && getCameraLock())
+		if (drawsCameraLockApart && !skipRender && getCameraLock())
 		{
 			Object* cameraLockObj = TheGameLogic->findObjectByID(getCameraLock());
 			if (cameraLockObj)
@@ -1917,7 +1934,7 @@ void W3DView::draw()
 		Bool continueTheEffect = false;
 		if (preRenderResult)	//if prerender passed, do the post render.
 			continueTheEffect = W3DShaderManager::filterPostRender(m_viewFilter, m_viewFilterMode, deltaScroll,doExtraRender);
-		if (!skipRender && getCameraLock())
+		if (drawsCameraLockApart && !skipRender && getCameraLock())
 		{
 			Object* cameraLockObj = TheGameLogic->findObjectByID(getCameraLock());
 			if (cameraLockObj)

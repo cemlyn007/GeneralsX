@@ -29,6 +29,7 @@
 
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
+#include "Common/EngineDrawing.h"	// GeneralsX @feature cemlyn007 21/10/2026 Drawing on demand
 
 #include "GameClient/Drawable.h"
 #include "GameClient/Module/SwayClientUpdate.h"
@@ -111,7 +112,13 @@ void SwayClientUpdate::clientUpdate()
 	else
 	{
 		// Otherwise, only update visible drawables
+#if RTS_ENGINE_CONTEXT
+		// GeneralsX @feature cemlyn007 21/10/2026 An engine that draws on demand sways every drawable, since whether one
+		// was visible depends on which views were drawn last (Common/EngineDrawing.h)
+		if (!draw || (!rts::drawsOnDemand() && !draw->isVisible()))
+#else
 		if (!draw || !draw->isVisible())
+#endif
 			return;
 	}
 

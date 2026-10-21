@@ -54,6 +54,12 @@
 #include "W3DDevice/GameClient/W3DStatusCircle.h"
 #include "W3DDevice/GameClient/W3DCustomScene.h"
 #include "W3DDevice/GameClient/W3DShroud.h"
+#include "Common/EngineDrawing.h"	// GeneralsX @feature cemlyn007 21/10/2026 Drawing on demand
+#include "WW3D2/hlod.h"	// GeneralsX @feature cemlyn007 21/10/2026 The client tick
+#include "WW3D2/ringobj.h"	// GeneralsX @feature cemlyn007 21/10/2026 The client tick
+#include "WW3D2/sphereobj.h"	// GeneralsX @feature cemlyn007 21/10/2026 The client tick
+#include "WW3D2/mesh.h"	// GeneralsX @feature cemlyn007 21/10/2026 The client tick
+#include "WW3D2/meshmdl.h"	// GeneralsX @feature cemlyn007 21/10/2026 The client tick
 #include "WW3D2/camera.h"
 #include "WW3D2/dx8renderer.h"
 #include "WW3D2/sortingrenderer.h"
@@ -387,6 +393,79 @@ Bool RTS3DScene::castRay(RayCollisionTestClass & raytest, Bool testAll, Int coll
 	return hit;
 }
 
+#if RTS_ENGINE_CONTEXT
+//=============================================================================
+// RTS3DScene::tickClient
+//=============================================================================
+// GeneralsX @feature cemlyn007 21/10/2026 The scene's logic frame, for the client tick of an engine that draws on
+// demand (Common/EngineDrawing.h). It runs, once, what each render advances for every other engine: the per-frame
+// updates of the objects that asked for them (emitters, particle buffers, dynamic lights), the release of those that
+// finished, the bounding volumes that bring particle buffers up to date, and the time-based animation of every model,
+// sphere and ring, whether or not any view can see them. The renders that follow pass no time, so they advance none of
+// it again. It also registers each model it meets with the mesh renderer, which a render otherwise does the first time
+// it draws the model, so the order the renderer draws its models in does not depend on which were drawn first.
+//=============================================================================
+static void advanceRenderObjectForClientTick(RenderObjClass *robj)
+{
+	switch (robj->Class_ID())
+	{
+		case RenderObjClass::CLASSID_HLOD:
+			static_cast<HLodClass *>(robj)->Advance_Client_Tick();
+			break;
+		case RenderObjClass::CLASSID_SPHERE:
+			static_cast<SphereRenderObjClass *>(robj)->Advance_Client_Tick();
+			break;
+		case RenderObjClass::CLASSID_RING:
+			static_cast<RingRenderObjClass *>(robj)->Advance_Client_Tick();
+			break;
+		case RenderObjClass::CLASSID_MESH:
+		{
+			MeshModelClass *model = static_cast<MeshClass *>(robj)->Peek_Model();
+			if (model != nullptr && !model->Has_Polygon_Renderers())
+				model->Register_For_Rendering();
+			break;
+		}
+		default:
+			break;
+	}
+	const Int subObjects = robj->Get_Num_Sub_Objects();
+	for (Int i = 0; i < subObjects; ++i)
+	{
+		RenderObjClass *sub = robj->Get_Sub_Object(i);
+		if (sub != nullptr)
+		{
+			advanceRenderObjectForClientTick(sub);
+			sub->Release_Ref();
+		}
+	}
+}
+
+
+
+
+void RTS3DScene::tickClient()
+{
+	RefRenderObjListIterator it(&UpdateList);
+	for (it.First(); !it.Is_Done(); it.Next())
+	{
+		RenderObjClass *robj = it.Peek_Obj();
+		if (robj->Class_ID() != RenderObjClass::CLASSID_TILEMAP)
+			robj->On_Frame_Update();
+	}
+	Release_Pending_Objects();
+
+	RefRenderObjListIterator objects(&RenderList);
+	for (objects.First(); !objects.Is_Done(); objects.Next())
+	{
+		RenderObjClass *robj = objects.Peek_Obj();
+		if (robj->Class_ID() == RenderObjClass::CLASSID_TILEMAP)
+			continue;
+		robj->Get_Bounding_Sphere();
+		advanceRenderObjectForClientTick(robj);
+	}
+}
+#endif
+
 //=============================================================================
 // RTS3DScene::Visibility_Check
 //=============================================================================
@@ -628,6 +707,11 @@ void RTS3DScene::renderOneObject(RenderInfoClass &rinfo, RenderObjClass *robj, I
 			// we keep drawing them for 2 seconds after they return to the fogged area,
 			// so the player can see them and missiles chasing them.  jba.
 			if (ss == OBJECTSHROUD_CLEAR) {
+#if RTS_ENGINE_CONTEXT
+				// GeneralsX @feature cemlyn007 21/10/2026 An engine that draws on demand notes it in its client tick, for
+				// every drawable, whichever were drawn (W3DDisplay::tickClient)
+				if (!rts::drawsOnDemand())
+#endif
 				draw->setShroudClearFrame(TheGameLogic->getFrame());
 			}	else if (ss >= OBJECTSHROUD_FOGGED && draw->getShroudClearFrame() != InvalidShroudClearFrame) {
 				UnsignedInt limit = 2*LOGICFRAMES_PER_SECOND;
@@ -1134,6 +1218,12 @@ void RTS3DScene::Customized_Render( RenderInfoClass &rinfo )
 			// If we are doing water mirror, we draw with backface culling inverted.  In this case,
 			// we only want to call On_Frame_Update if we aren't drawing water, as otherwise
 			// we get 2 frame updates per frame, and it screws up the particle emitters.
+#if RTS_ENGINE_CONTEXT
+			// GeneralsX @feature cemlyn007 21/10/2026 An engine that draws on demand runs every other object's frame
+			// update in its client tick (tickClient). The terrain's relights it for the dynamic lights in the drawn
+			// region, which advances nothing, so it stays.
+			if (!rts::drawsOnDemand() || robj->Class_ID() == RenderObjClass::CLASSID_TILEMAP)
+#endif
 			it.Peek_Obj()->On_Frame_Update();
 		}
 	}

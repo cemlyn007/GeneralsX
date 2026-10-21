@@ -48,11 +48,25 @@ public:
 	virtual void queueParticleRender() override;
 	///< returns the number of particles shown on screen per frame
 	virtual Int getOnScreenParticleCount() override { return m_onScreenParticleCount; }
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 The client tick's count of the field particles in a camera's view
+	// (Common/EngineDrawing.h)
+	void countFieldParticlesInView(CameraClass &camera);
+	// GeneralsX @feature cemlyn007 21/10/2026 A player's particle simulation (ParticleSystemManager::beginSimulations)
+	virtual ParticleSystemManager *newSimulation() const override { return NEW W3DParticleSystemManager; }
+	// GeneralsX @bugfix cemlyn007 21/10/2026 A reset lets go of the textures the last draw left on the point group and
+	// the streaks, in every simulation, so that none outlives the render device: the engine's teardown resets every
+	// subsystem before it releases the device, but deletes this manager only after
+	virtual void reset() override;
+#endif
 
 private:
 	Bool finishedBatch(const ParticleSystem& system, const RefCountPtr<TextureClass>& texture);
 	void initializeBatch(const ParticleSystem& system, const RefCountPtr<TextureClass>& texture);
 	void flushParticleBatch(RenderInfoClass& rinfo, UnsignedInt& pointCount);
+#if RTS_ENGINE_CONTEXT
+	void releaseTextures();
+#endif
 
 	enum { MAX_POINTS_PER_GROUP = 512 };
 

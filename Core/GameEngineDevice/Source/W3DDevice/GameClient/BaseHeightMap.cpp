@@ -2821,6 +2821,26 @@ void BaseHeightMapRenderObjClass::renderTrees(CameraClass * camera)
 	}
 }
 
+#if RTS_ENGINE_CONTEXT
+//=============================================================================
+// BaseHeightMapRenderObjClass::advanceTrees
+//=============================================================================
+// GeneralsX @feature cemlyn007 21/10/2026 The trees' logic frame of sway, toppling, sinking and pushing aside, which
+// renderTrees makes for every other engine, for the client tick of an engine that draws on demand
+// (Common/EngineDrawing.h)
+//=============================================================================
+void BaseHeightMapRenderObjClass::advanceTrees()
+{
+	if (m_map==nullptr) return;
+	if (Scene==nullptr) return;
+	if (m_treeBuffer) {
+		RTS3DScene *pMyScene = (RTS3DScene *)Scene;
+		RefRenderObjListIterator pDynamicLightsIterator(pMyScene->getDynamicLights());
+		m_treeBuffer->advance(&pDynamicLightsIterator);
+	}
+}
+#endif
+
 // ------------------------------------------------------------------------------------------------
 /** CRC */
 // ------------------------------------------------------------------------------------------------

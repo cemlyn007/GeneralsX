@@ -29,6 +29,7 @@
 
 #include "Lib/BaseType.h"
 #include "WW3D2/camera.h"
+#include "Common/EngineDrawing.h"	// GeneralsX @feature cemlyn007 21/10/2026 Drawing on demand
 #include "WWLib/simplevec.h"
 #include "WW3D2/dx8wrapper.h"
 #include "Common/MapObject.h"
@@ -704,6 +705,11 @@ void W3DShroud::render(CameraClass *cam)
 
 #ifdef DO_FOG_INTERPOLATION
 	//interpolate current shroud state to the final one
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 An engine that draws on demand fades its fog in its client tick
+	// (advanceFade), so a draw only uploads it (Common/EngineDrawing.h)
+	if (!rts::drawsOnDemand())
+#endif
 	interpolateFogLevels(&srcRect);
 #endif
 
@@ -729,6 +735,23 @@ void W3DShroud::render(CameraClass *cam)
 }
 
 #define FOG_INTERPOLATION_RATE	(255.0f/1000.0f)	//take one second to go from black to fully lit.
+
+#if RTS_ENGINE_CONTEXT
+//-----------------------------------------------------------------------------
+// GeneralsX @feature cemlyn007 21/10/2026 render()'s fade of the fog over the whole map towards its target, for the
+// client tick of an engine that draws on demand, which runs it once per logic frame (Common/EngineDrawing.h)
+void W3DShroud::advanceFade()
+{
+#ifdef DO_FOG_INTERPOLATION
+	RECT wholeMap;
+	wholeMap.left = 0;
+	wholeMap.top = 0;
+	wholeMap.right = m_numCellsX;
+	wholeMap.bottom = m_numCellsY;
+	interpolateFogLevels(&wholeMap);
+#endif
+}
+#endif
 //-----------------------------------------------------------------------------
 void W3DShroud::interpolateFogLevels(RECT *rect)
 {

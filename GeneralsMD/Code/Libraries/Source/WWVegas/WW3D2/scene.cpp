@@ -629,6 +629,12 @@ void SimpleSceneClass::Customized_Render(RenderInfoClass & rinfo)
 
 void SimpleSceneClass::Post_Render_Processing(RenderInfoClass& rinfo)
 {
+	Release_Pending_Objects();
+}
+
+// GeneralsX @refactor cemlyn007 21/10/2026 Post_Render_Processing's body, which a client tick also runs
+void SimpleSceneClass::Release_Pending_Objects()
+{
 	// process the 'Release' list.  These are objects that have notified us that they
 	// want to be released.  We have to walk this list twice, first un-linking the
 	// object from the scene or its container.  And then removing them all from

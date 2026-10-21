@@ -55,6 +55,7 @@ enum
 //         Includes
 //-----------------------------------------------------------------------------
 
+#include "Common/EngineDrawing.h"	// GeneralsX @feature cemlyn007 21/10/2026 Drawing on demand
 #include "W3DDevice/GameClient/W3DTreeBuffer.h"
 
 #include <WW3D2/assetmgr.h>
@@ -1452,6 +1453,82 @@ void W3DTreeBuffer::pushAsideTree(DrawableID id, const Coord3D *pusherPos,
 	}
 }
 
+//=============================================================================
+// W3DTreeBuffer::advanceToppledAndPushedTrees
+//=============================================================================
+// GeneralsX @refactor cemlyn007 21/10/2026 drawTrees' update of the toppling, sinking and pushed aside trees, so that
+// an engine that draws on demand can run it in its client tick (advance)
+//=============================================================================
+void W3DTreeBuffer::advanceToppledAndPushedTrees(Real timeScale)
+{
+	Int curTree;
+	for (curTree=0; curTree<m_numTrees; curTree++) {
+		Int type = m_trees[curTree].treeType;
+		if (type<0) { // deleted.
+			continue;
+		}
+		const W3DTreeDrawModuleData *moduleData = m_treeTypes[type].m_data;
+		if(m_trees[curTree].m_toppleState == TOPPLE_FALLING ||
+			 m_trees[curTree].m_toppleState == TOPPLE_FOGGED) {
+			updateTopplingTree(m_trees+curTree, timeScale);
+		} else if(m_trees[curTree].m_toppleState == TOPPLE_DOWN) {
+			if (moduleData->m_killWhenToppled) {
+				if (m_trees[curTree].m_sinkFramesLeft <= 0.0f) {
+					m_trees[curTree].treeType = DELETED_TREE_TYPE; // delete it. [7/11/2003]
+					m_anythingChanged = true; // need to regenerate trees. [7/11/2003]
+				}
+				const Real sinkDistancePerFrame = moduleData->m_sinkDistance / moduleData->m_sinkFrames;
+				m_trees[curTree].m_sinkFramesLeft -= timeScale;
+				m_trees[curTree].location.Z -= sinkDistancePerFrame * timeScale;
+				m_trees[curTree].m_mtx.Set_Translation(m_trees[curTree].location);
+			}
+		} else if (m_trees[curTree].pushAsideDelta!=0.0f) {
+			m_trees[curTree].pushAside += m_trees[curTree].pushAsideDelta;
+			if (m_trees[curTree].pushAside>=1.0f) {
+				m_trees[curTree].pushAsideDelta = -1.0f/(Real)moduleData->m_framesToMoveInward;
+			} else if (m_trees[curTree].pushAside<=0.0f) {
+				m_trees[curTree].pushAsideDelta = 0.0f;
+				m_trees[curTree].pushAside = 0.0f;
+			}
+		}
+	}
+
+}
+
+#if RTS_ENGINE_CONTEXT
+//=============================================================================
+// W3DTreeBuffer::advance
+//=============================================================================
+// GeneralsX @feature cemlyn007 21/10/2026 One logic frame of the trees' sway, toppling, sinking and pushing aside, and
+// the refill of their buffers that follows, for an engine that draws on demand: its client tick runs it once per logic
+// frame, and its draws only draw the trees (Common/EngineDrawing.h).
+//=============================================================================
+void W3DTreeBuffer::advance(RefRenderObjListIterator *pDynamicLightsIterator)
+{
+	const BreezeInfo& info = TheScriptEngine->getBreezeInfo();
+	if (info.m_breezeVersion != m_curSwayVersion)
+	{
+		updateSway(info);
+	}
+	const Real timeScale = TheFramePacer->getActualLogicTimeScaleOverFpsRatio();
+	for (Int i=0; i<MAX_SWAY_TYPES; i++)
+	{
+		m_curSwayOffset[i] += m_curSwayStep[i] * timeScale;
+		if (m_curSwayOffset[i] > NUM_SWAY_ENTRIES-1) {
+			m_curSwayOffset[i] -= NUM_SWAY_ENTRIES-1;
+		}
+	}
+	advanceToppledAndPushedTrees(timeScale);
+	if (m_anythingChanged) {
+		loadTreesInVertexAndIndexBuffers(pDynamicLightsIterator);
+		m_anythingChanged = false;
+	} else if (m_anyPushChanged) {
+		m_anyPushChanged = false;
+		updateVertexBuffer();
+	}
+}
+#endif
+
 DECLARE_PERF_TIMER(Tree_Render)
 
 //=============================================================================
@@ -1466,10 +1543,18 @@ void W3DTreeBuffer::drawTrees(CameraClass * camera, RefRenderObjListIterator *pD
 		return;
 	}
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 An engine that draws on demand sways, topples, sinks and pushes aside its
+	// trees, and refills their buffers, in its client tick (advance): a draw only draws them (Common/EngineDrawing.h)
+	const Bool onDemand = rts::drawsOnDemand();
+#else
+	const Bool onDemand = FALSE;
+#endif
+
 	// if breeze changes, always process the full update, even if not visible,
 	// so that things offscreen won't 'pop' when first viewed
 	const BreezeInfo& info = TheScriptEngine->getBreezeInfo();
-	if (info.m_breezeVersion != m_curSwayVersion)
+	if (!onDemand && info.m_breezeVersion != m_curSwayVersion)
 	{
 		updateSway(info);
 	}
@@ -1480,9 +1565,12 @@ void W3DTreeBuffer::drawTrees(CameraClass * camera, RefRenderObjListIterator *pD
 	Int i;
 	for (i=0; i<MAX_SWAY_TYPES; i++)
 	{
-		m_curSwayOffset[i] += m_curSwayStep[i] * timeScale;
-		if (m_curSwayOffset[i] > NUM_SWAY_ENTRIES-1) {
-			m_curSwayOffset[i] -= NUM_SWAY_ENTRIES-1;
+		if (!onDemand)
+		{
+			m_curSwayOffset[i] += m_curSwayStep[i] * timeScale;
+			if (m_curSwayOffset[i] > NUM_SWAY_ENTRIES-1) {
+				m_curSwayOffset[i] -= NUM_SWAY_ENTRIES-1;
+			}
 		}
 		Int minOffset = REAL_TO_INT_FLOOR(m_curSwayOffset[i]);
 		if (minOffset>=0 && minOffset+1<NUM_SWAY_ENTRIES) {
@@ -1530,35 +1618,9 @@ void W3DTreeBuffer::drawTrees(CameraClass * camera, RefRenderObjListIterator *pD
 	}
 
 	// Update pushed aside and toppling trees.
-	for (curTree=0; curTree<m_numTrees; curTree++) {
-		Int type = m_trees[curTree].treeType;
-		if (type<0) { // deleted.
-			continue;
-		}
-		const W3DTreeDrawModuleData *moduleData = m_treeTypes[type].m_data;
-		if(m_trees[curTree].m_toppleState == TOPPLE_FALLING ||
-			 m_trees[curTree].m_toppleState == TOPPLE_FOGGED) {
-			updateTopplingTree(m_trees+curTree, timeScale);
-		} else if(m_trees[curTree].m_toppleState == TOPPLE_DOWN) {
-			if (moduleData->m_killWhenToppled) {
-				if (m_trees[curTree].m_sinkFramesLeft <= 0.0f) {
-					m_trees[curTree].treeType = DELETED_TREE_TYPE; // delete it. [7/11/2003]
-					m_anythingChanged = true; // need to regenerate trees. [7/11/2003]
-				}
-				const Real sinkDistancePerFrame = moduleData->m_sinkDistance / moduleData->m_sinkFrames;
-				m_trees[curTree].m_sinkFramesLeft -= timeScale;
-				m_trees[curTree].location.Z -= sinkDistancePerFrame * timeScale;
-				m_trees[curTree].m_mtx.Set_Translation(m_trees[curTree].location);
-			}
-		} else if (m_trees[curTree].pushAsideDelta!=0.0f) {
-			m_trees[curTree].pushAside += m_trees[curTree].pushAsideDelta;
-			if (m_trees[curTree].pushAside>=1.0f) {
-				m_trees[curTree].pushAsideDelta = -1.0f/(Real)moduleData->m_framesToMoveInward;
-			} else if (m_trees[curTree].pushAside<=0.0f) {
-				m_trees[curTree].pushAsideDelta = 0.0f;
-				m_trees[curTree].pushAside = 0.0f;
-			}
-		}
+	if (!onDemand)
+	{
+		advanceToppledAndPushedTrees(timeScale);
 	}
 
 	if (m_anythingChanged) {

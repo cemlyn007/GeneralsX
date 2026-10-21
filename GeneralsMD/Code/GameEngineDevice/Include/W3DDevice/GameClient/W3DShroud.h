@@ -79,6 +79,11 @@ public:
 	~W3DShroud();
 
 	void render(CameraClass *cam);	///< render the current shroud state as seen from camera
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 The fog's fade over the whole map, for the client tick of an engine that
+	// draws on demand (Common/EngineDrawing.h)
+	void advanceFade();
+#endif
 	void init(WorldHeightMap *pMap, Real worldCellSizeX, Real worldCellSizeY);
 	void reset();
 	TextureClass *getShroudTexture() { return m_pDstTexture;}	//<return shroud projection texture.

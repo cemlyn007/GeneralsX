@@ -69,6 +69,12 @@ public:
 	/////////////////////////////////////////////////////////////////////////////
 	virtual void					Render(RenderInfoClass & rinfo) override;
 	virtual void					Special_Render(SpecialRenderInfoClass & rinfo) override;
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 What Render advances (the animation's frame and the hierarchy it poses), for
+	// the client tick of an engine that draws on demand. The tick runs it for every model once per logic frame, so a
+	// render after it, at the same logic time, moves nothing.
+	void							Advance_Client_Tick();
+#endif
 
 	/////////////////////////////////////////////////////////////////////////////
 	// Render Object Interface - "Scene Graph"
