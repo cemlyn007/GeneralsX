@@ -223,6 +223,13 @@ public:
 	/// fully headless engine builds) has no textures and reports FALSE.
 	/// Returns TRUE if `out` was filled.
 	virtual Bool copyToRGB( UnsignedByte *out, Int outW, Int outH ) { return FALSE; }
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 copyToRGB as a player sees the radar: for the length of the read, the
+	// player is the viewing player (the context's viewingPlayer), so that its blips are the ones the player may see, and
+	// the radar's shroud is the player's. The observed or local player's shroud and blips are put back after it. A
+	// player index of -1 reads the radar as the observed or local player sees it.
+	Bool copyToRGBForPlayer( Int playerIndex, UnsignedByte *out, Int outW, Int outH );
+#endif
 
 	/// empty the entire shroud
 	virtual void clearShroud() = 0;

@@ -3151,6 +3151,21 @@ void PartitionManager::refreshPlayerShrouds()
 				m_cells[i].getShroudStatusForPlayer(playerIndex));
 	}
 }
+
+//-----------------------------------------------------------------------------
+// GeneralsX @feature cemlyn007 21/10/2026 The radar's shroud as the player sees it (PartitionManager.h)
+//-----------------------------------------------------------------------------
+void PartitionManager::refreshRadarShroudForPlayer( Int playerIndex )
+{
+	TheRadar->clearShroud();
+	if (m_totalCellCount == 0)
+		return;
+	TheRadar->beginSetShroudLevel();
+	for (int i = 0; i < m_totalCellCount; ++i)
+		TheRadar->setShroudLevel(m_cells[i].getCellX(), m_cells[i].getCellY(),
+			m_cells[i].getShroudStatusForPlayer(playerIndex));
+	TheRadar->endSetShroudLevel();
+}
 #endif
 
 //-----------------------------------------------------------------------------

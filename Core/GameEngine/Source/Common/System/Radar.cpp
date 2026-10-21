@@ -40,6 +40,7 @@
 #include "Common/ThingTemplate.h"
 #include "Common/GlobalData.h"
 #include "Common/Xfer.h"
+#include "Common/EngineContext.h"	// GeneralsX @feature cemlyn007 21/10/2026 A player's radar
 
 #include "GameClient/Drawable.h"
 #include "GameClient/Eva.h"
@@ -1557,6 +1558,24 @@ void Radar::linkRadarObject( RadarObject *newObj, RadarObject **list )
 		prevPriority = currPriority;
 	}
 }
+
+#if RTS_ENGINE_CONTEXT
+// ------------------------------------------------------------------------------------------------
+// GeneralsX @feature cemlyn007 21/10/2026 The radar as a player sees it (Radar.h)
+// ------------------------------------------------------------------------------------------------
+Bool Radar::copyToRGBForPlayer( Int playerIndex, UnsignedByte *out, Int outW, Int outH )
+{
+	if( playerIndex < 0 || ThePlayerList->getNthPlayer( playerIndex ) == nullptr )
+		return copyToRGB( out, outW, outH );
+	rts::ctx()->viewingPlayer = playerIndex;
+	ThePartitionManager->refreshRadarShroudForPlayer( playerIndex );
+	const Bool copied = copyToRGB( out, outW, outH );
+	rts::ctx()->viewingPlayer = -1;
+	ThePartitionManager->refreshRadarShroudForPlayer( rts::getObservedOrLocalPlayer()->getPlayerIndex() );
+	refreshObjects();
+	return copied;
+}
+#endif
 
 // ------------------------------------------------------------------------------------------------
 // ------------------------------------------------------------------------------------------------

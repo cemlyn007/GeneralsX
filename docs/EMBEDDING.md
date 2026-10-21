@@ -510,10 +510,17 @@ was, so no logic ever runs with a viewing player set and the next draw starts
 from the same state. None of it has `rts::changeLocalPlayer`'s or
 `rts::changeObservedPlayer`'s other effects.
 
-Still the local player's in every draw: the radar, and the team colours a
-disguise, a garrison or a cave shows, which GeneralsX bakes into a model's
-render objects. The terrain's shroud is the player's own (Per-player shrouds,
-below).
+Still the local player's in every draw: the team colours a disguise, a
+garrison or a cave shows, which GeneralsX bakes into a model's render objects.
+The terrain's shroud is the player's own (Per-player shrouds, below).
+
+`Radar::copyToRGBForPlayer` reads the radar as a player sees it, in the same
+way: for the read, the player is the viewing player, so its blips are the ones
+`W3DRadar::canRenderObject` lets that player see (a stealthed enemy by the
+player's own relationship to it), and the radar's shroud is filled from the
+player's shroud (`PartitionManager::refreshRadarShroudForPlayer`). Afterwards
+the radar's shroud is the observed or local player's again. A radar read asks
+for no shroud status the client tick did not already ask for.
 
 ### Per-player views
 

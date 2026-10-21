@@ -143,9 +143,10 @@ RTS_ENGINE_CONTEXT_VALUE(bool, onDemandDrawing, false)
 // engine that renders, each slot's player also gets a terrain shroud of its own (Display::addPlayerShroud).
 RTS_ENGINE_CONTEXT_VALUE(bool, playerViews, false)
 
-// GeneralsX @feature cemlyn007 21/10/2026 The index of the player whose view is being drawn, or -1 outside such a draw
-// (Display::drawPlayerView). While it is set, the observed or local player (rts::getObservedOrLocalPlayer) is that
-// player, so that a draw shows the game as that player sees it. No logic runs while it is set.
+// GeneralsX @feature cemlyn007 21/10/2026 The index of the player whose view is being drawn, or whose radar is being read,
+// or -1 outside such a draw or read (Display::drawPlayerView, Radar::copyToRGBForPlayer). While it is set, the observed
+// or local player (rts::getObservedOrLocalPlayer) is that player, so that a draw or read shows the game as that player
+// sees it. No logic runs while it is set.
 RTS_ENGINE_CONTEXT_VALUE(std::int32_t, viewingPlayer, -1)
 
 // GeneralsX @feature cemlyn007 21/10/2026 Set by a host whose cameras are its own: a map script's camera actions (moves,

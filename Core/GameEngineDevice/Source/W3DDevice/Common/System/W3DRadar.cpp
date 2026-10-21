@@ -33,6 +33,7 @@
 #include "Common/Debug.h"
 #include "Common/GlobalData.h"
 #include "Common/GameUtility.h"
+#include "Common/EngineContext.h"	// GeneralsX @feature cemlyn007 21/10/2026 A player's radar
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
 
@@ -699,7 +700,16 @@ Bool W3DRadar::canRenderObject( const RadarObject *rObj, const Player *localPlay
 	// ML-- What the heck is this? local-only and neutral-observer-viewed units are stealthy?? Since when?
 	// Now it twinkles for any stealthed object, whether locally controlled or neutral-observer-viewed
 	//
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 For a read of a player's radar (Radar::copyToRGBForPlayer), the
+	// relationship is the player's own, as the control bar's is the player's it shows
+	const Relationship viewedRelationship = rts::ctx()->viewingPlayer >= 0
+		? localPlayer->getRelationship(obj->getTeam())
+		: TheControlBar->getCurrentlyViewedPlayerRelationship(obj->getTeam());
+	if (viewedRelationship == ENEMIES &&
+#else
 	if (TheControlBar->getCurrentlyViewedPlayerRelationship(obj->getTeam()) == ENEMIES &&
+#endif
 		obj->testStatus( OBJECT_STATUS_STEALTHED ) &&
 		!obj->testStatus( OBJECT_STATUS_DETECTED ) &&
 		!obj->testStatus( OBJECT_STATUS_DISGUISED ) )
