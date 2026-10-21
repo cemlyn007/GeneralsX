@@ -543,7 +543,10 @@ before it renders (`W3DView::prepareForDrawOnDemand`): it builds the view's
 camera from its pose if the pose changed since the client tick built it, so a
 camera aimed between two frames shows its aim at once, culls the terrain's
 bridges, trees and props for that camera, and drops the props' cached shroud,
-so they are tested again for the drawn view's player. Such an engine draws the
+so they are tested again for the drawn view's player. Each draw loads the trees
+that camera sees into the tree buffers from the trees as they are
+(`W3DTreeBuffer::drawTrees`), rather than keeping what earlier draws' cameras
+saw, which left a pushed-aside tree out of date. Such an engine draws the
 terrain whole (`W3DView::drawsEntireTerrain`), as GlobalData's
 `m_drawEntireTerrain` asks for: the terrain and its relighting then belong to
 no camera, and no camera's far plane depends on where another view left the

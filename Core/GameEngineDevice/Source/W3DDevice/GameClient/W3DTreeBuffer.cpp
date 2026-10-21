@@ -1501,7 +1501,7 @@ void W3DTreeBuffer::advanceToppledAndPushedTrees(Real timeScale)
 //=============================================================================
 // GeneralsX @feature cemlyn007 21/10/2026 One logic frame of the trees' sway, toppling, sinking and pushing aside, and
 // the refill of their buffers that follows, for an engine that draws on demand: its client tick runs it once per logic
-// frame, and its draws only draw the trees (Common/EngineDrawing.h).
+// frame, and its draws only load the trees their camera sees into the buffers and draw them (Common/EngineDrawing.h).
 //=============================================================================
 void W3DTreeBuffer::advance(RefRenderObjListIterator *pDynamicLightsIterator)
 {
@@ -1592,6 +1592,17 @@ void W3DTreeBuffer::drawTrees(CameraClass * camera, RefRenderObjListIterator *pD
 	}
 	if (m_updateAllKeys) {
 		cull(camera);
+	}
+
+	// GeneralsX @bugfix cemlyn007 21/10/2026 An engine that draws on demand loads the trees its camera sees into the
+	// buffers at every draw, from the trees as they are, before it queues their shadows: updateVertexBuffer writes only
+	// the trees the last cull saw and leaves a tree whose push has ended at its last push, so the buffers held what
+	// earlier draws' cameras had seen (Common/EngineDrawing.h)
+	if (onDemand)
+	{
+		m_anythingChanged = true;
+		loadTreesInVertexAndIndexBuffers(pDynamicLightsIterator);
+		m_anythingChanged = false;
 	}
 
 	Int curTree;
