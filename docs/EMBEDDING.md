@@ -303,6 +303,13 @@ recording is still open.
   `GlobalData::m_useCameraInReplay` is set. With no player looked at, as for a
   host without the observer control bar, it follows the camera of the player
   who recorded the replay.
+- **A host's own replay cameras.** A host that sets the context's
+  `replayCameraRoute` records its cameras into a replay itself, as
+  `MSG_SET_REPLAY_CAMERA` messages stamped with the player whose camera each
+  is, and the game records none of its own (`LookAtXlat`). In a playback,
+  every camera message is handed to the route in place of moving the
+  tactical view (`GameLogic::onSetReplayCamera`), so that the host can move
+  each of its views by the recorded camera it follows.
 - **Host map paths.** A map the host names by its absolute path, outside the
   map and save directories, is written into a game's options by that path and
   read back by it, so the replay of a game on it finds it again.

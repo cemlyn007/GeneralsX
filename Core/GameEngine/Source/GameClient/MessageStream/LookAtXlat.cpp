@@ -554,7 +554,13 @@ GameMessageDisposition LookAtTranslator::translateGameMessage(const GameMessage 
 
 			//if (TheGlobalData->m_saveCameraInReplay /*&& TheRecorder->getMode() != RECORDERMODETYPE_PLAYBACK *//**/&& (TheGameLogic->isInSinglePlayerGame() || TheGameLogic->isInSkirmishGame())/**/)
 			//if (TheGlobalData->m_saveCameraInReplay && (TheGameLogic->isInMultiplayerGame() || TheGameLogic->isInSinglePlayerGame() || TheGameLogic->isInSkirmishGame()))
+#if RTS_ENGINE_CONTEXT
+			// GeneralsX @feature cemlyn007 21/10/2026 A host that records its cameras itself (replayCameraRoute) records
+			// every camera it keeps, so the game records none of its own
+			if (TheGlobalData->m_saveCameraInReplay && rts::ctx()->replayCameraRoute == nullptr && (TheGameLogic->isInSinglePlayerGame() || TheGameLogic->isInSkirmishGame()))
+#else
 			if (TheGlobalData->m_saveCameraInReplay && (TheGameLogic->isInSinglePlayerGame() || TheGameLogic->isInSkirmishGame()))
+#endif
 			{
 				ViewLocation currentView;
 				TheTacticalView->getLocation(&currentView);

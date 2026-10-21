@@ -154,6 +154,12 @@ RTS_ENGINE_CONTEXT_VALUE(std::int32_t, viewingPlayer, -1)
 // variant knows from its construction on that it makes no particle systems, track marks or sounds of its own.
 RTS_ENGINE_CONTEXT_VALUE(bool, makingViewLookVariant, false)
 
+// GeneralsX @feature cemlyn007 21/10/2026 Set by a host that records its cameras into a replay itself and chooses which
+// of a replay's recorded cameras each of its views follows. The game then records no camera of its own (LookAtXlat),
+// and a playback hands every recorded camera pose to the route, stamped with the player whose camera it is, in place of
+// moving the tactical view (GameLogic::onSetReplayCamera).
+RTS_ENGINE_CONTEXT_VALUE(rts::ReplayCameraRoute, replayCameraRoute, nullptr)
+
 // GeneralsX @feature cemlyn007 21/10/2026 Set by a host whose cameras are its own: a map script's camera actions (moves,
 // pans, zooms, rotations, pitches, shakes, follows and the scripted camera's modifiers) then move no camera
 // (ScriptActions::executeAction).

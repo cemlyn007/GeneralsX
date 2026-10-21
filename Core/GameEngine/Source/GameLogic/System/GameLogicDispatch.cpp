@@ -2447,6 +2447,15 @@ bool GameLogic::onSetReplayCamera(MAYBE_UNUSED GameMessage *msg)
 	Player *msgPlayer = getMessagePlayer(msg);
 
 #if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 A host that chooses which recorded camera each of its views follows is
+	// handed every pose a playback carries out, and moves its views itself
+	if (rts::ctx()->replayCameraRoute != nullptr)
+	{
+		if (TheRecorder->isPlaybackMode())
+			rts::ctx()->replayCameraRoute(*msg);
+		return true;
+	}
+
 	// GeneralsX @feature cemlyn007 17/10/2026 An embedded host that follows the replay's camera follows the camera of
 	// the player who recorded the replay, the only player whose camera a replay holds, while no player is looked at:
 	// it has no observer control bar to pick one with.
