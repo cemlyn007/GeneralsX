@@ -2319,8 +2319,10 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 #if RTS_ENGINE_CONTEXT
 	// GeneralsX @feature cemlyn007 21/10/2026 Per-player views (Display::addPlayerView): for a host that sets the context's
 	// playerViews, every slot's player gets a view of its own, in place of the last game's, made as the tactical view
-	// is and set up as above, but looking at that player's own start position
+	// is and set up as above, but looking at that player's own start position, and, in an engine that draws, a terrain
+	// shroud of its own, filled from the player's shroud (Display::addPlayerShroud)
 	TheDisplay->endPlayerViews();
+	TheDisplay->endPlayerShrouds();
 	if (rts::ctx()->playerViews && TheGameInfo)
 	{
 		for (Int slot = 0; slot < MAX_SLOTS; ++slot)
@@ -2352,7 +2354,9 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 			playerView->setPitchToDefault();
 			playerView->setZoomToDefault();
 			TheDisplay->addPlayerView(slotPlayer->getPlayerIndex(), playerView);
+			TheDisplay->addPlayerShroud(slotPlayer->getPlayerIndex());
 		}
+		ThePartitionManager->refreshPlayerShrouds();
 	}
 #endif
 

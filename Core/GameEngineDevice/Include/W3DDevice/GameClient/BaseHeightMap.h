@@ -189,7 +189,28 @@ public:
 	/// Remove all highlighting.
 	void removeTerrainBibHighlighting();
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 The shroud the terrain is drawn with: the one a draw for a player chose
+	// (setDrawnShroud), or the terrain's own, which follows the game's local player
+	W3DShroud *getShroud()	{return m_drawnShroud ? m_drawnShroud : m_shroud;}
+
+	// GeneralsX @feature cemlyn007 21/10/2026 Per-player terrain shrouds (docs/EMBEDDING.md, "Per-player shrouds"). A
+	// render engine whose host sets the context's playerViews gives every slot's player a terrain shroud of its own when a
+	// game starts (GameLogic::startNewGame), beside the terrain's own shroud, which stays the local player's. The partition
+	// manager writes every change of a player's shroud to the player's own (Display::setPlayerShroudLevel) and fills them
+	// all in full whenever it refreshes the local player's (PartitionManager::refreshPlayerShrouds). The client tick fades
+	// them all, a device reset releases and reacquires them all, and a draw for a player draws the terrain with the
+	// player's own (Display::drawPlayerView).
+	void addPlayerShroud(Int playerIndex);
+	void endPlayerShrouds();
+	W3DShroud *findPlayerShroud(Int playerIndex) const;
+	Int playerShroudCount() const;
+	void setDrawnShroud(Int playerIndex);
+	void setBorderShroudLevels(UnsignedByte level);
+	void advanceShroudFades();
+#else
 	W3DShroud *getShroud()	{return m_shroud;}
+#endif
 	void updateShorelineTiles(Int minX, Int minY, Int maxX, Int maxY, WorldHeightMap *pMap);	///<figure out which tiles on this map cross water plane
 	void updateShorelineTile(Int X, Int Y, Int Border, WorldHeightMap *pMap);	///<figure out which tiles on this map cross water plane
 	void recordShoreLineSortInfos();
@@ -276,6 +297,10 @@ protected:
 	W3DScorchInterface *m_scorches;
 	W3DScorchInterface *m_staticScorches;
 	W3DShroud *m_shroud;	///< Class for drawing the shroud over terrain.
+#if RTS_ENGINE_CONTEXT
+	std::vector<W3DShroud *> m_playerShrouds;	///< GeneralsX @feature cemlyn007 21/10/2026 each player's own, by player index
+	W3DShroud *m_drawnShroud = nullptr;	///< GeneralsX @feature cemlyn007 21/10/2026 a player's, for the draw in progress
+#endif
 	struct shoreLineTileInfo
 	{	Int m_xy;	//x,y position of tile
 		Real verts[4*3];	//position of tile vertices. 4 verts with 3 components.

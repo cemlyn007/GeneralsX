@@ -110,7 +110,12 @@ W3DShroud::~W3DShroud()
    into the terrain object.  worldCellSize is the world-space dimensions of each shroud cell.
    The system will generate enough cells to cover the full map.
 */
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 21/10/2026 Or left for PartitionManager::refreshPlayerShrouds to fill (W3DShroud.h)
+void W3DShroud::init(WorldHeightMap *pMap, Real worldCellSizeX, Real worldCellSizeY, Bool fillFromLocalPlayer)
+#else
 void W3DShroud::init(WorldHeightMap *pMap, Real worldCellSizeX, Real worldCellSizeY)
+#endif
 {
 	DEBUG_ASSERTCRASH( m_pSrcTexture == nullptr, ("ReAcquire of existing shroud textures"));
 	DEBUG_ASSERTCRASH( pMap != nullptr, ("Shroud init with null WorldHeightMap"));
@@ -197,6 +202,10 @@ void W3DShroud::init(WorldHeightMap *pMap, Real worldCellSizeX, Real worldCellSi
 	}
 
 	//Force a refresh of shroud data since we just created a new source texture.
+#if RTS_ENGINE_CONTEXT
+	if (!fillFromLocalPlayer)
+		return;
+#endif
 	if (ThePartitionManager)
 		ThePartitionManager->refreshShroudForLocalPlayer();
 }

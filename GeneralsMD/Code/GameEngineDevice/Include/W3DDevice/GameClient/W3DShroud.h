@@ -84,7 +84,14 @@ public:
 	// draws on demand (Common/EngineDrawing.h)
 	void advanceFade();
 #endif
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 A player's own terrain shroud (BaseHeightMapRenderObjClass::addPlayerShroud)
+	// is filled by PartitionManager::refreshPlayerShrouds instead of from the local player's shroud
+	void init(WorldHeightMap *pMap, Real worldCellSizeX, Real worldCellSizeY, Bool fillFromLocalPlayer = TRUE);
+	W3DShroudLevel getBorderShroudLevel() const { return m_boderShroudLevel; }
+#else
 	void init(WorldHeightMap *pMap, Real worldCellSizeX, Real worldCellSizeY);
+#endif
 	void reset();
 	TextureClass *getShroudTexture() { return m_pDstTexture;}	//<return shroud projection texture.
 	void ReleaseResources();	///<release resources that can't survive D3D device reset.

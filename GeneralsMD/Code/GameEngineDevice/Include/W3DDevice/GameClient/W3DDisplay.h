@@ -139,6 +139,14 @@ public:
 	virtual void clearShroud() override;
 	virtual void setShroudLevel(Int x, Int y, CellShroudStatus setting) override;
 	virtual void setBorderShroudLevel(UnsignedByte level) override;	///<color that will appear in unused border terrain.
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 Per-player terrain shrouds (GameClient/Display.h)
+	virtual void addPlayerShroud(Int playerIndex) override;
+	virtual void endPlayerShrouds() override;
+	virtual Bool hasPlayerShroud(Int playerIndex) const override;
+	virtual void setPlayerShroudLevel(Int playerIndex, Int x, Int y, CellShroudStatus setting) override;
+	virtual void drawWithShroudOf(Int playerIndex) override;
+#endif
 #if defined(RTS_DEBUG)
 	virtual void dumpModelAssets(const char *path) override;	///< dump all used models/textures to a file.
 #endif

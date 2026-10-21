@@ -253,6 +253,30 @@ private:
 	Int m_savedGhostIndex;
 };
 
+// ------------------------------------------------------------------------------------------------
+// GeneralsX @feature cemlyn007 21/10/2026 For one draw of a player's view (Display::drawPlayerView): the terrain is drawn
+// with the player's own shroud (Display::drawWithShroudOf), and with the game's local player's again once the draw ends
+// ------------------------------------------------------------------------------------------------
+class PlayerShroudDraw
+{
+public:
+	PlayerShroudDraw( Display &display, Int playerIndex ) : m_display( display )
+	{
+		m_display.drawWithShroudOf( playerIndex );
+	}
+
+	~PlayerShroudDraw()
+	{
+		m_display.drawWithShroudOf( -1 );
+	}
+
+	PlayerShroudDraw( const PlayerShroudDraw & ) = delete;
+	PlayerShroudDraw &operator=( const PlayerShroudDraw & ) = delete;
+
+private:
+	Display &m_display;
+};
+
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -272,6 +296,7 @@ void Display::drawPlayerView( Int playerIndex )
 	ParticleSystemManager *const watcherParticles = TheParticleSystemManager;
 	const ParticleSimulationScope particles( viewer ? watcherParticles->findSimulationOfPlayer( playerIndex ) : watcherParticles, FALSE );
 	const PlayerViewDraw drawing( m_viewList, view, viewer );
+	const PlayerShroudDraw shroud( *this, viewer ? playerIndex : -1 );
 	draw();
 }
 #endif

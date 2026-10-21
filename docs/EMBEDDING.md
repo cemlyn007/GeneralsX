@@ -451,7 +451,10 @@ drawn, everything a draw used to advance:
   the scene's per-frame updates: lights, W3D emitters, model hierarchies,
   spheres and rings, and the registration of meshes for rendering;
 - the texture mappers, the projected and volumetric shadows' caches, the
-  terrain shroud's fade over the whole map, the trees' sway and toppling, the
+  fade of every terrain shroud over the whole map (the terrain's own and each
+  player's; the fade is compiled only under `DO_FOG_INTERPOLATION`, which
+  nothing defines, so fog changes at once, as GeneralsX shows it), the trees'
+  sway and toppling, the
   terrain and water tracks, the dynamic LOD and the cinematic text's
   countdown.
 
@@ -507,9 +510,10 @@ was, so no logic ever runs with a viewing player set and the next draw starts
 from the same state. None of it has `rts::changeLocalPlayer`'s or
 `rts::changeObservedPlayer`'s other effects.
 
-Still the local player's in every draw: the terrain's shroud (one
-`W3DShroud`), the radar, and the team colours a disguise, a garrison or a cave
-shows, which GeneralsX bakes into a model's render objects.
+Still the local player's in every draw: the radar, and the team colours a
+disguise, a garrison or a cave shows, which GeneralsX bakes into a model's
+render objects. The terrain's shroud is the player's own (Per-player shrouds,
+below).
 
 ### Per-player views
 
@@ -539,6 +543,24 @@ no camera, and no camera's far plane depends on where another view left the
 terrain. Its extra blend tiles get room for all of them at once
 (`HeightMapRenderObjClass::renderExtraBlendTiles`), rather than 16 more after
 each draw that ran out of room.
+
+### Per-player shrouds
+
+In an engine that renders, the same game starts give every slot's player a
+terrain shroud of its own (`Display::addPlayerShroud`,
+`BaseHeightMapRenderObjClass::addPlayerShroud`), beside the terrain's own
+shroud, which stays the local player's. Each is made for the map as the
+terrain's own is, with the same border, and the partition manager fills it
+from its player's shroud (`PartitionManager::refreshPlayerShrouds`), which it
+does again whenever it refreshes the local player's: after a load, a change of
+the map's active boundary or a device reset. Every change of a cell's shroud
+is written to the player's own shroud as it is made
+(`Display::setPlayerShroudLevel`). `Display::drawPlayerView` draws the terrain,
+water and trees with the drawn player's own shroud
+(`BaseHeightMapRenderObjClass::setDrawnShroud`, which `getShroud` follows), and
+with the terrain's own again when the draw ends. A device reset releases and
+reacquires them all, and `BaseHeightMapRenderObjClass::reset` deletes them with
+the map. An engine with no rendering has no terrain shroud, so it makes none.
 
 ### Script cameras
 

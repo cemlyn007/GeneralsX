@@ -2555,8 +2555,9 @@ void W3DDisplay::tickClient()
 	if (TheW3DVolumetricShadowManager)
 		TheW3DVolumetricShadowManager->tickClient();
 
-	if (TheTerrainRenderObject && TheTerrainRenderObject->getMap() && TheTerrainRenderObject->getShroud())
-		TheTerrainRenderObject->getShroud()->advanceFade();
+	// GeneralsX @feature cemlyn007 21/10/2026 Every player's own shroud too (BaseHeightMap::addPlayerShroud)
+	if (TheTerrainRenderObject)
+		TheTerrainRenderObject->advanceShroudFades();
 	if (TheTerrainRenderObject)
 		TheTerrainRenderObject->advanceTrees();
 	if (TheWaterTracksRenderSystem)
@@ -3487,6 +3488,14 @@ void W3DDisplay::clearShroud()
 //=============================================================================
 void W3DDisplay::setBorderShroudLevel(UnsignedByte level)
 {
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 Every player's own shroud too (BaseHeightMap::addPlayerShroud)
+	if (TheTerrainRenderObject)
+	{
+		TheTerrainRenderObject->setBorderShroudLevels(level);
+		return;
+	}
+#endif
 	if (TheTerrainRenderObject && TheTerrainRenderObject->getShroud())
 	{
 		TheTerrainRenderObject->getShroud()->setBorderShroudLevel((W3DShroudLevel)level);
@@ -3514,6 +3523,50 @@ void W3DDisplay::setShroudLevel( Int x, Int y, CellShroudStatus setting )
 
 	}
 }
+
+#if RTS_ENGINE_CONTEXT
+//=============================================================================
+// GeneralsX @feature cemlyn007 21/10/2026 Per-player terrain shrouds (GameClient/Display.h)
+//=============================================================================
+void W3DDisplay::addPlayerShroud(Int playerIndex)
+{
+	if (TheTerrainRenderObject)
+		TheTerrainRenderObject->addPlayerShroud(playerIndex);
+}
+
+void W3DDisplay::endPlayerShrouds()
+{
+	if (TheTerrainRenderObject)
+		TheTerrainRenderObject->endPlayerShrouds();
+}
+
+Bool W3DDisplay::hasPlayerShroud(Int playerIndex) const
+{
+	return TheTerrainRenderObject && TheTerrainRenderObject->findPlayerShroud(playerIndex) != nullptr;
+}
+
+//=============================================================================
+// GeneralsX @feature cemlyn007 21/10/2026 The player's own shroud, at the levels setShroudLevel gives the terrain's own
+//=============================================================================
+void W3DDisplay::setPlayerShroudLevel(Int playerIndex, Int x, Int y, CellShroudStatus setting)
+{
+	W3DShroud *shroud = TheTerrainRenderObject ? TheTerrainRenderObject->findPlayerShroud(playerIndex) : nullptr;
+	if (shroud == nullptr)
+		return;
+	if( setting == CELLSHROUD_SHROUDED )
+		shroud->setShroudLevel(x, y, (W3DShroudLevel)TheGlobalData->m_shroudAlpha );
+	else if( setting == CELLSHROUD_FOGGED )
+		shroud->setShroudLevel(x, y, (W3DShroudLevel)TheGlobalData->m_fogAlpha );
+	else
+		shroud->setShroudLevel(x, y, (W3DShroudLevel)TheGlobalData->m_clearAlpha );
+}
+
+void W3DDisplay::drawWithShroudOf(Int playerIndex)
+{
+	if (TheTerrainRenderObject)
+		TheTerrainRenderObject->setDrawnShroud(playerIndex);
+}
+#endif
 
 
 /** Start/Stop capturing an AVI movie*/

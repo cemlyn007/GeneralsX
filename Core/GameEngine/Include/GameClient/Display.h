@@ -148,6 +148,16 @@ public:
 	void addPlayerView( Int playerIndex, View *view );
 	View *findPlayerView( Int playerIndex ) const;
 	void drawPlayerView( Int playerIndex );
+
+	// GeneralsX @feature cemlyn007 21/10/2026 Per-player terrain shrouds, beside the per-player views: a display that draws
+	// gives every slot's player a terrain shroud of its own at each game's start (W3DDevice/GameClient/BaseHeightMap.h,
+	// addPlayerShroud), which the partition manager keeps up to date (setPlayerShroudLevel) and drawPlayerView draws the
+	// player's view with (drawWithShroudOf). A display that does not draw keeps none.
+	virtual void addPlayerShroud( Int playerIndex ) {}
+	virtual void endPlayerShrouds() {}
+	virtual Bool hasPlayerShroud( Int playerIndex ) const { return FALSE; }
+	virtual void setPlayerShroudLevel( Int playerIndex, Int x, Int y, CellShroudStatus setting ) {}
+	virtual void drawWithShroudOf( Int playerIndex ) {}
 #endif
 	virtual void draw() override;																		///< Redraw the entire display
 	virtual void setTimeOfDay( TimeOfDay tod ) = 0;								///< Set the time of day for this display

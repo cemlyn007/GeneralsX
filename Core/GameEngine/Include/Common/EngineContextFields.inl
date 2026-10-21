@@ -139,7 +139,8 @@ RTS_ENGINE_CONTEXT_VALUE(bool, onDemandDrawing, false)
 
 // GeneralsX @feature cemlyn007 21/10/2026 Set by a host that keeps a view of its own for every slot's player
 // (GameClient/Display.h, Display::beginPlayerViews): each game's start then makes one, a W3DView in an engine that
-// renders and a stand-in otherwise, beside the tactical view, which stays the view of the game's local player.
+// renders and a stand-in otherwise, beside the tactical view, which stays the view of the game's local player. In an
+// engine that renders, each slot's player also gets a terrain shroud of its own (Display::addPlayerShroud).
 RTS_ENGINE_CONTEXT_VALUE(bool, playerViews, false)
 
 // GeneralsX @feature cemlyn007 21/10/2026 The index of the player whose view is being drawn, or -1 outside such a draw
