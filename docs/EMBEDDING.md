@@ -252,6 +252,13 @@ live and in playback alike. A skirmish's replay records the local slot its
 game info names, -1 for none, rather than slot 0. A game whose info names a
 local slot plays as it does without the switch.
 
+Such a host posts several players' messages on one message stream. The
+stream drops a `MSG_DESTROY_SELECTED_GROUP` that the next message makes
+redundant (`MessageStream::isRedundantMessage`) only when that next message is
+the same player's, so one player's new selection never drops another
+player's emptied selection. A stream holding one player's messages, as in
+every game GeneralsX plays by itself, is unchanged.
+
 ### Queries
 
 A host may query an engine between frames, and a query must not change what

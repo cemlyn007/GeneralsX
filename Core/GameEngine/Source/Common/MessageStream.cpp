@@ -1133,6 +1133,12 @@ Bool MessageStream::isRedundantMessage(const GameMessage *msg) const
 		if (!msgNext)
 			break;
 
+		// GeneralsX @bugfix cemlyn007 21/10/2026 Only the same player's next message makes MSG_DESTROY_SELECTED_GROUP
+		// redundant: an embedding host posts several players' messages on one stream, and one player's new selection
+		// must not drop another player's emptied selection.
+		if (msgNext->getPlayerIndex() != msg->getPlayerIndex())
+			break;
+
 		switch (msgNext->getType())
 		{
 		case GameMessage::MSG_CREATE_SELECTED_GROUP:
