@@ -487,6 +487,30 @@ pivot, angle, pitch and zoom (`GameLogic::onSetReplayCamera`).
 A window engine draws the same way, and `Present_Off_Screen_Image` presents
 the last image drawn, whichever view it was drawn for.
 
+### Drawing as a player
+
+`Display::drawPlayerView` draws the game as one player sees it, or as the
+game's local player sees it for a player index of -1. For the draw it makes
+the player the context's `viewingPlayer`, which
+`rts::getObservedOrLocalPlayer` returns ahead of the control bar's observed
+player, so the draw's shroud tests and tints are that player's. It points the
+ghost objects at the player, refreshes the radar's objects, draws the
+player's particle simulation (`ParticleSimulationScope`), and gives every
+drawable the looks it has in the player's view (`Drawable::beginViewLook`):
+its stealth look, worked out for the player as `StealthUpdate` works it out
+for the observed or local player, and whether the player's shroud obscures it
+fully (`Drawable::isFullyObscuredByShroudFor`), with each draw module hiding
+the shadows of what is hidden (`DrawModule::beginViewLook`). These looks change
+only what the draw shows: no deselection, model change, shadow release, track
+cap or particle start or stop. When the draw ends, all of it is put back as it
+was, so no logic ever runs with a viewing player set and the next draw starts
+from the same state. None of it has `rts::changeLocalPlayer`'s or
+`rts::changeObservedPlayer`'s other effects.
+
+Still the local player's in every draw: the terrain's shroud (one
+`W3DShroud`), the radar, and the team colours a disguise, a garrison or a cave
+shows, which GeneralsX bakes into a model's render objects.
+
 ### The clock
 
 Logic code reads no clock. Every seeding names its seed: an engine starts on

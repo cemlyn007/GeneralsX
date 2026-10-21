@@ -2656,12 +2656,74 @@ void Drawable::setStealthLook(StealthLookType look)
 				break;
 		}
 		m_stealthLook = look;
+#if RTS_ENGINE_CONTEXT
+		// GeneralsX @feature cemlyn007 21/10/2026 A view's look changes only what one draw shows (beginViewLook)
+		if (!m_inViewLook)
+#endif
 		updateHiddenStatus();
 	}
 }
 
 
 #if RTS_ENGINE_CONTEXT
+//-------------------------------------------------------------------------------------------------
+// GeneralsX @feature cemlyn007 21/10/2026 See Drawable.h. The stealth look is the one StealthUpdate gives the drawable
+// for its observed or local player, worked out for the viewer, and its fields are set as setStealthLook sets them; the
+// fully-obscured test is GameClient::update's, for the viewer (isFullyObscuredByShroudFor). A drawable hidden in every
+// view is left alone, as nothing draws it.
+//-------------------------------------------------------------------------------------------------
+void Drawable::beginViewLook( const Player *viewer )
+{
+	m_viewLookSaved.stealthLook = m_stealthLook;
+	m_viewLookSaved.stealthOpacity = m_stealthOpacity;
+	m_viewLookSaved.effectiveStealthOpacity = m_effectiveStealthOpacity;
+	m_viewLookSaved.secondMaterialPassOpacity = m_secondMaterialPassOpacity;
+	m_viewLookSaved.hiddenByStealth = m_hiddenByStealth;
+	m_viewLookSaved.fullyObscuredByShroud = m_drawableFullyObscuredByShroud;
+	m_inViewLook = TRUE;
+	if (viewer == nullptr || isDrawableEffectivelyHidden())
+		return;
+
+	Object *object = getObject();
+	if (object != nullptr)
+	{
+		if (StealthUpdate *stealth = object->getStealth())
+		{
+			const StealthLookType look = stealth->stealthLookFor( viewer );
+			if (look != m_stealthLook)
+			{
+				setStealthLook( look );
+				if (m_stealthOpacity >= 1.0f)
+					m_effectiveStealthOpacity = 1.0f;
+			}
+		}
+	}
+
+	m_drawableFullyObscuredByShroud = m_drawableFullyObscuredByShroud || isFullyObscuredByShroudFor( viewer->getPlayerIndex() );
+
+	const Bool hidden = isDrawableEffectivelyHidden();
+	for (DrawModule** dm = getDrawModules(); *dm; ++dm)
+		(*dm)->beginViewLook( hidden, m_drawableFullyObscuredByShroud );
+}
+
+//-------------------------------------------------------------------------------------------------
+// GeneralsX @feature cemlyn007 21/10/2026 See Drawable.h
+//-------------------------------------------------------------------------------------------------
+void Drawable::endViewLook()
+{
+	if (!m_inViewLook)
+		return;
+	for (DrawModule** dm = getDrawModules(); *dm; ++dm)
+		(*dm)->endViewLook();
+	m_stealthLook = m_viewLookSaved.stealthLook;
+	m_stealthOpacity = m_viewLookSaved.stealthOpacity;
+	m_effectiveStealthOpacity = m_viewLookSaved.effectiveStealthOpacity;
+	m_secondMaterialPassOpacity = m_viewLookSaved.secondMaterialPassOpacity;
+	m_hiddenByStealth = m_viewLookSaved.hiddenByStealth;
+	m_drawableFullyObscuredByShroud = m_viewLookSaved.fullyObscuredByShroud;
+	m_inViewLook = FALSE;
+}
+
 //-------------------------------------------------------------------------------------------------
 // GeneralsX @feature cemlyn007 21/10/2026 GameClient::update's fully-obscured test, for the given player rather than the
 // observed or local one, with that player's shroud-clear frame (Drawable.h)

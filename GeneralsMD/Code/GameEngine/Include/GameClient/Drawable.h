@@ -383,6 +383,14 @@ public:
 	// for its local player, with that player's own shroud-clear frame, which the client tick notes
 	void setShroudClearFrameFor( Int playerIndex, UnsignedInt frame ) { m_shroudClearFrameFor[playerIndex] = frame; }
 	Bool isFullyObscuredByShroudFor( Int playerIndex );
+
+	// GeneralsX @feature cemlyn007 21/10/2026 For one draw of a player's view (Display::drawPlayerView): give the drawable
+	// the looks it has in that player's view, its stealth look and whether it is fully obscured by the player's shroud,
+	// as the logic and the client tick would give it for that player, but only for what the draw shows, with none of
+	// their other effects (no deselection, model change, shadow release, track cap or particle start or stop). Its draw
+	// modules hide their shadows to match. endViewLook puts every look back as it was.
+	void beginViewLook( const Player *viewer );
+	void endViewLook();
 #endif
 
 	void setShadowsEnabled(Bool enable);
@@ -708,6 +716,19 @@ private:
 	UnsignedInt		m_shroudClearFrame;						///< Last frame the local player saw this drawable "OBJECTSHROUD_CLEAR"
 #if RTS_ENGINE_CONTEXT
 	UnsignedInt		m_shroudClearFrameFor[MAX_PLAYER_COUNT];	///< GeneralsX @feature cemlyn007 21/10/2026 the same, per player
+
+	// GeneralsX @feature cemlyn007 21/10/2026 The looks beginViewLook replaced, for endViewLook to put back
+	struct ViewLookSaved
+	{
+		StealthLookType stealthLook;
+		Real stealthOpacity;
+		Real effectiveStealthOpacity;
+		Real secondMaterialPassOpacity;
+		Bool hiddenByStealth;
+		Bool fullyObscuredByShroud;
+	};
+	ViewLookSaved	m_viewLookSaved;
+	Bool					m_inViewLook = FALSE;	///< between beginViewLook and endViewLook
 #endif
 
 	DrawableLocoInfo*	m_locoInfo;	// lazily allocated

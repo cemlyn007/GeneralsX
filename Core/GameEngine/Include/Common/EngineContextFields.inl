@@ -137,6 +137,11 @@ RTS_ENGINE_CONTEXT_VALUE(bool, anchoredLocalPlayer, false)
 // advances everything a draw used to (W3DDisplay::tickClient), and a draw only renders the state the tick left.
 RTS_ENGINE_CONTEXT_VALUE(bool, onDemandDrawing, false)
 
+// GeneralsX @feature cemlyn007 21/10/2026 The index of the player whose view is being drawn, or -1 outside such a draw
+// (Display::drawPlayerView). While it is set, the observed or local player (rts::getObservedOrLocalPlayer) is that
+// player, so that a draw shows the game as that player sees it. No logic runs while it is set.
+RTS_ENGINE_CONTEXT_VALUE(std::int32_t, viewingPlayer, -1)
+
 // GeneralsX @feature cemlyn007 16/10/2026 Test-only: how many of this engine's next scratch-pad map deletes fail, as
 // a delete the file system refused does, leaving the file in place (GameStateMap::clearScratchPadMaps). A host's test
 // sets it to check that a scratch-pad map whose delete failed is kept and retried.

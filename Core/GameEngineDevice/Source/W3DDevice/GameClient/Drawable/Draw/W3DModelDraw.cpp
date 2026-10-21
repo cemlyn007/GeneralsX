@@ -1961,6 +1961,25 @@ void W3DModelDraw::setFullyObscuredByShroud(Bool fullyObscured)
 	}
 }
 
+#if RTS_ENGINE_CONTEXT
+//-------------------------------------------------------------------------------------------------
+// GeneralsX @feature cemlyn007 21/10/2026 For one draw of a player's view (DrawModule::beginViewLook): the shadow and the
+// terrain decal are hidden as setHidden and setFullyObscuredByShroud would hide them, with none of their other effects
+//-------------------------------------------------------------------------------------------------
+void W3DModelDraw::beginViewLook(Bool hidden, Bool fullyObscured)
+{
+	m_shadowViewLook.begin(m_shadow, hidden, fullyObscured);
+	m_terrainDecalViewLook.begin(m_terrainDecal, hidden, fullyObscured);
+}
+
+//-------------------------------------------------------------------------------------------------
+void W3DModelDraw::endViewLook()
+{
+	m_terrainDecalViewLook.end();
+	m_shadowViewLook.end();
+}
+#endif
+
 //-------------------------------------------------------------------------------------------------
 static Bool isAnimationComplete(RenderObjClass* r)
 {

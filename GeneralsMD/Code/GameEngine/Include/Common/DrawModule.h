@@ -84,6 +84,13 @@ public:
 	virtual void setTerrainDecalOpacity(Real o) {};
 
 	virtual void setFullyObscuredByShroud(Bool fullyObscured) = 0;
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 For one draw of a player's view (Drawable::beginViewLook): hide the shadows
+	// this module draws if its drawable is hidden or fully obscured in that view, and put them back as they were after
+	// the draw (endViewLook). Neither changes anything but what the draw shows.
+	virtual void beginViewLook(Bool hidden, Bool fullyObscured) {}
+	virtual void endViewLook() {}
+#endif
 
 	virtual Bool isVisible() const { return true; }	///< for limiting tree sway, etc to visible objects
 

@@ -159,6 +159,41 @@ inline void Shadow::enableShadowInvisible(Bool isEnabled)
 	m_isInvisibleEnabled=isEnabled;
 }
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 21/10/2026 A shadow's render switches as they were before one draw of a player's view hid
+// it (DrawModule::beginViewLook), put back when that draw ends
+class ShadowViewLook
+{
+public:
+	void begin(Shadow *shadow, Bool hidden, Bool fullyObscured)
+	{
+		m_shadow = shadow;
+		if (m_shadow == nullptr)
+			return;
+		m_render = m_shadow->isRenderEnabled();
+		m_invisible = m_shadow->isInvisibleEnabled();
+		if (hidden)
+			m_shadow->enableShadowRender(FALSE);
+		if (fullyObscured)
+			m_shadow->enableShadowInvisible(TRUE);
+	}
+
+	void end()
+	{
+		if (m_shadow == nullptr)
+			return;
+		m_shadow->enableShadowRender(m_render);
+		m_shadow->enableShadowInvisible(m_invisible);
+		m_shadow = nullptr;
+	}
+
+private:
+	Shadow *m_shadow = nullptr;
+	Bool m_render = FALSE;
+	Bool m_invisible = FALSE;
+};
+#endif
+
 ///@todo: Pull these out so casting, etc. is only done for visible decals.
 inline void Shadow::setOpacity(Int value)
 {

@@ -135,6 +135,10 @@ public:
 	// GeneralsX @feature cemlyn007 21/10/2026 Advance the client by one logic frame, for an engine that draws on demand
 	// (Common/EngineDrawing.h)
 	virtual void tickClient() {}
+
+	// GeneralsX @feature cemlyn007 21/10/2026 Draw the game as a player sees it, or as the game's local player sees it for
+	// a player index of -1 (docs/EMBEDDING.md, "Drawing as a player"), and leave the client as it found it
+	void drawPlayerView( Int playerIndex );
 #endif
 	virtual void draw() override;																		///< Redraw the entire display
 	virtual void setTimeOfDay( TimeOfDay tod ) = 0;								///< Set the time of day for this display

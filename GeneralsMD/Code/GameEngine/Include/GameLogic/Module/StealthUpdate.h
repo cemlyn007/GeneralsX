@@ -142,6 +142,11 @@ public:
 
   Bool isGrantedBySpecialPower() { return getStealthUpdateModuleData()->m_grantedBySpecialPower; }
 	Bool isTemporaryGrant() { return m_framesGranted > 0; }
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 The stealth look the object has for the given player, as update() works it
+	// out for the observed or local player, for one draw of that player's view (Drawable::beginViewLook)
+	StealthLookType stealthLookFor( const Player *player ) { return calcStealthedStatusForPlayer( getObject(), player ); }
+#endif
 
 protected:
 

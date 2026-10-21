@@ -32,6 +32,9 @@
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
 #include "Common/ModelState.h"
 #include "Common/DrawModule.h"
+#if RTS_ENGINE_CONTEXT
+#include "GameClient/Shadow.h"	// GeneralsX @feature cemlyn007 21/10/2026 ShadowViewLook
+#endif
 #ifdef BRUTAL_TIMING_HACK // hack for collecting model timing info.  jba.
 class RenderObjClass {
 public:
@@ -362,6 +365,11 @@ public:
 #endif
 
 	virtual void setFullyObscuredByShroud(Bool fullyObscured) override;
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 For one draw of a player's view (DrawModule::beginViewLook)
+	virtual void beginViewLook(Bool hidden, Bool fullyObscured) override;
+	virtual void endViewLook() override;
+#endif
 	virtual void setTerrainDecal(TerrainDecalType type) override;
 
 	virtual Bool isVisible() const override;
@@ -501,6 +509,10 @@ private:
 	RenderObjClass*								m_renderObject;										///< W3D Render object for this drawable
 	Shadow*												m_shadow;													///< Updates/Renders shadows of this object
 	Shadow*												m_terrainDecal;
+#if RTS_ENGINE_CONTEXT
+	ShadowViewLook								m_shadowViewLook;	///< GeneralsX @feature cemlyn007 21/10/2026 beginViewLook's
+	ShadowViewLook								m_terrainDecalViewLook;	///< GeneralsX @feature cemlyn007 21/10/2026 beginViewLook's
+#endif
 	TerrainTracksRenderObjClass*	m_trackRenderObject;							///< This is rendered under object
 	ParticleSystemIDVec						m_particleSystemIDs;							///< The ID numbers of the particle systems currently running.
 	std::vector<ModelConditionInfo::HideShowSubObjInfo>		m_subObjectVec;

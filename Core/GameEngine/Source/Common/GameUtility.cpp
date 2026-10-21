@@ -19,6 +19,9 @@
 #include "PreRTS.h"
 
 #include "Common/GameUtility.h"
+#if RTS_ENGINE_CONTEXT
+#include "Common/EngineContext.h"	// GeneralsX @feature cemlyn007 21/10/2026 The viewing player
+#endif
 #include "Common/PlayerList.h"
 #include "Common/Player.h"
 #include "Common/Radar.h"
@@ -65,8 +68,24 @@ bool localPlayerHasRadar()
 	return false;
 }
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 21/10/2026 The player whose view is being drawn (the context's viewingPlayer), which comes
+// ahead of the control bar's observed player, or null outside such a draw (Display::drawPlayerView)
+static Player* viewingPlayer()
+{
+	const Int index = ctx()->viewingPlayer;
+	if (index < 0 || ThePlayerList == nullptr)
+		return nullptr;
+	return ThePlayerList->getNthPlayer(index);
+}
+#endif
+
 Player* getObservedOrLocalPlayer()
 {
+#if RTS_ENGINE_CONTEXT
+	if (Player* viewing = viewingPlayer())
+		return viewing;
+#endif
 	DEBUG_ASSERTCRASH(TheControlBar != nullptr, ("TheControlBar is null"));
 	Player* player = TheControlBar->getObservedPlayer();
 	if (player == nullptr)
@@ -79,6 +98,10 @@ Player* getObservedOrLocalPlayer()
 
 Player* getObservedOrLocalPlayer_Safe()
 {
+#if RTS_ENGINE_CONTEXT
+	if (Player* viewing = viewingPlayer())
+		return viewing;
+#endif
 	Player* player = nullptr;
 
 	if (TheControlBar != nullptr)

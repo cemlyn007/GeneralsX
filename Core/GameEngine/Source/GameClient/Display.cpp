@@ -34,6 +34,16 @@
 #include "GameClient/DisplayStringManager.h"
 #include "GameClient/GameText.h"
 #include "GameClient/GlobalLanguage.h"
+#if RTS_ENGINE_CONTEXT
+#include "Common/EngineContext.h"	// GeneralsX @feature cemlyn007 21/10/2026 Drawing as a player
+#include "Common/Player.h"	// GeneralsX @feature cemlyn007 21/10/2026 Drawing as a player
+#include "Common/PlayerList.h"	// GeneralsX @feature cemlyn007 21/10/2026 Drawing as a player
+#include "Common/Radar.h"	// GeneralsX @feature cemlyn007 21/10/2026 Drawing as a player
+#include "GameClient/Drawable.h"	// GeneralsX @feature cemlyn007 21/10/2026 Drawing as a player
+#include "GameClient/GameClient.h"	// GeneralsX @feature cemlyn007 21/10/2026 Drawing as a player
+#include "GameClient/ParticleSys.h"	// GeneralsX @feature cemlyn007 21/10/2026 Drawing as a player
+#include "GameLogic/GhostObject.h"	// GeneralsX @feature cemlyn007 21/10/2026 Drawing as a player
+#endif
 //#include "GameLogic/ScriptEngine.h"
 //#include "GameLogic/GameLogic.h"
 
@@ -133,6 +143,88 @@ void Display::stepViews()
 		v->stepView();
 
 }
+
+#if RTS_ENGINE_CONTEXT
+namespace
+{
+
+// ------------------------------------------------------------------------------------------------
+// GeneralsX @feature cemlyn007 21/10/2026 For one draw as a player (Display::drawPlayerView): makes the view the
+// tactical view and the display's only view, and, for a player, makes it the viewing player, so that the observed or
+// local player is that player for the draw's shroud tests, tints and looks. It points the ghost objects at the player,
+// gives every drawable the looks it has in the player's view (Drawable::beginViewLook) and refreshes the radar's
+// objects for the player, as rts::changeObservedPlayer does, but with none of its other effects, and puts all of it
+// back as it was when the draw ends.
+// ------------------------------------------------------------------------------------------------
+class PlayerViewDraw
+{
+public:
+	PlayerViewDraw( View *&viewList, View *view, Player *viewer )
+		: m_viewList( viewList ), m_savedViewList( viewList ), m_savedTacticalView( TheTacticalView ), m_viewer( viewer ),
+			m_savedGhostIndex( TheGhostObjectManager ? TheGhostObjectManager->getLocalPlayerIndex() : 0 )
+	{
+		TheTacticalView = view;
+		m_viewList = view;
+		if( m_viewer == nullptr )
+			return;
+		rts::ctx()->viewingPlayer = m_viewer->getPlayerIndex();
+		if( TheGhostObjectManager )
+			TheGhostObjectManager->setLocalPlayerIndex( m_viewer->getPlayerIndex() );
+		for( Drawable *draw = TheGameClient->firstDrawable(); draw; draw = draw->getNextDrawable() )
+			draw->beginViewLook( m_viewer );
+		if( TheRadar )
+			TheRadar->refreshObjects();
+	}
+
+	~PlayerViewDraw()
+	{
+		if( m_viewer != nullptr )
+		{
+			for( Drawable *draw = TheGameClient->firstDrawable(); draw; draw = draw->getNextDrawable() )
+				draw->endViewLook();
+			if( TheGhostObjectManager )
+				TheGhostObjectManager->setLocalPlayerIndex( m_savedGhostIndex );
+			rts::ctx()->viewingPlayer = -1;
+			if( TheRadar )
+				TheRadar->refreshObjects();
+		}
+		m_viewList = m_savedViewList;
+		TheTacticalView = m_savedTacticalView;
+	}
+
+	PlayerViewDraw( const PlayerViewDraw & ) = delete;
+	PlayerViewDraw &operator=( const PlayerViewDraw & ) = delete;
+
+private:
+	View *&m_viewList;
+	View *m_savedViewList;
+	View *m_savedTacticalView;
+	Player *m_viewer;
+	Int m_savedGhostIndex;
+};
+
+}
+
+// ------------------------------------------------------------------------------------------------
+// GeneralsX @feature cemlyn007 21/10/2026 Drawing as a player (Display.h): draw the tactical view as the player sees
+// the game, with the player's particle simulation (ParticleSystemManager::beginSimulations), or as the game's local
+// player sees it, for a player index of -1
+// ------------------------------------------------------------------------------------------------
+void Display::drawPlayerView( Int playerIndex )
+{
+	View *view = TheTacticalView;
+	Player *viewer = playerIndex < 0 ? nullptr : ThePlayerList->getNthPlayer( playerIndex );
+	if( view == nullptr || (playerIndex >= 0 && viewer == nullptr) )
+	{
+		DEBUG_CRASH(( "Display::drawPlayerView - player %d has no view", playerIndex ));
+		return;
+	}
+	ParticleSystemManager *const watcherParticles = TheParticleSystemManager;
+	const ParticleSimulationScope particles( viewer ? watcherParticles->findSimulationOfPlayer( playerIndex ) : watcherParticles, FALSE );
+	const PlayerViewDraw drawing( m_viewList, view, viewer );
+	draw();
+}
+#endif
 
 /// Redraw the entire display
 void Display::draw()
