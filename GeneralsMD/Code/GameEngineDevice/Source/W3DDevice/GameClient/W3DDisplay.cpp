@@ -2180,6 +2180,17 @@ AGAIN:
 	{
 		WW3D::Set_Frame_Times(WW3D::FrameTimes());
 	}
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 The drawn view's own camera, terrain culling and props' shroud, set up for
+	// this draw, so that they depend neither on the view drawn last nor on the view the tick updated last
+	// (Display::drawPlayerView)
+	if (onDemand && TheGlobalData->m_loadScreenRender != TRUE)
+	{
+		primaryW3DView->prepareForDrawOnDemand();
+		if (TheTerrainRenderObject)
+			TheTerrainRenderObject->notifyShroudChanged();
+	}
+#endif
 
 	if (!onDemand && !freezeTime && TheScriptEngine->isTimeFast())
 	{

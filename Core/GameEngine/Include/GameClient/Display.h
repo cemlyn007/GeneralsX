@@ -32,6 +32,7 @@
 #include "GameClient/Color.h"
 #include "GameClient/GameFont.h"
 #include "GameClient/View.h"
+#include <vector>	// GeneralsX @feature cemlyn007 21/10/2026 The players' views
 
 enum ScreenshotFormat
 {
@@ -136,8 +137,16 @@ public:
 	// (Common/EngineDrawing.h)
 	virtual void tickClient() {}
 
-	// GeneralsX @feature cemlyn007 21/10/2026 Draw the game as a player sees it, or as the game's local player sees it for
-	// a player index of -1 (docs/EMBEDDING.md, "Drawing as a player"), and leave the client as it found it
+	// GeneralsX @feature cemlyn007 21/10/2026 Per-player views, for a host that sets the context's playerViews
+	// (docs/EMBEDDING.md, "Per-player views"). Each game's start gives every slot's player a view of its own
+	// (GameLogic::startNewGame), kept here beside the tactical view, which stays the view of the game's local player: the
+	// watcher's, for a host that anchors its local player. Every player's view is updated and stepped with the tactical
+	// view, so its camera moves by logic-frame time whether or not it is drawn, and none of them is ever drawn but by
+	// drawPlayerView, which draws one view as its player sees the game (the tactical view for a player index of -1) and
+	// leaves the client as it found it.
+	void endPlayerViews();
+	void addPlayerView( Int playerIndex, View *view );
+	View *findPlayerView( Int playerIndex ) const;
 	void drawPlayerView( Int playerIndex );
 #endif
 	virtual void draw() override;																		///< Redraw the entire display
@@ -217,6 +226,9 @@ protected:
 	Bool m_windowed;										///< TRUE when windowed, FALSE when fullscreen
 	Bool m_isBatching;
 	View *m_viewList;										///< All of the views into the world
+#if RTS_ENGINE_CONTEXT
+	std::vector<View *> m_playerViews;	///< GeneralsX @feature cemlyn007 21/10/2026 each player's view, by player index
+#endif
 
 	// Cinematic text data
 	AsciiString m_cinematicText;        ///< string of the cinematic text that should be displayed

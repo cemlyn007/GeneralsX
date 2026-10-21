@@ -511,6 +511,35 @@ Still the local player's in every draw: the terrain's shroud (one
 `W3DShroud`), the radar, and the team colours a disguise, a garrison or a cave
 shows, which GeneralsX bakes into a model's render objects.
 
+### Per-player views
+
+A host that sets the context's `playerViews` keeps a view of its own for every
+slot's player. Each game's start, live, loaded or played back, replaces the
+last game's views (`GameLogic::startNewGame`) with a view per slot player,
+made as the tactical view is (`InGameUI::createPlayerView`): a `W3DView` in an
+engine that renders and a `ViewDummy` stand-in otherwise. Each is set up as
+the tactical view is at a game's start, but looking at its own player's start
+position. The display keeps them (`Display::addPlayerView`,
+`Display::findPlayerView`), and updates and steps them with the tactical view,
+so every camera follows and settles by logic-frame time whether or not it is
+drawn. The tactical view stays the view of the game's local player: the
+watcher's, for a host that also anchors its local player.
+`Display::drawPlayerView` draws a player's own view: for the draw, it makes
+that view the tactical view and the display's only view.
+
+A draw of an engine that draws on demand sets up the drawn view's own state
+before it renders (`W3DView::prepareForDrawOnDemand`): it builds the view's
+camera from its pose if the pose changed since the client tick built it, so a
+camera aimed between two frames shows its aim at once, culls the terrain's
+bridges, trees and props for that camera, and drops the props' cached shroud,
+so they are tested again for the drawn view's player. Such an engine draws the
+terrain whole (`W3DView::drawsEntireTerrain`), as GlobalData's
+`m_drawEntireTerrain` asks for: the terrain and its relighting then belong to
+no camera, and no camera's far plane depends on where another view left the
+terrain. Its extra blend tiles get room for all of them at once
+(`HeightMapRenderObjClass::renderExtraBlendTiles`), rather than 16 more after
+each draw that ran out of room.
+
 ### The clock
 
 Logic code reads no clock. Every seeding names its seed: an engine starts on

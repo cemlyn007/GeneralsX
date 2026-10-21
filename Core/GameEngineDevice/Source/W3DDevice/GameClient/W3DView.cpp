@@ -755,6 +755,38 @@ Real W3DView::getMaxZoom(Real x, Real y) const
 }
 
 //-------------------------------------------------------------------------------------------------
+// GeneralsX @feature cemlyn007 21/10/2026 Whether the terrain is drawn whole: as GlobalData's m_drawEntireTerrain asks,
+// and always in an engine that draws on demand, whose views each have a camera of their own (Display::addPlayerView).
+// The drawn terrain and the cameras' far planes then depend on none of them: the terrain is not moved after whichever
+// camera was set up last, and no camera's frustum depends on where another left the terrain.
+//-------------------------------------------------------------------------------------------------
+Bool W3DView::drawsEntireTerrain()
+{
+#if RTS_ENGINE_CONTEXT
+	if (rts::drawsOnDemand())
+		return TRUE;
+#endif
+	return TheGlobalData->m_drawEntireTerrain;
+}
+
+#if RTS_ENGINE_CONTEXT
+//-------------------------------------------------------------------------------------------------
+// GeneralsX @feature cemlyn007 21/10/2026 Set up what a draw of this view needs that is the view's own rather than the
+// client tick's, for an engine that draws on demand (Common/EngineDrawing.h): the camera, rebuilt from the view's pose
+// if the pose changed since the tick built it, so that a camera aimed between two frames shows its aim at once, and the
+// terrain's bridges, trees and props culled for it. It steps nothing, and leaves the camera to be built again by the
+// next tick, as it would have been.
+//-------------------------------------------------------------------------------------------------
+void W3DView::prepareForDrawOnDemand()
+{
+	if (m_recalcCamera)
+		updateCameraTransform();
+	if (TheTerrainRenderObject)
+		updateTerrain();
+}
+#endif
+
+//-------------------------------------------------------------------------------------------------
 /** set the transform matrix of m_3DCamera, based on m_pos & m_angle */
 //-------------------------------------------------------------------------------------------------
 void W3DView::updateCameraTransform()
@@ -800,7 +832,7 @@ void W3DView::updateCameraClipPlanes(const Matrix3D &transform)
 {
 	Real farZ;
 
-	if (TheGlobalData->m_drawEntireTerrain)
+	if (drawsEntireTerrain())
 	{
 		farZ = 100000.0f;
 	}
@@ -3798,7 +3830,7 @@ void W3DView::Add_Camera_Shake (const Coord3D & position,float radius,float dura
 
 bool W3DView::getDesiredTerrainDrawSize(ICoord2D &dimensions) const
 {
-	if (TheGlobalData && TheGlobalData->m_drawEntireTerrain)
+	if (TheGlobalData && drawsEntireTerrain())
 	{
 		DEBUG_ASSERTCRASH(TheTerrainRenderObject != nullptr, ("TheTerrainRenderObject is null"));
 

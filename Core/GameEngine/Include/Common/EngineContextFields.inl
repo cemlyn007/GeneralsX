@@ -137,6 +137,11 @@ RTS_ENGINE_CONTEXT_VALUE(bool, anchoredLocalPlayer, false)
 // advances everything a draw used to (W3DDisplay::tickClient), and a draw only renders the state the tick left.
 RTS_ENGINE_CONTEXT_VALUE(bool, onDemandDrawing, false)
 
+// GeneralsX @feature cemlyn007 21/10/2026 Set by a host that keeps a view of its own for every slot's player
+// (GameClient/Display.h, Display::beginPlayerViews): each game's start then makes one, a W3DView in an engine that
+// renders and a stand-in otherwise, beside the tactical view, which stays the view of the game's local player.
+RTS_ENGINE_CONTEXT_VALUE(bool, playerViews, false)
+
 // GeneralsX @feature cemlyn007 21/10/2026 The index of the player whose view is being drawn, or -1 outside such a draw
 // (Display::drawPlayerView). While it is set, the observed or local player (rts::getObservedOrLocalPlayer) is that
 // player, so that a draw shows the game as that player sees it. No logic runs while it is set.
