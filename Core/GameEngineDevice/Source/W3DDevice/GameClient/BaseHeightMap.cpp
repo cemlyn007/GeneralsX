@@ -442,17 +442,19 @@ void BaseHeightMapRenderObjClass::ReleaseResources()
 		TheTerrainTracksRenderObjClassSystem->ReleaseResources();
 	if (TheW3DShadowManager)
 		TheW3DShadowManager->ReleaseResources();
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 Keeping each shroud's fade (W3DShroud::releaseKeepingFade), and the
+	// players' own shrouds too, which initHeightData makes again
+	if (m_shroud)
+		m_shroud->releaseKeepingFade();
+	for (W3DShroud *playerShroud : m_playerShrouds)
+		if (playerShroud)
+			playerShroud->releaseKeepingFade();
+#else
 	if (m_shroud)
 	{	m_shroud->reset();
 		m_shroud->ReleaseResources();
 	}
-#if RTS_ENGINE_CONTEXT
-	// GeneralsX @feature cemlyn007 21/10/2026 And the players' own shrouds, which initHeightData makes again
-	for (W3DShroud *playerShroud : m_playerShrouds)
-		if (playerShroud)
-		{	playerShroud->reset();
-			playerShroud->ReleaseResources();
-		}
 #endif
 
 	if (TheSmudgeManager)

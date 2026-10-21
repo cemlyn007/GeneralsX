@@ -452,11 +452,8 @@ drawn, everything a draw used to advance:
   spheres and rings, and the registration of meshes for rendering;
 - the texture mappers, the projected and volumetric shadows' caches, the
   fade of every terrain shroud over the whole map (the terrain's own and each
-  player's; the fade is compiled only under `DO_FOG_INTERPOLATION`, which
-  nothing defines, so fog changes at once, as GeneralsX shows it), the trees'
-  sway and toppling, the
-  terrain and water tracks, the dynamic LOD and the cinematic text's
-  countdown.
+  player's; Fog fade, below), the trees' sway and toppling, the terrain and
+  water tracks, the dynamic LOD and the cinematic text's countdown.
 
 A draw (`W3DDisplay::draw`) then renders the state the tick left. It freezes
 WW3D's frame times while it renders, and steps nothing, so two draws at one
@@ -571,6 +568,22 @@ water and trees with the drawn player's own shroud
 with the terrain's own again when the draw ends. A device reset releases and
 reacquires them all, and `BaseHeightMapRenderObjClass::reset` deletes them with
 the map. An engine with no rendering has no terrain shroud, so it makes none.
+
+### Fog fade
+
+GeneralsX compiles its fog fade out (`DO_FOG_INTERPOLATION` is never
+defined), so its fog changes at once. An engine that draws on demand fades
+its fog anyway, at the same rate the fade has (255 levels a second, on
+WW3D's sync time, so about 30 logic frames from shroud to clear): a cell's
+new level is the target its terrain shroud fades towards
+(`W3DShroud::setShroudLevel`), and the client tick moves every cell of every
+terrain shroud one step towards its target (`W3DShroud::advanceFade`), so a
+draw only uploads the faded levels and the fade does not depend on which
+frames were drawn. The levels a shroud is given before the first tick after
+it is made for a map (a new game, a load or a playback) are its seed, and show
+at once rather than fading in from black. A device reset keeps the fade's
+levels (`W3DShroud::releaseKeepingFade`), so a fade goes on over the reset as
+if there had been none. Every other engine shows fog as GeneralsX does.
 
 ### Script cameras
 

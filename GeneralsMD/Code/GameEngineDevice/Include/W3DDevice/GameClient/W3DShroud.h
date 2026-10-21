@@ -81,8 +81,18 @@ public:
 	void render(CameraClass *cam);	///< render the current shroud state as seen from camera
 #if RTS_ENGINE_CONTEXT
 	// GeneralsX @feature cemlyn007 21/10/2026 The fog's fade over the whole map, for the client tick of an engine that
-	// draws on demand (Common/EngineDrawing.h)
+	// draws on demand (Common/EngineDrawing.h). Such an engine fades its fog although DO_FOG_INTERPOLATION is not
+	// defined: a cell's new level is its target, and each tick moves the drawn level towards it. Every level a shroud
+	// is given before the first tick after its init is its seed, and shows at once.
 	void advanceFade();
+	// GeneralsX @feature cemlyn007 21/10/2026 A device reset's release (BaseHeightMapRenderObjClass::ReleaseResources):
+	// reset() and ReleaseResources(), keeping the fade's levels for the init that follows, so that a fade carries on
+	// over the reset as if there had been none
+	void releaseKeepingFade();
+	// GeneralsX @feature cemlyn007 21/10/2026 The level a cell's fog is fading towards, and whether it is still on its
+	// way there; without a fade in the tick, the drawn level, which never fades
+	W3DShroudLevel getTargetShroudLevel(Int x, Int y);
+	Bool isFading(Int x, Int y) const;
 #endif
 #if RTS_ENGINE_CONTEXT
 	// GeneralsX @feature cemlyn007 21/10/2026 A player's own terrain shroud (BaseHeightMapRenderObjClass::addPlayerShroud)
@@ -136,6 +146,15 @@ protected:
 	W3DShroudLevel m_boderShroudLevel;			///<color used to clear the shroud border
 	W3DShroudLevel *m_finalFogData;			///<copy of logical shroud in an easier to access array.
 	W3DShroudLevel *m_currentFogData;		///<copy of intermediate logical shroud while it's interpolated.
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 The client tick's fade (advanceFade): whether this shroud fades in the
+	// tick, whether it has been seeded, and whether the next reset keeps the fade's levels (releaseKeepingFade)
+	Bool m_fadesInTick = FALSE;
+	Bool m_fadeSeeded = FALSE;
+	Bool m_keepFadeOverReset = FALSE;
+	UnsignedInt m_fadeCellCount = 0;
+	void allocateFade(UnsignedInt cellCount);
+#endif
 	void interpolateFogLevels(RECT *rect);		///<fade current fog levels to actual logic side levels.
 	void fillBorderShroudData(W3DShroudLevel level, SurfaceClass* pDestSurface);	///<fill the destination texture with a known value
 };

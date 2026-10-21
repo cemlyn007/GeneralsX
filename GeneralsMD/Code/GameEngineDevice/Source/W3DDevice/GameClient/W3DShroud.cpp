@@ -155,6 +155,15 @@ void W3DShroud::init(WorldHeightMap *pMap, Real worldCellSizeX, Real worldCellSi
 	srcHeight=m_numCellsY;
 	srcHeight += 1;
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 An engine that draws on demand fades its fog in its client tick
+	// (advanceFade), whether or not DO_FOG_INTERPOLATION is defined
+	m_fadesInTick = rts::drawsOnDemand();
+	if (m_fadesInTick)
+		allocateFade(srcWidth*srcHeight);
+	else
+#endif
+	{
 #ifdef DO_FOG_INTERPOLATION
 	m_finalFogData = new W3DShroudLevel[srcWidth*srcHeight];
 	m_currentFogData = new W3DShroudLevel[srcWidth*srcHeight];
@@ -162,6 +171,7 @@ void W3DShroud::init(WorldHeightMap *pMap, Real worldCellSizeX, Real worldCellSi
 	memset(m_currentFogData,0,srcWidth*srcHeight);
  	memset(m_finalFogData,0,srcWidth*srcHeight);
 #endif
+	}
 
 #if defined(RTS_DEBUG)
 	if (TheGlobalData && TheGlobalData->m_fogOfWarOn)
@@ -186,6 +196,15 @@ void W3DShroud::init(WorldHeightMap *pMap, Real worldCellSizeX, Real worldCellSi
 
 	//clear entire texture to black
 	memset(m_srcTextureData,0,m_srcTexturePitch*srcHeight);
+
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 A fade kept over a device reset (releaseKeepingFade) draws its levels
+	// into the new surface
+	if (m_fadesInTick && m_fadeSeeded)
+		for (Int y = 0; y < m_numCellsY; y++)
+			for (Int x = 0; x < m_numCellsX; x++)
+				setShroudLevel(x, y, m_currentFogData[x + y*m_numCellsX], TRUE);
+#endif
 
 #if defined(RTS_DEBUG)
 	if (TheGlobalData && TheGlobalData->m_fogOfWarOn)
@@ -221,11 +240,17 @@ void W3DShroud::reset()
 		m_pSrcTexture=nullptr;
 	}
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 Or kept for the next init (releaseKeepingFade)
+	if (!m_keepFadeOverReset)
+#endif
+	{
 	delete [] m_finalFogData;
 	m_finalFogData=nullptr;
 
 	delete [] m_currentFogData;
 	m_currentFogData=nullptr;
+	}
 
 	m_clearDstTexture = TRUE;	//always refill the destination texture after a reset
 }
@@ -329,6 +354,17 @@ void W3DShroud::setShroudLevel(Int x, Int y, W3DShroudLevel level, Bool textureO
 #ifdef DO_FOG_INTERPOLATION
 			if (!textureOnly)
 				m_finalFogData[x+y*m_numCellsX]=level;
+#endif
+#if RTS_ENGINE_CONTEXT
+			// GeneralsX @feature cemlyn007 21/10/2026 A shroud that fades in the client tick takes a new level as its
+			// target, which the tick fades the drawn level towards (advanceFade). Its seed shows at once.
+			if (m_fadesInTick && !textureOnly)
+			{
+				m_finalFogData[x+y*m_numCellsX]=level;
+				if (m_fadeSeeded)
+					return;
+				m_currentFogData[x+y*m_numCellsX]=level;
+			}
 #endif
 			UnsignedInt bluepixel = (UnsignedInt)((Real)level*((Real)(TheGlobalData->m_shroudColor.getAsInt()&0xff)/255.0f));
 			UnsignedInt greenpixel = (UnsignedInt)((Real)level*((Real)((TheGlobalData->m_shroudColor.getAsInt()&0xff00)>>8)/255.0f));
@@ -751,14 +787,67 @@ void W3DShroud::render(CameraClass *cam)
 // client tick of an engine that draws on demand, which runs it once per logic frame (Common/EngineDrawing.h)
 void W3DShroud::advanceFade()
 {
-#ifdef DO_FOG_INTERPOLATION
+	if (!m_fadesInTick || m_pSrcTexture == nullptr)
+		return;
+	if (!m_fadeSeeded)
+	{
+		m_fadeSeeded = TRUE;
+		m_fogInterpolationTime = W3D_DRAW_CLOCK_MS();
+		m_fogInterpolationTimeSet = true;
+		return;
+	}
 	RECT wholeMap;
 	wholeMap.left = 0;
 	wholeMap.top = 0;
 	wholeMap.right = m_numCellsX;
 	wholeMap.bottom = m_numCellsY;
 	interpolateFogLevels(&wholeMap);
-#endif
+}
+
+//-----------------------------------------------------------------------------
+// GeneralsX @feature cemlyn007 21/10/2026 The fade's levels for a new map, or the ones kept over a device reset
+// (W3DShroud.h)
+void W3DShroud::allocateFade(UnsignedInt cellCount)
+{
+	const Bool keep = m_keepFadeOverReset && m_currentFogData != nullptr && m_finalFogData != nullptr
+		&& m_fadeCellCount == cellCount;
+	m_keepFadeOverReset = FALSE;
+	if (keep)
+		return;
+	delete [] m_finalFogData;
+	delete [] m_currentFogData;
+	m_finalFogData = new W3DShroudLevel[cellCount];
+	m_currentFogData = new W3DShroudLevel[cellCount];
+	memset(m_currentFogData,0,cellCount);
+	memset(m_finalFogData,0,cellCount);
+	m_fadeCellCount = cellCount;
+	m_fadeSeeded = FALSE;
+	m_fogInterpolationTimeSet = false;
+}
+
+//-----------------------------------------------------------------------------
+// GeneralsX @feature cemlyn007 21/10/2026 A cell's fade (W3DShroud.h)
+W3DShroudLevel W3DShroud::getTargetShroudLevel(Int x, Int y)
+{
+	if (!m_fadesInTick || m_finalFogData == nullptr || x < 0 || y < 0 || x >= m_numCellsX || y >= m_numCellsY)
+		return getShroudLevel(x, y);
+	return m_finalFogData[x + y*m_numCellsX];
+}
+
+Bool W3DShroud::isFading(Int x, Int y) const
+{
+	if (!m_fadesInTick || m_finalFogData == nullptr || x < 0 || y < 0 || x >= m_numCellsX || y >= m_numCellsY)
+		return FALSE;
+	return m_currentFogData[x + y*m_numCellsX] != m_finalFogData[x + y*m_numCellsX];
+}
+
+//-----------------------------------------------------------------------------
+// GeneralsX @feature cemlyn007 21/10/2026 A device reset's release, keeping the fade (W3DShroud.h)
+void W3DShroud::releaseKeepingFade()
+{
+	m_keepFadeOverReset = m_fadesInTick;
+	reset();
+	ReleaseResources();
 }
 #endif
 //-----------------------------------------------------------------------------
