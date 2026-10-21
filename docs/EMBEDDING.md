@@ -243,6 +243,15 @@ count is per engine, starts at zero and never decreases, and is part of no
 checksum, save or replay. A host uses it to drop what it kept for a game a new
 one has replaced.
 
+A host that drives every human slot itself sets the context's
+`anchoredLocalPlayer`. A game whose info names no local slot then makes the
+always-revealed ReplayObserver its local player as its player list is made
+(`PlayerList::newGame`), rather than its first human side. Everything
+`startNewGame` caches about the local player is then the ReplayObserver's,
+live and in playback alike. A skirmish's replay records the local slot its
+game info names, -1 for none, rather than slot 0. A game whose info names a
+local slot plays as it does without the switch.
+
 ### Queries
 
 A host may query an engine between frames, and a query must not change what

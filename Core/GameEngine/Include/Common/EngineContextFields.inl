@@ -124,6 +124,14 @@ RTS_ENGINE_CONTEXT_VALUE(void*, applicationHWnd, nullptr)
 // once it is set.
 RTS_ENGINE_CONTEXT_VALUE(std::int64_t, playbackMismatchFrame, -1)
 
+// GeneralsX @feature cemlyn007 21/10/2026 Set by a host that drives every human slot itself and keeps the game's own
+// local player out of every slot (its "anchor"). A game whose info names no local slot then makes the always-revealed
+// ReplayObserver its local player as its player list is made (PlayerList::newGame), rather than its first human side,
+// so that everything startNewGame caches about the local player (VictoryConditions, the ghost objects, the shroud) is
+// the anchor's, live and in playback alike. A skirmish's replay records the local slot its game info names (-1 for
+// none) rather than slot 0. A game whose info names a local slot plays as it does without it.
+RTS_ENGINE_CONTEXT_VALUE(bool, anchoredLocalPlayer, false)
+
 // GeneralsX @feature cemlyn007 16/10/2026 Test-only: how many of this engine's next scratch-pad map deletes fail, as
 // a delete the file system refused does, leaving the file in place (GameStateMap::clearScratchPadMaps). A host's test
 // sets it to check that a scratch-pad map whose delete failed is kept and retried.

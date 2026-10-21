@@ -171,7 +171,14 @@ void PlayerList::newGame()
 			setLocal = true;
 		}
 
-		if (!setLocal && !TheNetwork && d->getBool(TheKey_playerIsHuman))
+#if RTS_ENGINE_CONTEXT
+		// GeneralsX @feature cemlyn007 21/10/2026 With the host's anchor, only the ReplayObserver stands in for a
+		// missing local slot: every human side is the host's to drive, and none is the game's own local player.
+		const Bool mayStandInForLocal = !rts::ctx()->anchoredLocalPlayer || pname == "ReplayObserver";
+#else
+		const Bool mayStandInForLocal = TRUE;
+#endif
+		if (!setLocal && !TheNetwork && mayStandInForLocal && d->getBool(TheKey_playerIsHuman))
 		{
 			setLocalPlayer(p);
 			setLocal = true;

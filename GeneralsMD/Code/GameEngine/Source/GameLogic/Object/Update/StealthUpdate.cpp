@@ -1007,7 +1007,9 @@ void StealthUpdate::changeVisualDisguise()
 			{
 				TheInGameUI->selectDrawable( draw );
 			}
-			Player *clientPlayer = ThePlayerList->getLocalPlayer();
+			// GeneralsX @feature cemlyn007 21/10/2026 The disguise's indicator colour is only a look, so it follows the
+			// observed or local player, as the stealth look does, rather than the local player alone.
+			Player *clientPlayer = rts::getObservedOrLocalPlayer();
 			if( self->getControllingPlayer()->getRelationship( clientPlayer->getDefaultTeam() ) != ALLIES && clientPlayer->isPlayerActive() )
 			{
 				//Neutrals and enemies will see this disguised unit as the team it's disguised as.

@@ -32,6 +32,7 @@
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 #include "Common/GameState.h"
+#include "Common/GameUtility.h"
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
 #include "Common/Team.h"
@@ -320,7 +321,9 @@ void CaveContain::recalcApparentControllingPlayer()
 	}
 
 	// Handle the team color that is rendered
-	const Player* controller = getApparentControllingPlayer(ThePlayerList->getLocalPlayer());
+	// GeneralsX @feature cemlyn007 21/10/2026 The rendered team colour is only a look, so it follows the observed or
+	// local player, as the stealth look does, rather than the local player alone.
+	const Player* controller = getApparentControllingPlayer(rts::getObservedOrLocalPlayer_Safe());
 	if (controller)
 	{
 		if (TheGlobalData->m_timeOfDay == TIME_OF_DAY_NIGHT)

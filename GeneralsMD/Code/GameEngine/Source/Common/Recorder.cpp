@@ -636,6 +636,13 @@ void RecorderClass::startRecording(GameDifficulty diff, Int originalGameMode, In
       theSlotList = GameInfoToAsciiString(TheSkirmishGameInfo);
       DEBUG_LOG(("GameInfo String: %s",theSlotList.str()));
 			localIndex = 0;
+#if RTS_ENGINE_CONTEXT
+			// GeneralsX @feature cemlyn007 21/10/2026 With the host's anchor, the replay names the local slot the game
+			// info names, -1 for a game whose local player holds no slot, so that playback checks the anchor's checksums
+			// (handleCRCMessage takes a player with no slot as local when the local slot is -1).
+			if (rts::ctx()->anchoredLocalPlayer)
+				localIndex = TheSkirmishGameInfo->getLocalSlotNum();
+#endif
     }
     else
     {
