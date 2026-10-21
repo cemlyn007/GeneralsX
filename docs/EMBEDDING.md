@@ -540,6 +540,14 @@ terrain. Its extra blend tiles get room for all of them at once
 (`HeightMapRenderObjClass::renderExtraBlendTiles`), rather than 16 more after
 each draw that ran out of room.
 
+### Script cameras
+
+A host whose cameras are its own sets the context's `scriptsMoveNoCamera`.
+A map script's camera actions (moves, pans, zooms, rotations, pitches,
+shakes, follows, tethers, the scripted camera's modifiers and the default
+view; `ScriptActions::executeAction`) then move no camera. A script's other
+actions run as before.
+
 ### The clock
 
 Logic code reads no clock. Every seeding names its seed: an engine starts on

@@ -147,6 +147,11 @@ RTS_ENGINE_CONTEXT_VALUE(bool, playerViews, false)
 // player, so that a draw shows the game as that player sees it. No logic runs while it is set.
 RTS_ENGINE_CONTEXT_VALUE(std::int32_t, viewingPlayer, -1)
 
+// GeneralsX @feature cemlyn007 21/10/2026 Set by a host whose cameras are its own: a map script's camera actions (moves,
+// pans, zooms, rotations, pitches, shakes, follows and the scripted camera's modifiers) then move no camera
+// (ScriptActions::executeAction).
+RTS_ENGINE_CONTEXT_VALUE(bool, scriptsMoveNoCamera, false)
+
 // GeneralsX @feature cemlyn007 16/10/2026 Test-only: how many of this engine's next scratch-pad map deletes fail, as
 // a delete the file system refused does, leaving the file in place (GameStateMap::clearScratchPadMaps). A host's test
 // sets it to check that a scratch-pad map whose delete failed is kept and retried.
