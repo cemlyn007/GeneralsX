@@ -2062,7 +2062,9 @@ void W3DModelDraw::setFullyObscuredByShroud(Bool fullyObscured)
 #if RTS_ENGINE_CONTEXT
 //-------------------------------------------------------------------------------------------------
 // GeneralsX @feature cemlyn007 21/10/2026 For one draw of a player's view (DrawModule::beginViewLook): the shadow and the
-// terrain decal are hidden as setHidden and setFullyObscuredByShroud would hide them, with none of their other effects
+// terrain decal are hidden as setHidden and setFullyObscuredByShroud would hide them, with none of their other effects,
+// and (22/10/2026) a fake structure's decal is hidden from a player GeneralsX would not show it to
+// (Drawable::hidesTerrainDecalInViewLook)
 //-------------------------------------------------------------------------------------------------
 void W3DModelDraw::beginViewLook(Bool hidden, Bool fullyObscured)
 {
@@ -2071,8 +2073,9 @@ void W3DModelDraw::beginViewLook(Bool hidden, Bool fullyObscured)
 	m_viewLookVariantDrawn = m_viewLookVariant != nullptr
 		&& getDrawable()->getPlayerLook(getDrawable()->getViewLookPlayerIndex(), &color, &garrisoned)
 		&& !hasLook(color, garrisoned) && m_viewLookVariant->hasLook(color, garrisoned);
+	const Bool decalHidden = getDrawable()->hidesTerrainDecalInViewLook();
 	m_shadowViewLook.begin(m_shadow, hidden || m_viewLookVariantDrawn, fullyObscured);
-	m_terrainDecalViewLook.begin(m_terrainDecal, hidden || m_viewLookVariantDrawn, fullyObscured);
+	m_terrainDecalViewLook.begin(m_terrainDecal, hidden || m_viewLookVariantDrawn || decalHidden, fullyObscured);
 	if (!m_viewLookVariantDrawn)
 		return;
 	if (m_renderObject)
@@ -2085,7 +2088,7 @@ void W3DModelDraw::beginViewLook(Bool hidden, Bool fullyObscured)
 	if (variant.m_renderObject)
 		variant.m_renderObject->Set_Hidden(hidden);
 	variant.m_shadowViewLook.begin(variant.m_shadow, hidden, fullyObscured);
-	variant.m_terrainDecalViewLook.begin(variant.m_terrainDecal, hidden, fullyObscured);
+	variant.m_terrainDecalViewLook.begin(variant.m_terrainDecal, hidden || decalHidden, fullyObscured);
 }
 
 //-------------------------------------------------------------------------------------------------

@@ -579,6 +579,20 @@ player's, the drawable's own look. A cave's colour (`CaveContain`) needs none
 of this: its look code asks `OpenContain::getApparentControllingPlayer`, which
 always answers no player, so a cave shows its team's colours to everyone.
 
+A fake structure's terrain decal (`KINDOF_FS_FAKE`, the template's shadow
+texture) is another such look: GeneralsX gives the drawable the decal when its
+local player is the structure's owner, an ally or neutral to it (an observer),
+and none for an enemy, deciding it when the drawable is bound to its object,
+when the object changes team, and in `GameClient::updateFakeDrawables` (a
+player's defeat, a change of local player). Built with the engine context, the
+same places also record which players GeneralsX would not show the decal to
+were each the local player (`Drawable::recordFakeStructureDecalViewers`), and a
+load records it again, since a save keeps only the local player's decal. The
+local player's decal stays on the drawable; a draw of the view of a player
+who would not see it hides it for the length of the draw
+(`Drawable::hidesTerrainDecalInViewLook`, read by
+`W3DModelDraw::beginViewLook`).
+
 ### Per-player views
 
 A host that sets the context's `playerViews` keeps a view of its own for every

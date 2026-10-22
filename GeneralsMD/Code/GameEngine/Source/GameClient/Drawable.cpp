@@ -2757,6 +2757,34 @@ Bool Drawable::getPlayerLook( Int playerIndex, Color *color, Bool *garrisoned ) 
 }
 
 //-------------------------------------------------------------------------------------------------
+// GeneralsX @feature cemlyn007 22/10/2026 See Drawable.h. Each player's relationship to the fake's team is the one
+// GeneralsX's own test reads for its local player
+//-------------------------------------------------------------------------------------------------
+void Drawable::recordFakeStructureDecalViewers()
+{
+	m_fakeDecalHiddenFor = 0;
+	const Object *object = getObject();
+	if (object == nullptr || ThePlayerList == nullptr)
+		return;
+	for (Int i = 0; i < ThePlayerList->getPlayerCount() && i < MAX_PLAYER_COUNT; ++i)
+	{
+		const Player *player = ThePlayerList->getNthPlayer(i);
+		if (player == nullptr)
+			continue;
+		const Relationship rel = player->getRelationship(object->getTeam());
+		if (rel != ALLIES && rel != NEUTRAL)
+			m_fakeDecalHiddenFor |= 1u << i;
+	}
+}
+
+//-------------------------------------------------------------------------------------------------
+Bool Drawable::hidesTerrainDecalInViewLook() const
+{
+	const Int index = getViewLookPlayerIndex();
+	return index >= 0 && index < MAX_PLAYER_COUNT && (m_fakeDecalHiddenFor & (1u << index)) != 0;
+}
+
+//-------------------------------------------------------------------------------------------------
 void Drawable::syncViewLookVariants()
 {
 	for (DrawModule** dm = getDrawModules(); *dm; ++dm)
@@ -4439,6 +4467,10 @@ void Drawable::friend_bindToObject( Object *obj ) ///< bind this drawable to an 
 				setTerrainDecal(TERRAIN_DECAL_SHADOW_TEXTURE);
 			else
 				setTerrainDecal(TERRAIN_DECAL_NONE);
+#if RTS_ENGINE_CONTEXT
+			// GeneralsX @feature cemlyn007 22/10/2026 And for every player (recordFakeStructureDecalViewers)
+			recordFakeStructureDecalViewers();
+#endif
 		}
 	}
 
@@ -4477,6 +4509,10 @@ void Drawable::changedTeam()
 				setTerrainDecal(TERRAIN_DECAL_SHADOW_TEXTURE);
 			else
 				setTerrainDecal(TERRAIN_DECAL_NONE);
+#if RTS_ENGINE_CONTEXT
+			// GeneralsX @feature cemlyn007 22/10/2026 And for every player (recordFakeStructureDecalViewers)
+			recordFakeStructureDecalViewers();
+#endif
 		}
 	}
 }
@@ -5698,6 +5734,11 @@ void Drawable::xfer( Xfer *xfer )
 // ------------------------------------------------------------------------------------------------
 void Drawable::loadPostProcess()
 {
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 22/10/2026 A save keeps the local player's decal alone (recordFakeStructureDecalViewers)
+	if (m_object != nullptr && m_object->isKindOf(KINDOF_FS_FAKE))
+		recordFakeStructureDecalViewers();
+#endif
 		// if we have an object, we don't need to save/load the pos, just restore it.
 		// if we don't, we'd better save it!
 	if (m_object != nullptr)

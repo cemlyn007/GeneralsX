@@ -405,6 +405,13 @@ public:
 	void setPlayerLook( Int playerIndex, Color color, Bool garrisoned );
 	Bool getPlayerLook( Int playerIndex, Color *color, Bool *garrisoned ) const;
 	void syncViewLookVariants();
+
+	// GeneralsX @feature cemlyn007 22/10/2026 Which players GeneralsX would show a fake structure's terrain decal
+	// (KINDOF_FS_FAKE) were each the local player: those its owner's team is an ally of or neutral to, worked out where
+	// GeneralsX works it out for its local player (binding, a team change, GameClient::updateFakeDrawables) and again
+	// after a load. A draw of another player's view hides the decal (beginViewLook).
+	void recordFakeStructureDecalViewers();
+	Bool hidesTerrainDecalInViewLook() const;
 #endif
 
 	void setShadowsEnabled(Bool enable);
@@ -753,6 +760,7 @@ private:
 		Bool recorded = FALSE;
 	};
 	PlayerLook*		m_playerLooks = nullptr;
+	UnsignedInt		m_fakeDecalHiddenFor = 0;	///< GeneralsX @feature cemlyn007 22/10/2026 a bit per player (recordFakeStructureDecalViewers)
 #endif
 
 	DrawableLocoInfo*	m_locoInfo;	// lazily allocated

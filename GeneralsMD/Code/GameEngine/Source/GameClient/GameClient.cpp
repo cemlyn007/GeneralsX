@@ -870,6 +870,10 @@ void GameClient::updateFakeDrawables()
 				draw->setTerrainDecal(TERRAIN_DECAL_SHADOW_TEXTURE);
 			else
 				draw->setTerrainDecal(TERRAIN_DECAL_NONE);
+#if RTS_ENGINE_CONTEXT
+			// GeneralsX @feature cemlyn007 22/10/2026 And for every player (Drawable::recordFakeStructureDecalViewers)
+			draw->recordFakeStructureDecalViewers();
+#endif
 		}
 	}
 }
