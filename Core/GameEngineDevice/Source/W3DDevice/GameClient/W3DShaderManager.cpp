@@ -53,6 +53,7 @@
 //
 //-----------------------------------------------------------------------------
 
+#include "Common/EngineDrawing.h"	// GeneralsX @bugfix cemlyn007 21/10/2026 Drawing on demand
 #include "WW3D2/dx8wrapper.h"
 #include "WW3D2/assetmgr.h"
 #include "Lib/BaseType.h"
@@ -2299,6 +2300,18 @@ Int TerrainShaderPixelShader::set(Int pass)
 
 		DX8Wrapper::Set_DX8_Texture_Stage_State(2,  D3DTSS_ADDRESSU, D3DTADDRESS_WRAP);
 		DX8Wrapper::Set_DX8_Texture_Stage_State(2,  D3DTSS_ADDRESSV, D3DTADDRESS_WRAP);
+
+#if RTS_ENGINE_CONTEXT
+		// GeneralsX @bugfix cemlyn007 21/10/2026 For an engine that draws on demand, the cloud and light-map stages' mip
+		// filters are set here: this pass never set them, so it used whatever the previous draw's last pass left (no mip
+		// mapping before an engine's first draw of a game, point mip mapping after), and an image depended on the draws
+		// before it. These are the values an earlier draw leaves (Common/EngineDrawing.h).
+		if (rts::drawsOnDemand())
+		{
+			DX8Wrapper::Set_DX8_Texture_Stage_State(2, D3DTSS_MIPFILTER, D3DTEXF_POINT);
+			DX8Wrapper::Set_DX8_Texture_Stage_State(3, D3DTSS_MIPFILTER, D3DTEXF_NONE);
+		}
+#endif
 
 		if (W3DShaderManager::getCurrentShader() == W3DShaderManager::ST_TERRAIN_BASE_NOISE12)
 		{	//full shader

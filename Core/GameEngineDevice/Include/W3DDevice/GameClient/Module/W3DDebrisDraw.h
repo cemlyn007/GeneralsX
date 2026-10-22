@@ -32,6 +32,9 @@
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
 #include "Common/GameType.h"
 #include "Common/DrawModule.h"
+#if RTS_ENGINE_CONTEXT
+#include "GameClient/Shadow.h"	// GeneralsX @feature cemlyn007 21/10/2026 ShadowViewLook
+#endif
 #include "Common/FileSystem.h"	// this is only here to pull in LOAD_TEST_ASSETS
 
 // FORWARD REFERENCES /////////////////////////////////////////////////////////////////////////////
@@ -61,6 +64,13 @@ public:
 	virtual void allocateShadows() override {};	///< we don't care about preserving temporary shadows.
 
 	virtual void setFullyObscuredByShroud(Bool fullyObscured) override;
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 For one draw of a player's view (DrawModule::beginViewLook)
+	virtual void beginViewLook(Bool hidden, Bool fullyObscured) override { m_shadowViewLook.begin(m_shadow, hidden, fullyObscured); }
+	virtual void endViewLook() override { m_shadowViewLook.end(); }
+	// GeneralsX @feature cemlyn007 22/10/2026 Its model carries the drawable's DrawableInfo (DrawModule::rendersWithDrawableInfo)
+	virtual Bool rendersWithDrawableInfo() const override { return TRUE; }
+#endif
 	virtual void reactToTransformChange(const Matrix3D* oldMtx, const Coord3D* oldPos, Real oldAngle) override;
 	virtual void reactToGeometryChange() override { }
 
@@ -93,5 +103,8 @@ private:
 	Int												m_frames;
 	Bool											m_finalStop;
 	Shadow*										m_shadow;													///< Updates/Renders shadows of this object
+#if RTS_ENGINE_CONTEXT
+	ShadowViewLook						m_shadowViewLook;	///< GeneralsX @feature cemlyn007 21/10/2026 beginViewLook's
+#endif
 
 };

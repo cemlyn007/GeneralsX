@@ -328,6 +328,22 @@ public:
 	// Returns the render frame count.
 	static unsigned int		Get_Frame_Count() { return FrameCount; }
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 For an engine that draws on demand (Common/EngineDrawing.h): its frame
+	// count counts client ticks, not renders, since what keys off its parity (the ping-pong particle buffers) is
+	// advanced by the tick; and a draw saves the frame times, renders with none, and puts them back, so that what renders
+	// advances nothing.
+	struct FrameTimes
+	{
+		unsigned int SyncFrameTime = 0;
+		float LogicFrameTimeMs = 0.0f;
+	};
+	static FrameTimes			Get_Frame_Times() { return FrameTimes{ SyncTime - PreviousSyncTime, LogicFrameTimeMs }; }
+	static void						Set_Frame_Times(const FrameTimes& times) { PreviousSyncTime = SyncTime - times.SyncFrameTime; LogicFrameTimeMs = times.LogicFrameTimeMs; }
+	static void						Count_Client_Tick() { FrameCount = FrameCount + 1; }
+	static bool						Counts_Client_Ticks() { return rts::ctx()->onDemandDrawing && rts::ctx()->dx8HeadlessRender; }
+#endif
+
 	static unsigned int		Get_Last_Frame_Poly_Count();
 	static unsigned int		Get_Last_Frame_Vertex_Count();
 

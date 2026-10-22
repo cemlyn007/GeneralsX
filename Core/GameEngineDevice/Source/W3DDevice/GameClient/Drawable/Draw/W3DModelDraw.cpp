@@ -67,6 +67,13 @@
 #include "WW3D2/mesh.h"
 #include "WW3D2/meshmdl.h"
 #include "Common/BitFlagsIO.h"
+#if RTS_ENGINE_CONTEXT
+#include <cstring>
+#include "Common/EngineContext.h"	// GeneralsX @feature cemlyn007 21/10/2026 Per-player looks (syncViewLookVariant)
+#include "Common/EngineDrawing.h"
+#include "Common/ModuleFactory.h"
+#include "Common/NameKeyGenerator.h"
+#endif
 
 
 //-------------------------------------------------------------------------------------------------
@@ -75,6 +82,61 @@ static inline Bool isValidTimeToCalcLogicStuff()
 	return (TheGameLogic && TheGameLogic->isInGameLogicUpdate()) ||
 		(TheGameState && TheGameState->isInLoadGame());
 }
+
+#if RTS_ENGINE_CONTEXT
+//-------------------------------------------------------------------------------------------------
+// GeneralsX @feature cemlyn007 21/10/2026 The client random stream as it was made, put back as it is destroyed, so that
+// what a look variant draws from it leaves it as it was (W3DModelDraw::syncViewLookVariant)
+//-------------------------------------------------------------------------------------------------
+namespace
+{
+class KeepClientRandomStream
+{
+public:
+	KeepClientRandomStream() { std::memcpy(m_stream, rts::ctx()->gameClientSeed, sizeof(m_stream)); }
+	~KeepClientRandomStream() { std::memcpy(rts::ctx()->gameClientSeed, m_stream, sizeof(m_stream)); }
+	KeepClientRandomStream(const KeepClientRandomStream &) = delete;
+	KeepClientRandomStream &operator=(const KeepClientRandomStream &) = delete;
+
+private:
+	std::uint32_t m_stream[sizeof(rts::ctx()->gameClientSeed) / sizeof(std::uint32_t)];
+};
+}
+
+//-------------------------------------------------------------------------------------------------
+// GeneralsX @feature cemlyn007 21/10/2026 Passes a call this module gets on to its look variant, first, with the client
+// random stream as it was, so that the variant's random picks are the ones this module is about to make and leave the
+// stream as the variant found it; calls this module makes of itself while it carries the call out are not passed on
+// again (W3DModelDraw.h)
+//-------------------------------------------------------------------------------------------------
+struct W3DModelDraw::ViewLookForward
+{
+	template <class Call>
+	ViewLookForward(W3DModelDraw *draw, Call call) : m_draw(draw)
+	{
+		if (draw->m_viewLookVariant == nullptr || draw->m_forwardingToViewLookVariant)
+			return;
+		{
+			KeepClientRandomStream keep;
+			call(*draw->m_viewLookVariant);
+		}
+		draw->m_forwardingToViewLookVariant = TRUE;
+		m_began = TRUE;
+	}
+
+	~ViewLookForward()
+	{
+		if (m_began)
+			m_draw->m_forwardingToViewLookVariant = FALSE;
+	}
+
+	ViewLookForward(const ViewLookForward &) = delete;
+	ViewLookForward &operator=(const ViewLookForward &) = delete;
+
+	W3DModelDraw *m_draw;
+	Bool m_began = FALSE;
+};
+#endif
 
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
@@ -1314,6 +1376,10 @@ static void parseShowHideSubObject(INI* ini, void *instance, void *store, const 
 //-------------------------------------------------------------------------------------------------
 void W3DModelDraw::showSubObject( const AsciiString& name, Bool show )
 {
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 And the look variant (syncViewLookVariant)
+	ViewLookForward forward(this, [&](W3DModelDraw &variant) { variant.showSubObject(name, show); });
+#endif
 	if( name.isNotEmpty() )
 	{
 		Bool found = false;
@@ -1749,6 +1815,10 @@ W3DModelDraw::W3DModelDraw(Thing *thing, const ModuleData* moduleData) : DrawMod
 	}
 	m_needRecalcBoneParticleSystems = false;
 	m_fullyObscuredByShroud = false;
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 A look variant from its first model state on (syncViewLookVariant)
+	m_isViewLookVariant = rts::ctx()->makingViewLookVariant;
+#endif
 
 	// only validate the current time-of-day and weather conditions by default.
 	getW3DModelDrawModuleData()->validateStuffForTimeAndWeather(getDrawable(),
@@ -1800,6 +1870,10 @@ void W3DModelDraw::onDrawableBoundToObject()
 //-------------------------------------------------------------------------------------------------
 W3DModelDraw::~W3DModelDraw()
 {
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 The look variant goes with this module (syncViewLookVariant)
+	dropViewLookVariant();
+#endif
 	if (m_trackRenderObject && TheTerrainTracksRenderObjClassSystem)
 	{
 		TheTerrainTracksRenderObjClassSystem->unbindTrack(m_trackRenderObject);
@@ -1832,8 +1906,16 @@ void W3DModelDraw::doStartOrStopParticleSys()
 //-------------------------------------------------------------------------------------------------
 void W3DModelDraw::setHidden(Bool hidden)
 {
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 And the look variant (syncViewLookVariant), whose model stays hidden but in
+	// the views it is drawn in
+	ViewLookForward forward(this, [&](W3DModelDraw &variant) { variant.setHidden(hidden); });
+	if (m_renderObject)
+		m_renderObject->Set_Hidden(hidden || (m_isViewLookVariant && !m_shownInViewLook));
+#else
 	if (m_renderObject)
 		m_renderObject->Set_Hidden(hidden);
+#endif
 
 	if (m_shadow)
 		m_shadow->enableShadowRender(!hidden);
@@ -1854,6 +1936,10 @@ void W3DModelDraw::setHidden(Bool hidden)
 /**Free all data used by this model's shadow.  This is used to dynamically enable/disable shadows by the options screen*/
 void W3DModelDraw::releaseShadows()	///< frees all shadow resources used by this module - used by Options screen.
 {
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 And the look variant (syncViewLookVariant)
+	ViewLookForward forward(this, [&](W3DModelDraw &variant) { variant.releaseShadows(); });
+#endif
 	if (m_shadow)
 		m_shadow->release();
 	m_shadow = nullptr;
@@ -1862,6 +1948,10 @@ void W3DModelDraw::releaseShadows()	///< frees all shadow resources used by this
 /** Create shadow resources if not already present. This is used to dynamically enable/disable shadows by the options screen*/
 void W3DModelDraw::allocateShadows()
 {
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 And the look variant (syncViewLookVariant)
+	ViewLookForward forward(this, [&](W3DModelDraw &variant) { variant.allocateShadows(); });
+#endif
 	const ThingTemplate *tmplate=getDrawable()->getTemplate();
 
 	//Check if we don't already have a shadow but need one for this type of model.
@@ -1889,6 +1979,10 @@ void W3DModelDraw::allocateShadows()
 //-------------------------------------------------------------------------------------------------
 void W3DModelDraw::setShadowsEnabled(Bool enable)
 {
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 And the look variant (syncViewLookVariant)
+	ViewLookForward forward(this, [&](W3DModelDraw &variant) { variant.setShadowsEnabled(enable); });
+#endif
 	if (m_shadow)
 		m_shadow->enableShadowRender(enable);
 	m_shadowEnabled = enable;
@@ -1948,6 +2042,10 @@ void W3DModelDraw::getRenderCostRecursive(RenderCost & rc,RenderObjClass * robj)
 //-------------------------------------------------------------------------------------------------
 void W3DModelDraw::setFullyObscuredByShroud(Bool fullyObscured)
 {
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 And the look variant (syncViewLookVariant)
+	ViewLookForward forward(this, [&](W3DModelDraw &variant) { variant.setFullyObscuredByShroud(fullyObscured); });
+#endif
 	if (m_fullyObscuredByShroud != fullyObscured)
 	{
 		m_fullyObscuredByShroud = fullyObscured;
@@ -1960,6 +2058,158 @@ void W3DModelDraw::setFullyObscuredByShroud(Bool fullyObscured)
 		doStartOrStopParticleSys();
 	}
 }
+
+#if RTS_ENGINE_CONTEXT
+//-------------------------------------------------------------------------------------------------
+// GeneralsX @feature cemlyn007 21/10/2026 For one draw of a player's view (DrawModule::beginViewLook): the shadow and the
+// terrain decal are hidden as setHidden and setFullyObscuredByShroud would hide them, with none of their other effects,
+// and (22/10/2026) a fake structure's decal is hidden from a player GeneralsX would not show it to
+// (Drawable::hidesTerrainDecalInViewLook)
+//-------------------------------------------------------------------------------------------------
+void W3DModelDraw::beginViewLook(Bool hidden, Bool fullyObscured)
+{
+	Color color = 0;
+	Bool garrisoned = FALSE;
+	m_viewLookVariantDrawn = m_viewLookVariant != nullptr
+		&& getDrawable()->getPlayerLook(getDrawable()->getViewLookPlayerIndex(), &color, &garrisoned)
+		&& !hasLook(color, garrisoned) && m_viewLookVariant->hasLook(color, garrisoned);
+	const Bool decalHidden = getDrawable()->hidesTerrainDecalInViewLook();
+	m_shadowViewLook.begin(m_shadow, hidden || m_viewLookVariantDrawn, fullyObscured);
+	m_terrainDecalViewLook.begin(m_terrainDecal, hidden || m_viewLookVariantDrawn || decalHidden, fullyObscured);
+	if (!m_viewLookVariantDrawn)
+		return;
+	if (m_renderObject)
+	{
+		m_hiddenBeforeViewLook = m_renderObject->Is_Hidden();
+		m_renderObject->Set_Hidden(TRUE);
+	}
+	W3DModelDraw &variant = *m_viewLookVariant;
+	variant.m_shownInViewLook = TRUE;
+	if (variant.m_renderObject)
+		variant.m_renderObject->Set_Hidden(hidden);
+	variant.m_shadowViewLook.begin(variant.m_shadow, hidden, fullyObscured);
+	variant.m_terrainDecalViewLook.begin(variant.m_terrainDecal, hidden || decalHidden, fullyObscured);
+}
+
+//-------------------------------------------------------------------------------------------------
+void W3DModelDraw::endViewLook()
+{
+	if (m_viewLookVariantDrawn)
+	{
+		W3DModelDraw &variant = *m_viewLookVariant;
+		variant.m_terrainDecalViewLook.end();
+		variant.m_shadowViewLook.end();
+		if (variant.m_renderObject)
+			variant.m_renderObject->Set_Hidden(TRUE);
+		variant.m_shownInViewLook = FALSE;
+		if (m_renderObject)
+			m_renderObject->Set_Hidden(m_hiddenBeforeViewLook);
+		m_viewLookVariantDrawn = FALSE;
+	}
+	m_terrainDecalViewLook.end();
+	m_shadowViewLook.end();
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// GeneralsX @feature cemlyn007 21/10/2026 A variant's model condition: its drawable's, garrisoned or not as its look is
+//-------------------------------------------------------------------------------------------------
+ModelConditionFlags W3DModelDraw::viewLookFlags(const ModelConditionFlags& c) const
+{
+	ModelConditionFlags flags = c;
+	if (m_viewLookGarrisoned)
+		flags.set(MODELCONDITION_GARRISONED);
+	else
+		flags.clear(MODELCONDITION_GARRISONED);
+	return flags;
+}
+
+//-------------------------------------------------------------------------------------------------
+// GeneralsX @feature cemlyn007 21/10/2026 Whether this module draws the look: its colour, and its model garrisoned or not
+//-------------------------------------------------------------------------------------------------
+Bool W3DModelDraw::hasLook(Color color, Bool garrisoned) const
+{
+	const Int hexColor = (color == 0) ? 0 : (color | 0xFF000000);
+	const Bool drawnGarrisoned = m_isViewLookVariant ? m_viewLookGarrisoned
+		: getDrawable()->getModelConditionFlags().test(MODELCONDITION_GARRISONED);
+	return hexColor == m_hexColor && garrisoned == drawnGarrisoned;
+}
+
+//-------------------------------------------------------------------------------------------------
+// GeneralsX @feature cemlyn007 21/10/2026 See W3DModelDraw.h. The client tick of an engine that draws on demand keeps the
+// variant for the first look a player sees that differs from this module's own, makes it when one appears, changes its
+// colour or garrisoned model when the look changes, and drops it when every player sees this module's own look. A third
+// look, which GeneralsX's rules never give, would be drawn as this module's own.
+//-------------------------------------------------------------------------------------------------
+void W3DModelDraw::syncViewLookVariant()
+{
+	if (m_isViewLookVariant)
+		return;
+	Color color = 0;
+	Bool garrisoned = FALSE;
+	Bool wanted = FALSE;
+	if (rts::drawsOnDemand() && getW3DModelDrawModuleData()->m_okToChangeModelColor)
+	{
+		for (Int player = 0; player < MAX_PLAYER_COUNT && !wanted; ++player)
+			wanted = getDrawable()->getPlayerLook(player, &color, &garrisoned) && !hasLook(color, garrisoned);
+	}
+	if (!wanted)
+	{
+		dropViewLookVariant();
+		return;
+	}
+	if (m_viewLookVariant == nullptr)
+	{
+		makeViewLookVariant(color, garrisoned);
+		return;
+	}
+	W3DModelDraw &variant = *m_viewLookVariant;
+	if (variant.hasLook(color, garrisoned))
+		return;
+	KeepClientRandomStream keep;
+	if (variant.m_viewLookGarrisoned != garrisoned)
+	{
+		variant.m_viewLookGarrisoned = garrisoned;
+		variant.replaceModelConditionState(variant.viewLookFlags(getDrawable()->getModelConditionFlags()));
+	}
+	variant.replaceIndicatorColor(color);
+}
+
+//-------------------------------------------------------------------------------------------------
+// GeneralsX @feature cemlyn007 21/10/2026 A variant of this module with the look, made as the drawable made this module
+// and brought to this module's state: its model condition, sub-objects, visibility, shroud and terrain decal
+//-------------------------------------------------------------------------------------------------
+void W3DModelDraw::makeViewLookVariant(Color color, Bool garrisoned)
+{
+	KeepClientRandomStream keep;
+	rts::ctx()->makingViewLookVariant = true;
+	Module *module = TheModuleFactory->newModule(getDrawable(), TheNameKeyGenerator->keyToName(getModuleNameKey()),
+		getModuleData(), MODULETYPE_DRAW);
+	rts::ctx()->makingViewLookVariant = false;
+	W3DModelDraw *variant = static_cast<W3DModelDraw *>(static_cast<DrawModule *>(module));
+	variant->m_viewLookGarrisoned = garrisoned;
+	variant->replaceModelConditionState(variant->viewLookFlags(getDrawable()->getModelConditionFlags()));
+	variant->replaceIndicatorColor(color);
+	variant->m_subObjectVec = m_subObjectVec;
+	variant->updateSubObjects();
+	variant->setFullyObscuredByShroud(m_fullyObscuredByShroud);
+	variant->setHidden(getDrawable()->isDrawableEffectivelyHidden());
+	if (m_terrainDecal != nullptr)
+		variant->setTerrainDecal(getDrawable()->getTerrainDecalType());
+	m_viewLookVariant = variant;
+}
+
+//-------------------------------------------------------------------------------------------------
+void W3DModelDraw::dropViewLookVariant()
+{
+	if (m_viewLookVariant == nullptr)
+		return;
+	W3DModelDraw *variant = m_viewLookVariant;
+	m_viewLookVariant = nullptr;
+	m_viewLookVariantDrawn = FALSE;
+	deleteInstance(variant);
+}
+#endif
 
 //-------------------------------------------------------------------------------------------------
 static Bool isAnimationComplete(RenderObjClass* r)
@@ -2049,6 +2299,10 @@ void W3DModelDraw::adjustTransformMtx(Matrix3D& mtx) const
 //-------------------------------------------------------------------------------------------------
 void W3DModelDraw::doDrawModule(const Matrix3D* transformMtx)
 {
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 And the look variant (syncViewLookVariant)
+	ViewLookForward forward(this, [&](W3DModelDraw &variant) { variant.doDrawModule(transformMtx); });
+#endif
 	// update whether or not we should be animating.
 	setPauseAnimation( !getDrawable()->getShouldAnimate(getW3DModelDrawModuleData()->m_animationsRequirePower) );
 
@@ -2730,6 +2984,10 @@ Bool W3DModelDraw::updateBonesForClientParticleSystems()
 //-------------------------------------------------------------------------------------------------
 void W3DModelDraw::setTerrainDecal(TerrainDecalType type)
 {
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 And the look variant (syncViewLookVariant)
+	ViewLookForward forward(this, [&](W3DModelDraw &variant) { variant.setTerrainDecal(type); });
+#endif
 	if (m_terrainDecal)
 		m_terrainDecal->release();
 
@@ -2768,6 +3026,10 @@ void W3DModelDraw::setTerrainDecal(TerrainDecalType type)
 //-------------------------------------------------------------------------------------------------
 void W3DModelDraw::setTerrainDecalSize(Real x, Real y)
 {
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 And the look variant (syncViewLookVariant)
+	ViewLookForward forward(this, [&](W3DModelDraw &variant) { variant.setTerrainDecalSize(x, y); });
+#endif
 	if (m_terrainDecal)
 	{
 		m_terrainDecal->setSize(x,y);
@@ -2776,6 +3038,10 @@ void W3DModelDraw::setTerrainDecalSize(Real x, Real y)
 //-------------------------------------------------------------------------------------------------
 void W3DModelDraw::setTerrainDecalOpacity(Real o)
 {
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 And the look variant (syncViewLookVariant)
+	ViewLookForward forward(this, [&](W3DModelDraw &variant) { variant.setTerrainDecalOpacity(o); });
+#endif
 	if (m_terrainDecal)
 	{
 		m_terrainDecal->setOpacity((Int)(255.0f * o));
@@ -3000,7 +3266,11 @@ void W3DModelDraw::setModelState(const ModelConditionInfo* newState)
 	// will never allow the placement of new ones if the status bit is set that tells us
 	// we should not automatically create particle systems for the model condition states
 	//
-	if( getDrawable()->testDrawableStatus( DRAWABLE_STATUS_NO_STATE_PARTICLES ) == FALSE )
+	if( getDrawable()->testDrawableStatus( DRAWABLE_STATUS_NO_STATE_PARTICLES ) == FALSE
+#if RTS_ENGINE_CONTEXT
+			&& !m_isViewLookVariant	// GeneralsX @feature cemlyn007 21/10/2026 A look variant makes no particle systems
+#endif
+		)
 		m_needRecalcBoneParticleSystems = true;
 
 	// always stop particle systems now
@@ -3055,6 +3325,9 @@ void W3DModelDraw::setModelState(const ModelConditionInfo* newState)
 		// set up tracks, if not already set.
 		if (m_renderObject &&
 				TheGlobalData->m_makeTrackMarks &&
+#if RTS_ENGINE_CONTEXT
+				!m_isViewLookVariant &&	// GeneralsX @feature cemlyn007 21/10/2026 A look variant makes no track marks
+#endif
 				!m_trackRenderObject &&
 				TheTerrainTracksRenderObjClassSystem != nullptr &&
 				!getW3DModelDrawModuleData()->m_trackFile.isEmpty())
@@ -3104,6 +3377,11 @@ void W3DModelDraw::setModelState(const ModelConditionInfo* newState)
 					collType |= PICK_TYPE_FORCEATTACKABLE;
 				if (tmplate->isKindOf(KINDOF_CLICK_THROUGH))
 					collType = 0;
+#if RTS_ENGINE_CONTEXT
+				// GeneralsX @feature cemlyn007 21/10/2026 A look variant is never picked
+				if (m_isViewLookVariant)
+					collType = 0;
+#endif
 				m_renderObject->Set_Collision_Type( collType );
 			}
 
@@ -3145,6 +3423,11 @@ void W3DModelDraw::setModelState(const ModelConditionInfo* newState)
 					m_shadow->enableShadowRender(FALSE);
 				m_shadowEnabled = FALSE;
 			}
+#if RTS_ENGINE_CONTEXT
+			// GeneralsX @feature cemlyn007 21/10/2026 A look variant's model is hidden but in the views it is drawn in
+			else if (m_isViewLookVariant && !m_shownInViewLook)
+				m_renderObject->Set_Hidden(TRUE);
+#endif
 
 			//
 			// set the transform for the new model to that we saved before, we do this so that the
@@ -3181,6 +3464,10 @@ void W3DModelDraw::setModelState(const ModelConditionInfo* newState)
 //-------------------------------------------------------------------------------------------------
 void W3DModelDraw::replaceModelConditionState(const ModelConditionFlags& c)
 {
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 And the look variant (syncViewLookVariant)
+	ViewLookForward forward(this, [&](W3DModelDraw &variant) { variant.replaceModelConditionState(variant.viewLookFlags(c)); });
+#endif
 	m_hideHeadlights = c.test(MODELCONDITION_NIGHT) ? false : true;
 
 	const ModelConditionInfo* info = findBestInfo(c);
@@ -3650,6 +3937,10 @@ void W3DModelDraw::reactToTransformChange( const Matrix3D* oldMtx,
 																					 const Coord3D* oldPos,
 																					 Real oldAngle )
 {
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 And the look variant (syncViewLookVariant)
+	ViewLookForward forward(this, [&](W3DModelDraw &variant) { variant.reactToTransformChange(oldMtx, oldPos, oldAngle); });
+#endif
 
 	// set the position of our render object
 	if( m_renderObject )
@@ -3695,6 +3986,10 @@ Int W3DModelDraw::getBarrelCount(WeaponSlotType wslot) const
 //-------------------------------------------------------------------------------------------------
 Bool W3DModelDraw::handleWeaponFireFX(WeaponSlotType wslot, Int specificBarrelToUse, const FXList* fxl, Real weaponSpeed, const Coord3D* victimPos, Real damageRadius)
 {
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 And the look variant (syncViewLookVariant)
+	ViewLookForward forward(this, [&](W3DModelDraw &variant) { variant.handleWeaponFireFX(wslot, specificBarrelToUse, nullptr, weaponSpeed, victimPos, damageRadius); });
+#endif
 	DEBUG_ASSERTCRASH(specificBarrelToUse >= 0, ("specificBarrelToUse should now always be explicit"));
 
 	if (!m_curState || !(m_curState->m_validStuff & ModelConditionInfo::BARRELS_VALID))
@@ -3787,6 +4082,10 @@ Bool W3DModelDraw::handleWeaponFireFX(WeaponSlotType wslot, Int specificBarrelTo
 //-------------------------------------------------------------------------------------------------
 void W3DModelDraw::setAnimationLoopDuration(UnsignedInt numFrames)
 {
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 And the look variant (syncViewLookVariant)
+	ViewLookForward forward(this, [&](W3DModelDraw &variant) { variant.setAnimationLoopDuration(numFrames); });
+#endif
 // this is never defined -- srj
 #ifdef NO_DURATIONS_ON_TRANSITIONS
 	if (m_curState != nullptr && m_curState->m_transition != NO_TRANSITION &&
@@ -3814,6 +4113,10 @@ void W3DModelDraw::setAnimationLoopDuration(UnsignedInt numFrames)
 */
 void W3DModelDraw::setAnimationCompletionTime(UnsignedInt numFrames)
 {
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 And the look variant (syncViewLookVariant)
+	ViewLookForward forward(this, [&](W3DModelDraw &variant) { variant.setAnimationCompletionTime(numFrames); });
+#endif
 	if (m_curState != nullptr && m_curState->m_transitionSig != NO_TRANSITION && m_curState->m_animations.size() > 0 &&
 			m_nextState != nullptr && m_nextState->m_transitionSig == NO_TRANSITION && m_nextState->m_animations.size() > 0)
 	{
@@ -3836,6 +4139,10 @@ void W3DModelDraw::setAnimationCompletionTime(UnsignedInt numFrames)
 //-------------------------------------------------------------------------------------------------
 void W3DModelDraw::setAnimationFrame( int frame )
 {
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 And the look variant (syncViewLookVariant)
+	ViewLookForward forward(this, [&](W3DModelDraw &variant) { variant.setAnimationFrame(frame); });
+#endif
 	if( m_renderObject && m_whichAnimInCurState >= 0 )
 	{
 		const W3DAnimationInfo& animInfo = m_curState->m_animations[ m_whichAnimInCurState ];
@@ -3848,6 +4155,10 @@ void W3DModelDraw::setAnimationFrame( int frame )
 //-------------------------------------------------------------------------------------------------
 void W3DModelDraw::setPauseAnimation(Bool pauseAnim)
 {
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 And the look variant (syncViewLookVariant)
+	ViewLookForward forward(this, [&](W3DModelDraw &variant) { variant.setPauseAnimation(pauseAnim); });
+#endif
 	if (m_pauseAnimation == pauseAnim)
 	{
 		return;
@@ -3937,6 +4248,10 @@ Bool W3DModelDraw::isVisible() const
 //-------------------------------------------------------------------------------------------------
 void W3DModelDraw::updateProjectileClipStatus( UnsignedInt shotsRemaining, UnsignedInt maxShots, WeaponSlotType slot )
 {
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 And the look variant (syncViewLookVariant)
+	ViewLookForward forward(this, [&](W3DModelDraw &variant) { variant.updateProjectileClipStatus(shotsRemaining, maxShots, slot); });
+#endif
 	if ((getW3DModelDrawModuleData()->m_projectileBoneFeedbackEnabledSlots & (1 << slot)) == 0)
 		return; // Only if specified.
 
@@ -3944,8 +4259,12 @@ void W3DModelDraw::updateProjectileClipStatus( UnsignedInt shotsRemaining, Unsig
 }
 
 //-------------------------------------------------------------------------------------------------
-void W3DModelDraw::updateDrawModuleSupplyStatus( Int , Int currentSupply )
+void W3DModelDraw::updateDrawModuleSupplyStatus( Int maxSupply, Int currentSupply )
 {
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 And the look variant (syncViewLookVariant)
+	ViewLookForward forward(this, [&](W3DModelDraw &variant) { variant.updateDrawModuleSupplyStatus(maxSupply, currentSupply); });
+#endif
 	// This level only cares if you have anything or not
 	if( currentSupply > 0 )
 	{
@@ -3993,6 +4312,10 @@ void W3DModelDraw::doHideShowProjectileObjects( UnsignedInt showCount, UnsignedI
 //-------------------------------------------------------------------------------------------------
 void W3DModelDraw::updateSubObjects()
 {
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 And the look variant (syncViewLookVariant)
+	ViewLookForward forward(this, [&](W3DModelDraw &variant) { variant.updateSubObjects(); });
+#endif
 	if (!m_renderObject)
 		return;
 

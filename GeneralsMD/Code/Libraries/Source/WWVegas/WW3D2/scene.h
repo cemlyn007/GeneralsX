@@ -257,4 +257,9 @@ protected:
 
 	virtual void Customized_Render(RenderInfoClass & rinfo) override;
 	virtual void Post_Render_Processing(RenderInfoClass& rinfo) override;
+
+public:
+	// GeneralsX @feature cemlyn007 21/10/2026 Post_Render_Processing's release of the objects that asked to be released,
+	// for the client tick of an engine that draws on demand, which runs their per-frame updates outside rendering
+	void Release_Pending_Objects();
 };

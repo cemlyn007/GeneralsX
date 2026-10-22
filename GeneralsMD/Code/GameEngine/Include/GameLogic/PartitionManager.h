@@ -1514,6 +1514,15 @@ public:
 		player changes.
 		*/
 	void refreshShroudForLocalPlayer();
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 Per-player terrain shrouds (GameClient/Display.h): fills every player's own
+	// terrain shroud from that player's shroud, as refreshShroudForLocalPlayer fills the terrain's own, which calls it.
+	// Like it, this pushes the logic's shroud out to the display and changes nothing in the logic.
+	void refreshPlayerShrouds();
+	// GeneralsX @feature cemlyn007 21/10/2026 Fills the radar's shroud from the player's shroud, for a read of the radar
+	// as that player sees it (Radar::copyToRGBForPlayer), and changes nothing else
+	void refreshRadarShroudForPlayer( Int playerIndex );
+#endif
 
 	/**
 		Shrouded has no absolute meaning.  It only makes sense to say "Shrouded for him".

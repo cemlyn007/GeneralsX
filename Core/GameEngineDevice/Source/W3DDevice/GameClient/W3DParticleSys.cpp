@@ -35,6 +35,7 @@
 #include "W3DDevice/GameClient/W3DSmudge.h"
 #include "W3DDevice/GameClient/W3DSnow.h"
 #include "WW3D2/camera.h"
+#include "Common/EngineDrawing.h"	// GeneralsX @feature cemlyn007 21/10/2026 Drawing on demand
 
 
 //------------------------------------------------------------------------------ Performance Timers
@@ -85,6 +86,26 @@ W3DParticleSystemManager::~W3DParticleSystemManager()
 	REF_PTR_RELEASE(m_sizeBuffer);
 	REF_PTR_RELEASE(m_angleBuffer);
 }
+
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @bugfix cemlyn007 21/10/2026 See the declaration
+void W3DParticleSystemManager::reset()
+{
+	ParticleSystemManager::reset();
+	releaseTextures();
+	for (Int index = 0; index < getSimulationCount(); ++index)
+		static_cast<W3DParticleSystemManager *>(getSimulation(index))->releaseTextures();
+}
+
+void W3DParticleSystemManager::releaseTextures()
+{
+	m_batchTexture.Clear();
+	if (m_pointGroup != nullptr)
+		m_pointGroup->Set_Texture(nullptr);
+	if (m_streakLine != nullptr)
+		m_streakLine->Set_Texture(nullptr);
+}
+#endif
 
 /**
  * Hack because DoParticles is called from Flush(), which is called
@@ -138,7 +159,15 @@ void W3DParticleSystemManager::doParticles(RenderInfoClass &rinfo)
 	unsigned int personalities[MAX_POINTS_PER_GROUP];
 
 
-	m_fieldParticleCount = 0;
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 An engine that draws on demand counts its field particles in its client
+	// tick (countFieldParticlesInView), so a draw does not change what the next particle update creates
+	const Bool countsFieldParticles = !rts::drawsOnDemand();
+#else
+	const Bool countsFieldParticles = TRUE;
+#endif
+	if (countsFieldParticles)
+		m_fieldParticleCount = 0;
 
 	const Bool drawSmudge = TheSmudgeManager && TheSmudgeManager->getHardwareSupport() && TheGlobalData->m_useHeatEffects;
 
@@ -247,7 +276,8 @@ void W3DParticleSystemManager::doParticles(RenderInfoClass &rinfo)
 			pos = p->getPosition();
 			psize = p->getSize();
 
-			m_fieldParticleCount += ( sys->getPriority() == AREA_EFFECT && sys->isFieldParticle() );
+			if (countsFieldParticles)
+				m_fieldParticleCount += ( sys->getPriority() == AREA_EFFECT && sys->isFieldParticle() );
 
 			//@todo lorenzen sez: use pointer arithmetic for these arrays
 			personalities[pointCount] = p->getPersonality();
@@ -411,6 +441,43 @@ void W3DParticleSystemManager::doParticles(RenderInfoClass &rinfo)
 		((W3DSmudgeManager *)TheSmudgeManager)->render(rinfo);
 	}
 }
+
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 21/10/2026 doParticles' count of the field particles in a camera's view, which the next
+// particle update's createParticle reads, for the client tick of an engine that draws on demand: it counts them for the
+// camera of the view the simulation belongs to, once per logic frame, whatever is drawn (Common/EngineDrawing.h)
+void W3DParticleSystemManager::countFieldParticlesInView(CameraClass &camera)
+{
+	m_fieldParticleCount = 0;
+	if (TheTerrainRenderObject == nullptr)
+		return;
+
+	AABoxClass bbox;
+	TheTerrainRenderObject->getMaximumVisibleBox(camera.Get_Frustum(), &bbox, TRUE);
+
+	ParticleSystemManager::ParticleSystemList &particleSysList = getAllParticleSystems();
+	for( ParticleSystemManager::ParticleSystemListIt it = particleSysList.begin(); it != particleSysList.end(); ++it)
+	{
+		ParticleSystem *sys = (*it);
+		if (!sys || sys->isUsingDrawables() || sys->isUsingSmudge())
+			continue;
+		if (sys->getPriority() != AREA_EFFECT || !sys->isFieldParticle())
+			continue;
+		for (Particle* vp = sys->getFirstParticle(); vp; vp = vp->m_systemNext)
+		{
+			const Coord3D* pos = vp->getPosition();
+			const Real psize = vp->getSize();
+			if (WWMath::Fabs(pos->x - bbox.Center.X) > (bbox.Extent.X + psize) ||
+				WWMath::Fabs(pos->y - bbox.Center.Y) > (bbox.Extent.Y + psize) ||
+				WWMath::Fabs(pos->z - bbox.Center.Z) > (bbox.Extent.Z + psize))
+			{
+				continue;
+			}
+			++m_fieldParticleCount;
+		}
+	}
+}
+#endif
 
 Bool W3DParticleSystemManager::finishedBatch(const ParticleSystem& system, const RefCountPtr<TextureClass>& texture)
 {

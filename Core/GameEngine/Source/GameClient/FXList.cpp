@@ -812,6 +812,13 @@ void FXList::doFXPos(const Coord3D *primary, const Matrix3D* primaryMtx, const R
 	if (ThePartitionManager->getShroudStatusForPlayer(playerIndex, primary) != CELLSHROUD_CLEAR)
 		return;
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 22/10/2026 Its particle systems go to the simulations of the players who can see the
+	// place, as above (ParticleViewersScope)
+	ParticleViewersScope viewers(TheParticleSystemManager, [primary](Int viewer)
+		{ return ThePartitionManager->getShroudStatusForPlayer(viewer, primary) == CELLSHROUD_CLEAR; });
+#endif
+
 	for (FXNuggetList::const_iterator it = m_nuggets.begin(); it != m_nuggets.end(); ++it)
 	{
 		(*it)->doFXPos(primary, primaryMtx, primarySpeed, secondary, overrideRadius);
@@ -825,6 +832,13 @@ void FXList::doFXObj(const Object* primary, const Object* secondary) const
 
 	if (primary && primary->getShroudedStatus(playerIndex) > OBJECTSHROUD_PARTIAL_CLEAR)
 		return;	//the primary object is fogged or shrouded so don't bother with the effect.
+
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 22/10/2026 Its particle systems go to the simulations of the players for whom the
+	// primary object is no worse than partly clear, as above (ParticleViewersScope)
+	ParticleViewersScope viewers(TheParticleSystemManager, [primary](Int viewer)
+		{ return primary == nullptr || primary->getShroudedStatus(viewer) <= OBJECTSHROUD_PARTIAL_CLEAR; });
+#endif
 
 	for (FXNuggetList::const_iterator it = m_nuggets.begin(); it != m_nuggets.end(); ++it)
 	{

@@ -52,6 +52,14 @@ class INI;
 class DebugWindowDialog;		// really ParticleEditorDialog
 class RenderInfoClass;			// ick
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 21/10/2026 A change made to a particle system of the watcher's particle simulation is made
+// to its copy in every player's simulation too (ParticleSystemManager::beginSimulations)
+#define RTS_CHANGE_PARTICLE_MIRRORS(call) changeMirrors([&](ParticleSystem &mirror) { mirror.call; })
+#else
+#define RTS_CHANGE_PARTICLE_MIRRORS(call)
+#endif
+
 enum ParticleSystemID CPP_11(: Int)
 {
 	INVALID_PARTICLE_SYSTEM_ID = 0
@@ -586,7 +594,7 @@ public:
 	void rotateLocalTransformX( Real x );				///< rotate local transform matrix
 	void rotateLocalTransformY( Real y );				///< rotate local transform matrix
 	void rotateLocalTransformZ( Real z );				///< rotate local transform matrix
-	void setSkipParentXfrm(Bool enable) { m_skipParentXfrm = enable; } ///<disable transforming particle system with parent matrix.
+	void setSkipParentXfrm(Bool enable) { m_skipParentXfrm = enable; RTS_CHANGE_PARTICLE_MIRRORS(setSkipParentXfrm(enable)); } ///<disable transforming particle system with parent matrix.
 
 	const Coord3D *getDriftVelocity() { return &m_driftVelocity; }	///< get the drift velocity of the system
 
@@ -602,22 +610,22 @@ public:
 	void stop();													///< stop a particle system from emitting
 	void destroy();												///< stop emitting, and wait for particles to die, then destroy self
 
-	void setVelocityMultiplier( const Coord3D *value ) { m_velCoeff = *value; }	///< set the velocity multiplier coefficient
+	void setVelocityMultiplier( const Coord3D *value ) { m_velCoeff = *value; RTS_CHANGE_PARTICLE_MIRRORS(setVelocityMultiplier(value)); }	///< set the velocity multiplier coefficient
 	const Coord3D *getVelocityMultiplier() { return &m_velCoeff; }					///< get the velocity multiplier coefficient
 
-	void setBurstCountMultiplier( Real value ) { m_countCoeff = value; }
+	void setBurstCountMultiplier( Real value ) { m_countCoeff = value; RTS_CHANGE_PARTICLE_MIRRORS(setBurstCountMultiplier(value)); }
 	Real getBurstCountMultiplier() { return m_countCoeff; }
 
-	void setBurstDelayMultiplier( Real value ) { m_delayCoeff = value; }
+	void setBurstDelayMultiplier( Real value ) { m_delayCoeff = value; RTS_CHANGE_PARTICLE_MIRRORS(setBurstDelayMultiplier(value)); }
 	Real getBurstDelayMultiplier() { return m_delayCoeff; }
 
-	void setSizeMultiplier( Real value ) { m_sizeCoeff = value; }
+	void setSizeMultiplier( Real value ) { m_sizeCoeff = value; RTS_CHANGE_PARTICLE_MIRRORS(setSizeMultiplier(value)); }
 	Real getSizeMultiplier() { return m_sizeCoeff; }
 
 	/// Force a burst of particles to be emitted immediately.
-	void trigger () { m_burstDelayLeft = 0; m_delayLeft = 0;}
+	void trigger () { m_burstDelayLeft = 0; m_delayLeft = 0; RTS_CHANGE_PARTICLE_MIRRORS(trigger());}
 
-	void setInitialDelay( UnsignedInt delay ) { m_delayLeft = delay; }
+	void setInitialDelay( UnsignedInt delay ) { m_delayLeft = delay; RTS_CHANGE_PARTICLE_MIRRORS(setInitialDelay(delay)); }
 
 	const AsciiString& getParticleTypeName() const { return m_particleTypeName; }	///< return the name of the particles
 	Bool isUsingParticles() const { return m_particleType == PARTICLE; }
@@ -638,7 +646,7 @@ public:
 	ParticleSystem *getMaster() { return m_masterSystem; }
 	const Coord3D *getSlavePositionOffset() { return &m_slavePosOffset; }
 
-	void setSystemLifetime( UnsignedInt frames ) { m_systemLifetimeLeft = frames; }; ///< not the particle life, the system!... Lorenzen
+	void setSystemLifetime( UnsignedInt frames ) { m_systemLifetimeLeft = frames; RTS_CHANGE_PARTICLE_MIRRORS(setSystemLifetime(frames)); }; ///< not the particle life, the system!... Lorenzen
 	void setLifetimeRange( Real min, Real max );
 	Bool isSystemForever() const {return m_isForever;}
 
@@ -670,8 +678,8 @@ public:
 	DrawableID getAttachedDrawable() { return m_attachedToDrawableID; }
 
 	// Access to dynamically changing part of a particle system.
-	void setEmissionVolumeSphereRadius( Real newRadius ) { if (m_emissionVolumeType == SPHERE) m_emissionVolume.sphere.radius = newRadius; }
-	void setEmissionVolumeCylinderRadius( Real newRadius ) { if (m_emissionVolumeType == CYLINDER) m_emissionVolume.cylinder.radius = newRadius; }
+	void setEmissionVolumeSphereRadius( Real newRadius ) { if (m_emissionVolumeType == SPHERE) m_emissionVolume.sphere.radius = newRadius; RTS_CHANGE_PARTICLE_MIRRORS(setEmissionVolumeSphereRadius(newRadius)); }
+	void setEmissionVolumeCylinderRadius( Real newRadius ) { if (m_emissionVolumeType == CYLINDER) m_emissionVolume.cylinder.radius = newRadius; RTS_CHANGE_PARTICLE_MIRRORS(setEmissionVolumeCylinderRadius(newRadius)); }
 	EmissionVolumeType getEmisionVolumeType() const { return m_emissionVolumeType; }
 	ParticlePriorityType getPriority() const { return m_priority; }
 
@@ -679,7 +687,30 @@ public:
 	Real getWindAngle() { return m_windAngle; }
 	WindMotion getWindMotion() { return m_windMotion; }
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 Whether this system is the watcher's simulation's, with a copy in every
+	// player's simulation that each of its changes is made to (ParticleSystemManager::beginSimulations)
+	void setMirrored( Bool mirrored ) { m_isMirrored = mirrored; }
+	Bool isMirrored() const { return m_isMirrored; }
+	// GeneralsX @feature cemlyn007 21/10/2026 Whether one of this simulation's particles drives this system, and the
+	// simulation it belongs to (ParticleSystemManager::copyLoadedSystemsToSimulations)
+	Bool isControlledByParticle() const { return m_controlParticle != nullptr; }
+	ParticleSystemManager *getOwner() const { return m_owner; }
+	template <typename Change>
+	void changeMirrors( const Change &change )
+	{
+		if (m_isMirrored)
+			forEachMirror( [](ParticleSystem &mirror, const void *argument) { (*static_cast<const Change *>(argument))(mirror); }, &change );
+	}
+#endif
+
 protected:
+
+#if RTS_ENGINE_CONTEXT
+	void forEachMirror( void (*apply)(ParticleSystem &mirror, const void *argument), const void *argument );
+	Bool m_isMirrored = FALSE;
+	ParticleSystemManager *m_owner = nullptr;	///< the particle simulation this system belongs to
+#endif
 
 	// snapshot methods
 	virtual void crc( Xfer *xfer ) override;
@@ -828,6 +859,39 @@ public:
 	virtual void doParticles(RenderInfoClass &rinfo) = 0;
 	virtual void queueParticleRender() = 0;
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 One particle simulation per player, for an engine that draws on demand
+	// (Common/EngineDrawing.h). This manager is the watcher's simulation; beginSimulations gives each of the named
+	// players a simulation of its own, which copies every particle system made in this one and every change made to it,
+	// and simulates it with that player's shroud test and its own client random stream, as GeneralsX does for whoever is
+	// its local player. update() advances every simulation, so each is the same whichever are drawn. A draw renders the
+	// simulation that is current (ParticleSimulationScope).
+	void beginSimulations( const std::vector<Int> &playerIndices );
+	void endSimulations();
+	Int getSimulationCount() const { return (Int)m_simulations.size(); }
+	ParticleSystemManager *getSimulation( Int i ) const { return m_simulations[i]; }
+	ParticleSystemManager *findSimulationOfPlayer( Int playerIndex );	///< the player's simulation, or this one
+	Bool isPlayerSimulation() const { return m_templateSource != nullptr; }
+	Int getLocalPlayerIndex() const { return m_localPlayerIndex; }
+	UnsignedInt *getClientRandomStream() { return m_clientRandomStream; }
+	virtual ParticleSystemManager *newSimulation() const { return nullptr; }	///< a manager of this kind with no templates
+	// GeneralsX @feature cemlyn007 22/10/2026 The players whose simulations get a copy of a system the watcher's makes now,
+	// one bit per player index (ParticleViewersScope), and the players among this one's simulations that the test passes
+	UnsignedInt getCreationViewers() const { return m_creationViewers; }
+	void setCreationViewers( UnsignedInt viewers ) { m_creationViewers = viewers; }
+	template <typename Sees>
+	UnsignedInt findViewers( const Sees &sees ) const
+	{
+		UnsignedInt viewers = 0;
+		for (const ParticleSystemManager *simulation : m_simulations)
+		{
+			if (sees(simulation->m_localPlayerIndex))
+				viewers |= 1u << simulation->m_localPlayerIndex;
+		}
+		return viewers;
+	}
+#endif
+
 	virtual void preloadAssets( TimeOfDay timeOfDay );
 
 	// these are only for use by particle systems to link and unlink themselves
@@ -840,6 +904,23 @@ protected:
 	virtual void crc( Xfer *xfer ) override;
 	virtual void xfer( Xfer *xfer ) override;
 	virtual void loadPostProcess() override;
+
+#if RTS_ENGINE_CONTEXT
+	void updateOwnSystems();
+	void resetOwnSystems();
+	ParticleSystem *createOwnSystem( const ParticleSystemTemplate *sysTemplate, Bool createSlaves );
+	void xferOwnSystems( Xfer *xfer );
+	void xferSimulations( Xfer *xfer );
+	void copyLoadedSystemsToSimulations();
+	void mirrorLoadedSystems();
+	std::vector<ParticleSystemID> m_loadedSystemIDs;	///< the systems the last load restored, in the order it restored them
+	UnsignedInt m_creationViewers = ~0u;							///< see getCreationViewers
+	std::vector<ParticleSystemManager *> m_simulations;	///< the players' simulations, owned by the watcher's
+	ParticleSystemManager *m_templateSource = nullptr;		///< for a player's simulation, the watcher's, whose templates it uses
+	UnsignedInt m_clientRandomStream[6] = {};						///< the simulation's own client random stream
+	Int m_creationDepth = 0;													///< systems being made inside the making of another
+	Bool m_updatingOwnSystems = FALSE;
+#endif
 
 	Particle *m_allParticlesHead[ NUM_PARTICLE_PRIORITIES ];
 	Particle *m_allParticlesTail[ NUM_PARTICLE_PRIORITIES ];
@@ -897,6 +978,60 @@ protected:
 /// The particle system manager singleton
 #if !RTS_ENGINE_CONTEXT
 extern ParticleSystemManager *TheParticleSystemManager;
+#endif
+
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 21/10/2026 Makes a particle simulation the current one (TheParticleSystemManager) for its
+// lifetime, and, if asked, its client random stream the current client stream, putting both back after
+// (ParticleSystemManager::beginSimulations)
+class ParticleSimulationScope
+{
+public:
+	ParticleSimulationScope( ParticleSystemManager *simulation, Bool withRandomStream );
+	~ParticleSimulationScope();
+	ParticleSimulationScope( const ParticleSimulationScope & ) = delete;
+	ParticleSimulationScope &operator=( const ParticleSimulationScope & ) = delete;
+
+private:
+	ParticleSystemManager *m_previous;
+	ParticleSystemManager *m_simulation;
+	Bool m_withRandomStream;
+	UnsignedInt m_savedRandomStream[6];
+};
+#endif
+
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 22/10/2026 GeneralsX makes some effects (an FX list's, a stealth detector's ping, a
+// gunship's strafing smoke and the like) only if its observed or local player can see where they are made. In the
+// watcher's simulation the logic still makes them as its observed or local player sees the game, and for its lifetime
+// this scope leaves out of the copies the simulation of each player for whom sees(playerIndex) is false, as GeneralsX
+// would not make the effect were that player its local player. Scopes nest: a player must pass every test around a
+// system's making. It changes nothing without players' simulations, so an engine that does not draw asks nothing.
+class ParticleViewersScope
+{
+public:
+	template <typename Sees>
+	ParticleViewersScope( ParticleSystemManager *manager, const Sees &sees )
+		: m_manager(manager != nullptr && manager->getSimulationCount() > 0 ? manager : nullptr), m_previous(~0u)
+	{
+		if (m_manager != nullptr)
+		{
+			m_previous = m_manager->getCreationViewers();
+			m_manager->setCreationViewers(m_previous & m_manager->findViewers(sees));
+		}
+	}
+	~ParticleViewersScope()
+	{
+		if (m_manager != nullptr)
+			m_manager->setCreationViewers(m_previous);
+	}
+	ParticleViewersScope( const ParticleViewersScope & ) = delete;
+	ParticleViewersScope &operator=( const ParticleViewersScope & ) = delete;
+
+private:
+	ParticleSystemManager *m_manager;
+	UnsignedInt m_previous;
+};
 #endif
 
 class DebugDisplayInterface;

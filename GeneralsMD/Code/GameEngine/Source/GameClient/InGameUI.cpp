@@ -1440,6 +1440,26 @@ void InGameUI::init()
 
 }
 
+#if RTS_ENGINE_CONTEXT
+//-------------------------------------------------------------------------------------------------
+// GeneralsX @feature cemlyn007 21/10/2026 See InGameUI.h
+//-------------------------------------------------------------------------------------------------
+View *InGameUI::createPlayerView()
+{
+	View *view = createView(TheGlobalData->m_headless && !TheGlobalData->m_headlessRender);
+	if (view == nullptr)
+		return nullptr;
+	view->init();
+	if (TheDisplay)
+	{
+		view->setWidth( TheDisplay->getWidth() );
+		view->setHeight( TheDisplay->getHeight() );
+	}
+	view->setCameraHeightAboveGroundLimitsToDefault();
+	return view;
+}
+#endif
+
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
 void InGameUI::setRadiusCursor(RadiusCursorType cursorType, const SpecialPowerTemplate* specPowTempl, WeaponSlotType weaponSlot)

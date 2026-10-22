@@ -199,6 +199,11 @@ static ParticleSystemID createParticleSystem( const AsciiString &name, const Dra
 
 void W3DTankTruckDraw::createTreadEmitters()
 {
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 A look variant makes no particle systems (W3DModelDraw::syncViewLookVariant)
+	if (isViewLookVariant())
+		return;
+#endif
 	if (getW3DTankTruckDrawModuleData())
 	{
 		static_assert(ARRAY_SIZE(m_treadDebrisIDs) == 2, "m_treadDebrisIDs array size is expected to be 2");
@@ -233,6 +238,11 @@ void W3DTankTruckDraw::tossTreadEmitters()
 //-------------------------------------------------------------------------------------------------
 void W3DTankTruckDraw::createWheelEmitters()
 {
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 A look variant makes no particle systems (W3DModelDraw::syncViewLookVariant)
+	if (isViewLookVariant())
+		return;
+#endif
 	if (getDrawable()->isDrawableEffectivelyHidden())
 		return;
 	if (getW3DTankTruckDrawModuleData())

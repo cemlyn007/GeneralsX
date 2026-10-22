@@ -62,6 +62,10 @@ public:
 	virtual void releaseShadows() override {};	///< we don't care about preserving temporary shadows.
 	virtual void allocateShadows() override {};	///< we don't care about preserving temporary shadows.
 	virtual void setFullyObscuredByShroud(Bool fullyObscured) override;
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 22/10/2026 Its model carries the drawable's DrawableInfo (DrawModule::rendersWithDrawableInfo)
+	virtual Bool rendersWithDrawableInfo() const override { return TRUE; }
+#endif
 	virtual void reactToTransformChange(const Matrix3D* oldMtx, const Coord3D* oldPos, Real oldAngle) override;
 	virtual void reactToGeometryChange() override { }
 

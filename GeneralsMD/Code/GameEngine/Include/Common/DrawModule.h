@@ -84,6 +84,21 @@ public:
 	virtual void setTerrainDecalOpacity(Real o) {};
 
 	virtual void setFullyObscuredByShroud(Bool fullyObscured) = 0;
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 For one draw of a player's view (Drawable::beginViewLook): hide the shadows
+	// this module draws if its drawable is hidden or fully obscured in that view, and put them back as they were after
+	// the draw (endViewLook). Neither changes anything but what the draw shows.
+	virtual void beginViewLook(Bool hidden, Bool fullyObscured) {}
+	virtual void endViewLook() {}
+	// GeneralsX @feature cemlyn007 21/10/2026 For the client tick of an engine that draws on demand: make, change or drop
+	// the variant this module draws in the views of players who see its drawable with another look
+	// (Drawable::setPlayerLook)
+	virtual void syncViewLookVariant() {}
+	// GeneralsX @feature cemlyn007 22/10/2026 Whether this module draws render objects that carry its drawable's
+	// DrawableInfo, the only ones RTS3DScene::renderOneObject notes the drawable's shroud-clear frame for, so that the
+	// client tick notes it for the same drawables (W3DDisplay::tickClient)
+	virtual Bool rendersWithDrawableInfo() const { return FALSE; }
+#endif
 
 	virtual Bool isVisible() const { return true; }	///< for limiting tree sway, etc to visible objects
 

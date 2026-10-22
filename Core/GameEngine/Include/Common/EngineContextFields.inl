@@ -124,6 +124,47 @@ RTS_ENGINE_CONTEXT_VALUE(void*, applicationHWnd, nullptr)
 // once it is set.
 RTS_ENGINE_CONTEXT_VALUE(std::int64_t, playbackMismatchFrame, -1)
 
+// GeneralsX @feature cemlyn007 21/10/2026 Set by a host that drives every human slot itself and keeps the game's own
+// local player out of every slot (its "anchor"). A game whose info names no local slot then makes the always-revealed
+// ReplayObserver its local player as its player list is made (PlayerList::newGame), rather than its first human side,
+// so that everything startNewGame caches about the local player (VictoryConditions, the ghost objects, the shroud) is
+// the anchor's, live and in playback alike. A skirmish's replay records the local slot its game info names (-1 for
+// none) rather than slot 0. A game whose info names a local slot plays as it does without it.
+RTS_ENGINE_CONTEXT_VALUE(bool, anchoredLocalPlayer, false)
+
+// GeneralsX @feature cemlyn007 21/10/2026 Set by a host that draws a render-headless engine's images only when it asks
+// for them (Common/EngineDrawing.h). The engine's frames then draw nothing: a client tick after each logic frame
+// advances everything a draw used to (W3DDisplay::tickClient), and a draw only renders the state the tick left.
+RTS_ENGINE_CONTEXT_VALUE(bool, onDemandDrawing, false)
+
+// GeneralsX @feature cemlyn007 21/10/2026 Set by a host that keeps a view of its own for every slot's player
+// (GameClient/Display.h, Display::beginPlayerViews): each game's start then makes one, a W3DView in an engine that
+// renders and a stand-in otherwise, beside the tactical view, which stays the view of the game's local player. In an
+// engine that renders, each slot's player also gets a terrain shroud of its own (Display::addPlayerShroud).
+RTS_ENGINE_CONTEXT_VALUE(bool, playerViews, false)
+
+// GeneralsX @feature cemlyn007 21/10/2026 The index of the player whose view is being drawn, or whose radar is being read,
+// or -1 outside such a draw or read (Display::drawPlayerView, Radar::copyToRGBForPlayer). While it is set, the observed
+// or local player (rts::getObservedOrLocalPlayer) is that player, so that a draw or read shows the game as that player
+// sees it. No logic runs while it is set.
+RTS_ENGINE_CONTEXT_VALUE(std::int32_t, viewingPlayer, -1)
+
+// GeneralsX @feature cemlyn007 21/10/2026 Set while a model draw makes the look variant it draws in the views of players
+// who see its drawable with another team colour or garrisoned model (W3DModelDraw::syncViewLookVariant), so that the
+// variant knows from its construction on that it makes no particle systems, track marks or sounds of its own.
+RTS_ENGINE_CONTEXT_VALUE(bool, makingViewLookVariant, false)
+
+// GeneralsX @feature cemlyn007 21/10/2026 Set by a host that records its cameras into a replay itself and chooses which
+// of a replay's recorded cameras each of its views follows. The game then records no camera of its own (LookAtXlat),
+// and a playback hands every recorded camera pose to the route, stamped with the player whose camera it is, in place of
+// moving the tactical view (GameLogic::onSetReplayCamera).
+RTS_ENGINE_CONTEXT_VALUE(rts::ReplayCameraRoute, replayCameraRoute, nullptr)
+
+// GeneralsX @feature cemlyn007 21/10/2026 Set by a host whose cameras are its own: a map script's camera actions (moves,
+// pans, zooms, rotations, pitches, shakes, follows and the scripted camera's modifiers) then move no camera
+// (ScriptActions::executeAction).
+RTS_ENGINE_CONTEXT_VALUE(bool, scriptsMoveNoCamera, false)
+
 // GeneralsX @feature cemlyn007 16/10/2026 Test-only: how many of this engine's next scratch-pad map deletes fail, as
 // a delete the file system refused does, leaving the file in place (GameStateMap::clearScratchPadMaps). A host's test
 // sets it to check that a scratch-pad map whose delete failed is kept and retried.

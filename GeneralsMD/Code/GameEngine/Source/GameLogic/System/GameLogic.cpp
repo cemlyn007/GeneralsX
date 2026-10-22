@@ -92,6 +92,8 @@
 #include "GameClient/MapUtil.h"
 #include "GameClient/Mouse.h"
 #include "GameClient/ParticleSys.h"
+#include "Common/EngineDrawing.h"	// GeneralsX @feature cemlyn007 21/10/2026 Drawing on demand
+#include "GameClient/Display.h"	// GeneralsX @feature cemlyn007 21/10/2026 Per-player views
 #include "GameClient/TerrainVisual.h"
 #include "GameClient/View.h"
 #include "GameClient/CampaignManager.h"
@@ -1671,6 +1673,23 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 	TheTeamFactory->reset();
 	ThePlayerList->newGame();
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 An engine that draws on demand simulates particles once for the watcher (its
+	// local player) and once for each slot's player (ParticleSystemManager::beginSimulations)
+	if (rts::drawsOnDemand())
+	{
+		std::vector<Int> slotPlayers;
+		for (Int slot = 0; slot < MAX_SLOTS; ++slot)
+		{
+			AsciiString slotPlayerName;
+			slotPlayerName.format("player%d", slot);
+			if (Player *slotPlayer = ThePlayerList->findPlayerWithNameKey(TheNameKeyGenerator->nameToKey(slotPlayerName)))
+				slotPlayers.push_back(slotPlayer->getPlayerIndex());
+		}
+		TheParticleSystemManager->beginSimulations(slotPlayers);
+	}
+#endif
+
 	// update the loadscreen
 	updateLoadProgress(LOAD_PROGRESS_POST_PLAYER_LIST_RESET);
 
@@ -2297,6 +2316,50 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 	TheTacticalView->setPitchToDefault();
 	TheTacticalView->setZoomToDefault();
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 Per-player views (Display::addPlayerView): for a host that sets the context's
+	// playerViews, every slot's player gets a view of its own, in place of the last game's, made as the tactical view
+	// is and set up as above, but looking at that player's own start position, and, in an engine that draws, a terrain
+	// shroud of its own, filled from the player's shroud (Display::addPlayerShroud)
+	TheDisplay->endPlayerViews();
+	TheDisplay->endPlayerShrouds();
+	if (rts::ctx()->playerViews && TheGameInfo)
+	{
+		for (Int slot = 0; slot < MAX_SLOTS; ++slot)
+		{
+			AsciiString slotPlayerName;
+			slotPlayerName.format("player%d", slot);
+			Player *slotPlayer = ThePlayerList->findPlayerWithNameKey(TheNameKeyGenerator->nameToKey(slotPlayerName));
+			const GameSlot *gameSlot = TheGameInfo->getConstSlot(slot);
+			if (slotPlayer == nullptr || gameSlot == nullptr)
+				continue;
+			View *playerView = TheInGameUI->createPlayerView();
+			if (playerView == nullptr)
+				continue;
+			playerView->setAngleToDefault();
+			playerView->setPitchToDefault();
+			playerView->setZoomToDefault();
+			playerView->setZoomToMax();
+			Coord3D lookAt;
+			lookAt.x = 50;
+			lookAt.y = 50;
+			lookAt.z = 0;
+			AsciiString startName;
+			startName.format("Player_%d_Start", gameSlot->getStartPos()+1);
+			if (Waypoint *start = findNamedWaypoint(startName))
+				lookAt = *start->getLocation();
+			playerView->lookAt( &lookAt );
+			playerView->initHeightForMap();
+			playerView->setAngleToDefault();
+			playerView->setPitchToDefault();
+			playerView->setZoomToDefault();
+			TheDisplay->addPlayerView(slotPlayer->getPlayerIndex(), playerView);
+			TheDisplay->addPlayerShroud(slotPlayer->getPlayerIndex());
+		}
+		ThePartitionManager->refreshPlayerShrouds();
+	}
+#endif
+
 	// update the loadscreen
 	updateLoadProgress(LOAD_PROGRESS_POST_STARTING_CAMERA_2);
 
@@ -2502,6 +2565,12 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 
 	}
 	TheTacticalView->setOkToAdjustHeight(TRUE);
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 And every player's view (Display::addPlayerView)
+	for (Int playerIndex = 0; playerIndex < MAX_PLAYER_COUNT; ++playerIndex)
+		if (View *playerView = TheDisplay->findPlayerView(playerIndex))
+			playerView->setOkToAdjustHeight(TRUE);
+#endif
 
 // If defined, the game times various units.
 #ifdef DO_UNIT_TIMINGS

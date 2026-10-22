@@ -1153,6 +1153,10 @@ WW3DErrorType WW3D::End_Render(bool flip_frame)
 		Get_Render_Backend()->End_Scene(flip_frame);
 	}
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 Counted by the client tick instead, for an engine that draws on demand
+	if (!Counts_Client_Ticks())
+#endif
 	FrameCount++;
 
 	{

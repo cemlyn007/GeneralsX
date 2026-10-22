@@ -108,6 +108,11 @@ public:
 	};
 
 	RingRenderObjClass();
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 Render's time-based animation, for the client tick of an engine that draws
+	// on demand, whose renders pass no time
+	void								Advance_Client_Tick() { animate(); }
+#endif
 	RingRenderObjClass(const W3dRingStruct & def);
 	RingRenderObjClass(const RingRenderObjClass & src);
 	RingRenderObjClass & operator = (const RingRenderObjClass &);

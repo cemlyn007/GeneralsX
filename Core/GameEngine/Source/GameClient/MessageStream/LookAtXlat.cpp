@@ -554,7 +554,13 @@ GameMessageDisposition LookAtTranslator::translateGameMessage(const GameMessage 
 
 			//if (TheGlobalData->m_saveCameraInReplay /*&& TheRecorder->getMode() != RECORDERMODETYPE_PLAYBACK *//**/&& (TheGameLogic->isInSinglePlayerGame() || TheGameLogic->isInSkirmishGame())/**/)
 			//if (TheGlobalData->m_saveCameraInReplay && (TheGameLogic->isInMultiplayerGame() || TheGameLogic->isInSinglePlayerGame() || TheGameLogic->isInSkirmishGame()))
+#if RTS_ENGINE_CONTEXT
+			// GeneralsX @feature cemlyn007 21/10/2026 A host that records its cameras itself (replayCameraRoute) records
+			// every camera it keeps, so the game records none of its own
+			if (TheGlobalData->m_saveCameraInReplay && rts::ctx()->replayCameraRoute == nullptr && (TheGameLogic->isInSinglePlayerGame() || TheGameLogic->isInSkirmishGame()))
+#else
 			if (TheGlobalData->m_saveCameraInReplay && (TheGameLogic->isInSinglePlayerGame() || TheGameLogic->isInSkirmishGame()))
+#endif
 			{
 				ViewLocation currentView;
 				TheTacticalView->getLocation(&currentView);
@@ -566,8 +572,15 @@ GameMessageDisposition LookAtTranslator::translateGameMessage(const GameMessage 
 				msg->appendIntegerArgument( (Int)TheMouse->getMouseCursor() );
 				msg->appendPixelArgument( m_currentPos );
 				// TheSuperHackers @tweak Save 3D camera position and direction to recover optimal playback precision
-				msg->appendLocationArgument( TheTacticalView->get3DCameraPosition() );
-				msg->appendLocationArgument( TheTacticalView->get3DCameraDirection() );
+				// GeneralsX @bugfix cemlyn007 21/10/2026 Only an engine that builds its 3D camera saves it. A headless engine
+				// with no rendering never builds it (W3DView::updateCameraTransform), so it saved the camera at the origin
+				// looking down, which playback then showed as it is, a black image. Without it, playback builds the camera
+				// from the pivot, angle, pitch and zoom above.
+				if (!TheGlobalData->m_headless || TheGlobalData->m_headlessRender)
+				{
+					msg->appendLocationArgument( TheTacticalView->get3DCameraPosition() );
+					msg->appendLocationArgument( TheTacticalView->get3DCameraDirection() );
+				}
 			}
 			break;
 		}

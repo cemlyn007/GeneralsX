@@ -69,6 +69,12 @@ public:
 	}
 	void invalidateCachedLightPositions();	///<forces shadow volumes to update regardless of last lightposition
 	void loadTerrainShadows();
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 The shadows' logic frame, for the client tick of an engine that draws on
+	// demand (Common/EngineDrawing.h): each new grounded shadow's extrusion padding, which Update otherwise works out the
+	// first time the shadow is drawn
+	void tickClient();
+#endif
 
 	// rendering
 	void renderShadows( Bool forceStencilFill );

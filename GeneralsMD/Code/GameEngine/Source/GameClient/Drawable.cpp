@@ -445,6 +445,10 @@ Drawable::Drawable( const ThingTemplate *thingTemplate, DrawableStatusBits statu
 	m_timeToFade = 0;
 
 	m_shroudClearFrame = InvalidShroudClearFrame;
+#if RTS_ENGINE_CONTEXT
+	for (i = 0; i < MAX_PLAYER_COUNT; ++i)
+		m_shroudClearFrameFor[i] = InvalidShroudClearFrame;
+#endif
 
 	for (i = 0; i < NUM_DRAWABLE_MODULE_TYPES; ++i)
 		m_modules[i] = nullptr;
@@ -609,6 +613,12 @@ Drawable::~Drawable()
 	stopAmbientSound();
 
 	m_ambientSound.Clear();
+
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 Each player's look (setPlayerLook)
+	delete [] m_playerLooks;
+	m_playerLooks = nullptr;
+#endif
 
   clearCustomSoundAmbient( false );
 
@@ -2652,10 +2662,161 @@ void Drawable::setStealthLook(StealthLookType look)
 				break;
 		}
 		m_stealthLook = look;
+#if RTS_ENGINE_CONTEXT
+		// GeneralsX @feature cemlyn007 21/10/2026 A view's look changes only what one draw shows (beginViewLook)
+		if (!m_inViewLook)
+#endif
 		updateHiddenStatus();
 	}
 }
 
+
+#if RTS_ENGINE_CONTEXT
+//-------------------------------------------------------------------------------------------------
+// GeneralsX @feature cemlyn007 21/10/2026 See Drawable.h. The stealth look is the one StealthUpdate gives the drawable
+// for its observed or local player, worked out for the viewer, and its fields are set as setStealthLook sets them; the
+// fully-obscured test is GameClient::update's, for the viewer (isFullyObscuredByShroudFor). A drawable hidden in every
+// view is left alone, as nothing draws it.
+//-------------------------------------------------------------------------------------------------
+void Drawable::beginViewLook( const Player *viewer )
+{
+	m_viewLookSaved.stealthLook = m_stealthLook;
+	m_viewLookSaved.stealthOpacity = m_stealthOpacity;
+	m_viewLookSaved.effectiveStealthOpacity = m_effectiveStealthOpacity;
+	m_viewLookSaved.secondMaterialPassOpacity = m_secondMaterialPassOpacity;
+	m_viewLookSaved.hiddenByStealth = m_hiddenByStealth;
+	m_viewLookSaved.fullyObscuredByShroud = m_drawableFullyObscuredByShroud;
+	m_inViewLook = TRUE;
+	m_viewLookPlayerIndex = viewer != nullptr ? viewer->getPlayerIndex() : -1;
+	if (viewer == nullptr || isDrawableEffectivelyHidden())
+		return;
+
+	Object *object = getObject();
+	if (object != nullptr)
+	{
+		if (StealthUpdate *stealth = object->getStealth())
+		{
+			const StealthLookType look = stealth->stealthLookFor( viewer );
+			if (look != m_stealthLook)
+			{
+				setStealthLook( look );
+				if (m_stealthOpacity >= 1.0f)
+					m_effectiveStealthOpacity = 1.0f;
+			}
+		}
+	}
+
+	m_drawableFullyObscuredByShroud = m_drawableFullyObscuredByShroud || isFullyObscuredByShroudFor( viewer->getPlayerIndex() );
+
+	const Bool hidden = isDrawableEffectivelyHidden();
+	for (DrawModule** dm = getDrawModules(); *dm; ++dm)
+		(*dm)->beginViewLook( hidden, m_drawableFullyObscuredByShroud );
+}
+
+//-------------------------------------------------------------------------------------------------
+// GeneralsX @feature cemlyn007 21/10/2026 See Drawable.h
+//-------------------------------------------------------------------------------------------------
+void Drawable::endViewLook()
+{
+	if (!m_inViewLook)
+		return;
+	for (DrawModule** dm = getDrawModules(); *dm; ++dm)
+		(*dm)->endViewLook();
+	m_stealthLook = m_viewLookSaved.stealthLook;
+	m_stealthOpacity = m_viewLookSaved.stealthOpacity;
+	m_effectiveStealthOpacity = m_viewLookSaved.effectiveStealthOpacity;
+	m_secondMaterialPassOpacity = m_viewLookSaved.secondMaterialPassOpacity;
+	m_hiddenByStealth = m_viewLookSaved.hiddenByStealth;
+	m_drawableFullyObscuredByShroud = m_viewLookSaved.fullyObscuredByShroud;
+	m_inViewLook = FALSE;
+	m_viewLookPlayerIndex = -1;
+}
+
+//-------------------------------------------------------------------------------------------------
+// GeneralsX @feature cemlyn007 21/10/2026 See Drawable.h
+//-------------------------------------------------------------------------------------------------
+void Drawable::setPlayerLook( Int playerIndex, Color color, Bool garrisoned )
+{
+	if (playerIndex < 0 || playerIndex >= MAX_PLAYER_COUNT)
+		return;
+	if (m_playerLooks == nullptr)
+		m_playerLooks = new PlayerLook[MAX_PLAYER_COUNT];
+	m_playerLooks[playerIndex].color = color;
+	m_playerLooks[playerIndex].garrisoned = garrisoned;
+	m_playerLooks[playerIndex].recorded = TRUE;
+}
+
+//-------------------------------------------------------------------------------------------------
+Bool Drawable::getPlayerLook( Int playerIndex, Color *color, Bool *garrisoned ) const
+{
+	if (m_playerLooks == nullptr || playerIndex < 0 || playerIndex >= MAX_PLAYER_COUNT || !m_playerLooks[playerIndex].recorded)
+		return FALSE;
+	*color = m_playerLooks[playerIndex].color;
+	*garrisoned = m_playerLooks[playerIndex].garrisoned;
+	return TRUE;
+}
+
+//-------------------------------------------------------------------------------------------------
+// GeneralsX @feature cemlyn007 22/10/2026 See Drawable.h. Each player's relationship to the fake's team is the one
+// GeneralsX's own test reads for its local player
+//-------------------------------------------------------------------------------------------------
+void Drawable::recordFakeStructureDecalViewers()
+{
+	m_fakeDecalHiddenFor = 0;
+	const Object *object = getObject();
+	if (object == nullptr || ThePlayerList == nullptr)
+		return;
+	for (Int i = 0; i < ThePlayerList->getPlayerCount() && i < MAX_PLAYER_COUNT; ++i)
+	{
+		const Player *player = ThePlayerList->getNthPlayer(i);
+		if (player == nullptr)
+			continue;
+		const Relationship rel = player->getRelationship(object->getTeam());
+		if (rel != ALLIES && rel != NEUTRAL)
+			m_fakeDecalHiddenFor |= 1u << i;
+	}
+}
+
+//-------------------------------------------------------------------------------------------------
+Bool Drawable::hidesTerrainDecalInViewLook() const
+{
+	const Int index = getViewLookPlayerIndex();
+	return index >= 0 && index < MAX_PLAYER_COUNT && (m_fakeDecalHiddenFor & (1u << index)) != 0;
+}
+
+//-------------------------------------------------------------------------------------------------
+void Drawable::syncViewLookVariants()
+{
+	for (DrawModule** dm = getDrawModules(); *dm; ++dm)
+		(*dm)->syncViewLookVariant();
+}
+
+//-------------------------------------------------------------------------------------------------
+// GeneralsX @feature cemlyn007 21/10/2026 GameClient::update's fully-obscured test, for the given player rather than the
+// observed or local one, with that player's shroud-clear frame (Drawable.h)
+//-------------------------------------------------------------------------------------------------
+Bool Drawable::isFullyObscuredByShroudFor( Int playerIndex )
+{
+#if ENABLE_CONFIGURABLE_SHROUD
+	if (!TheGlobalData->m_shroudOn)
+		return getFullyObscuredByShroud();
+#endif
+	Object *object = getObject();
+	if (object == nullptr || playerIndex < 0 || playerIndex >= MAX_PLAYER_COUNT)
+		return getFullyObscuredByShroud();
+	ObjectShroudStatus ss = object->getShroudedStatus(playerIndex);
+	const UnsignedInt clearFrame = m_shroudClearFrameFor[playerIndex];
+	if (ss >= OBJECTSHROUD_FOGGED && clearFrame != InvalidShroudClearFrame)
+	{
+		UnsignedInt limit = 2*LOGICFRAMES_PER_SECOND;
+		if (object->isEffectivelyDead())
+			limit += 3*LOGICFRAMES_PER_SECOND;
+		if (TheGameLogic->getFrame() < limit + clearFrame)
+			ss = OBJECTSHROUD_CLEAR;
+	}
+	return ss >= OBJECTSHROUD_FOGGED;
+}
+#endif
 
 //-------------------------------------------------------------------------------------------------
 /** default draw is to just call the database defined draw */
@@ -3318,6 +3479,121 @@ void Drawable::drawHealing(const IRegion2D* healthBarRegion)
 	}
 
 }
+
+#if RTS_ENGINE_CONTEXT
+// ------------------------------------------------------------------------------------------------
+// GeneralsX @feature cemlyn007 21/10/2026 See Drawable.h. Each test is the one its draw function makes, with the drawable
+// taken to be on screen.
+// ------------------------------------------------------------------------------------------------
+void Drawable::advanceIconsForClientTick()
+{
+	if( !TheGameLogic->getDrawIconUI() || TheScriptEngine->getFade() != ScriptEngine::FADE_NONE )
+		return;
+	const Object *obj = getObject();
+	if( obj == nullptr || obj->isEffectivelyDead() || obj->isKindOf( KINDOF_IGNORED_IN_GUI ) )
+		return;
+
+	const UnsignedInt now = TheGameLogic->getFrame();
+
+	if( !obj->isKindOf( KINDOF_NO_HEAL_ICON ) && !obj->getStatusBits().test( OBJECT_STATUS_SOLD ) )
+	{
+		Bool showHealing = FALSE;
+		BodyModuleInterface *body = obj->getBodyModule();
+		if( body->getHealth() != body->getMaxHealth() && now > HEALING_ICON_DISPLAY_TIME &&
+				now - body->getLastHealingTimestamp() <= HEALING_ICON_DISPLAY_TIME )
+			showHealing = TRUE;
+		DrawableIconType typeIndex = ICON_DEFAULT_HEAL;
+		if( isKindOf( KINDOF_STRUCTURE ) )
+			typeIndex = ICON_STRUCTURE_HEAL;
+		else if( isKindOf( KINDOF_VEHICLE ) )
+			typeIndex = ICON_VEHICLE_HEAL;
+		if( showHealing )
+		{
+			if( getIconInfo()->m_icon[ typeIndex ] == nullptr )
+				getIconInfo()->m_icon[ typeIndex ] = newInstance(Anim2D)( s_animationTemplates[ typeIndex ], TheAnim2DCollection );
+		}
+		else
+		{
+			killIcon(typeIndex);
+		}
+	}
+
+	if( obj->testWeaponSetFlag( WEAPONSET_CARBOMB ) && obj->getControllingPlayer() == rts::getObservedOrLocalPlayer() )
+	{
+		if( !getIconInfo()->m_icon[ ICON_CARBOMB ] )
+			getIconInfo()->m_icon[ ICON_CARBOMB ] = newInstance(Anim2D)( s_animationTemplates[ ICON_CARBOMB ], TheAnim2DCollection );
+		getIconInfo()->m_keepTillFrame[ ICON_CARBOMB ] = FOREVER;
+	}
+	else
+	{
+		killIcon(ICON_CARBOMB);
+	}
+
+	RTS_ENGINE_STATIC(NameKeyType, key_StickyBombUpdate, NAMEKEY( "StickyBombUpdate" ));
+	StickyBombUpdate *update = (StickyBombUpdate*)obj->findUpdateModule( key_StickyBombUpdate );
+	if( update && update->getTargetObject() )
+	{
+		if( update->isTimedBomb() )
+		{
+			if( !getIconInfo()->m_icon[ ICON_BOMB_TIMED ] )
+			{
+				getIconInfo()->m_icon[ ICON_BOMB_REMOTE ] = newInstance(Anim2D)( s_animationTemplates[ ICON_BOMB_REMOTE ], TheAnim2DCollection );
+				getIconInfo()->m_icon[ ICON_BOMB_TIMED ] = newInstance(Anim2D)( s_animationTemplates[ ICON_BOMB_TIMED ], TheAnim2DCollection );
+				UnsignedInt dieFrame = update->getDetonationFrame();
+				UnsignedInt seconds = REAL_TO_INT_CEIL( (dieFrame - now) * SECONDS_PER_LOGICFRAME_REAL);
+				UnsignedInt numFrames = getIconInfo()->m_icon[ ICON_BOMB_TIMED ]->getAnimTemplate()->getNumFrames();
+				if (seconds > numFrames - 1)
+					seconds = numFrames - 1;
+				getIconInfo()->m_icon[ ICON_BOMB_TIMED ]->setMinFrame(numFrames - seconds - 1);
+				getIconInfo()->m_icon[ ICON_BOMB_TIMED ]->reset();
+			}
+			getIconInfo()->m_keepTillFrame[ ICON_BOMB_REMOTE ] = now + 1;
+			getIconInfo()->m_keepTillFrame[ ICON_BOMB_TIMED ] = now + 1;
+		}
+		else
+		{
+			if( !getIconInfo()->m_icon[ ICON_BOMB_REMOTE ] )
+				getIconInfo()->m_icon[ ICON_BOMB_REMOTE ] = newInstance(Anim2D)( s_animationTemplates[ ICON_BOMB_REMOTE ], TheAnim2DCollection );
+			getIconInfo()->m_keepTillFrame[ ICON_BOMB_REMOTE ] = now + 1;
+		}
+	}
+	if( hasIconInfo() )
+	{
+		if( getIconInfo()->m_keepTillFrame[ ICON_BOMB_TIMED ] <= now )
+			killIcon(ICON_BOMB_TIMED);
+		if( getIconInfo()->m_keepTillFrame[ ICON_BOMB_REMOTE ] <= now )
+			killIcon(ICON_BOMB_REMOTE);
+	}
+
+	if( obj->testWeaponBonusCondition( WEAPONBONUSCONDITION_ENTHUSIASTIC ) == TRUE )
+	{
+		DrawableIconType iconIndex = ICON_ENTHUSIASTIC;
+		if( obj->testWeaponBonusCondition( WEAPONBONUSCONDITION_SUBLIMINAL ) == TRUE )
+			iconIndex = ICON_ENTHUSIASTIC_SUBLIMINAL;
+		if( getIconInfo()->m_icon[ iconIndex ] == nullptr )
+			getIconInfo()->m_icon[ iconIndex ] = newInstance(Anim2D)( s_animationTemplates[ iconIndex ], TheAnim2DCollection );
+	}
+	else
+	{
+		killIcon(ICON_ENTHUSIASTIC);
+		killIcon(ICON_ENTHUSIASTIC_SUBLIMINAL);
+	}
+
+	if( obj->isDisabledByType( DISABLED_HACKED )
+		|| obj->isDisabledByType( DISABLED_PARALYZED )
+		|| obj->isDisabledByType( DISABLED_EMP )
+		|| obj->isDisabledByType( DISABLED_SUBDUED )
+		|| obj->isDisabledByType( DISABLED_UNDERPOWERED ) )
+	{
+		if( getIconInfo()->m_icon[ ICON_DISABLED ] == nullptr )
+			getIconInfo()->m_icon[ ICON_DISABLED ] = newInstance(Anim2D)( s_animationTemplates[ ICON_DISABLED ], TheAnim2DCollection );
+	}
+	else
+	{
+		killIcon(ICON_DISABLED);
+	}
+}
+#endif
 
 // ------------------------------------------------------------------------------------------------
 /** This enthusiastic effect is TEMPORARY for the multiplayer test */
@@ -4113,6 +4389,12 @@ void Drawable::replaceModelConditionStateInDrawable()
 //-------------------------------------------------------------------------------------------------
 void Drawable::setIndicatorColor(Color color)
 {
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 The drawable now looks the same to every player (setPlayerLook)
+	if (m_playerLooks != nullptr)
+		for (Int i = 0; i < MAX_PLAYER_COUNT; ++i)
+			m_playerLooks[i].recorded = FALSE;
+#endif
 	for (DrawModule** dm = getDrawModules(); *dm; ++dm)
 	{
 		ObjectDrawInterface* di = (*dm)->getObjectDrawInterface();
@@ -4185,6 +4467,10 @@ void Drawable::friend_bindToObject( Object *obj ) ///< bind this drawable to an 
 				setTerrainDecal(TERRAIN_DECAL_SHADOW_TEXTURE);
 			else
 				setTerrainDecal(TERRAIN_DECAL_NONE);
+#if RTS_ENGINE_CONTEXT
+			// GeneralsX @feature cemlyn007 22/10/2026 And for every player (recordFakeStructureDecalViewers)
+			recordFakeStructureDecalViewers();
+#endif
 		}
 	}
 
@@ -4223,6 +4509,10 @@ void Drawable::changedTeam()
 				setTerrainDecal(TERRAIN_DECAL_SHADOW_TEXTURE);
 			else
 				setTerrainDecal(TERRAIN_DECAL_NONE);
+#if RTS_ENGINE_CONTEXT
+			// GeneralsX @feature cemlyn007 22/10/2026 And for every player (recordFakeStructureDecalViewers)
+			recordFakeStructureDecalViewers();
+#endif
 		}
 	}
 }
@@ -5444,6 +5734,11 @@ void Drawable::xfer( Xfer *xfer )
 // ------------------------------------------------------------------------------------------------
 void Drawable::loadPostProcess()
 {
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 22/10/2026 A save keeps the local player's decal alone (recordFakeStructureDecalViewers)
+	if (m_object != nullptr && m_object->isKindOf(KINDOF_FS_FAKE))
+		recordFakeStructureDecalViewers();
+#endif
 		// if we have an object, we don't need to save/load the pos, just restore it.
 		// if we don't, we'd better save it!
 	if (m_object != nullptr)

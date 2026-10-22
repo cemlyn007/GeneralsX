@@ -606,6 +606,12 @@ public:
 
   void triggerDoubleClickAttackMoveGuardHint();
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 A new view, made as init() makes the tactical view, for a player's view
+	// (Display::addPlayerView): a W3DView in an engine that renders and a stand-in otherwise. The caller owns it.
+	View *createPlayerView();
+#endif
+
 
 public:
 	// World 2D animation methods

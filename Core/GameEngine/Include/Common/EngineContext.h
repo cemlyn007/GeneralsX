@@ -108,9 +108,14 @@ class WW3DAssetManager;
 struct W3DRenderState;
 struct WW3DState;
 struct SDL_Window;
+class GameMessage;	// GeneralsX @feature cemlyn007 21/10/2026 The replay camera route's message
 
 namespace rts
 {
+
+// GeneralsX @feature cemlyn007 21/10/2026 A host's route for a replay's camera poses (EngineContextFields.inl,
+// replayCameraRoute): it is handed every MSG_SET_REPLAY_CAMERA a playback carries out.
+using ReplayCameraRoute = void (*)(const GameMessage& message);
 
 // GeneralsX @feature cemlyn007 14/10/2026 The identity of one per-engine static (Common/EngineStatic.h,
 // PerEngineStatic): only its address is used, as the key of the static in each EngineContext's table. A key is

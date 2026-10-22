@@ -35,6 +35,7 @@
 ///@todo: Find better way to determine when shadow volumes need updating - lights move, objects move.
 
 // SYSTEM INCLUDES ////////////////////////////////////////////////////////////
+#include "Common/EngineDrawing.h"	// GeneralsX @feature cemlyn007 21/10/2026 Drawing on demand
 #include <assert.h>
 
 // USER INCLUDES //////////////////////////////////////////////////////////////
@@ -2048,6 +2049,18 @@ void W3DVolumetricShadow::updateMeshVolume(Int meshIndex, Int lightIndex, const 
 #endif	//near light source
 #endif // CNC3
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 An engine that draws on demand rebuilds every volume it draws, at every draw,
+	// as a dynamic volume, rather than only once its mesh has turned far enough and in a vertex buffer the first time:
+	// which volumes a draw rebuilt, and in which buffers, depended on the draws before it, and so did the shadows
+	// (Common/EngineDrawing.h)
+	const Bool exactShadowVolumes = rts::drawsOnDemand();
+	if (exactShadowVolumes)
+		isMeshRotating = true;
+#else
+	const Bool exactShadowVolumes = FALSE;
+#endif
+
 	// get the light
 	lightPosWorld = TheW3DShadowManager->getLightPosWorld(lightIndex);
 
@@ -2067,6 +2080,12 @@ void W3DVolumetricShadow::updateMeshVolume(Int meshIndex, Int lightIndex, const 
 		}
 	}
 
+	if (exactShadowVolumes)
+	{
+		if (lightPosWorld != m_lightPosHistory[ lightIndex ][meshIndex])
+			isLightMoving = true;
+	}
+	else
 	if (lightPosWorld != m_lightPosHistory[ lightIndex ][meshIndex])
 	{	//Light position has moved, see if enough to matter
 
@@ -2187,6 +2206,12 @@ void W3DVolumetricShadow::updateMeshVolume(Int meshIndex, Int lightIndex, const 
 			//
 			if (!m_shadowVolume[ lightIndex ][meshIndex])
 				allocateShadowVolume( lightIndex,meshIndex );
+			if (exactShadowVolumes && !(m_shadowVolume[ lightIndex ][meshIndex]->GetFlags() & SHADOW_DYNAMIC))
+			{
+				m_shadowVolume[ lightIndex ][meshIndex]->SetFlags(m_shadowVolume[ lightIndex ][meshIndex]->GetFlags() | SHADOW_DYNAMIC);
+				resetShadowVolume( lightIndex,meshIndex );
+				allocateShadowVolume( lightIndex,meshIndex );
+			}
 			if( m_shadowVolumeVB[ lightIndex ][meshIndex] )
 			{	//Updating an existing vertex buffer shadow volume.  This means we're
 				//probably dealing with an animated mesh.  Update flags to reflect this fact.
@@ -2641,6 +2666,16 @@ void W3DVolumetricShadow::constructVolume( Vector3 *lightPosObject,Real shadowEx
 	polygonCount = 0;
 
 	indicesPerMesh=m_numIndicesPerMesh[meshIndex];
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @bugfix cemlyn007 21/10/2026 For an engine that draws on demand, a silhouette with no edges empties the
+	// volume: returning first kept the volume of whichever earlier draw last had edges, so the shadow depended on the
+	// draws before (Common/EngineDrawing.h)
+	if (!indicesPerMesh && rts::drawsOnDemand())
+	{
+		shadowVolume->SetNumActivePolygon(0);
+		shadowVolume->SetNumActiveVertex(0);
+	}
+#endif
 	if (!indicesPerMesh)
 		return;	//nothing to draw
 
@@ -3727,6 +3762,31 @@ public:
 };
 
 /** Used to cause a rebuild of all shadow volumes*/
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 21/10/2026 See W3DVolumetricShadow.h. The padding depends on the model's bounding box and
+// the ground around it when it is worked out, which it then keeps, so working it out when the shadow is first drawn
+// made a shadow depend on which frames were drawn. The test is Update's for a grounded object.
+void W3DVolumetricShadowManager::tickClient()
+{
+	for (W3DVolumetricShadow *shadow = m_shadowList; shadow; shadow = shadow->m_next)
+	{
+		if (shadow->m_geometry == nullptr || shadow->m_robj == nullptr || shadow->m_extraExtrusionPadding)
+			continue;
+		const Vector3 pos = shadow->m_robj->Get_Position();
+		if (pos == Vector3(0,0,0))
+			continue;
+		Real groundHeight;
+		if (TheTerrainLogic)
+			groundHeight = TheTerrainLogic->getGroundHeight(pos.X, pos.Y);
+		else
+			groundHeight = TheTerrainRenderObject->getHeightMapHeight(pos.X, pos.Y, nullptr);
+		if (fabs(pos.Z - groundHeight) >= AIRBORNE_UNIT_GROUND_DELTA)
+			continue;
+		shadow->updateOptimalExtrusionPadding();
+	}
+}
+#endif
+
 void W3DVolumetricShadowManager::invalidateCachedLightPositions()
 {
 

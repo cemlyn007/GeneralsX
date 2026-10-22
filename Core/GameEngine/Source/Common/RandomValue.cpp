@@ -117,6 +117,14 @@ void InitRandom()
 }
 #endif
 
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 21/10/2026 See RandomValue.h
+void SeedClientRandomStream( UnsignedInt seed, UnsignedInt *stream )
+{
+	seedRandom(seed, *reinterpret_cast<UnsignedInt (*)[6]>(stream));
+}
+#endif
+
 void InitRandom( UnsignedInt seed )
 {
 #ifdef DETERMINISTIC

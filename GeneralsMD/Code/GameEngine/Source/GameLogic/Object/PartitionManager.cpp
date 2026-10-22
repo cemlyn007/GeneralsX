@@ -1306,6 +1306,10 @@ void PartitionCell::addLooker(Int playerIndex)
 			TheDisplay->setShroudLevel(m_cellX, m_cellY, newShroud);
 			TheRadar->setShroudLevel(m_cellX, m_cellY, newShroud);
 		}
+#if RTS_ENGINE_CONTEXT
+		// GeneralsX @feature cemlyn007 21/10/2026 And the player's own terrain shroud, if it has one (GameClient/Display.h)
+		TheDisplay->setPlayerShroudLevel(playerIndex, m_cellX, m_cellY, newShroud);
+#endif
 	}
 }
 
@@ -1342,6 +1346,10 @@ void PartitionCell::removeLooker(Int playerIndex)
 			TheDisplay->setShroudLevel(m_cellX, m_cellY, newShroud);
 			TheRadar->setShroudLevel(m_cellX, m_cellY, newShroud);
 		}
+#if RTS_ENGINE_CONTEXT
+		// GeneralsX @feature cemlyn007 21/10/2026 And the player's own terrain shroud, if it has one (GameClient/Display.h)
+		TheDisplay->setPlayerShroudLevel(playerIndex, m_cellX, m_cellY, newShroud);
+#endif
 	}
 }
 
@@ -1369,6 +1377,10 @@ void PartitionCell::addShrouder( Int playerIndex )
 			TheDisplay->setShroudLevel(m_cellX, m_cellY, newShroud);
 			TheRadar->setShroudLevel(m_cellX, m_cellY, newShroud);
 		}
+#if RTS_ENGINE_CONTEXT
+		// GeneralsX @feature cemlyn007 21/10/2026 And the player's own terrain shroud, if it has one (GameClient/Display.h)
+		TheDisplay->setPlayerShroudLevel(playerIndex, m_cellX, m_cellY, newShroud);
+#endif
 	}
 }
 
@@ -3116,7 +3128,45 @@ void PartitionManager::refreshShroudForLocalPlayer()
 		}
 		TheRadar->endSetShroudLevel();
 	}
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 And every player's own terrain shroud (GameClient/Display.h)
+	refreshPlayerShrouds();
+#endif
 }
+
+#if RTS_ENGINE_CONTEXT
+//-----------------------------------------------------------------------------
+// GeneralsX @feature cemlyn007 21/10/2026 Per-player terrain shrouds (PartitionManager.h)
+//-----------------------------------------------------------------------------
+void PartitionManager::refreshPlayerShrouds()
+{
+	if (m_totalCellCount == 0)
+		return;
+	for (Int playerIndex = 0; playerIndex < MAX_PLAYER_COUNT; ++playerIndex)
+	{
+		if (!TheDisplay->hasPlayerShroud(playerIndex))
+			continue;
+		for (int i = 0; i < m_totalCellCount; ++i)
+			TheDisplay->setPlayerShroudLevel(playerIndex, m_cells[i].getCellX(), m_cells[i].getCellY(),
+				m_cells[i].getShroudStatusForPlayer(playerIndex));
+	}
+}
+
+//-----------------------------------------------------------------------------
+// GeneralsX @feature cemlyn007 21/10/2026 The radar's shroud as the player sees it (PartitionManager.h)
+//-----------------------------------------------------------------------------
+void PartitionManager::refreshRadarShroudForPlayer( Int playerIndex )
+{
+	TheRadar->clearShroud();
+	if (m_totalCellCount == 0)
+		return;
+	TheRadar->beginSetShroudLevel();
+	for (int i = 0; i < m_totalCellCount; ++i)
+		TheRadar->setShroudLevel(m_cells[i].getCellX(), m_cells[i].getCellY(),
+			m_cells[i].getShroudStatusForPlayer(playerIndex));
+	TheRadar->endSetShroudLevel();
+}
+#endif
 
 //-----------------------------------------------------------------------------
 CellShroudStatus PartitionManager::getShroudStatusForPlayer(Int playerIndex, Int x, Int y) const

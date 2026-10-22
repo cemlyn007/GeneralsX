@@ -39,5 +39,10 @@ extern void InitRandom();
 extern void InitRandom( UnsignedInt seed );
 extern UnsignedInt GetGameLogicRandomSeed();   ///< Get the seed (used for replays)
 extern UnsignedInt GetGameLogicRandomSeedCRC();///< Get the seed (used for CRCs)
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 21/10/2026 Seed a client random stream of six words, as InitRandom seeds the engine's, for
+// a particle simulation that keeps a stream of its own (ParticleSystemManager::beginSimulations)
+extern void SeedClientRandomStream( UnsignedInt seed, UnsignedInt *stream );
+#endif
 
 //--------------------------------------------------------------------------------------------------------------

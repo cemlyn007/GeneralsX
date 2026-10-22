@@ -234,6 +234,11 @@ public:
 
 	SphereRenderObjClass();
 	SphereRenderObjClass(const W3dSphereStruct & def);
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 Render's time-based animation, for the client tick of an engine that draws
+	// on demand, whose renders pass no time
+	void								Advance_Client_Tick() { animate(); }
+#endif
 	SphereRenderObjClass(const SphereRenderObjClass & src);
 	SphereRenderObjClass & operator = (const SphereRenderObjClass &);
 	virtual ~SphereRenderObjClass() override;

@@ -352,6 +352,12 @@ void LaserUpdate::initLaser( const Object *parent, const Object *target, const C
 		//Make sure the laser flare is visible to the player. If no parent, assume laser owner will handle it.
 		if (!parent || parent->getShroudedStatus( localPlayer->getPlayerIndex() ) <= OBJECTSHROUD_PARTIAL_CLEAR )
 		{
+#if RTS_ENGINE_CONTEXT
+			// GeneralsX @feature cemlyn007 22/10/2026 The flares go to the simulations of the players who can see the laser's
+			// parent, as above (ParticleViewersScope)
+			ParticleViewersScope viewers(TheParticleSystemManager, [parent](Int viewer)
+				{ return !parent || parent->getShroudedStatus(viewer) <= OBJECTSHROUD_PARTIAL_CLEAR; });
+#endif
 
 			//If we don't have a particle system for the lense flare (muzzle flare), create it.
 			if( data->m_particleSystemName.isNotEmpty() )

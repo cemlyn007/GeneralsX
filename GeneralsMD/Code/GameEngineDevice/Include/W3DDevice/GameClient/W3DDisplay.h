@@ -83,6 +83,10 @@ public:
 
 	virtual void step() override; ///< Do one fixed time step
 	virtual void draw() override;  ///< redraw the entire display
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 The client tick of an engine that draws on demand (Common/EngineDrawing.h)
+	virtual void tickClient() override;
+#endif
 
 	/// @todo Replace these light management routines with a LightManager singleton
 	virtual void createLightPulse( const Coord3D *pos, const RGBColor *color, Real innerRadius,Real outerRadius,
@@ -135,6 +139,14 @@ public:
 	virtual void clearShroud() override;
 	virtual void setShroudLevel(Int x, Int y, CellShroudStatus setting) override;
 	virtual void setBorderShroudLevel(UnsignedByte level) override;	///<color that will appear in unused border terrain.
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 Per-player terrain shrouds (GameClient/Display.h)
+	virtual void addPlayerShroud(Int playerIndex) override;
+	virtual void endPlayerShrouds() override;
+	virtual Bool hasPlayerShroud(Int playerIndex) const override;
+	virtual void setPlayerShroudLevel(Int playerIndex, Int x, Int y, CellShroudStatus setting) override;
+	virtual void drawWithShroudOf(Int playerIndex) override;
+#endif
 #if defined(RTS_DEBUG)
 	virtual void dumpModelAssets(const char *path) override;	///< dump all used models/textures to a file.
 #endif

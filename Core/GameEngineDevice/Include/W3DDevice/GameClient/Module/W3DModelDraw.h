@@ -32,6 +32,9 @@
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
 #include "Common/ModelState.h"
 #include "Common/DrawModule.h"
+#if RTS_ENGINE_CONTEXT
+#include "GameClient/Shadow.h"	// GeneralsX @feature cemlyn007 21/10/2026 ShadowViewLook
+#endif
 #ifdef BRUTAL_TIMING_HACK // hack for collecting model timing info.  jba.
 class RenderObjClass {
 public:
@@ -362,6 +365,20 @@ public:
 #endif
 
 	virtual void setFullyObscuredByShroud(Bool fullyObscured) override;
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 For one draw of a player's view (DrawModule::beginViewLook)
+	virtual void beginViewLook(Bool hidden, Bool fullyObscured) override;
+	virtual void endViewLook() override;
+	// GeneralsX @feature cemlyn007 21/10/2026 Per-player looks (Drawable::setPlayerLook). A model whose drawable some player
+	// sees with another team colour or garrisoned model than its own keeps a variant of itself with that look: a second
+	// module of its own class, made in the client tick, which every call this module gets is passed on to, so that its
+	// model, animation, sub-objects, turret and shadow follow this one's, and which makes no particle systems, track
+	// marks or effects of its own. Its model is hidden except in a draw of the view of a player who sees its look, in
+	// which it is drawn in place of this module's (beginViewLook).
+	virtual void syncViewLookVariant() override;
+	// GeneralsX @feature cemlyn007 22/10/2026 Its models carry the drawable's DrawableInfo (DrawModule::rendersWithDrawableInfo)
+	virtual Bool rendersWithDrawableInfo() const override { return TRUE; }
+#endif
 	virtual void setTerrainDecal(TerrainDecalType type) override;
 
 	virtual Bool isVisible() const override;
@@ -449,6 +466,10 @@ protected:
 
 
 	Bool getFullyObscuredByShroud() const { return m_fullyObscuredByShroud; }
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 Whether this module is another's look variant (syncViewLookVariant)
+	Bool isViewLookVariant() const { return m_isViewLookVariant; }
+#endif
 
 private:
 
@@ -501,6 +522,24 @@ private:
 	RenderObjClass*								m_renderObject;										///< W3D Render object for this drawable
 	Shadow*												m_shadow;													///< Updates/Renders shadows of this object
 	Shadow*												m_terrainDecal;
+#if RTS_ENGINE_CONTEXT
+	ShadowViewLook								m_shadowViewLook;	///< GeneralsX @feature cemlyn007 21/10/2026 beginViewLook's
+	ShadowViewLook								m_terrainDecalViewLook;	///< GeneralsX @feature cemlyn007 21/10/2026 beginViewLook's
+
+	// GeneralsX @feature cemlyn007 21/10/2026 The look variant (syncViewLookVariant)
+	struct ViewLookForward;
+	W3DModelDraw*									m_viewLookVariant = nullptr;	///< this module's variant, if any
+	Bool													m_isViewLookVariant = FALSE;	///< this module is another's variant
+	Bool													m_viewLookGarrisoned = FALSE;	///< a variant: whether its model is the garrisoned one
+	Bool													m_forwardingToViewLookVariant = FALSE;	///< in a call already passed on to the variant
+	Bool													m_viewLookVariantDrawn = FALSE;	///< the variant is drawn in place of this one in this view
+	Bool													m_hiddenBeforeViewLook = FALSE;	///< whether the model was hidden before the variant replaced it
+	Bool													m_shownInViewLook = FALSE;	///< a variant: drawn in this view
+	ModelConditionFlags viewLookFlags(const ModelConditionFlags& c) const;
+	Bool hasLook(Color color, Bool garrisoned) const;
+	void makeViewLookVariant(Color color, Bool garrisoned);
+	void dropViewLookVariant();
+#endif
 	TerrainTracksRenderObjClass*	m_trackRenderObject;							///< This is rendered under object
 	ParticleSystemIDVec						m_particleSystemIDs;							///< The ID numbers of the particle systems currently running.
 	std::vector<ModelConditionInfo::HideShowSubObjInfo>		m_subObjectVec;

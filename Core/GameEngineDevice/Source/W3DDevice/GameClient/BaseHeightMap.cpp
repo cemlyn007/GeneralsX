@@ -214,6 +214,10 @@ BaseHeightMapRenderObjClass::~BaseHeightMapRenderObjClass()
 	delete m_waypointBuffer;
 	m_waypointBuffer = nullptr;
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 And the players' own shrouds (addPlayerShroud)
+	endPlayerShrouds();
+#endif
 	delete m_shroud;
 	m_shroud = nullptr;
 
@@ -438,10 +442,20 @@ void BaseHeightMapRenderObjClass::ReleaseResources()
 		TheTerrainTracksRenderObjClassSystem->ReleaseResources();
 	if (TheW3DShadowManager)
 		TheW3DShadowManager->ReleaseResources();
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 Keeping each shroud's fade (W3DShroud::releaseKeepingFade), and the
+	// players' own shrouds too, which initHeightData makes again
+	if (m_shroud)
+		m_shroud->releaseKeepingFade();
+	for (W3DShroud *playerShroud : m_playerShrouds)
+		if (playerShroud)
+			playerShroud->releaseKeepingFade();
+#else
 	if (m_shroud)
 	{	m_shroud->reset();
 		m_shroud->ReleaseResources();
 	}
+#endif
 
 	if (TheSmudgeManager)
 		TheSmudgeManager->ReleaseResources();
@@ -477,6 +491,12 @@ void BaseHeightMapRenderObjClass::ReAcquireResources()
 		TheW3DShadowManager->ReAcquireResources();
 	if (m_shroud)
 		m_shroud->ReAcquireResources();
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 And the players' own shrouds
+	for (W3DShroud *playerShroud : m_playerShrouds)
+		if (playerShroud)
+			playerShroud->ReAcquireResources();
+#endif
 
 	if (m_map)
 	{
@@ -678,6 +698,10 @@ void BaseHeightMapRenderObjClass::reset()
 	{	m_shroud->reset();
 		m_shroud->setBorderShroudLevel((W3DShroudLevel)TheGlobalData->m_shroudAlpha);	//assume border is always black at start.
 	}
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 The players' own shrouds go with the map; the next game makes new ones
+	endPlayerShrouds();
+#endif
 }
 
 //=============================================================================
@@ -1804,6 +1828,15 @@ Int BaseHeightMapRenderObjClass::initHeightData(Int x, Int y, WorldHeightMap *pM
 
 	REF_PTR_SET(m_map, pMap);	//update our heightmap pointer in case it changed since last call.
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 The players' own shrouds are made again for the map first, so that the
+	// refresh of the terrain's own shroud below (W3DShroud::init) fills them too (PartitionManager::refreshPlayerShrouds)
+	for (W3DShroud *playerShroud : m_playerShrouds)
+		if (playerShroud)
+		{	playerShroud->reset();
+			playerShroud->init(m_map,TheGlobalData->m_partitionCellSize,TheGlobalData->m_partitionCellSize,FALSE);
+		}
+#endif
 	if (m_shroud)
 		m_shroud->init(m_map,TheGlobalData->m_partitionCellSize,TheGlobalData->m_partitionCellSize);
 #ifdef DO_ROADS
@@ -2820,6 +2853,119 @@ void BaseHeightMapRenderObjClass::renderTrees(CameraClass * camera)
 		m_treeBuffer->drawTrees(camera, &pDynamicLightsIterator);
 	}
 }
+
+#if RTS_ENGINE_CONTEXT
+//=============================================================================
+// BaseHeightMapRenderObjClass::advanceTrees
+//=============================================================================
+// GeneralsX @feature cemlyn007 21/10/2026 The trees' logic frame of sway, toppling, sinking and pushing aside, which
+// renderTrees makes for every other engine, for the client tick of an engine that draws on demand
+// (Common/EngineDrawing.h)
+//=============================================================================
+void BaseHeightMapRenderObjClass::advanceTrees()
+{
+	if (m_map==nullptr) return;
+	if (Scene==nullptr) return;
+	if (m_treeBuffer) {
+		RTS3DScene *pMyScene = (RTS3DScene *)Scene;
+		RefRenderObjListIterator pDynamicLightsIterator(pMyScene->getDynamicLights());
+		m_treeBuffer->advance(&pDynamicLightsIterator);
+	}
+}
+
+//=============================================================================
+// GeneralsX @feature cemlyn007 21/10/2026 Per-player terrain shrouds (BaseHeightMap.h): a shroud of the player's own,
+// made for the map as the terrain's own is, with the same border, in place of any the player had. It is left empty for
+// PartitionManager::refreshPlayerShrouds to fill. An engine with no terrain shroud of its own (no rendering) makes none.
+//=============================================================================
+void BaseHeightMapRenderObjClass::addPlayerShroud(Int playerIndex)
+{
+	if (m_shroud == nullptr || m_map == nullptr || playerIndex < 0)
+		return;
+	if ((Int)m_playerShrouds.size() <= playerIndex)
+		m_playerShrouds.resize(playerIndex + 1, nullptr);
+	if (m_drawnShroud == m_playerShrouds[playerIndex])
+		m_drawnShroud = nullptr;
+	delete m_playerShrouds[playerIndex];
+	W3DShroud *playerShroud = NEW W3DShroud;
+	playerShroud->init(m_map,TheGlobalData->m_partitionCellSize,TheGlobalData->m_partitionCellSize,FALSE);
+	playerShroud->setBorderShroudLevel(m_shroud->getBorderShroudLevel());
+	m_playerShrouds[playerIndex] = playerShroud;
+}
+
+//=============================================================================
+// GeneralsX @feature cemlyn007 21/10/2026 Per-player terrain shrouds (BaseHeightMap.h): delete every player's own
+//=============================================================================
+void BaseHeightMapRenderObjClass::endPlayerShrouds()
+{
+	m_drawnShroud = nullptr;
+	std::vector<W3DShroud *> playerShrouds;
+	playerShrouds.swap(m_playerShrouds);
+	for (W3DShroud *playerShroud : playerShrouds)
+		delete playerShroud;
+}
+
+//=============================================================================
+// GeneralsX @feature cemlyn007 21/10/2026 Per-player terrain shrouds (BaseHeightMap.h): the player's own, or null
+//=============================================================================
+W3DShroud *BaseHeightMapRenderObjClass::findPlayerShroud(Int playerIndex) const
+{
+	if (playerIndex < 0 || playerIndex >= (Int)m_playerShrouds.size())
+		return nullptr;
+	return m_playerShrouds[playerIndex];
+}
+
+//=============================================================================
+// GeneralsX @feature cemlyn007 21/10/2026 Per-player terrain shrouds (BaseHeightMap.h): how many players have their own
+//=============================================================================
+Int BaseHeightMapRenderObjClass::playerShroudCount() const
+{
+	Int count = 0;
+	for (const W3DShroud *playerShroud : m_playerShrouds)
+		if (playerShroud)
+			++count;
+	return count;
+}
+
+//=============================================================================
+// GeneralsX @feature cemlyn007 21/10/2026 Per-player terrain shrouds (BaseHeightMap.h): draw the terrain with the
+// player's own shroud, or with the terrain's own for a player index of -1
+//=============================================================================
+void BaseHeightMapRenderObjClass::setDrawnShroud(Int playerIndex)
+{
+	m_drawnShroud = findPlayerShroud(playerIndex);
+	DEBUG_ASSERTCRASH(playerIndex < 0 || m_drawnShroud != nullptr || m_shroud == nullptr,
+		("BaseHeightMapRenderObjClass::setDrawnShroud - player %d has no shroud", playerIndex));
+}
+
+//=============================================================================
+// GeneralsX @feature cemlyn007 21/10/2026 Per-player terrain shrouds (BaseHeightMap.h): the map border's shroud, the
+// same for every player
+//=============================================================================
+void BaseHeightMapRenderObjClass::setBorderShroudLevels(UnsignedByte level)
+{
+	if (m_shroud)
+		m_shroud->setBorderShroudLevel((W3DShroudLevel)level);
+	for (W3DShroud *playerShroud : m_playerShrouds)
+		if (playerShroud)
+			playerShroud->setBorderShroudLevel((W3DShroudLevel)level);
+}
+
+//=============================================================================
+// GeneralsX @feature cemlyn007 21/10/2026 Per-player terrain shrouds (BaseHeightMap.h): the client tick's fade of every
+// shroud over the whole map (W3DShroud::advanceFade)
+//=============================================================================
+void BaseHeightMapRenderObjClass::advanceShroudFades()
+{
+	if (m_map == nullptr)
+		return;
+	if (m_shroud)
+		m_shroud->advanceFade();
+	for (W3DShroud *playerShroud : m_playerShrouds)
+		if (playerShroud)
+			playerShroud->advanceFade();
+}
+#endif
 
 // ------------------------------------------------------------------------------------------------
 /** CRC */

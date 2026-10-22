@@ -73,6 +73,7 @@
 #include "GameClient/MetaEvent.h"
 #include "GameClient/Mouse.h"
 #include "GameClient/ParticleSys.h"
+#include "Common/EngineDrawing.h"	// GeneralsX @feature cemlyn007 21/10/2026 Drawing on demand
 #include "GameClient/PlaceEventTranslator.h"
 #include "GameClient/RayEffect.h"
 #include "GameClient/SelectionXlat.h"
@@ -747,6 +748,11 @@ void GameClient::update()
 	// redraw all views, update the GUI
 	//if(TheGameLogic->getFrame() >= 2)
 
+#if RTS_ENGINE_CONTEXT
+		// GeneralsX @feature cemlyn007 21/10/2026 An engine that draws on demand draws only when its host asks
+		// (Common/EngineDrawing.h)
+		if (!rts::drawsOnDemand())
+#endif
 		TheDisplay->DRAW();
 	}
 
@@ -864,6 +870,10 @@ void GameClient::updateFakeDrawables()
 				draw->setTerrainDecal(TERRAIN_DECAL_SHADOW_TEXTURE);
 			else
 				draw->setTerrainDecal(TERRAIN_DECAL_NONE);
+#if RTS_ENGINE_CONTEXT
+			// GeneralsX @feature cemlyn007 22/10/2026 And for every player (Drawable::recordFakeStructureDecalViewers)
+			draw->recordFakeStructureDecalViewers();
+#endif
 		}
 	}
 }

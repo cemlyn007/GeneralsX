@@ -976,6 +976,23 @@ void StealthUpdate::disguiseAsObject( const Object *target )
 }
 
 //-------------------------------------------------------------------------------------------------
+// GeneralsX @feature cemlyn007 21/10/2026 The indicator colour a disguised unit is drawn in for a viewer: neutrals and
+// enemies that are still playing see the team it is disguised as, and its own team and its allies its true colours
+// (changeVisualDisguise's rule, for any viewer rather than the observed or local player alone)
+//-------------------------------------------------------------------------------------------------
+static Color disguiseIndicatorColorFor( const Object *self, const Player *disguisePlayer, const Player *viewer )
+{
+	const Bool night = TheGlobalData->m_timeOfDay == TIME_OF_DAY_NIGHT;
+	if( self->getControllingPlayer()->getRelationship( viewer->getDefaultTeam() ) != ALLIES && viewer->isPlayerActive() )
+	{
+		//Neutrals and enemies will see this disguised unit as the team it's disguised as.
+		return night ? disguisePlayer->getPlayerNightColor() : disguisePlayer->getPlayerColor();
+	}
+	//If it's on our team or our ally's team, then show it's true colors.
+	return night ? self->getNightIndicatorColor() : self->getIndicatorColor();
+}
+
+//-------------------------------------------------------------------------------------------------
 void StealthUpdate::changeVisualDisguise()
 {
 	Object *self = getObject();
@@ -1007,23 +1024,19 @@ void StealthUpdate::changeVisualDisguise()
 			{
 				TheInGameUI->selectDrawable( draw );
 			}
-			Player *clientPlayer = ThePlayerList->getLocalPlayer();
-			if( self->getControllingPlayer()->getRelationship( clientPlayer->getDefaultTeam() ) != ALLIES && clientPlayer->isPlayerActive() )
+			// GeneralsX @feature cemlyn007 21/10/2026 The disguise's indicator colour is only a look, so it follows the
+			// observed or local player, as the stealth look does, rather than the local player alone.
+			Player *clientPlayer = rts::getObservedOrLocalPlayer();
+			draw->setIndicatorColor( disguiseIndicatorColorFor( self, player, clientPlayer ) );
+#if RTS_ENGINE_CONTEXT
+			// GeneralsX @feature cemlyn007 21/10/2026 And the colour each player sees it in, as GeneralsX would colour it
+			// for that player as its local player (Drawable::setPlayerLook)
+			for( Int i = 0; i < ThePlayerList->getPlayerCount(); ++i )
 			{
-				//Neutrals and enemies will see this disguised unit as the team it's disguised as.
-				if (TheGlobalData->m_timeOfDay == TIME_OF_DAY_NIGHT)
-					draw->setIndicatorColor( player->getPlayerNightColor() );
-				else
-					draw->setIndicatorColor( player->getPlayerColor() );
+				const Player *viewer = ThePlayerList->getNthPlayer( i );
+				draw->setPlayerLook( viewer->getPlayerIndex(), disguiseIndicatorColorFor( self, player, viewer ), FALSE );
 			}
-			else
-			{
-				//If it's on our team or our ally's team, then show it's true colors.
-				if (TheGlobalData->m_timeOfDay == TIME_OF_DAY_NIGHT)
-					draw->setIndicatorColor( self->getNightIndicatorColor() );
-				else
-					draw->setIndicatorColor( self->getIndicatorColor() );
-			}
+#endif
 		}
 
 		//Play a disguise sound!

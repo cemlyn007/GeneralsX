@@ -34,6 +34,9 @@
 #include "Common/ThingTemplate.h"
 #include "Common/INI.h"
 #include "Common/RandomValue.h"
+#if RTS_ENGINE_CONTEXT
+#include "Common/EngineDrawing.h"	// GeneralsX @bugfix cemlyn007 22/10/2026 Particle placement picks
+#endif
 #include "Common/Player.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Module/EMPUpdate.h"
@@ -310,8 +313,17 @@ void EMPUpdate::doDisableAttack()
 						if (sys)
 						{
 							Coord3D offs = {0,0,0};
+#if RTS_ENGINE_CONTEXT
+							// GeneralsX @bugfix cemlyn007 22/10/2026 The spark's place and delay are picked from the client random
+							// stream in an engine that draws on demand, so its logic random generator is the same as an engine's
+							// with no rendering, which makes no spark and so picks nothing (Common/EngineDrawing.h)
+							const Bool clientRandom = rts::placesParticlesWithClientRandom();
+							curVictim->getGeometryInfo().makeRandomOffsetWithinFootprint( offs, clientRandom );
+							offs.z = clientRandom ? GameClientRandomValue(3, victimHeight) : GameLogicRandomValue(3, victimHeight);
+#else
 							curVictim->getGeometryInfo().makeRandomOffsetWithinFootprint( offs );
 							offs.z = GameLogicRandomValue(3, victimHeight);
+#endif
 
 							//This puts all the sparks within a quadrahemicycloid (rectangular dome) volume
 							//The same shape as a four cornered camping dome tent, for those with less Greek
@@ -328,7 +340,11 @@ void EMPUpdate::doDisableAttack()
 							sys->attachToObject(curVictim);
 							sys->setPosition( &offs );
 							sys->setSystemLifetime(MAX(0, data->m_disabledDuration - 30));
+#if RTS_ENGINE_CONTEXT
+							sys->setInitialDelay(clientRandom ? GameClientRandomValue(1,100) : GameLogicRandomValue(1,100));
+#else
 							sys->setInitialDelay(GameLogicRandomValue(1,100));
+#endif
 						}
 					}
 				}

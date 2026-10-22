@@ -243,6 +243,26 @@ count is per engine, starts at zero and never decreases, and is part of no
 checksum, save or replay. A host uses it to drop what it kept for a game a new
 one has replaced.
 
+A host that drives every human slot itself sets the context's
+`anchoredLocalPlayer`. A game whose info names no local slot then makes the
+always-revealed ReplayObserver its local player as its player list is made
+(`PlayerList::newGame`), rather than its first human side. Everything
+`startNewGame` caches about the local player is then the ReplayObserver's,
+live and in playback alike. A skirmish's replay records the local slot its
+game info names, -1 for none, rather than slot 0. A game whose info names a
+local slot plays as it does without the switch. A save keeps its game info's
+local IP, so a load names no local slot again. A save made without the switch,
+whose local IP is its human slots' (`GameStateMap::xfer`), is given a local IP
+no slot holds as it loads, before its player list is made, so it too loads
+with the ReplayObserver as its local player and every human slot alike.
+
+Such a host posts several players' messages on one message stream. The
+stream drops a `MSG_DESTROY_SELECTED_GROUP` that the next message makes
+redundant (`MessageStream::isRedundantMessage`) only when that next message is
+the same player's, so one player's new selection never drops another
+player's emptied selection. A stream holding one player's messages, as in
+every game GeneralsX plays by itself, is unchanged.
+
 ### Queries
 
 A host may query an engine between frames, and a query must not change what
@@ -287,6 +307,13 @@ recording is still open.
   `GlobalData::m_useCameraInReplay` is set. With no player looked at, as for a
   host without the observer control bar, it follows the camera of the player
   who recorded the replay.
+- **A host's own replay cameras.** A host that sets the context's
+  `replayCameraRoute` records its cameras into a replay itself, as
+  `MSG_SET_REPLAY_CAMERA` messages stamped with the player whose camera each
+  is, and the game records none of its own (`LookAtXlat`). In a playback,
+  every camera message is handed to the route in place of moving the
+  tactical view (`GameLogic::onSetReplayCamera`), so that the host can move
+  each of its views by the recorded camera it follows.
 - **Host map paths.** A map the host names by its absolute path, outside the
   map and save directories, is written into a game's options by that path and
   read back by it, so the replay of a game on it finds it again.
@@ -414,6 +441,272 @@ buffer of the render size. Its frames never present;
 buffer and presents it when the host asks. Its own window handles stay null,
 so it makes no SDL call and pumps no events. A window engine with no present
 window, such as the game's executable's, keeps upstream's window path.
+
+### Drawing on demand
+
+A host that sets the context's `onDemandDrawing` draws a render engine's
+images only when it asks for them (`Common/EngineDrawing.h`,
+`rts::drawsOnDemand`, which also needs `m_headless` and `m_headlessRender`).
+`GameClient::update` then draws nothing. Instead, after each logic frame,
+`GameEngine::update` runs the display's client tick (`Display::tickClient`,
+`W3DDisplay::tickClient`), which advances, once and whether or not anything is
+drawn, everything a draw used to advance:
+
+- WW3D's clock: the logic frame time, the sync time and the client tick count
+  that the ping-pong particle buffers follow (`WW3D::Count_Client_Tick`);
+- the cameras, through `updateViews`, without the drawable loop that each
+  view's update ran;
+- every drawable's draw modules and icons, once, whichever views can see it,
+  and its shroud-clear frame for the watcher and for every slot's player,
+  for a drawable that renders through the scene's drawable pass alone
+  (`DrawModule::rendersWithDrawableInfo`), as GeneralsX notes it only as it
+  renders one (`RTS3DScene::renderOneObject`), so that a projectile stream, a
+  laser or a rope, which has none, is fully obscured as soon as it is fogged;
+- the particle simulations (below), the field-particle count they read, and
+  the scene's per-frame updates: lights, W3D emitters, model hierarchies,
+  spheres and rings, and the registration of meshes for rendering;
+- the texture mappers, the projected and volumetric shadows' caches, the
+  fade of every terrain shroud over the whole map (the terrain's own and each
+  player's; Fog fade, below), the trees' sway and toppling, the terrain and
+  water tracks, the dynamic LOD and the cinematic text's countdown.
+
+A draw (`W3DDisplay::draw`) then renders the state the tick left. It freezes
+WW3D's frame times while it renders, and steps nothing, so two draws at one
+frame are the same and an image does not depend on which views were drawn
+before, at that frame or at earlier ones. A draw also leaves out what made it
+depend on the draws before it: the camera-locked drawable is drawn with the
+rest of the scene, not hidden and drawn again alone; terrain tracks are
+flushed from the tracks that are visible now; shadow volumes are rebuilt
+exactly every time; and the terrain shader resets the sampler states it set.
+No cursor pick is made.
+
+Such an engine simulates particles though it is headless. The manager is the
+watcher's simulation. When a game starts, `beginSimulations` gives each
+slot's player a simulation of its own (`newSimulation`), which copies the
+particle systems made in the watcher's, with the same ID, and every change
+made to them. Each simulation tests shroud for its own player and draws from
+its own client random stream, so its particles are those GeneralsX shows the
+player whose view it is, and no player's emission shifts another's. The tick
+updates every simulation, and a draw renders the one that
+`ParticleSimulationScope` makes current.
+
+GeneralsX makes some effects only where its observed or local player can see:
+an FX list's (`FXList::doFXPos` needs the place clear, `doFXObj` the object no
+worse than partly clear), a stealth detector's ping, a Spectre gunship's
+strafing smoke, a laser's flares and a Chinook's rotor wash. The logic still
+makes them for the anchor, which sees everything, so the watcher's simulation
+gets every one; around each such test a `ParticleViewersScope` asks the same
+question of every player whose simulation exists, and a system made inside it
+is copied only into the simulations of the players who pass (scopes nest, so a
+player must pass every test around the making). A player left out makes
+nothing and draws nothing from its client random stream, as GeneralsX would
+not had that player been its local player; the placement picks of an FX
+list's particle nugget come from the client stream of the frame, which the
+test does not move. The tests read the players' cell shroud and objects'
+shrouded status, which change no logic in these engines (they have no ghost
+objects), and with no simulations (an engine with no rendering) nothing is
+asked. The other kinds of FX-list effect are not per player: terrain
+scorches, light pulses, tracers and ray effects are made once, for the anchor,
+and show in any view that draws them, and a view shake shakes the watcher's
+camera (the tactical view) alone. Nor is the particle uplink cannon's test,
+which takes its beam's effects away while its local player cannot see the
+cannon and puts them back once it can: for the anchor it never takes them
+away.
+
+A save holds the watcher's particle systems and then, since version 2 of the
+manager's block, every player's simulation as it is, with its own systems,
+particles and ID counter (`xferSimulations`); a load reads each into its own
+simulation, where the load's post-processing links each system to the
+masters, slaves and controlling particles of that simulation. A save from
+before version 2 holds the watcher's alone, and a load copies each of them,
+with its ID and its particles, into every player's simulation
+(`copyLoadedSystemsToSimulations`). Neither changes a client random stream,
+and each restored system of the watcher's that is neither a slave nor driven
+by a particle then copies its changes, as a system made outside an update
+does. A reset lets go of the textures the last draw left on each
+simulation's point group and streaks, so none outlives the render device.
+
+An engine with no rendering runs `ParticleSystemManagerDummy`, which makes no
+particle system, so the logic must not depend on whether one exists. Where game
+logic makes a particle system and then places it with a random pick (the random
+bone of a damage state's system in `TransitionDamageFX`, the place, height and
+delay of an EMP's sparks in `EMPUpdate`, the place of a special ability's
+disable effect in `SpecialAbilityUpdate`), an engine that draws on demand picks
+from the client random stream (`rts::placesParticlesWithClientRandom`), so its
+logic random generator, and the game, are those of an engine with no rendering,
+and replays cross between the two. GeneralsX's own play keeps the logic random
+pick.
+
+A playback that follows the replay's camera shows the 3D camera the replay
+holds as it is, since the tick builds no camera over it before a draw. An
+engine with no rendering builds no 3D camera, so the replay camera it records
+holds none (`LookAtXlat`). Playback leaves out a recorded 3D camera at the
+origin too, as such an engine recorded before, and builds the camera from the
+pivot, angle, pitch and zoom (`GameLogic::onSetReplayCamera`).
+
+A window engine draws the same way, and `Present_Off_Screen_Image` presents
+the last image drawn, whichever view it was drawn for.
+
+### Drawing as a player
+
+`Display::drawPlayerView` draws the game as one player sees it, or as the
+game's local player sees it for a player index of -1. For the draw it makes
+the player the context's `viewingPlayer`, which
+`rts::getObservedOrLocalPlayer` returns ahead of the control bar's observed
+player, so the draw's shroud tests and tints are that player's. It points the
+ghost objects at the player, refreshes the radar's objects, draws the
+player's particle simulation (`ParticleSimulationScope`), and gives every
+drawable the looks it has in the player's view (`Drawable::beginViewLook`):
+its stealth look, worked out for the player as `StealthUpdate` works it out
+for the observed or local player, and whether the player's shroud obscures it
+fully (`Drawable::isFullyObscuredByShroudFor`), with each draw module hiding
+the shadows of what is hidden (`DrawModule::beginViewLook`). These looks change
+only what the draw shows: no deselection, model change, shadow release, track
+cap or particle start or stop. When the draw ends, all of it is put back as it
+was, so no logic ever runs with a viewing player set and the next draw starts
+from the same state. None of it has `rts::changeLocalPlayer`'s or
+`rts::changeObservedPlayer`'s other effects.
+
+The team colours a disguise or a garrison shows, and a garrison's garrisoned
+model, are each player's own too (Per-player looks, below). The terrain's
+shroud is the player's own (Per-player shrouds, below).
+
+`Radar::copyToRGBForPlayer` reads the radar as a player sees it, in the same
+way: for the read, the player is the viewing player, so its blips are the ones
+`W3DRadar::canRenderObject` lets that player see (a stealthed enemy by the
+player's own relationship to it), and the radar's shroud is filled from the
+player's shroud (`PartitionManager::refreshRadarShroudForPlayer`). The blips
+whose colour depends on who sees them, disguised units and containers such as
+garrisons, are coloured for the player (`Radar::recolorViewerDependentObjects`).
+Afterwards the radar's shroud and colours are the observed or local player's
+again. A radar read asks for no shroud status the client tick did not already
+ask for.
+
+### Per-player looks
+
+GeneralsX works out some looks for its local player alone and bakes them into
+a model's render objects: the team colour of a disguised unit
+(`StealthUpdate::changeVisualDisguise`: its enemies that are still playing see
+the colours of the team it is disguised as, its own side and everyone else its
+true colours), and a garrison's team colour and garrisoned model
+(`GarrisonContain::recalcApparentControllingPlayer`: a garrison of stealthy,
+undetected units shows its original team's colours and ungarrisoned model to
+everyone but its own side and allies). Changing such a look rebuilds the model,
+which restarts its animation and its particle systems, so a draw cannot change
+it per player. Built with the engine context, the same code records, when
+it sets the look, the look GeneralsX would set for every player were it the
+local player (`Drawable::setPlayerLook`); `Drawable::setIndicatorColor`
+forgets them, since the drawable then looks the same to everyone. In the client
+tick of an engine that draws on demand, a model draw whose drawable some player
+sees with another look than its own keeps a variant of itself with that look
+(`W3DModelDraw::syncViewLookVariant`): a second module of the same class, made
+as the drawable made the first, with its own model, which every call the first
+module gets is passed on to first, with the client random stream kept as it
+was, so that its model condition, animation, sub-objects, turret, recoil,
+shadow and terrain decal follow the first's. A variant makes no particle
+systems, track marks or weapon effects, and cannot be picked. Its model is
+hidden except in a draw of the view of a player who sees its look, in which it
+is drawn, and the first module's model, shadow and decal hidden, for the length
+of the draw (`W3DModelDraw::beginViewLook`). The watcher's view is the local
+player's, the drawable's own look. A cave's colour (`CaveContain`) needs none
+of this: its look code asks `OpenContain::getApparentControllingPlayer`, which
+always answers no player, so a cave shows its team's colours to everyone.
+
+A fake structure's terrain decal (`KINDOF_FS_FAKE`, the template's shadow
+texture) is another such look: GeneralsX gives the drawable the decal when its
+local player is the structure's owner, an ally or neutral to it (an observer),
+and none for an enemy, deciding it when the drawable is bound to its object,
+when the object changes team, and in `GameClient::updateFakeDrawables` (a
+player's defeat, a change of local player). Built with the engine context, the
+same places also record which players GeneralsX would not show the decal to
+were each the local player (`Drawable::recordFakeStructureDecalViewers`), and a
+load records it again, since a save keeps only the local player's decal. The
+local player's decal stays on the drawable; a draw of the view of a player
+who would not see it hides it for the length of the draw
+(`Drawable::hidesTerrainDecalInViewLook`, read by
+`W3DModelDraw::beginViewLook`).
+
+A projectile stream's lines (`W3DProjectileStreamDraw`: the Dragon Tank's
+flames, the Toxin Tractor's toxin, the Ambulance's cleaning spray) are taken
+out of the scene while the stream is fully obscured for GeneralsX's local
+player (`setFullyObscuredByShroud`); its stealth or a hidden drawable does not
+matter. They stay in the scene in an engine that draws on demand, and a draw of
+a view in which the stream is fully obscured hides them, and only them, for the
+length of the draw (`W3DProjectileStreamDraw::beginViewLook`).
+
+### Per-player views
+
+A host that sets the context's `playerViews` keeps a view of its own for every
+slot's player. Each game's start, live, loaded or played back, replaces the
+last game's views (`GameLogic::startNewGame`) with a view per slot player,
+made as the tactical view is (`InGameUI::createPlayerView`): a `W3DView` in an
+engine that renders and a `ViewDummy` stand-in otherwise. Each is set up as
+the tactical view is at a game's start, but looking at its own player's start
+position. The display keeps them (`Display::addPlayerView`,
+`Display::findPlayerView`), and updates and steps them with the tactical view,
+so every camera follows and settles by logic-frame time whether or not it is
+drawn. The tactical view stays the view of the game's local player: the
+watcher's, for a host that also anchors its local player.
+`Display::drawPlayerView` draws a player's own view: for the draw, it makes
+that view the tactical view and the display's only view.
+
+A draw of an engine that draws on demand sets up the drawn view's own state
+before it renders (`W3DView::prepareForDrawOnDemand`): it builds the view's
+camera from its pose if the pose changed since the client tick built it, so a
+camera aimed between two frames shows its aim at once, culls the terrain's
+bridges, trees and props for that camera, and drops the props' cached shroud,
+so they are tested again for the drawn view's player. Each draw loads the trees
+that camera sees into the tree buffers from the trees as they are
+(`W3DTreeBuffer::drawTrees`), rather than keeping what earlier draws' cameras
+saw, which left a pushed-aside tree out of date. Such an engine draws the
+terrain whole (`W3DView::drawsEntireTerrain`), as GlobalData's
+`m_drawEntireTerrain` asks for: the terrain and its relighting then belong to
+no camera, and no camera's far plane depends on where another view left the
+terrain. Its extra blend tiles get room for all of them at once
+(`HeightMapRenderObjClass::renderExtraBlendTiles`), rather than 16 more after
+each draw that ran out of room.
+
+### Per-player shrouds
+
+In an engine that renders, the same game starts give every slot's player a
+terrain shroud of its own (`Display::addPlayerShroud`,
+`BaseHeightMapRenderObjClass::addPlayerShroud`), beside the terrain's own
+shroud, which stays the local player's. Each is made for the map as the
+terrain's own is, with the same border, and the partition manager fills it
+from its player's shroud (`PartitionManager::refreshPlayerShrouds`), which it
+does again whenever it refreshes the local player's: after a load, a change of
+the map's active boundary or a device reset. Every change of a cell's shroud
+is written to the player's own shroud as it is made
+(`Display::setPlayerShroudLevel`). `Display::drawPlayerView` draws the terrain,
+water and trees with the drawn player's own shroud
+(`BaseHeightMapRenderObjClass::setDrawnShroud`, which `getShroud` follows), and
+with the terrain's own again when the draw ends. A device reset releases and
+reacquires them all, and `BaseHeightMapRenderObjClass::reset` deletes them with
+the map. An engine with no rendering has no terrain shroud, so it makes none.
+
+### Fog fade
+
+GeneralsX compiles its fog fade out (`DO_FOG_INTERPOLATION` is never
+defined), so its fog changes at once. An engine that draws on demand fades
+its fog anyway, at the same rate the fade has (255 levels a second, on
+WW3D's sync time, so about 30 logic frames from shroud to clear): a cell's
+new level is the target its terrain shroud fades towards
+(`W3DShroud::setShroudLevel`), and the client tick moves every cell of every
+terrain shroud one step towards its target (`W3DShroud::advanceFade`), so a
+draw only uploads the faded levels and the fade does not depend on which
+frames were drawn. The levels a shroud is given before the first tick after
+it is made for a map (a new game, a load or a playback) are its seed, and show
+at once rather than fading in from black. A device reset keeps the fade's
+levels (`W3DShroud::releaseKeepingFade`), so a fade goes on over the reset as
+if there had been none. Every other engine shows fog as GeneralsX does.
+
+### Script cameras
+
+A host whose cameras are its own sets the context's `scriptsMoveNoCamera`.
+A map script's camera actions (moves, pans, zooms, rotations, pitches,
+shakes, follows, tethers, the scripted camera's modifiers and the default
+view; `ScriptActions::executeAction`) then move no camera. A script's other
+actions run as before.
 
 ### The clock
 

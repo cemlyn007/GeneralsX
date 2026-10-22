@@ -156,6 +156,11 @@ void W3DTruckDraw::setFullyObscuredByShroud(Bool fullyObscured)
 //-------------------------------------------------------------------------------------------------
 void W3DTruckDraw::createWheelEmitters()
 {
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 A look variant makes no particle systems (W3DModelDraw::syncViewLookVariant)
+	if (isViewLookVariant())
+		return;
+#endif
 	if (getDrawable()->isDrawableEffectivelyHidden())
 		return;
 	if (getW3DTruckDrawModuleData())

@@ -55,6 +55,7 @@ enum
 //         Includes
 //-----------------------------------------------------------------------------
 
+#include "Common/EngineDrawing.h"	// GeneralsX @feature cemlyn007 21/10/2026 Drawing on demand
 #include "W3DDevice/GameClient/W3DTreeBuffer.h"
 
 #include <WW3D2/assetmgr.h>
@@ -1452,84 +1453,15 @@ void W3DTreeBuffer::pushAsideTree(DrawableID id, const Coord3D *pusherPos,
 	}
 }
 
-DECLARE_PERF_TIMER(Tree_Render)
-
 //=============================================================================
-// W3DTreeBuffer::drawTrees
+// W3DTreeBuffer::advanceToppledAndPushedTrees
 //=============================================================================
-/** Draws the trees.  Uses camera to cull. */
+// GeneralsX @refactor cemlyn007 21/10/2026 drawTrees' update of the toppling, sinking and pushed aside trees, so that
+// an engine that draws on demand can run it in its client tick (advance)
 //=============================================================================
-void W3DTreeBuffer::drawTrees(CameraClass * camera, RefRenderObjListIterator *pDynamicLightsIterator)
+void W3DTreeBuffer::advanceToppledAndPushedTrees(Real timeScale)
 {
-	USE_PERF_TIMER(Tree_Render)
-	if (!m_isTerrainPass) {
-		return;
-	}
-
-	// if breeze changes, always process the full update, even if not visible,
-	// so that things offscreen won't 'pop' when first viewed
-	const BreezeInfo& info = TheScriptEngine->getBreezeInfo();
-	if (info.m_breezeVersion != m_curSwayVersion)
-	{
-		updateSway(info);
-	}
-
-	// TheSuperHackers @tweak The tree sway, topple and sink time steps are now decoupled from the render update.
-	const Real timeScale = TheFramePacer->getActualLogicTimeScaleOverFpsRatio();
-	Vector3 swayFactor[MAX_SWAY_TYPES];
-	Int i;
-	for (i=0; i<MAX_SWAY_TYPES; i++)
-	{
-		m_curSwayOffset[i] += m_curSwayStep[i] * timeScale;
-		if (m_curSwayOffset[i] > NUM_SWAY_ENTRIES-1) {
-			m_curSwayOffset[i] -= NUM_SWAY_ENTRIES-1;
-		}
-		Int minOffset = REAL_TO_INT_FLOOR(m_curSwayOffset[i]);
-		if (minOffset>=0 && minOffset+1<NUM_SWAY_ENTRIES) {
-			Real f2 = m_curSwayOffset[i] - minOffset;
-			Real f1 = 1.0f - f2;
-			swayFactor[i] = f1*m_swayOffsets[minOffset] + f2*m_swayOffsets[minOffset+1];
-			swayFactor[i] *= m_curSwayFactor[i];
-		}
-	}
-
-	m_isTerrainPass = false;
-
-	if (m_needToUpdateTexture) {
-		m_needToUpdateTexture = false;
-		updateTexture();
-	}
-	if (m_treeTexture==nullptr) {
-		return;
-	}
-	if (m_updateAllKeys) {
-		cull(camera);
-	}
-
 	Int curTree;
-	// Draw tree shadows.
-	if (m_shadow && TheW3DProjectedShadowManager && TheGlobalData->m_useShadowDecals) {
-		for (curTree=0; curTree<m_numTrees; curTree++) {
-			Int type = m_trees[curTree].treeType;
-			if (type<0) { // deleted.
-				continue;
-			}
-			if (!m_trees[curTree].visible || !m_treeTypes[type].m_doShadow) {
-				continue;
-			}
-
-			if (m_trees[curTree].m_toppleState == TOPPLE_FALLING ||
-					m_trees[curTree].m_toppleState == TOPPLE_DOWN) {
-				continue;
-			}
-			m_shadow->setSize(m_treeTypes[type].m_shadowSize, m_treeTypes[type].m_shadowSize);
-			m_shadow->setPosition(m_trees[curTree].location.X, m_trees[curTree].location.Y, m_trees[curTree].location.Z);
-			TheW3DProjectedShadowManager->queueDecal(m_shadow);
-		}
-		TheW3DProjectedShadowManager->flushDecals(m_shadow->getTexture(0), SHADOW_DECAL);
-	}
-
-	// Update pushed aside and toppling trees.
 	for (curTree=0; curTree<m_numTrees; curTree++) {
 		Int type = m_trees[curTree].treeType;
 		if (type<0) { // deleted.
@@ -1559,6 +1491,147 @@ void W3DTreeBuffer::drawTrees(CameraClass * camera, RefRenderObjListIterator *pD
 				m_trees[curTree].pushAside = 0.0f;
 			}
 		}
+	}
+
+}
+
+#if RTS_ENGINE_CONTEXT
+//=============================================================================
+// W3DTreeBuffer::advance
+//=============================================================================
+// GeneralsX @feature cemlyn007 21/10/2026 One logic frame of the trees' sway, toppling, sinking and pushing aside, and
+// the refill of their buffers that follows, for an engine that draws on demand: its client tick runs it once per logic
+// frame, and its draws only load the trees their camera sees into the buffers and draw them (Common/EngineDrawing.h).
+//=============================================================================
+void W3DTreeBuffer::advance(RefRenderObjListIterator *pDynamicLightsIterator)
+{
+	const BreezeInfo& info = TheScriptEngine->getBreezeInfo();
+	if (info.m_breezeVersion != m_curSwayVersion)
+	{
+		updateSway(info);
+	}
+	const Real timeScale = TheFramePacer->getActualLogicTimeScaleOverFpsRatio();
+	for (Int i=0; i<MAX_SWAY_TYPES; i++)
+	{
+		m_curSwayOffset[i] += m_curSwayStep[i] * timeScale;
+		if (m_curSwayOffset[i] > NUM_SWAY_ENTRIES-1) {
+			m_curSwayOffset[i] -= NUM_SWAY_ENTRIES-1;
+		}
+	}
+	advanceToppledAndPushedTrees(timeScale);
+	if (m_anythingChanged) {
+		loadTreesInVertexAndIndexBuffers(pDynamicLightsIterator);
+		m_anythingChanged = false;
+	} else if (m_anyPushChanged) {
+		m_anyPushChanged = false;
+		updateVertexBuffer();
+	}
+}
+#endif
+
+DECLARE_PERF_TIMER(Tree_Render)
+
+//=============================================================================
+// W3DTreeBuffer::drawTrees
+//=============================================================================
+/** Draws the trees.  Uses camera to cull. */
+//=============================================================================
+void W3DTreeBuffer::drawTrees(CameraClass * camera, RefRenderObjListIterator *pDynamicLightsIterator)
+{
+	USE_PERF_TIMER(Tree_Render)
+	if (!m_isTerrainPass) {
+		return;
+	}
+
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 An engine that draws on demand sways, topples, sinks and pushes aside its
+	// trees, and refills their buffers, in its client tick (advance): a draw only draws them (Common/EngineDrawing.h)
+	const Bool onDemand = rts::drawsOnDemand();
+#else
+	const Bool onDemand = FALSE;
+#endif
+
+	// if breeze changes, always process the full update, even if not visible,
+	// so that things offscreen won't 'pop' when first viewed
+	const BreezeInfo& info = TheScriptEngine->getBreezeInfo();
+	if (!onDemand && info.m_breezeVersion != m_curSwayVersion)
+	{
+		updateSway(info);
+	}
+
+	// TheSuperHackers @tweak The tree sway, topple and sink time steps are now decoupled from the render update.
+	const Real timeScale = TheFramePacer->getActualLogicTimeScaleOverFpsRatio();
+	Vector3 swayFactor[MAX_SWAY_TYPES];
+	Int i;
+	for (i=0; i<MAX_SWAY_TYPES; i++)
+	{
+		if (!onDemand)
+		{
+			m_curSwayOffset[i] += m_curSwayStep[i] * timeScale;
+			if (m_curSwayOffset[i] > NUM_SWAY_ENTRIES-1) {
+				m_curSwayOffset[i] -= NUM_SWAY_ENTRIES-1;
+			}
+		}
+		Int minOffset = REAL_TO_INT_FLOOR(m_curSwayOffset[i]);
+		if (minOffset>=0 && minOffset+1<NUM_SWAY_ENTRIES) {
+			Real f2 = m_curSwayOffset[i] - minOffset;
+			Real f1 = 1.0f - f2;
+			swayFactor[i] = f1*m_swayOffsets[minOffset] + f2*m_swayOffsets[minOffset+1];
+			swayFactor[i] *= m_curSwayFactor[i];
+		}
+	}
+
+	m_isTerrainPass = false;
+
+	if (m_needToUpdateTexture) {
+		m_needToUpdateTexture = false;
+		updateTexture();
+	}
+	if (m_treeTexture==nullptr) {
+		return;
+	}
+	if (m_updateAllKeys) {
+		cull(camera);
+	}
+
+	// GeneralsX @bugfix cemlyn007 21/10/2026 An engine that draws on demand loads the trees its camera sees into the
+	// buffers at every draw, from the trees as they are, before it queues their shadows: updateVertexBuffer writes only
+	// the trees the last cull saw and leaves a tree whose push has ended at its last push, so the buffers held what
+	// earlier draws' cameras had seen (Common/EngineDrawing.h)
+	if (onDemand)
+	{
+		m_anythingChanged = true;
+		loadTreesInVertexAndIndexBuffers(pDynamicLightsIterator);
+		m_anythingChanged = false;
+	}
+
+	Int curTree;
+	// Draw tree shadows.
+	if (m_shadow && TheW3DProjectedShadowManager && TheGlobalData->m_useShadowDecals) {
+		for (curTree=0; curTree<m_numTrees; curTree++) {
+			Int type = m_trees[curTree].treeType;
+			if (type<0) { // deleted.
+				continue;
+			}
+			if (!m_trees[curTree].visible || !m_treeTypes[type].m_doShadow) {
+				continue;
+			}
+
+			if (m_trees[curTree].m_toppleState == TOPPLE_FALLING ||
+					m_trees[curTree].m_toppleState == TOPPLE_DOWN) {
+				continue;
+			}
+			m_shadow->setSize(m_treeTypes[type].m_shadowSize, m_treeTypes[type].m_shadowSize);
+			m_shadow->setPosition(m_trees[curTree].location.X, m_trees[curTree].location.Y, m_trees[curTree].location.Z);
+			TheW3DProjectedShadowManager->queueDecal(m_shadow);
+		}
+		TheW3DProjectedShadowManager->flushDecals(m_shadow->getTexture(0), SHADOW_DECAL);
+	}
+
+	// Update pushed aside and toppling trees.
+	if (!onDemand)
+	{
+		advanceToppledAndPushedTrees(timeScale);
 	}
 
 	if (m_anythingChanged) {

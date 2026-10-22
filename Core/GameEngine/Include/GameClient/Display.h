@@ -32,6 +32,7 @@
 #include "GameClient/Color.h"
 #include "GameClient/GameFont.h"
 #include "GameClient/View.h"
+#include <vector>	// GeneralsX @feature cemlyn007 21/10/2026 The players' views
 
 enum ScreenshotFormat
 {
@@ -131,6 +132,33 @@ public:
 	virtual Bool isBatching() const { return m_isBatching; }	///< returns true if currently batching 2D draw operations.
 
 	virtual void step() {}; ///< Do one fixed time step
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 Advance the client by one logic frame, for an engine that draws on demand
+	// (Common/EngineDrawing.h)
+	virtual void tickClient() {}
+
+	// GeneralsX @feature cemlyn007 21/10/2026 Per-player views, for a host that sets the context's playerViews
+	// (docs/EMBEDDING.md, "Per-player views"). Each game's start gives every slot's player a view of its own
+	// (GameLogic::startNewGame), kept here beside the tactical view, which stays the view of the game's local player: the
+	// watcher's, for a host that anchors its local player. Every player's view is updated and stepped with the tactical
+	// view, so its camera moves by logic-frame time whether or not it is drawn, and none of them is ever drawn but by
+	// drawPlayerView, which draws one view as its player sees the game (the tactical view for a player index of -1) and
+	// leaves the client as it found it.
+	void endPlayerViews();
+	void addPlayerView( Int playerIndex, View *view );
+	View *findPlayerView( Int playerIndex ) const;
+	void drawPlayerView( Int playerIndex );
+
+	// GeneralsX @feature cemlyn007 21/10/2026 Per-player terrain shrouds, beside the per-player views: a display that draws
+	// gives every slot's player a terrain shroud of its own at each game's start (W3DDevice/GameClient/BaseHeightMap.h,
+	// addPlayerShroud), which the partition manager keeps up to date (setPlayerShroudLevel) and drawPlayerView draws the
+	// player's view with (drawWithShroudOf). A display that does not draw keeps none.
+	virtual void addPlayerShroud( Int playerIndex ) {}
+	virtual void endPlayerShrouds() {}
+	virtual Bool hasPlayerShroud( Int playerIndex ) const { return FALSE; }
+	virtual void setPlayerShroudLevel( Int playerIndex, Int x, Int y, CellShroudStatus setting ) {}
+	virtual void drawWithShroudOf( Int playerIndex ) {}
+#endif
 	virtual void draw() override;																		///< Redraw the entire display
 	virtual void setTimeOfDay( TimeOfDay tod ) = 0;								///< Set the time of day for this display
 	virtual void createLightPulse( const Coord3D *pos, const RGBColor *color, Real innerRadius,Real attenuationWidth,
@@ -208,6 +236,9 @@ protected:
 	Bool m_windowed;										///< TRUE when windowed, FALSE when fullscreen
 	Bool m_isBatching;
 	View *m_viewList;										///< All of the views into the world
+#if RTS_ENGINE_CONTEXT
+	std::vector<View *> m_playerViews;	///< GeneralsX @feature cemlyn007 21/10/2026 each player's view, by player index
+#endif
 
 	// Cinematic text data
 	AsciiString m_cinematicText;        ///< string of the cinematic text that should be displayed

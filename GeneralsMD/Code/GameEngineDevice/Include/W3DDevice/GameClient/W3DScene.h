@@ -97,6 +97,11 @@ public:
 	virtual void draw() override;
 	virtual void reset() override {}
 	void doRender(CameraClass * cam);
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 The scene's logic frame, for the client tick of an engine that draws on
+	// demand (Common/EngineDrawing.h)
+	void tickClient();
+#endif
 
 protected:
 	void renderOneObject(RenderInfoClass &rinfo, RenderObjClass *robj, Int localPlayerIndex);

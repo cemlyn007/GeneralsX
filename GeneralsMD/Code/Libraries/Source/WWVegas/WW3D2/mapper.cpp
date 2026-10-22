@@ -68,7 +68,59 @@ TextureMapperClass::TextureMapperClass(unsigned int stage)
 {
 	Stage = stage;
 	if (Stage >= MeshMatDescClass::MAX_TEX_STAGES) Stage = MeshMatDescClass::MAX_TEX_STAGES - 1;
+#if RTS_ENGINE_CONTEXT
+	Link_For_Client_Tick();
+#endif
 }
+
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 21/10/2026 Every mapper of the engine, for its client tick (mapper.h)
+namespace {
+struct ClientTickMappers
+{
+	TextureMapperClass *Head = nullptr;
+};
+constexpr rts::PerEngineStatic<ClientTickMappers> ClientTickMappers_perEngine{};
+}
+
+void TextureMapperClass::Link_For_Client_Tick()
+{
+	ClientTickMappers &mappers = ClientTickMappers_perEngine.get();
+	ClientTickPrev = nullptr;
+	ClientTickNext = mappers.Head;
+	if (mappers.Head)
+		mappers.Head->ClientTickPrev = this;
+	mappers.Head = this;
+}
+
+void TextureMapperClass::Unlink_For_Client_Tick()
+{
+	ClientTickMappers &mappers = ClientTickMappers_perEngine.get();
+	if (ClientTickPrev)
+		ClientTickPrev->ClientTickNext = ClientTickNext;
+	else if (mappers.Head == this)
+		mappers.Head = ClientTickNext;
+	if (ClientTickNext)
+		ClientTickNext->ClientTickPrev = ClientTickPrev;
+	ClientTickPrev = nullptr;
+	ClientTickNext = nullptr;
+}
+
+void TextureMapperClass::Advance_All_For_Client_Tick()
+{
+	for (TextureMapperClass *mapper = ClientTickMappers_perEngine.get().Head; mapper; mapper = mapper->ClientTickNext)
+		mapper->Advance_Client_Tick();
+}
+
+void TextureMapperClass::Advance_Client_Tick()
+{
+	if (Is_Time_Variant())
+	{
+		Matrix4x4 unused;
+		Calculate_Texture_Matrix(unused);
+	}
+}
+#endif
 
 
 // Scale mapper
@@ -1065,16 +1117,38 @@ BumpEnvTextureMapperClass::BumpEnvTextureMapperClass(const BumpEnvTextureMapperC
 {
 }
 
-void BumpEnvTextureMapperClass::Apply(int uv_array_index)
+#if RTS_ENGINE_CONTEXT
+void BumpEnvTextureMapperClass::Advance_Bump_Angle()
 {
-	LinearOffsetTextureMapperClass::Apply(uv_array_index);
-
 	unsigned int now = WW3D::Get_Sync_Time();
 	unsigned int delta =  now - LastUsedSyncTime;
 	LastUsedSyncTime=now;
 
 	CurrentAngle+=RadiansPerSecond * delta * 0.001f;
 	CurrentAngle=fmodf(CurrentAngle,2*WWMATH_PI);
+}
+
+void BumpEnvTextureMapperClass::Advance_Client_Tick()
+{
+	LinearOffsetTextureMapperClass::Advance_Client_Tick();
+	Advance_Bump_Angle();
+}
+#endif
+
+void BumpEnvTextureMapperClass::Apply(int uv_array_index)
+{
+	LinearOffsetTextureMapperClass::Apply(uv_array_index);
+
+#if RTS_ENGINE_CONTEXT
+	Advance_Bump_Angle();
+#else
+	unsigned int now = WW3D::Get_Sync_Time();
+	unsigned int delta =  now - LastUsedSyncTime;
+	LastUsedSyncTime=now;
+
+	CurrentAngle+=RadiansPerSecond * delta * 0.001f;
+	CurrentAngle=fmodf(CurrentAngle,2*WWMATH_PI);
+#endif
 
 	// Compute the sine and cosine for the bump matrix
 	float c,s;

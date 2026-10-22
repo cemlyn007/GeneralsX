@@ -28,6 +28,9 @@
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
+#if RTS_ENGINE_CONTEXT
+#include "Common/EngineContext.h"	// GeneralsX @feature cemlyn007 21/10/2026 Scripts move no camera
+#endif
 
 #include "Common/AudioAffect.h"
 #include "Common/AudioHandleSpecialValues.h"
@@ -6570,8 +6573,59 @@ void ScriptActions::doNamedSetTrainHeld( const AsciiString &locoName, const Bool
 //-------------------------------------------------------------------------------------------------
 /** Execute an action */
 //-------------------------------------------------------------------------------------------------
+#if RTS_ENGINE_CONTEXT
+//-------------------------------------------------------------------------------------------------
+// GeneralsX @feature cemlyn007 21/10/2026 Whether a script action moves the camera: moves, pans, zooms, rotations,
+// pitches, shakes, follows, tethers, the scripted camera's modifiers and the default view. For a host whose cameras are
+// its own (the context's scriptsMoveNoCamera), executeAction makes none of them.
+//-------------------------------------------------------------------------------------------------
+static Bool movesCamera( Int actionType )
+{
+	switch (actionType)
+	{
+		case ScriptAction::MOVE_CAMERA_TO:
+		case ScriptAction::SETUP_CAMERA:
+		case ScriptAction::ZOOM_CAMERA:
+		case ScriptAction::PITCH_CAMERA:
+		case ScriptAction::CAMERA_FOLLOW_NAMED:
+		case ScriptAction::CAMERA_STOP_FOLLOW:
+		case ScriptAction::CAMERA_MOD_LOOK_TOWARD:
+		case ScriptAction::CAMERA_MOD_FINAL_LOOK_TOWARD:
+		case ScriptAction::MOVE_CAMERA_ALONG_WAYPOINT_PATH:
+		case ScriptAction::ROTATE_CAMERA:
+		case ScriptAction::CAMERA_LOOK_TOWARD_OBJECT:
+		case ScriptAction::CAMERA_LOOK_TOWARD_WAYPOINT:
+		case ScriptAction::RESET_CAMERA:
+		case ScriptAction::MOVE_CAMERA_TO_SELECTION:
+		case ScriptAction::CAMERA_MOD_FREEZE_TIME:
+		case ScriptAction::CAMERA_MOD_FREEZE_ANGLE:
+		case ScriptAction::CAMERA_MOD_SET_FINAL_ZOOM:
+		case ScriptAction::CAMERA_MOD_SET_FINAL_PITCH:
+		case ScriptAction::CAMERA_MOD_SET_FINAL_SPEED_MULTIPLIER:
+		case ScriptAction::CAMERA_MOD_SET_ROLLING_AVERAGE:
+		case ScriptAction::CAMERA_MOVE_HOME:
+		case ScriptAction::CAMERA_TETHER_NAMED:
+		case ScriptAction::CAMERA_STOP_TETHER_NAMED:
+		case ScriptAction::CAMERA_SET_DEFAULT:
+		case ScriptAction::CAMERA_MOTION_BLUR_JUMP:
+		case ScriptAction::SCREEN_SHAKE:
+		case ScriptAction::CAMERA_ENABLE_SLAVE_MODE:
+		case ScriptAction::CAMERA_DISABLE_SLAVE_MODE:
+		case ScriptAction::CAMERA_ADD_SHAKER_AT:
+			return TRUE;
+		default:
+			return FALSE;
+	}
+}
+#endif
+
 void ScriptActions::executeAction( ScriptAction *pAction )
 {
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 A host whose cameras are its own: a map script moves no camera
+	if (rts::ctx()->scriptsMoveNoCamera && movesCamera(pAction->getActionType()))
+		return;
+#endif
 	switch (pAction->getActionType()) {
 		default:
 			DEBUG_CRASH(("Unknown ScriptAction type %d", pAction->getActionType())); return;

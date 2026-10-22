@@ -40,6 +40,7 @@
 // USER INCLUDES //////////////////////////////////////////////////////////////////////////////////
 #include "Lib/BaseType.h"
 
+#include "Common/EngineDrawing.h"	// GeneralsX @feature cemlyn007 21/10/2026 Drawing on demand
 #include "Common/BuildAssistant.h"
 #include "Common/FramePacer.h"
 #include "Common/GameUtility.h"
@@ -754,6 +755,38 @@ Real W3DView::getMaxZoom(Real x, Real y) const
 }
 
 //-------------------------------------------------------------------------------------------------
+// GeneralsX @feature cemlyn007 21/10/2026 Whether the terrain is drawn whole: as GlobalData's m_drawEntireTerrain asks,
+// and always in an engine that draws on demand, whose views each have a camera of their own (Display::addPlayerView).
+// The drawn terrain and the cameras' far planes then depend on none of them: the terrain is not moved after whichever
+// camera was set up last, and no camera's frustum depends on where another left the terrain.
+//-------------------------------------------------------------------------------------------------
+Bool W3DView::drawsEntireTerrain()
+{
+#if RTS_ENGINE_CONTEXT
+	if (rts::drawsOnDemand())
+		return TRUE;
+#endif
+	return TheGlobalData->m_drawEntireTerrain;
+}
+
+#if RTS_ENGINE_CONTEXT
+//-------------------------------------------------------------------------------------------------
+// GeneralsX @feature cemlyn007 21/10/2026 Set up what a draw of this view needs that is the view's own rather than the
+// client tick's, for an engine that draws on demand (Common/EngineDrawing.h): the camera, rebuilt from the view's pose
+// if the pose changed since the tick built it, so that a camera aimed between two frames shows its aim at once, and the
+// terrain's bridges, trees and props culled for it. It steps nothing, and leaves the camera to be built again by the
+// next tick, as it would have been.
+//-------------------------------------------------------------------------------------------------
+void W3DView::prepareForDrawOnDemand()
+{
+	if (m_recalcCamera)
+		updateCameraTransform();
+	if (TheTerrainRenderObject)
+		updateTerrain();
+}
+#endif
+
+//-------------------------------------------------------------------------------------------------
 /** set the transform matrix of m_3DCamera, based on m_pos & m_angle */
 //-------------------------------------------------------------------------------------------------
 void W3DView::updateCameraTransform()
@@ -799,7 +832,7 @@ void W3DView::updateCameraClipPlanes(const Matrix3D &transform)
 {
 	Real farZ;
 
-	if (TheGlobalData->m_drawEntireTerrain)
+	if (drawsEntireTerrain())
 	{
 		farZ = 100000.0f;
 	}
@@ -1721,6 +1754,13 @@ void W3DView::update()
 	TheTerrainVisual->updateSeismicSimulations();
 #endif
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 An engine that draws on demand advances every drawable's draw modules
+	// once per logic frame in its client tick, whichever views can see them (W3DDisplay::tickClient)
+	if (rts::drawsOnDemand())
+		return;
+#endif
+
 	Region3D axisAlignedRegion;
 	getAxisAlignedViewRegion(axisAlignedRegion);
 
@@ -1879,6 +1919,15 @@ void W3DView::draw()
 	Bool doExtraRender = false;
 	CustomScenePassModes customScenePassMode  = SCENE_PASS_DEFAULT;
 	Bool preRenderResult = false;
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 A draw of an engine that draws on demand renders the drawable the camera is
+	// locked on with the rest of the scene. Hiding it for the scene and showing it again to draw it alone capped its
+	// track marks and deselected it at every draw, so the track marks depended on which frames were drawn
+	// (Common/EngineDrawing.h).
+	const Bool drawsCameraLockApart = !rts::drawsOnDemand();
+#else
+	const Bool drawsCameraLockApart = TRUE;
+#endif
 
 	if (m_viewFilterMode &&
 			m_viewFilter > FT_NULL_FILTER &&
@@ -1886,7 +1935,7 @@ void W3DView::draw()
 	{
 		// Most likely will redirect rendering to a texture.
 		preRenderResult=W3DShaderManager::filterPreRender(m_viewFilter, skipRender, customScenePassMode);
-		if (!skipRender && getCameraLock())
+		if (drawsCameraLockApart && !skipRender && getCameraLock())
 		{
 			Object* cameraLockObj = TheGameLogic->findObjectByID(getCameraLock());
 			if (cameraLockObj)
@@ -1917,7 +1966,7 @@ void W3DView::draw()
 		Bool continueTheEffect = false;
 		if (preRenderResult)	//if prerender passed, do the post render.
 			continueTheEffect = W3DShaderManager::filterPostRender(m_viewFilter, m_viewFilterMode, deltaScroll,doExtraRender);
-		if (!skipRender && getCameraLock())
+		if (drawsCameraLockApart && !skipRender && getCameraLock())
 		{
 			Object* cameraLockObj = TheGameLogic->findObjectByID(getCameraLock());
 			if (cameraLockObj)
@@ -3781,7 +3830,7 @@ void W3DView::Add_Camera_Shake (const Coord3D & position,float radius,float dura
 
 bool W3DView::getDesiredTerrainDrawSize(ICoord2D &dimensions) const
 {
-	if (TheGlobalData && TheGlobalData->m_drawEntireTerrain)
+	if (TheGlobalData && drawsEntireTerrain())
 	{
 		DEBUG_ASSERTCRASH(TheTerrainRenderObject != nullptr, ("TheTerrainRenderObject is null"));
 

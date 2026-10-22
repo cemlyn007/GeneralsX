@@ -36,7 +36,13 @@
 #include "Common/PerfTimer.h"
 #include "Common/ThingFactory.h"
 #include "Common/GameLOD.h"
+#include "Common/RandomValue.h"	// GeneralsX @feature cemlyn007 21/10/2026 The simulations' streams
 #include "Common/Xfer.h"
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 21/10/2026 Copying a load's particle systems (copyLoadedSystemsToSimulations)
+#include "Common/XferLoad.h"
+#include "Common/XferSave.h"
+#endif
 
 #include "GameClient/Drawable.h"
 #include "GameClient/DebugDisplay.h"
@@ -727,7 +733,14 @@ void Particle::loadPostProcess()
 		ParticleSystem *system;
 
 		// find system
+#if RTS_ENGINE_CONTEXT
+		// GeneralsX @feature cemlyn007 21/10/2026 In the particle's own simulation, which a copy of a load's systems in a
+		// player's simulation is not the current one for (ParticleSystemManager::copyLoadedSystemsToSimulations)
+		ParticleSystemManager *simulation = m_system->getOwner() != nullptr ? m_system->getOwner() : TheParticleSystemManager;
+		system = simulation->findParticleSystem( m_systemUnderControlID );
+#else
 		system = TheParticleSystemManager->findParticleSystem( m_systemUnderControlID );
+#endif
 
 		// set us as the control particle for this system
 		system->setControlParticle( this );
@@ -1086,6 +1099,10 @@ ParticleSystem::ParticleSystem( const ParticleSystemTemplate *sysTemplate,
 																ParticleSystemID id,
 																Bool createSlaves )
 {
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 The simulation it is made in (ParticleSystemManager::beginSimulations)
+	m_owner = TheParticleSystemManager;
+#endif
 	m_systemParticlesHead = m_systemParticlesTail = nullptr;
 
 	m_isFirstPos = true;
@@ -1317,6 +1334,7 @@ void ParticleSystem::setSaveable(Bool b)
 	m_isSaveable = b;
 	if (m_slaveSystem)
 		m_slaveSystem->setSaveable(b);
+	RTS_CHANGE_PARTICLE_MIRRORS(setSaveable(b));
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -1325,6 +1343,7 @@ void ParticleSystem::setSaveable(Bool b)
 void ParticleSystem::start()
 {
 	m_isStopped = false;
+	RTS_CHANGE_PARTICLE_MIRRORS(start());
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -1333,6 +1352,7 @@ void ParticleSystem::start()
 void ParticleSystem::stop()
 {
 	m_isStopped = true;
+	RTS_CHANGE_PARTICLE_MIRRORS(stop());
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -1345,6 +1365,7 @@ void ParticleSystem::destroy()
 	{
 		m_slaveSystem->destroy();  // If we don't it will leak forever.  We are solely responsible for it.
 	}
+	RTS_CHANGE_PARTICLE_MIRRORS(destroy());
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -1370,6 +1391,7 @@ void ParticleSystem::setPosition( const Coord3D *pos )
 	m_localTransform.Set_Y_Translation( pos->y );
 	m_localTransform.Set_Z_Translation( pos->z );
 	m_isLocalIdentity = false;
+	RTS_CHANGE_PARTICLE_MIRRORS(setPosition(pos));
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -1379,6 +1401,7 @@ void ParticleSystem::setLocalTransform( const Matrix3D *matrix )
 {
 	m_localTransform = *matrix;
 	m_isLocalIdentity = false;
+	RTS_CHANGE_PARTICLE_MIRRORS(setLocalTransform(matrix));
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -1388,6 +1411,7 @@ void ParticleSystem::rotateLocalTransformX( Real x )
 {
 	m_localTransform.Rotate_X( x );
 	m_isLocalIdentity = false;
+	RTS_CHANGE_PARTICLE_MIRRORS(rotateLocalTransformX(x));
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -1397,6 +1421,7 @@ void ParticleSystem::rotateLocalTransformY( Real y )
 {
 	m_localTransform.Rotate_Y( y );
 	m_isLocalIdentity = false;
+	RTS_CHANGE_PARTICLE_MIRRORS(rotateLocalTransformY(y));
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -1406,6 +1431,7 @@ void ParticleSystem::rotateLocalTransformZ( Real z )
 {
 	m_localTransform.Rotate_Z( z );
 	m_isLocalIdentity = false;
+	RTS_CHANGE_PARTICLE_MIRRORS(rotateLocalTransformZ(z));
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -1417,6 +1443,7 @@ void ParticleSystem::attachToDrawable( const Drawable *draw )
 		m_attachedToDrawableID = draw->getID();
 	else
 		m_attachedToDrawableID = INVALID_DRAWABLE_ID;
+	RTS_CHANGE_PARTICLE_MIRRORS(attachToDrawable(draw));
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -1428,6 +1455,7 @@ void ParticleSystem::attachToObject( const Object *obj )
 		m_attachedToObjectID = obj->getID();
 	else
 		m_attachedToObjectID = INVALID_ID;
+	RTS_CHANGE_PARTICLE_MIRRORS(attachToObject(obj));
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -1983,7 +2011,13 @@ Bool ParticleSystem::update( Int localPlayerIndex  )
 
 		if (attachedTo)
 		{
+#if RTS_ENGINE_CONTEXT
+			// GeneralsX @feature cemlyn007 21/10/2026 A player's particle simulation tests the drawable as that player sees
+			// it (ParticleSystemManager::beginSimulations)
+			if (TheParticleSystemManager->isPlayerSimulation() ? attachedTo->isFullyObscuredByShroudFor(localPlayerIndex) : attachedTo->getFullyObscuredByShroud())
+#else
 			if (attachedTo->getFullyObscuredByShroud())
+#endif
 				isShrouded = true;
 
 			parentXfrm = attachedTo->getTransformMatrix();
@@ -2491,6 +2525,7 @@ ParticleInfo ParticleSystem::mergeRelatedParticleSystems( ParticleSystem *master
 void ParticleSystem::setLifetimeRange( Real min, Real max )
 {
 	m_lifetime.setRange( min, max );
+	RTS_CHANGE_PARTICLE_MIRRORS(setLifetimeRange(min, max));
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -2499,6 +2534,25 @@ void ParticleSystem::setControlParticle( Particle *p )
 {
 	m_controlParticle = p;
 }
+
+#if RTS_ENGINE_CONTEXT
+// ------------------------------------------------------------------------------------------------
+// GeneralsX @feature cemlyn007 21/10/2026 Apply a change to this system's copy in every player's particle simulation:
+// the system of the same ID there (ParticleSystemManager::beginSimulations)
+// ------------------------------------------------------------------------------------------------
+void ParticleSystem::forEachMirror( void (*apply)(ParticleSystem &mirror, const void *argument), const void *argument )
+{
+	if (m_owner == nullptr)
+		return;
+	const Int simulations = m_owner->getSimulationCount();
+	for (Int i = 0; i < simulations; ++i)
+	{
+		ParticleSystem *mirror = m_owner->getSimulation(i)->findParticleSystem(m_systemID);
+		if (mirror != nullptr && mirror != this)
+			apply(*mirror, argument);
+	}
+}
+#endif
 
 // ------------------------------------------------------------------------------------------------
 /** CRC */
@@ -2669,7 +2723,12 @@ void ParticleSystem::loadPostProcess()
 		}
 
 		// assign system
+#if RTS_ENGINE_CONTEXT
+		// GeneralsX @feature cemlyn007 21/10/2026 In this system's own simulation (see Particle::loadPostProcess)
+		m_slaveSystem = (m_owner != nullptr ? m_owner : TheParticleSystemManager)->findParticleSystem( m_slaveSystemID );
+#else
 		m_slaveSystem = TheParticleSystemManager->findParticleSystem( m_slaveSystemID );
+#endif
 
 		// sanity
 		if( m_slaveSystem == nullptr || m_slaveSystem->isDestroyed() == TRUE )
@@ -2696,7 +2755,12 @@ void ParticleSystem::loadPostProcess()
 		}
 
 		// assign system
+#if RTS_ENGINE_CONTEXT
+		// GeneralsX @feature cemlyn007 21/10/2026 In this system's own simulation (see Particle::loadPostProcess)
+		m_masterSystem = (m_owner != nullptr ? m_owner : TheParticleSystemManager)->findParticleSystem( m_masterSystemID );
+#else
 		m_masterSystem = TheParticleSystemManager->findParticleSystem( m_masterSystemID );
+#endif
 
 		// sanity
 		if( m_masterSystem == nullptr || m_masterSystem->isDestroyed() == TRUE )
@@ -2997,6 +3061,9 @@ ParticleSystemManager::ParticleSystemManager()
 // ------------------------------------------------------------------------------------------------
 ParticleSystemManager::~ParticleSystemManager()
 {
+#if RTS_ENGINE_CONTEXT
+	endSimulations();
+#endif
 	reset();
 
 	TemplateMap::iterator begin(m_templateMap.begin());
@@ -3036,6 +3103,22 @@ void ParticleSystemManager::init()
 // ------------------------------------------------------------------------------------------------
 void ParticleSystemManager::reset()
 {
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 Every player's simulation is reset with the watcher's
+	for (ParticleSystemManager *simulation : m_simulations)
+	{
+		ParticleSimulationScope scope(simulation, FALSE);
+		simulation->resetOwnSystems();
+	}
+	resetOwnSystems();
+}
+
+// ------------------------------------------------------------------------------------------------
+// GeneralsX @refactor cemlyn007 21/10/2026 reset()'s body: the reset of this simulation's own systems
+// ------------------------------------------------------------------------------------------------
+void ParticleSystemManager::resetOwnSystems()
+{
+#endif
 	while (!m_allParticleSystemList.empty())
 	{
 		DEBUG_ASSERTCRASH(m_allParticleSystemList.front() != nullptr, ("ParticleSystemManager::reset: ParticleSystem is null"));
@@ -3074,12 +3157,41 @@ void ParticleSystemManager::reset()
 //DECLARE_PERF_TIMER(ParticleSystemManager)
 void ParticleSystemManager::update()
 {
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 With players' simulations, the watcher's and then every player's, each with
+	// its own client random stream (beginSimulations)
+	if (!m_simulations.empty())
+	{
+		{
+			ParticleSimulationScope scope(this, TRUE);
+			updateOwnSystems();
+		}
+		for (ParticleSystemManager *simulation : m_simulations)
+		{
+			ParticleSimulationScope scope(simulation, TRUE);
+			simulation->updateOwnSystems();
+		}
+		return;
+	}
+	updateOwnSystems();
+}
+
+// ------------------------------------------------------------------------------------------------
+// GeneralsX @refactor cemlyn007 21/10/2026 update()'s body: the update of this simulation's own systems
+// ------------------------------------------------------------------------------------------------
+void ParticleSystemManager::updateOwnSystems()
+{
+#endif
 	if (m_lastLogicFrameUpdate == TheGameLogic->getFrame()) {
 		return;
 	}
 
 	// update the last logic frame.
 	m_lastLogicFrameUpdate = TheGameLogic->getFrame();
+
+#if RTS_ENGINE_CONTEXT
+	m_updatingOwnSystems = TRUE;
+#endif
 
 	//USE_PERF_TIMER(ParticleSystemManager)
 	ParticleSystemListIt it = m_allParticleSystemList.begin();
@@ -3099,6 +3211,9 @@ void ParticleSystemManager::update()
 			deleteInstance(sys);
 		}
 	}
+#if RTS_ENGINE_CONTEXT
+	m_updatingOwnSystems = FALSE;
+#endif
 
 	// GeneralsX @bugfix fbraz 04/05/2026 Skip smudge rendering path in headless replay simulation.
 	const Bool drawSmudge = !TheGlobalData->m_headless && TheSmudgeManager && TheSmudgeManager->getHardwareSupport() && TheGlobalData->m_useHeatEffects;
@@ -3162,8 +3277,47 @@ ParticleSystem *ParticleSystemManager::createParticleSystem( const ParticleSyste
 	if (sysTemplate == nullptr)
 		return nullptr;
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 A system made in the watcher's simulation, other than inside the making of
+	// another or inside the simulation's own update, is made in every player's simulation too, with the same ID and from
+	// that simulation's client random stream, and is marked so that its changes are copied (beginSimulations)
+	if (!m_simulations.empty() && m_creationDepth == 0 && !m_updatingOwnSystems)
+	{
+		ParticleSystem *sys;
+		{
+			ParticleSimulationScope scope(this, TRUE);
+			sys = createOwnSystem(sysTemplate, createSlaves);
+		}
+		for (ParticleSystemManager *simulation : m_simulations)
+		{
+			// GeneralsX @feature cemlyn007 22/10/2026 Only for the players who would see it made (ParticleViewersScope); the
+			// simulation of a player left out makes nothing and draws nothing from its client random stream
+			if ((m_creationViewers & (1u << simulation->m_localPlayerIndex)) == 0)
+				continue;
+			ParticleSimulationScope scope(simulation, TRUE);
+			++simulation->m_creationDepth;
+			newInstance(ParticleSystem)( sysTemplate, sys->getSystemID(), createSlaves );
+			--simulation->m_creationDepth;
+		}
+		sys->setMirrored(TRUE);
+		return sys;
+	}
+	return createOwnSystem(sysTemplate, createSlaves);
+}
+
+// ------------------------------------------------------------------------------------------------
+// GeneralsX @refactor cemlyn007 21/10/2026 createParticleSystem's body: a system of this simulation's own, with the
+// next of its IDs
+// ------------------------------------------------------------------------------------------------
+ParticleSystem *ParticleSystemManager::createOwnSystem( const ParticleSystemTemplate *sysTemplate, Bool createSlaves )
+{
+	++m_creationDepth;
+#endif
 	m_uniqueSystemID = (ParticleSystemID)((UnsignedInt)m_uniqueSystemID + 1);
 	ParticleSystem *sys = newInstance(ParticleSystem)( sysTemplate, m_uniqueSystemID, createSlaves );
+#if RTS_ENGINE_CONTEXT
+	--m_creationDepth;
+#endif
 	return sys;
 }
 
@@ -3213,6 +3367,11 @@ void ParticleSystemManager::destroyParticleSystemByID(ParticleSystemID id)
 // ------------------------------------------------------------------------------------------------
 ParticleSystemTemplate *ParticleSystemManager::findTemplate( const AsciiString &name ) const
 {
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 A player's simulation uses the watcher's templates (beginSimulations)
+	if (m_templateSource != nullptr)
+		return m_templateSource->findTemplate(name);
+#endif
 	ParticleSystemTemplate *sysTemplate = nullptr;
 
 	TemplateMap::const_iterator find(m_templateMap.find(name));
@@ -3288,6 +3447,11 @@ void ParticleSystemManager::destroyAttachedSystems( Object *obj )
 
 	}
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 And those of every player's simulation (beginSimulations)
+	for (ParticleSystemManager *simulation : m_simulations)
+		simulation->destroyAttachedSystems(obj);
+#endif
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -3441,9 +3605,29 @@ void ParticleSystemManager::xfer( Xfer *xfer )
 {
 
 	// version
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 22/10/2026 2: followed by every player's simulation, as it is (xferSimulations)
+	XferVersion currentVersion = 2;
+#else
 	XferVersion currentVersion = 1;
+#endif
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
+
+#if RTS_ENGINE_CONTEXT
+	xferOwnSystems( xfer );
+	if( version >= 2 )
+		xferSimulations( xfer );
+	else if( xfer->getXferMode() == XFER_LOAD )
+		copyLoadedSystemsToSimulations();
+}
+
+// ------------------------------------------------------------------------------------------------
+// GeneralsX @refactor cemlyn007 22/10/2026 xfer()'s body: this simulation's own systems
+// ------------------------------------------------------------------------------------------------
+void ParticleSystemManager::xferOwnSystems( Xfer *xfer )
+{
+#endif
 
 	// unique system ID counter
 	xfer->xferUser( &m_uniqueSystemID, sizeof( ParticleSystemID ) );
@@ -3487,6 +3671,10 @@ void ParticleSystemManager::xfer( Xfer *xfer )
 	else
 	{
 		DEBUG_ASSERTCRASH(m_allParticleSystemList.empty(), ("ParticleSystemManager: particle systems list is expected empty at start of xfer-load."));
+#if RTS_ENGINE_CONTEXT
+		// GeneralsX @feature cemlyn007 21/10/2026 Which systems this load restores (copyLoadedSystemsToSimulations)
+		m_loadedSystemIDs.clear();
+#endif
 
 		const ParticleSystemTemplate *systemTemplate;
 
@@ -3530,19 +3718,267 @@ void ParticleSystemManager::xfer( Xfer *xfer )
 			}
 
 			friend_addParticleSystem(system);
+#if RTS_ENGINE_CONTEXT
+			m_loadedSystemIDs.push_back(system->getSystemID());
+#endif
 		}
 
 	}
 
 }
 
+#if RTS_ENGINE_CONTEXT
+// ------------------------------------------------------------------------------------------------
+// GeneralsX @feature cemlyn007 22/10/2026 Every player's simulation, each as it is: a player's simulation holds only
+// the effects that player could see made (ParticleViewersScope), and only the particles its own shroud test let its
+// systems emit, which the watcher's systems do not tell. Each simulation's systems are read into it, and post-processed
+// with the rest of the load in it (ParticleSystem::loadPostProcess, Particle::loadPostProcess).
+// ------------------------------------------------------------------------------------------------
+void ParticleSystemManager::xferSimulations( Xfer *xfer )
+{
+	Int simulationCount = (Int)m_simulations.size();
+	xfer->xferInt( &simulationCount );
+	for( Int i = 0; i < simulationCount; ++i )
+	{
+		Int playerIndex = xfer->getXferMode() == XFER_SAVE ? m_simulations[i]->m_localPlayerIndex : -1;
+		xfer->xferInt( &playerIndex );
+		ParticleSystemManager *simulation = findSimulationOfPlayer( playerIndex );
+		if( simulation == this )
+		{
+			DEBUG_CRASH(( "ParticleSystemManager::xferSimulations - No simulation of player %d", playerIndex ));
+			throw SC_INVALID_DATA;
+		}
+		ParticleSimulationScope scope( simulation, FALSE );
+		simulation->xferOwnSystems( xfer );
+	}
+}
+#endif
+
 // ------------------------------------------------------------------------------------------------
 /** Load post process */
 // ------------------------------------------------------------------------------------------------
 void ParticleSystemManager::loadPostProcess()
 {
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 The systems the load restored change their copies too
+	mirrorLoadedSystems();
+#endif
+}
+
+#if RTS_ENGINE_CONTEXT
+// ------------------------------------------------------------------------------------------------
+// GeneralsX @feature cemlyn007 21/10/2026 Give each of the players a particle simulation of its own, in place of any the
+// last game had (see the declaration). A player's simulation tests shroud as that player (its local player index), uses
+// the watcher's templates, starts its client random stream from the game's seed, as the watcher's does, and numbers the
+// systems it makes for itself (a particle's attached system, a slave) from an ID range of its own, so that they never
+// meet the IDs of the systems it copies.
+// ------------------------------------------------------------------------------------------------
+void ParticleSystemManager::beginSimulations( const std::vector<Int> &playerIndices )
+{
+	endSimulations();
+	SeedClientRandomStream(GetGameLogicRandomSeed(), m_clientRandomStream);
+	UnsignedInt idBase = 0x40000000u;
+	for (Int playerIndex : playerIndices)
+	{
+		ParticleSystemManager *simulation = newSimulation();
+		if (simulation == nullptr)
+			continue;
+		simulation->m_templateSource = this;
+		simulation->m_localPlayerIndex = playerIndex;
+		simulation->m_lastLogicFrameUpdate = m_lastLogicFrameUpdate;
+		simulation->m_uniqueSystemID = (ParticleSystemID)idBase;
+		idBase += 0x08000000u;
+		SeedClientRandomStream(GetGameLogicRandomSeed(), simulation->m_clientRandomStream);
+		m_simulations.push_back(simulation);
+	}
+}
+
+namespace
+{
+
+// ------------------------------------------------------------------------------------------------
+// GeneralsX @feature cemlyn007 21/10/2026 XferSave into memory, for ParticleSystemManager::copyLoadedSystemsToSimulations
+// ------------------------------------------------------------------------------------------------
+class ParticleCopyWriter : public XferSave
+{
+public:
+	virtual void open( AsciiString identifier ) override { Xfer::open( identifier ); }
+	virtual void close() override {}
+	virtual Int beginBlock() override
+	{
+		m_blockStarts.push_back( m_bytes.size() );
+		XferBlockSize blockSize = 0;
+		xferImplementation( &blockSize, sizeof( blockSize ) );
+		return XFER_OK;
+	}
+	virtual void endBlock() override
+	{
+		const size_t start = m_blockStarts.back();
+		m_blockStarts.pop_back();
+		const XferBlockSize blockSize = (XferBlockSize)(m_bytes.size() - start - sizeof( XferBlockSize ));
+		memcpy( &m_bytes[start], &blockSize, sizeof( blockSize ) );
+	}
+	virtual void skip( Int dataSize ) override { m_bytes.resize( m_bytes.size() + dataSize ); }
+	const std::vector<UnsignedByte> &bytes() const { return m_bytes; }
+
+protected:
+	virtual void xferImplementation( void *data, Int dataSize ) override
+	{
+		const UnsignedByte *first = static_cast<const UnsignedByte *>( data );
+		m_bytes.insert( m_bytes.end(), first, first + dataSize );
+	}
+
+private:
+	std::vector<UnsignedByte> m_bytes;
+	std::vector<size_t> m_blockStarts;
+};
+
+// ------------------------------------------------------------------------------------------------
+// GeneralsX @feature cemlyn007 21/10/2026 XferLoad from what a ParticleCopyWriter wrote; what it reads is post-processed
+// with the rest of the load
+// ------------------------------------------------------------------------------------------------
+class ParticleCopyReader : public XferLoad
+{
+public:
+	explicit ParticleCopyReader( const std::vector<UnsignedByte> &bytes ) : m_bytes( bytes ) {}
+	virtual void open( AsciiString identifier ) override { Xfer::open( identifier ); }
+	virtual void close() override {}
+	virtual Int beginBlock() override
+	{
+		XferBlockSize blockSize = 0;
+		xferImplementation( &blockSize, sizeof( blockSize ) );
+		return blockSize;
+	}
+	virtual void endBlock() override {}
+	virtual void skip( Int dataSize ) override { take( dataSize ); }
+
+protected:
+	virtual void xferImplementation( void *data, Int dataSize ) override
+	{
+		memcpy( data, take( dataSize ), dataSize );
+	}
+
+private:
+	const UnsignedByte *take( Int dataSize )
+	{
+		if( dataSize < 0 || m_next + dataSize > m_bytes.size() )
+			throw XFER_READ_ERROR;
+		const UnsignedByte *taken = m_bytes.data() + m_next;
+		m_next += dataSize;
+		return taken;
+	}
+
+	const std::vector<UnsignedByte> &m_bytes;
+	size_t m_next = 0;
+};
 
 }
+
+// ------------------------------------------------------------------------------------------------
+// GeneralsX @feature cemlyn007 21/10/2026 A load restores its particle systems into the watcher's simulation, and
+// GeneralsX would restore them for whoever is its local player. So each player's simulation gets a copy of each of them,
+// with the same ID and its particles, as if it had copied them as they were made; the copy changes no client random
+// stream. The copies are post-processed with the rest of the load, which links each to its master, slaves and
+// controlling particle in its own simulation (ParticleSystem::loadPostProcess, Particle::loadPostProcess).
+// GeneralsX @feature cemlyn007 22/10/2026 Only for a save made before version 2, which holds the watcher's systems
+// alone; a later save holds every player's simulation (xferSimulations).
+// ------------------------------------------------------------------------------------------------
+void ParticleSystemManager::copyLoadedSystemsToSimulations()
+{
+	if (m_simulations.empty() || m_loadedSystemIDs.empty())
+		return;
+
+	ParticleCopyWriter writer;
+	for (ParticleSystemID id : m_loadedSystemIDs)
+		writer.xferSnapshot( findParticleSystem(id) );
+
+	UnsignedInt clientStream[6];
+	memcpy(clientStream, rts::ctx()->gameClientSeed, sizeof(clientStream));
+	for (ParticleSystemManager *simulation : m_simulations)
+	{
+		ParticleSimulationScope scope(simulation, FALSE);
+		ParticleCopyReader reader(writer.bytes());
+		for (ParticleSystemID id : m_loadedSystemIDs)
+		{
+			ParticleSystem *copy = newInstance(ParticleSystem)( findParticleSystem(id)->getTemplate(), INVALID_PARTICLE_SYSTEM_ID, FALSE );
+			reader.xferSnapshot( copy );
+			simulation->friend_addParticleSystem( copy );
+		}
+	}
+	memcpy(rts::ctx()->gameClientSeed, clientStream, sizeof(clientStream));
+}
+
+// ------------------------------------------------------------------------------------------------
+// GeneralsX @feature cemlyn007 21/10/2026 Once the load's systems are linked, each that is neither a slave nor driven
+// by a particle is marked so that its changes are copied to its copies, as a system made outside an update is
+// ------------------------------------------------------------------------------------------------
+void ParticleSystemManager::mirrorLoadedSystems()
+{
+	if (!m_simulations.empty())
+	{
+		for (ParticleSystemID id : m_loadedSystemIDs)
+		{
+			ParticleSystem *system = findParticleSystem(id);
+			if (system != nullptr && system->getMaster() == nullptr && !system->isControlledByParticle())
+				system->setMirrored(TRUE);
+		}
+	}
+	m_loadedSystemIDs.clear();
+}
+
+// ------------------------------------------------------------------------------------------------
+// GeneralsX @feature cemlyn007 21/10/2026 Delete every player's simulation, with what it holds
+// ------------------------------------------------------------------------------------------------
+void ParticleSystemManager::endSimulations()
+{
+	std::vector<ParticleSystemManager *> simulations;
+	simulations.swap(m_simulations);
+	for (ParticleSystemManager *simulation : simulations)
+	{
+		ParticleSimulationScope scope(simulation, FALSE);
+		delete simulation;
+	}
+	for (ParticleSystem *system : m_allParticleSystemList)
+		system->setMirrored(FALSE);
+}
+
+// ------------------------------------------------------------------------------------------------
+// GeneralsX @feature cemlyn007 21/10/2026 The player's simulation, or this one (the watcher's) for a player that has none
+// ------------------------------------------------------------------------------------------------
+ParticleSystemManager *ParticleSystemManager::findSimulationOfPlayer( Int playerIndex )
+{
+	for (ParticleSystemManager *simulation : m_simulations)
+	{
+		if (simulation->m_localPlayerIndex == playerIndex)
+			return simulation;
+	}
+	return this;
+}
+
+// ------------------------------------------------------------------------------------------------
+// GeneralsX @feature cemlyn007 21/10/2026 See the declaration
+// ------------------------------------------------------------------------------------------------
+ParticleSimulationScope::ParticleSimulationScope( ParticleSystemManager *simulation, Bool withRandomStream )
+	: m_previous(TheParticleSystemManager), m_simulation(simulation), m_withRandomStream(withRandomStream)
+{
+	TheParticleSystemManager = simulation;
+	if (m_withRandomStream)
+	{
+		memcpy(m_savedRandomStream, rts::ctx()->gameClientSeed, sizeof(m_savedRandomStream));
+		memcpy(rts::ctx()->gameClientSeed, simulation->getClientRandomStream(), sizeof(m_savedRandomStream));
+	}
+}
+
+ParticleSimulationScope::~ParticleSimulationScope()
+{
+	if (m_withRandomStream)
+	{
+		memcpy(m_simulation->getClientRandomStream(), rts::ctx()->gameClientSeed, sizeof(m_savedRandomStream));
+		memcpy(rts::ctx()->gameClientSeed, m_savedRandomStream, sizeof(m_savedRandomStream));
+	}
+	TheParticleSystemManager = m_previous;
+}
+#endif
 
 // ------------------------------------------------------------------------------------------------
 /** Output particle system statistics to the screen

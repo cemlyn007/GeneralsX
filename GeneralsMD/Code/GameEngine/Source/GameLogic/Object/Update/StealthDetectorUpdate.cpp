@@ -372,6 +372,12 @@ UpdateSleepTime StealthDetectorUpdate::update()
 	//Make sure the detector is visible to the local player before we add effects or sounds.
 	if ( self->getShroudedStatus( localPlayer->getPlayerIndex() ) <= OBJECTSHROUD_PARTIAL_CLEAR )
 	{
+#if RTS_ENGINE_CONTEXT
+		// GeneralsX @feature cemlyn007 22/10/2026 The ping's particle systems go to the simulations of the players who can
+		// see the detector, as above (ParticleViewersScope)
+		ParticleViewersScope viewers(TheParticleSystemManager, [self](Int viewer)
+			{ return self->getShroudedStatus(viewer) <= OBJECTSHROUD_PARTIAL_CLEAR; });
+#endif
     if ( self->testStatus( OBJECT_STATUS_STEALTHED ) == FALSE || self->getControllingPlayer() == localPlayer )
     {
 		  Drawable *myDraw = self->getDrawable();

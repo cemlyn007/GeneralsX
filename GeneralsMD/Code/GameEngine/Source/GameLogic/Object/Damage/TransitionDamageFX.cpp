@@ -31,6 +31,9 @@
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
 #include "Common/Xfer.h"
+#if RTS_ENGINE_CONTEXT
+#include "Common/EngineDrawing.h"	// GeneralsX @bugfix cemlyn007 22/10/2026 Particle placement picks
+#endif
 #include "GameClient/Drawable.h"
 #include "GameClient/FXList.h"
 #include "GameLogic/GameLogic.h"
@@ -253,7 +256,9 @@ void TransitionDamageFX::onDelete()
 /** Given an FXLoc info struct, return the effect position that we are supposed to use.
 	* The position is local to to the object */
 //-------------------------------------------------------------------------------------------------
-static Coord3D getLocalEffectPos( const FXLocInfo *locInfo, Drawable *draw )
+// GeneralsX @bugfix cemlyn007 22/10/2026 placesParticleSystem: whether the position places a particle system just made,
+// whose random bone is then picked as Common/EngineDrawing.h's placesParticlesWithClientRandom says
+static Coord3D getLocalEffectPos( const FXLocInfo *locInfo, Drawable *draw, Bool placesParticleSystem = FALSE )
 {
 
 	DEBUG_ASSERTCRASH( locInfo, ("getLocalEffectPos: locInfo is null") );
@@ -290,7 +295,15 @@ static Coord3D getLocalEffectPos( const FXLocInfo *locInfo, Drawable *draw )
 				return locInfo->loc;
 
 			// pick one of the bone positions
+#if RTS_ENGINE_CONTEXT
+			// GeneralsX @bugfix cemlyn007 22/10/2026 A particle system's bone is picked from the client random stream in an
+			// engine that draws on demand, so its logic random generator is the same as an engine's with no rendering, which
+			// makes no particle system and so picks no bone (Common/EngineDrawing.h)
+			Int pick = placesParticleSystem && rts::placesParticlesWithClientRandom() ? GameClientRandomValue( 0, boneCount - 1 )
+				: GameLogicRandomValue( 0, boneCount - 1 );
+#else
 			Int pick = GameLogicRandomValue( 0, boneCount - 1 );
+#endif
 			return positions[ pick ];
 
 		}
@@ -394,7 +407,7 @@ void TransitionDamageFX::onBodyDamageStateChange( const DamageInfo* damageInfo,
 					{
 
 						// get the what is the position we're going to played the effect at
-						pos = getLocalEffectPos( &modData->m_particleSystem[ newState ][ i ].locInfo, draw );
+						pos = getLocalEffectPos( &modData->m_particleSystem[ newState ][ i ].locInfo, draw, TRUE );
 
 						//
 						// set position on system given any bone position provided, the bone position is

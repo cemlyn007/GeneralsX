@@ -46,6 +46,7 @@
 //         Includes
 //-----------------------------------------------------------------------------
 #include "W3DDevice/GameClient/HeightMap.h"
+#include "Common/EngineDrawing.h"	// GeneralsX @bugfix cemlyn007 21/10/2026 Drawing on demand
 
 #ifndef USE_FLAT_HEIGHT_MAP // Flat height map uses flattened textures. jba. [3/20/2003]
 
@@ -2205,6 +2206,13 @@ void HeightMapRenderObjClass::renderExtraBlendTiles()
 	if (!m_numExtraBlendTiles)
 		return;	//nothing to draw
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @bugfix cemlyn007 21/10/2026 A draw of an engine that draws on demand makes room for every extra blend tile
+	// at once, rather than growing its room by 16 tiles after each draw that ran out of it, so which blend tiles a draw
+	// shows does not depend on how many draws came before it (Common/EngineDrawing.h)
+	if (rts::drawsOnDemand() && maxBlendTiles < m_numExtraBlendTiles)
+		maxBlendTiles = m_numExtraBlendTiles;
+#endif
 	if (maxBlendTiles > 10000)	//we can only fit about 10000 tiles into a single VB.
 		maxBlendTiles = 10000;
 

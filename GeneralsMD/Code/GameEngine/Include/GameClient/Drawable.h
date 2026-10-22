@@ -377,6 +377,42 @@ public:
 
 	void setShroudClearFrame( UnsignedInt frame )  { m_shroudClearFrame = frame; }
 	UnsignedInt getShroudClearFrame() { return m_shroudClearFrame; }
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 The shroud-clear frame and fully-obscured test as a given player sees the
+	// drawable, for that player's particle simulation (ParticleSystemManager::beginSimulations): GameClient::update's test
+	// for its local player, with that player's own shroud-clear frame, which the client tick notes
+	void setShroudClearFrameFor( Int playerIndex, UnsignedInt frame ) { m_shroudClearFrameFor[playerIndex] = frame; }
+	Bool isFullyObscuredByShroudFor( Int playerIndex );
+
+	// GeneralsX @feature cemlyn007 21/10/2026 For one draw of a player's view (Display::drawPlayerView): give the drawable
+	// the looks it has in that player's view, its stealth look and whether it is fully obscured by the player's shroud,
+	// as the logic and the client tick would give it for that player, but only for what the draw shows, with none of
+	// their other effects (no deselection, model change, shadow release, track cap or particle start or stop). Its draw
+	// modules hide their shadows to match. endViewLook puts every look back as it was.
+	void beginViewLook( const Player *viewer );
+	void endViewLook();
+	// GeneralsX @feature cemlyn007 21/10/2026 The index of the player whose view is being drawn, between beginViewLook and
+	// endViewLook, or -1
+	Int getViewLookPlayerIndex() const { return m_inViewLook ? m_viewLookPlayerIndex : -1; }
+
+	// GeneralsX @feature cemlyn007 21/10/2026 The team colour a player sees the drawable in, and whether it sees it
+	// garrisoned, where GeneralsX works them out for its local player alone and bakes them into the model: a disguise's
+	// colour (StealthUpdate::changeVisualDisguise) and a garrison's colour and garrisoned model
+	// (GarrisonContain::recalcApparentControllingPlayer). Each is recorded when GeneralsX would set it, as GeneralsX would
+	// set it for that player were it the local player. setIndicatorColor forgets them all, since the drawable then looks
+	// the same to every player. A model draw draws a variant of its model in the views of the players who see another
+	// look than its own (W3DModelDraw::syncViewLookVariant), which the client tick keeps up to date (syncViewLookVariants).
+	void setPlayerLook( Int playerIndex, Color color, Bool garrisoned );
+	Bool getPlayerLook( Int playerIndex, Color *color, Bool *garrisoned ) const;
+	void syncViewLookVariants();
+
+	// GeneralsX @feature cemlyn007 22/10/2026 Which players GeneralsX would show a fake structure's terrain decal
+	// (KINDOF_FS_FAKE) were each the local player: those its owner's team is an ally of or neutral to, worked out where
+	// GeneralsX works it out for its local player (binding, a team change, GameClient::updateFakeDrawables) and again
+	// after a load. A draw of another player's view hides the decal (beginViewLook).
+	void recordFakeStructureDecalViewers();
+	Bool hidesTerrainDecalInViewLook() const;
+#endif
 
 	void setShadowsEnabled(Bool enable);
 	Bool getShadowsEnabled() const { return BitIsSet(m_status, DRAWABLE_STATUS_SHADOWS); }
@@ -415,6 +451,14 @@ public:
 	void updateDrawable();														///< update the drawable
 
 	void drawIconUI();													///< draw "icon"(s) needed on drawable (health bars, veterency, etc)
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 What drawIconUI decides for its animated icons (healing, enthusiasm, bombs,
+	// disabled): making each one its object's state calls for, and removing each one it no longer does, as a draw would if
+	// the drawable were on screen, for the client tick of an engine that draws on demand (Common/EngineDrawing.h). Its
+	// draws then find each icon already made or removed, so when an icon's animation starts does not depend on when the
+	// drawable was first drawn.
+	void advanceIconsForClientTick();
+#endif
 
 	void startAmbientSound( Bool onlyIfPermanent = false );
 	void stopAmbientSound();
@@ -691,6 +735,33 @@ private:
 	UnsignedInt		m_timeToFade;						///< how slowly am I fading
 
 	UnsignedInt		m_shroudClearFrame;						///< Last frame the local player saw this drawable "OBJECTSHROUD_CLEAR"
+#if RTS_ENGINE_CONTEXT
+	UnsignedInt		m_shroudClearFrameFor[MAX_PLAYER_COUNT];	///< GeneralsX @feature cemlyn007 21/10/2026 the same, per player
+
+	// GeneralsX @feature cemlyn007 21/10/2026 The looks beginViewLook replaced, for endViewLook to put back
+	struct ViewLookSaved
+	{
+		StealthLookType stealthLook;
+		Real stealthOpacity;
+		Real effectiveStealthOpacity;
+		Real secondMaterialPassOpacity;
+		Bool hiddenByStealth;
+		Bool fullyObscuredByShroud;
+	};
+	ViewLookSaved	m_viewLookSaved;
+	Bool					m_inViewLook = FALSE;	///< between beginViewLook and endViewLook
+	Int						m_viewLookPlayerIndex = -1;	///< GeneralsX @feature cemlyn007 21/10/2026 beginViewLook's viewer
+
+	// GeneralsX @feature cemlyn007 21/10/2026 Each player's look (setPlayerLook), made when the first is recorded
+	struct PlayerLook
+	{
+		Color color = 0;
+		Bool garrisoned = FALSE;
+		Bool recorded = FALSE;
+	};
+	PlayerLook*		m_playerLooks = nullptr;
+	UnsignedInt		m_fakeDecalHiddenFor = 0;	///< GeneralsX @feature cemlyn007 22/10/2026 a bit per player (recordFakeStructureDecalViewers)
+#endif
 
 	DrawableLocoInfo*	m_locoInfo;	// lazily allocated
 

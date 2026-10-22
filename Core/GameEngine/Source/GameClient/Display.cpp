@@ -34,6 +34,16 @@
 #include "GameClient/DisplayStringManager.h"
 #include "GameClient/GameText.h"
 #include "GameClient/GlobalLanguage.h"
+#if RTS_ENGINE_CONTEXT
+#include "Common/EngineContext.h"	// GeneralsX @feature cemlyn007 21/10/2026 Drawing as a player
+#include "Common/Player.h"	// GeneralsX @feature cemlyn007 21/10/2026 Drawing as a player
+#include "Common/PlayerList.h"	// GeneralsX @feature cemlyn007 21/10/2026 Drawing as a player
+#include "Common/Radar.h"	// GeneralsX @feature cemlyn007 21/10/2026 Drawing as a player
+#include "GameClient/Drawable.h"	// GeneralsX @feature cemlyn007 21/10/2026 Drawing as a player
+#include "GameClient/GameClient.h"	// GeneralsX @feature cemlyn007 21/10/2026 Drawing as a player
+#include "GameClient/ParticleSys.h"	// GeneralsX @feature cemlyn007 21/10/2026 Drawing as a player
+#include "GameLogic/GhostObject.h"	// GeneralsX @feature cemlyn007 21/10/2026 Drawing as a player
+#endif
 //#include "GameLogic/ScriptEngine.h"
 //#include "GameLogic/GameLogic.h"
 
@@ -73,6 +83,10 @@ Display::~Display()
 {
 
 	stopMovie();
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 And the players' views
+	endPlayerViews();
+#endif
 	// delete all our views if present
 	deleteViews();
 
@@ -124,6 +138,12 @@ void Display::updateViews()
 	for( View *v = m_viewList; v; v = v->getNextView() )
 		v->updateView();
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 And every player's view, in player order
+	for( View *v : m_playerViews )
+		if( v )
+			v->updateView();
+#endif
 }
 
 void Display::stepViews()
@@ -132,7 +152,154 @@ void Display::stepViews()
 	for( View *v = m_viewList; v; v = v->getNextView() )
 		v->stepView();
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 21/10/2026 And every player's view, in player order
+	for( View *v : m_playerViews )
+		if( v )
+			v->stepView();
+#endif
 }
+
+#if RTS_ENGINE_CONTEXT
+// ------------------------------------------------------------------------------------------------
+// GeneralsX @feature cemlyn007 21/10/2026 Per-player views (Display.h): delete every player's view
+// ------------------------------------------------------------------------------------------------
+void Display::endPlayerViews()
+{
+	std::vector<View *> views;
+	views.swap( m_playerViews );
+	for( View *v : views )
+		delete v;
+}
+
+// ------------------------------------------------------------------------------------------------
+// GeneralsX @feature cemlyn007 21/10/2026 Per-player views (Display.h): keep a view as the player's, in place of any it
+// had. The display owns it from then on.
+// ------------------------------------------------------------------------------------------------
+void Display::addPlayerView( Int playerIndex, View *view )
+{
+	DEBUG_ASSERTCRASH( playerIndex >= 0, ("Display::addPlayerView - invalid player index '%d'", playerIndex) );
+	if( (Int)m_playerViews.size() <= playerIndex )
+		m_playerViews.resize( playerIndex + 1, nullptr );
+	delete m_playerViews[ playerIndex ];
+	m_playerViews[ playerIndex ] = view;
+}
+
+// ------------------------------------------------------------------------------------------------
+// GeneralsX @feature cemlyn007 21/10/2026 Per-player views (Display.h): the player's view, or null for a player with none
+// ------------------------------------------------------------------------------------------------
+View *Display::findPlayerView( Int playerIndex ) const
+{
+	if( playerIndex < 0 || playerIndex >= (Int)m_playerViews.size() )
+		return nullptr;
+	return m_playerViews[ playerIndex ];
+}
+
+namespace
+{
+
+// ------------------------------------------------------------------------------------------------
+// GeneralsX @feature cemlyn007 21/10/2026 For one draw of a player's view (Display::drawPlayerView): makes the view the
+// tactical view and the display's only view, and, for a player, makes it the viewing player, so that the observed or
+// local player is that player for the draw's shroud tests, tints and looks. It points the ghost objects at the player,
+// gives every drawable the looks it has in the player's view (Drawable::beginViewLook) and refreshes the radar's
+// objects for the player, as rts::changeObservedPlayer does, but with none of its other effects, and puts all of it
+// back as it was when the draw ends.
+// ------------------------------------------------------------------------------------------------
+class PlayerViewDraw
+{
+public:
+	PlayerViewDraw( View *&viewList, View *view, Player *viewer )
+		: m_viewList( viewList ), m_savedViewList( viewList ), m_savedTacticalView( TheTacticalView ), m_viewer( viewer ),
+			m_savedGhostIndex( TheGhostObjectManager ? TheGhostObjectManager->getLocalPlayerIndex() : 0 )
+	{
+		TheTacticalView = view;
+		m_viewList = view;
+		if( m_viewer == nullptr )
+			return;
+		rts::ctx()->viewingPlayer = m_viewer->getPlayerIndex();
+		if( TheGhostObjectManager )
+			TheGhostObjectManager->setLocalPlayerIndex( m_viewer->getPlayerIndex() );
+		for( Drawable *draw = TheGameClient->firstDrawable(); draw; draw = draw->getNextDrawable() )
+			draw->beginViewLook( m_viewer );
+		if( TheRadar )
+			TheRadar->refreshObjects();
+	}
+
+	~PlayerViewDraw()
+	{
+		if( m_viewer != nullptr )
+		{
+			for( Drawable *draw = TheGameClient->firstDrawable(); draw; draw = draw->getNextDrawable() )
+				draw->endViewLook();
+			if( TheGhostObjectManager )
+				TheGhostObjectManager->setLocalPlayerIndex( m_savedGhostIndex );
+			rts::ctx()->viewingPlayer = -1;
+			if( TheRadar )
+				TheRadar->refreshObjects();
+		}
+		m_viewList = m_savedViewList;
+		TheTacticalView = m_savedTacticalView;
+	}
+
+	PlayerViewDraw( const PlayerViewDraw & ) = delete;
+	PlayerViewDraw &operator=( const PlayerViewDraw & ) = delete;
+
+private:
+	View *&m_viewList;
+	View *m_savedViewList;
+	View *m_savedTacticalView;
+	Player *m_viewer;
+	Int m_savedGhostIndex;
+};
+
+// ------------------------------------------------------------------------------------------------
+// GeneralsX @feature cemlyn007 21/10/2026 For one draw of a player's view (Display::drawPlayerView): the terrain is drawn
+// with the player's own shroud (Display::drawWithShroudOf), and with the game's local player's again once the draw ends
+// ------------------------------------------------------------------------------------------------
+class PlayerShroudDraw
+{
+public:
+	PlayerShroudDraw( Display &display, Int playerIndex ) : m_display( display )
+	{
+		m_display.drawWithShroudOf( playerIndex );
+	}
+
+	~PlayerShroudDraw()
+	{
+		m_display.drawWithShroudOf( -1 );
+	}
+
+	PlayerShroudDraw( const PlayerShroudDraw & ) = delete;
+	PlayerShroudDraw &operator=( const PlayerShroudDraw & ) = delete;
+
+private:
+	Display &m_display;
+};
+
+}
+
+// ------------------------------------------------------------------------------------------------
+// GeneralsX @feature cemlyn007 21/10/2026 Per-player views (Display.h): draw the player's view as the player sees the
+// game, with the player's particle simulation (ParticleSystemManager::beginSimulations), or the tactical view, as the
+// game's local player sees it, for a player index of -1
+// ------------------------------------------------------------------------------------------------
+void Display::drawPlayerView( Int playerIndex )
+{
+	View *view = playerIndex < 0 ? TheTacticalView : findPlayerView( playerIndex );
+	Player *viewer = playerIndex < 0 ? nullptr : ThePlayerList->getNthPlayer( playerIndex );
+	if( view == nullptr || (playerIndex >= 0 && viewer == nullptr) )
+	{
+		DEBUG_CRASH(( "Display::drawPlayerView - player %d has no view", playerIndex ));
+		return;
+	}
+	ParticleSystemManager *const watcherParticles = TheParticleSystemManager;
+	const ParticleSimulationScope particles( viewer ? watcherParticles->findSimulationOfPlayer( playerIndex ) : watcherParticles, FALSE );
+	const PlayerViewDraw drawing( m_viewList, view, viewer );
+	const PlayerShroudDraw shroud( *this, viewer ? playerIndex : -1 );
+	draw();
+}
+#endif
 
 /// Redraw the entire display
 void Display::draw()
