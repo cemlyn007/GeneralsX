@@ -119,6 +119,40 @@ void W3DProjectileStreamDraw::setFullyObscuredByShroud(Bool fullyObscured)
 	}
 }
 
+#if RTS_ENGINE_CONTEXT
+//-------------------------------------------------------------------------------------------------
+// GeneralsX @feature cemlyn007 22/10/2026 See W3DProjectileStreamDraw.h
+//-------------------------------------------------------------------------------------------------
+void W3DProjectileStreamDraw::beginViewLook(Bool, Bool fullyObscured)
+{
+	m_linesHiddenInViewLook = fullyObscured;
+	if (!m_linesHiddenInViewLook)
+		return;
+	for( Int lineIndex = 0; lineIndex < m_linesValid; lineIndex++ )
+	{
+		SegmentedLineClass *line = m_allLines[lineIndex];
+		if (line == nullptr)
+			continue;
+		m_lineHiddenBeforeViewLook[lineIndex] = line->Is_Hidden() != 0;
+		line->Set_Hidden(TRUE);
+	}
+}
+
+//-------------------------------------------------------------------------------------------------
+void W3DProjectileStreamDraw::endViewLook()
+{
+	if (!m_linesHiddenInViewLook)
+		return;
+	for( Int lineIndex = 0; lineIndex < m_linesValid; lineIndex++ )
+	{
+		SegmentedLineClass *line = m_allLines[lineIndex];
+		if (line != nullptr)
+			line->Set_Hidden(m_lineHiddenBeforeViewLook[lineIndex]);
+	}
+	m_linesHiddenInViewLook = FALSE;
+}
+#endif
+
 //-------------------------------------------------------------------------------------------------
 /** Map behavior states into W3D animations. */
 //-------------------------------------------------------------------------------------------------

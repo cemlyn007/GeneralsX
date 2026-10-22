@@ -68,6 +68,8 @@ public:
 	// GeneralsX @feature cemlyn007 21/10/2026 For one draw of a player's view (DrawModule::beginViewLook)
 	virtual void beginViewLook(Bool hidden, Bool fullyObscured) override { m_shadowViewLook.begin(m_shadow, hidden, fullyObscured); }
 	virtual void endViewLook() override { m_shadowViewLook.end(); }
+	// GeneralsX @feature cemlyn007 22/10/2026 Its model carries the drawable's DrawableInfo (DrawModule::rendersWithDrawableInfo)
+	virtual Bool rendersWithDrawableInfo() const override { return TRUE; }
 #endif
 	virtual void reactToTransformChange(const Matrix3D* oldMtx, const Coord3D* oldPos, Real oldAngle) override;
 	virtual void reactToGeometryChange() override { }

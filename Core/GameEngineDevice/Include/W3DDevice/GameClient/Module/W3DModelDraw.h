@@ -376,6 +376,8 @@ public:
 	// marks or effects of its own. Its model is hidden except in a draw of the view of a player who sees its look, in
 	// which it is drawn in place of this module's (beginViewLook).
 	virtual void syncViewLookVariant() override;
+	// GeneralsX @feature cemlyn007 22/10/2026 Its models carry the drawable's DrawableInfo (DrawModule::rendersWithDrawableInfo)
+	virtual Bool rendersWithDrawableInfo() const override { return TRUE; }
 #endif
 	virtual void setTerrainDecal(TerrainDecalType type) override;
 

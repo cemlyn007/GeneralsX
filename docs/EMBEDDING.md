@@ -457,7 +457,11 @@ drawn, everything a draw used to advance:
 - the cameras, through `updateViews`, without the drawable loop that each
   view's update ran;
 - every drawable's draw modules and icons, once, whichever views can see it,
-  and its shroud-clear frame for the watcher and for every slot's player;
+  and its shroud-clear frame for the watcher and for every slot's player,
+  for a drawable that renders through the scene's drawable pass alone
+  (`DrawModule::rendersWithDrawableInfo`), as GeneralsX notes it only as it
+  renders one (`RTS3DScene::renderOneObject`), so that a projectile stream, a
+  laser or a rope, which has none, is fully obscured as soon as it is fogged;
 - the particle simulations (below), the field-particle count they read, and
   the scene's per-frame updates: lights, W3D emitters, model hierarchies,
   spheres and rings, and the registration of meshes for rendering;
@@ -592,6 +596,14 @@ local player's decal stays on the drawable; a draw of the view of a player
 who would not see it hides it for the length of the draw
 (`Drawable::hidesTerrainDecalInViewLook`, read by
 `W3DModelDraw::beginViewLook`).
+
+A projectile stream's lines (`W3DProjectileStreamDraw`: the Dragon Tank's
+flames, the Toxin Tractor's toxin, the Ambulance's cleaning spray) are taken
+out of the scene while the stream is fully obscured for GeneralsX's local
+player (`setFullyObscuredByShroud`); its stealth or a hidden drawable does not
+matter. They stay in the scene in an engine that draws on demand, and a draw of
+a view in which the stream is fully obscured hides them, and only them, for the
+length of the draw (`W3DProjectileStreamDraw::beginViewLook`).
 
 ### Per-player views
 

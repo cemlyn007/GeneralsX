@@ -70,6 +70,14 @@ public:
 	virtual void allocateShadows() override {};	///< we don't care about preserving temporary shadows.
 	virtual void setShadowsEnabled(Bool ) override { }
 	virtual void setFullyObscuredByShroud(Bool) override;
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 22/10/2026 For one draw of a player's view (DrawModule::beginViewLook): the lines are
+	// hidden while the stream is fully obscured in that view, as setFullyObscuredByShroud takes them out of the scene for
+	// GeneralsX's local player, and shown as before after the draw (endViewLook). Whether the drawable is hidden does not
+	// matter, as it does not for GeneralsX, whose lines stay in the scene while their drawable is hidden.
+	virtual void beginViewLook(Bool hidden, Bool fullyObscured) override;
+	virtual void endViewLook() override;
+#endif
 	virtual void reactToTransformChange(const Matrix3D* oldMtx, const Coord3D* oldPos, Real oldAngle) override { }
 	virtual void reactToGeometryChange() override { }
 
@@ -79,4 +87,8 @@ protected:
 	TextureClass *m_texture;
 	SegmentedLineClass *m_allLines[MAX_PROJECTILE_STREAM];	///< Persist, so I can ensure they live a full cycle, and minimize re-creates by holding on
 	Int m_linesValid;
+#if RTS_ENGINE_CONTEXT
+	Bool m_linesHiddenInViewLook = FALSE;	///< GeneralsX @feature cemlyn007 22/10/2026 beginViewLook hid the lines
+	Bool m_lineHiddenBeforeViewLook[MAX_PROJECTILE_STREAM] = {};	///< GeneralsX @feature cemlyn007 22/10/2026 for endViewLook
+#endif
 };

@@ -2462,6 +2462,17 @@ AGAIN:
 }
 
 #if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 22/10/2026 Whether some draw module of the drawable draws render objects carrying its
+// DrawableInfo (DrawModule::rendersWithDrawableInfo): GeneralsX notes a drawable's shroud-clear frame only as it renders
+// one (RTS3DScene::renderOneObject), so a drawable with none, such as a projectile stream's, never has one
+static Bool rendersWithDrawableInfo(Drawable *draw)
+{
+	for (DrawModule **dm = draw->getDrawModules(); *dm; ++dm)
+		if ((*dm)->rendersWithDrawableInfo())
+			return TRUE;
+	return FALSE;
+}
+
 // W3DDisplay::tickClient =====================================================
 // GeneralsX @feature cemlyn007 21/10/2026 The client tick of an engine that draws on demand (Common/EngineDrawing.h).
 // GameEngine::update runs it after each logic frame, whether or not anything is drawn. It advances, once and in the
@@ -2537,7 +2548,7 @@ void W3DDisplay::tickClient()
 		if (draw->isDrawableEffectivelyHidden())
 			continue;
 		Object *object = draw->getObject();
-		if (object == nullptr)
+		if (object == nullptr || !rendersWithDrawableInfo(draw))
 			continue;
 		if (object->getShroudedStatus(localPlayerIndex) == OBJECTSHROUD_CLEAR)
 			draw->setShroudClearFrame(frame);

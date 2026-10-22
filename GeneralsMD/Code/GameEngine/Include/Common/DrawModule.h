@@ -94,6 +94,10 @@ public:
 	// the variant this module draws in the views of players who see its drawable with another look
 	// (Drawable::setPlayerLook)
 	virtual void syncViewLookVariant() {}
+	// GeneralsX @feature cemlyn007 22/10/2026 Whether this module draws render objects that carry its drawable's
+	// DrawableInfo, the only ones RTS3DScene::renderOneObject notes the drawable's shroud-clear frame for, so that the
+	// client tick notes it for the same drawables (W3DDisplay::tickClient)
+	virtual Bool rendersWithDrawableInfo() const { return FALSE; }
 #endif
 
 	virtual Bool isVisible() const { return true; }	///< for limiting tree sway, etc to visible objects
