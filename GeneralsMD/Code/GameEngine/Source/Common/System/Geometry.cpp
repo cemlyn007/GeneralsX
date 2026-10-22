@@ -376,8 +376,26 @@ Bool GeometryInfo::isPointInFootprint(const Coord3D& geomCenter, const Coord3D& 
 }
 
 //=============================================================================
+#if RTS_ENGINE_CONTEXT
 void GeometryInfo::makeRandomOffsetWithinFootprint(Coord3D& pt) const
 {
+	makeRandomOffsetWithinFootprint(pt, FALSE);
+}
+
+// GeneralsX @bugfix cemlyn007 22/10/2026 The pick draws from the game client random stream when clientRandom is set
+// (Common/EngineDrawing.h, placesParticlesWithClientRandom), and from the game logic random generator otherwise, as
+// GeneralsX's does
+void GeometryInfo::makeRandomOffsetWithinFootprint(Coord3D& pt, Bool clientRandom) const
+{
+	auto randomValueReal = [clientRandom](Real lo, Real hi)
+	{
+		return clientRandom ? GameClientRandomValueReal(lo, hi) : GameLogicRandomValueReal(lo, hi);
+	};
+#else
+void GeometryInfo::makeRandomOffsetWithinFootprint(Coord3D& pt) const
+{
+	auto randomValueReal = [](Real lo, Real hi) { return GameLogicRandomValueReal(lo, hi); };
+#endif
 	switch(m_type)
 	{
 		case GEOMETRY_SPHERE:
@@ -390,8 +408,8 @@ void GeometryInfo::makeRandomOffsetWithinFootprint(Coord3D& pt) const
 			Real distSqr;
 			do
 			{
-				pt.x = GameLogicRandomValueReal(-m_majorRadius, m_majorRadius);
-				pt.y = GameLogicRandomValueReal(-m_majorRadius, m_majorRadius);
+				pt.x = randomValueReal(-m_majorRadius, m_majorRadius);
+				pt.y = randomValueReal(-m_majorRadius, m_majorRadius);
 				pt.z = 0.0f;
 				distSqr = sqr(pt.x) + sqr(pt.y);
 			} while (distSqr > maxDistSqr);
@@ -407,8 +425,8 @@ void GeometryInfo::makeRandomOffsetWithinFootprint(Coord3D& pt) const
 
 		case GEOMETRY_BOX:
 		{
-			pt.x = GameLogicRandomValueReal(-m_majorRadius, m_majorRadius);
-			pt.y = GameLogicRandomValueReal(-m_minorRadius, m_minorRadius);
+			pt.x = randomValueReal(-m_majorRadius, m_majorRadius);
+			pt.y = randomValueReal(-m_minorRadius, m_minorRadius);
 			pt.z = 0.0f;
 			break;
 		}

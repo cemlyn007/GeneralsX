@@ -173,6 +173,11 @@ public:
 
 	/// note that the pt is generated using game logic random, not game client random!
 	void makeRandomOffsetWithinFootprint(Coord3D& pt) const;
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @bugfix cemlyn007 22/10/2026 The same pick from the game client random stream when clientRandom is set, for
+	// a pick that only places a particle effect (Common/EngineDrawing.h, placesParticlesWithClientRandom)
+	void makeRandomOffsetWithinFootprint(Coord3D& pt, Bool clientRandom) const;
+#endif
 	void makeRandomOffsetOnPerimeter(Coord3D& pt) const; //Chooses a random point on the extent border.
 
 	void clipPointToFootprint(const Coord3D& geomCenter, Coord3D& ptToClip) const;

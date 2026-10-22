@@ -30,6 +30,9 @@
 #include "PreRTS.h" // This must go first in EVERY cpp file in the GameEngine
 
 #include "Common/GameAudio.h"
+#if RTS_ENGINE_CONTEXT
+#include "Common/EngineDrawing.h"	// GeneralsX @bugfix cemlyn007 22/10/2026 Particle placement picks
+#endif
 #include "Common/GlobalData.h"
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
@@ -1413,7 +1416,14 @@ void SpecialAbilityUpdate::triggerAbilityEffect()
           if (sys)
           {
             Coord3D offs = {0,0,0};
+#if RTS_ENGINE_CONTEXT
+            // GeneralsX @bugfix cemlyn007 22/10/2026 The effect's place is picked from the client random stream in an engine
+            // that draws on demand, so its logic random generator is the same as an engine's with no rendering, which makes
+            // no effect and so picks nothing (Common/EngineDrawing.h)
+            target->getGeometryInfo().makeRandomOffsetWithinFootprint( offs, rts::placesParticlesWithClientRandom() );
+#else
             target->getGeometryInfo().makeRandomOffsetWithinFootprint( offs );
+#endif
 
             sys->attachToObject(target);
             sys->setPosition( &offs );

@@ -493,6 +493,17 @@ and each restored system that is neither a slave nor driven by a particle then
 copies its changes, as a system made outside an update does. A reset lets go of the textures the last draw left on each
 simulation's point group and streaks, so none outlives the render device.
 
+An engine with no rendering runs `ParticleSystemManagerDummy`, which makes no
+particle system, so the logic must not depend on whether one exists. Where game
+logic makes a particle system and then places it with a random pick (the random
+bone of a damage state's system in `TransitionDamageFX`, the place, height and
+delay of an EMP's sparks in `EMPUpdate`, the place of a special ability's
+disable effect in `SpecialAbilityUpdate`), an engine that draws on demand picks
+from the client random stream (`rts::placesParticlesWithClientRandom`), so its
+logic random generator, and the game, are those of an engine with no rendering,
+and replays cross between the two. GeneralsX's own play keeps the logic random
+pick.
+
 A playback that follows the replay's camera shows the 3D camera the replay
 holds as it is, since the tick builds no camera over it before a draw. An
 engine with no rendering builds no 3D camera, so the replay camera it records

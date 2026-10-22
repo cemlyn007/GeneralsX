@@ -39,6 +39,16 @@ inline Bool drawsOnDemand()
 	return ctx()->onDemandDrawing && TheGlobalData != nullptr && TheGlobalData->m_headless && TheGlobalData->m_headlessRender;
 }
 
+// GeneralsX @bugfix cemlyn007 22/10/2026 Whether a random pick that only places a particle system game logic has just
+// made (a damage state's smoke at a random bone, an EMP's sparks over its victim) draws from the game client random
+// stream rather than the game logic random generator. An engine that draws on demand simulates particles, and one with
+// no rendering makes none (ParticleSystemManagerDummy), so a logic random pick made only once the system exists would
+// make the two play different games. GeneralsX's own play keeps the logic random pick.
+inline Bool placesParticlesWithClientRandom()
+{
+	return drawsOnDemand();
+}
+
 }
 
 #endif
