@@ -2604,6 +2604,11 @@ void BaseHeightMapRenderObjClass::renderShoreLinesSorted(CameraClass *pCamera)
 						if (tileY >= edgeY)
 							break;	//since tiles are x-sorted, there will not be any visible ones after this one.
 
+						if (!isCellDrawn(x, tileY))	// GeneralsX @feature cemlyn007 22/10/2026 Per-draw terrain culling (HeightMap.h)
+						{	shoreInfo++;
+							continue;
+						}
+
 						if (vertexCount >= (DEFAULT_MAX_BATCH_SHORELINE_TILES*4))
 						{	lastRenderedTile=k;
 							goto flushVertexBuffer0;
@@ -2724,6 +2729,11 @@ flushVertexBuffer0:
 
 						if (tileX >= edgeX)
 							break;	//since tiles are x-sorted, there will not be any visible ones after this one.
+
+						if (!isCellDrawn(tileX, y))	// GeneralsX @feature cemlyn007 22/10/2026 Per-draw terrain culling (HeightMap.h)
+						{	shoreInfo++;
+							continue;
+						}
 
 						if (vertexCount >= (DEFAULT_MAX_BATCH_SHORELINE_TILES*4))
 						{	lastRenderedTile=k;

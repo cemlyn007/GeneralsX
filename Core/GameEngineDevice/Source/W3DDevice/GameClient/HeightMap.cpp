@@ -47,10 +47,13 @@
 //-----------------------------------------------------------------------------
 #include "W3DDevice/GameClient/HeightMap.h"
 #include "Common/EngineDrawing.h"	// GeneralsX @bugfix cemlyn007 21/10/2026 Drawing on demand
+#include "Common/EngineTestHooks.h"	// GeneralsX @feature cemlyn007 22/10/2026 Per-draw terrain culling (HeightMap.h)
 
 #ifndef USE_FLAT_HEIGHT_MAP // Flat height map uses flattened textures. jba. [3/20/2003]
 
 #include <stdlib.h>
+#include <algorithm>	// GeneralsX @feature cemlyn007 22/10/2026 Per-draw terrain culling (HeightMap.h)
+#include <cfloat>
 #include <WW3D2/assetmgr.h>
 #include <WW3D2/texture.h>
 #include <WWMath/tri.h>
@@ -139,6 +142,13 @@ void HeightMapRenderObjClass::freeIndexVertexBuffers()
 	m_vertexBufferBackup = nullptr;
 
 	m_numVertexBufferTiles = 0;
+	m_tileBounds.clear();	// GeneralsX @feature cemlyn007 22/10/2026 (HeightMap.h)
+	m_tileBoundsStale.clear();
+	m_tileDrawn.clear();
+	m_cullsTiles = false;
+	m_tileQuadsToRelight.clear();
+	m_numFrameLights = 0;
+	m_frameLightsCurrent = false;
 }
 
 //=============================================================================
@@ -548,7 +558,7 @@ Int HeightMapRenderObjClass::updateVB(DX8VertexBufferClass	*pVB, VERTEX_FORMAT *
 /** Update the dynamic lighting values only in a rectangular block of the given Vertex Buffer.
 The vertex locations and texture coords are unchanged.
 */
-Int HeightMapRenderObjClass::updateVBForLight(DX8VertexBufferClass	*pVB, VERTEX_FORMAT *data, Int x0, Int y0, Int x1, Int y1, Int originX, Int originY, W3DDynamicLight *pLights[], Int numLights)
+Int HeightMapRenderObjClass::updateVBForLight(DX8VertexBufferClass	*pVB, VERTEX_FORMAT *data, Int x0, Int y0, Int x1, Int y1, Int originX, Int originY, W3DDynamicLight *pLights[], Int numLights, Bool everyQuad)
 {
 
 #if (OPTIMIZED_HEIGHTMAP_LIGHTING)	// (gth) if optimizations are enabled, jump over to the "optimized" version of this function.
@@ -574,8 +584,8 @@ Int HeightMapRenderObjClass::updateVBForLight(DX8VertexBufferClass	*pVB, VERTEX_
 		{
 			const Int mapY = getYWithOrigin(j);
 			const Int yCoord = mapY+m_map->getDrawOrgY()-m_map->getBorderSizeInline();
-			Bool intersect = false;
-			for (k=0; k<numLights; k++) {
+			Bool intersect = everyQuad;	// GeneralsX @feature cemlyn007 22/10/2026 (HeightMap.h)
+			for (k=0; !everyQuad && k<numLights; k++) {
 				if (pLights[k]->m_minY <= yCoord+1 &&
 					pLights[k]->m_maxY >= yCoord) {
 					intersect = true;
@@ -599,8 +609,8 @@ Int HeightMapRenderObjClass::updateVBForLight(DX8VertexBufferClass	*pVB, VERTEX_
 			{
 				const Int mapX = getXWithOrigin(i);
 				const Int xCoord = mapX+m_map->getDrawOrgX()-m_map->getBorderSizeInline();
-				Bool intersect = false;
-				for (k=0; k<numLights; k++) {
+				Bool intersect = everyQuad;	// GeneralsX @feature cemlyn007 22/10/2026 (HeightMap.h)
+				for (k=0; !everyQuad && k<numLights; k++) {
 					if (pLights[k]->m_minX <= xCoord+1 &&
 						pLights[k]->m_maxX >= xCoord &&
 						pLights[k]->m_minY <= yCoord+1 &&
@@ -1011,6 +1021,8 @@ Int HeightMapRenderObjClass::updateBlock(Int x0, Int y0, Int x1, Int y1,  WorldH
 			DX8VertexBufferClass *pVB = getVertexBufferTile(i, j);
 			VERTEX_FORMAT *pData = getVertexBufferBackup(i, j);
 			updateVB(pVB, pData, xMin, yMin, xMax, yMax, originX, originY, pMap, pLightsIterator);
+			if (static_cast<Int>(m_tileBoundsStale.size()) == m_numVertexBufferTiles)	// GeneralsX @feature cemlyn007 22/10/2026 (HeightMap.h)
+				m_tileBoundsStale[j*m_numVBTilesX+i] = 1;
 		}
 	}
 
@@ -1435,6 +1447,20 @@ void HeightMapRenderObjClass::On_Frame_Update()
 			}
 		}
 		pLight->m_priorEnable = pLight->m_enabled;
+	}
+	// GeneralsX @feature cemlyn007 22/10/2026 Per-draw terrain culling (HeightMap.h): the draw relights the tiles it
+	// draws. Otherwise, relight first the quads a culled draw left to relight, which no draw of the whole terrain leaves.
+	if (cullsTilesPerDraw())
+	{
+		addQuadsToRelight(enabledLights, numDynaLights);
+		return;
+	}
+	m_frameLightsCurrent = false;
+	if (!m_tileQuadsToRelight.empty())
+	{
+		std::copy(enabledLights, enabledLights + numDynaLights, m_frameLights);
+		m_numFrameLights = numDynaLights;
+		relightTiles(FALSE);
 	}
 	if (numDynaLights > 0) {
 		//step through each vertex buffer that needs updating
@@ -1935,6 +1961,11 @@ void HeightMapRenderObjClass::Render(RenderInfoClass & rinfo)
 
 	DX8Wrapper::Set_Light_Environment(rinfo.light_environment);
 
+	cullTiles(&rinfo.Camera);	// GeneralsX @feature cemlyn007 22/10/2026 Per-draw terrain culling (HeightMap.h)
+	if (m_cullsTiles && m_frameLightsCurrent && !ShaderClass::Is_Backface_Culling_Inverted())
+		relightTiles(TRUE);
+	m_frameLightsCurrent = false;
+
 	// Force shaders to update.
 	m_stageTwoTexture->restore();
 	DX8Wrapper::Set_Texture(0,nullptr);
@@ -2044,6 +2075,8 @@ void HeightMapRenderObjClass::Render(RenderInfoClass & rinfo)
 		for (j=0; j<m_numVBTilesY; j++)
 			for (i=0; i<m_numVBTilesX; i++)
 			{
+				if (!isTileDrawn(i, j))	// GeneralsX @feature cemlyn007 22/10/2026 Per-draw terrain culling (HeightMap.h)
+					continue;
 				DX8Wrapper::Set_Vertex_Buffer(getVertexBufferTile(i, j));
 #ifdef PRE_TRANSFORM_VERTEX
 				if (m_xformedVertexBuffer && pass==0) {
@@ -2150,6 +2183,155 @@ void HeightMapRenderObjClass::Render(RenderInfoClass & rinfo)
 
 
 
+//=============================================================================
+// GeneralsX @feature cemlyn007 22/10/2026 Per-draw culling of a whole-map terrain (HeightMap.h, docs/EMBEDDING.md).
+// An engine that draws on demand draws the terrain whole (W3DView::drawsEntireTerrain), so the VB tiles' vertices never
+// move with a camera. Each tile keeps a box around its vertices, refreshed only after updateBlock rewrote them, and a
+// draw skips the tiles wholly outside its own camera's frustum, with their extra blend and shoreline tiles. A box that
+// is wholly outside a frustum plane holds no triangle that could cover a pixel, so a culled draw is the same image as
+// a draw of every tile. A host's tests can turn the culling off (rts::armWholeTerrainDraws) to compare the two.
+//=============================================================================
+Bool HeightMapRenderObjClass::cullsTilesPerDraw() const
+{
+#if RTS_ENGINE_CONTEXT
+	return rts::drawsOnDemand() && !rts::wholeTerrainDrawsArmed() && m_map != nullptr && m_vertexBufferTiles != nullptr
+		&& m_x >= m_map->getXExtent() && m_y >= m_map->getYExtent() && m_originX == 0 && m_originY == 0
+		&& m_map->getDrawOrgX() == 0 && m_map->getDrawOrgY() == 0;
+#else
+	return false;
+#endif
+}
+
+void HeightMapRenderObjClass::refreshTileBounds(Int tileX, Int tileY)
+{
+	constexpr Int vertsPerRow = VERTEX_BUFFER_TILE_LENGTH*4;
+	const Int columns = (tileX == m_numVBTilesX-1 && m_numBlockColumnsInLastVB) ? m_numBlockColumnsInLastVB : VERTEX_BUFFER_TILE_LENGTH;
+	const Int rows = (tileY == m_numVBTilesY-1 && m_numBlockRowsInLastVB) ? m_numBlockRowsInLastVB : VERTEX_BUFFER_TILE_LENGTH;
+	const VERTEX_FORMAT *data = getVertexBufferBackup(tileX, tileY);
+	Vector3 lo(FLT_MAX, FLT_MAX, FLT_MAX);
+	Vector3 hi(-FLT_MAX, -FLT_MAX, -FLT_MAX);
+	for (Int row = 0; row < rows; ++row)
+	{
+		const VERTEX_FORMAT *vertex = data + row*vertsPerRow;
+		for (Int index = 0; index < columns*4; ++index, ++vertex)
+		{
+			lo.X = std::min(lo.X, vertex->x); hi.X = std::max(hi.X, vertex->x);
+			lo.Y = std::min(lo.Y, vertex->y); hi.Y = std::max(hi.Y, vertex->y);
+			lo.Z = std::min(lo.Z, vertex->z); hi.Z = std::max(hi.Z, vertex->z);
+		}
+	}
+	const Int tile = tileY*m_numVBTilesX+tileX;
+	m_tileBounds[tile].Init_Min_Max(lo, hi);
+	m_tileBoundsStale[tile] = 0;
+}
+
+void HeightMapRenderObjClass::cullTiles(CameraClass *camera)
+{
+	m_cullsTiles = camera != nullptr && cullsTilesPerDraw();
+	if (!m_cullsTiles)
+		return;
+	if (static_cast<Int>(m_tileBounds.size()) != m_numVertexBufferTiles)
+	{
+		m_tileBounds.assign(m_numVertexBufferTiles, AABoxClass());
+		m_tileBoundsStale.assign(m_numVertexBufferTiles, 1);
+		m_tileDrawn.assign(m_numVertexBufferTiles, 1);
+	}
+	const FrustumClass &frustum = camera->Get_Frustum();
+	for (Int tileY = 0; tileY < m_numVBTilesY; ++tileY)
+		for (Int tileX = 0; tileX < m_numVBTilesX; ++tileX)
+		{
+			const Int tile = tileY*m_numVBTilesX+tileX;
+			if (m_tileBoundsStale[tile])
+				refreshTileBounds(tileX, tileY);
+			m_tileDrawn[tile] = CollisionMath::Overlap_Test(frustum, m_tileBounds[tile]) != CollisionMath::OUTSIDE;
+		}
+}
+
+Bool HeightMapRenderObjClass::isCellDrawn(Int cellX, Int cellY) const
+{
+	if (!m_cullsTiles)
+		return TRUE;
+	const Int tileX = std::min(cellX / VERTEX_BUFFER_TILE_LENGTH, m_numVBTilesX-1);
+	const Int tileY = std::min(cellY / VERTEX_BUFFER_TILE_LENGTH, m_numVBTilesY-1);
+	return m_tileDrawn[tileY*m_numVBTilesX+tileX] != 0;
+}
+
+void HeightMapRenderObjClass::addQuadsToRelight(W3DDynamicLight *lights[], Int numLights)
+{
+	if (static_cast<Int>(m_tileQuadsToRelight.size()) != m_numVertexBufferTiles)
+		m_tileQuadsToRelight.assign(m_numVertexBufferTiles, IRegion2D{{0, 0}, {0, 0}});
+	std::copy(lights, lights + numLights, m_frameLights);
+	m_numFrameLights = numLights;
+	m_frameLightsCurrent = true;
+	const Int border = m_map->getBorderSizeInline();
+	for (Int k = 0; k < numLights; k++)
+	{
+		const W3DDynamicLight *light = lights[k];
+		const Int regions[2][4] = {
+			{light->m_minX, light->m_minY, light->m_maxX, light->m_maxY},
+			{light->m_prevMinX, light->m_prevMinY, light->m_prevMaxX, light->m_prevMaxY},
+		};
+		for (const Int *region : regions)
+		{
+			const Int loX = std::max(region[0] - 1 + border, 0);
+			const Int loY = std::max(region[1] - 1 + border, 0);
+			const Int hiX = std::min(region[2] + border + 1, m_numVBTilesX*VERTEX_BUFFER_TILE_LENGTH);
+			const Int hiY = std::min(region[3] + border + 1, m_numVBTilesY*VERTEX_BUFFER_TILE_LENGTH);
+			if (loX >= hiX || loY >= hiY)
+				continue;
+			for (Int tileY = loY / VERTEX_BUFFER_TILE_LENGTH; tileY <= (hiY - 1) / VERTEX_BUFFER_TILE_LENGTH; tileY++)
+				for (Int tileX = loX / VERTEX_BUFFER_TILE_LENGTH; tileX <= (hiX - 1) / VERTEX_BUFFER_TILE_LENGTH; tileX++)
+				{
+					const Int originX = tileX*VERTEX_BUFFER_TILE_LENGTH;
+					const Int originY = tileY*VERTEX_BUFFER_TILE_LENGTH;
+					const IRegion2D quads = {
+						{std::max(loX, originX), std::max(loY, originY)},
+						{std::min(hiX, originX + VERTEX_BUFFER_TILE_LENGTH), std::min(hiY, originY + VERTEX_BUFFER_TILE_LENGTH)}};
+					IRegion2D &toRelight = m_tileQuadsToRelight[tileY*m_numVBTilesX+tileX];
+					if (toRelight.lo.x >= toRelight.hi.x)
+						toRelight = quads;
+					else
+					{
+						toRelight.lo.x = std::min(toRelight.lo.x, quads.lo.x);
+						toRelight.lo.y = std::min(toRelight.lo.y, quads.lo.y);
+						toRelight.hi.x = std::max(toRelight.hi.x, quads.hi.x);
+						toRelight.hi.y = std::max(toRelight.hi.y, quads.hi.y);
+					}
+				}
+		}
+	}
+}
+
+void HeightMapRenderObjClass::relightTiles(Bool drawnOnly)
+{
+	if (static_cast<Int>(m_tileQuadsToRelight.size()) != m_numVertexBufferTiles)
+		return;
+	for (Int tileY = 0; tileY < m_numVBTilesY; tileY++)
+		for (Int tileX = 0; tileX < m_numVBTilesX; tileX++)
+		{
+			IRegion2D &toRelight = m_tileQuadsToRelight[tileY*m_numVBTilesX+tileX];
+			if (toRelight.lo.x >= toRelight.hi.x || (drawnOnly && !isTileDrawn(tileX, tileY)))
+				continue;
+			updateVBForLight(getVertexBufferTile(tileX, tileY), getVertexBufferBackup(tileX, tileY), toRelight.lo.x, toRelight.lo.y,
+				toRelight.hi.x, toRelight.hi.y, tileX*VERTEX_BUFFER_TILE_LENGTH, tileY*VERTEX_BUFFER_TILE_LENGTH, m_frameLights,
+				m_numFrameLights, TRUE);
+			toRelight = IRegion2D{{0, 0}, {0, 0}};
+		}
+}
+
+Int HeightMapRenderObjClass::countExtraBlendTilesToDraw(Int drawStartX, Int drawStartY, Int drawEdgeX, Int drawEdgeY) const
+{
+	Int count = 0;
+	for (Int j = 0; j < m_numExtraBlendTiles; j++)
+	{
+		const Int x = m_extraBlendTilePositions[j] & 0xffff;
+		const Int y = m_extraBlendTilePositions[j] >> 16;
+		if (x >= drawStartX && x < drawEdgeX && y >= drawStartY && y < drawEdgeY && isCellDrawn(x, y))
+			++count;
+	}
+	return count;
+}
+
 ///Performs additional terrain rendering pass, blending in the black shroud texture.
 void HeightMapRenderObjClass::renderTerrainPass(CameraClass *pCamera)
 {
@@ -2162,6 +2344,8 @@ void HeightMapRenderObjClass::renderTerrainPass(CameraClass *pCamera)
 	for (Int j=0; j<m_numVBTilesY; j++)
 		for (Int i=0; i<m_numVBTilesX; i++)
 		{
+			if (!isTileDrawn(i, j))	// GeneralsX @feature cemlyn007 22/10/2026 Per-draw terrain culling (HeightMap.h)
+				continue;
 			DX8Wrapper::Set_Vertex_Buffer(getVertexBufferTile(i, j));
 #ifdef PRE_TRANSFORM_VERTEX
 			if (m_xformedVertexBuffer && pass==0) {
@@ -2197,21 +2381,41 @@ void HeightMapRenderObjClass::renderExtraBlendTiles()
 	Int indexCount = 0;
 	Int xExtent = m_map->getXExtent();
 	Int border = m_map->getBorderSizeInline();
-	// GeneralsX @refactor cemlyn007 01/10/2026 The height map's own, grown as its draws need (PLAN-023 Phase 8, stage
-	// RR3): a member, not a function-local static every render engine's terrain grew.
-	Int& maxBlendTiles = m_maxExtraBlendTiles;
 
 	m_numVisibleExtraBlendTiles = 0;
 
 	if (!m_numExtraBlendTiles)
 		return;	//nothing to draw
 
+	// GeneralsX @feature cemlyn007 22/10/2026 The visible region, found before the buffers are made (it was found after)
+	Int drawEdgeY=m_map->getDrawOrgY()+m_map->getDrawHeight()-1;
+	Int drawEdgeX=m_map->getDrawOrgX()+m_map->getDrawWidth()-1;
+	if (drawEdgeX > (m_map->getXExtent()-1))
+		drawEdgeX = m_map->getXExtent()-1;
+	if (drawEdgeY > (m_map->getYExtent()-1))
+		drawEdgeY = m_map->getYExtent()-1;
+	Int drawStartX=m_map->getDrawOrgX();
+	Int drawStartY=m_map->getDrawOrgY();
+
 #if RTS_ENGINE_CONTEXT
 	// GeneralsX @bugfix cemlyn007 21/10/2026 A draw of an engine that draws on demand makes room for every extra blend tile
-	// at once, rather than growing its room by 16 tiles after each draw that ran out of it, so which blend tiles a draw
-	// shows does not depend on how many draws came before it (Common/EngineDrawing.h)
-	if (rts::drawsOnDemand() && maxBlendTiles < m_numExtraBlendTiles)
-		maxBlendTiles = m_numExtraBlendTiles;
+	// it draws at once, rather than growing its room by 16 tiles after each draw that ran out of it, so which blend tiles
+	// a draw shows does not depend on how many draws came before it (Common/EngineDrawing.h).
+	// GeneralsX @feature cemlyn007 22/10/2026 And only for those it draws, counted first: the blend tiles in its camera's
+	// frustum when the terrain culls its tiles per draw (HeightMap.h), not every blend tile on the map.
+	Int drawnBlendTiles = 0;
+	const Bool onDemand = rts::drawsOnDemand();
+	if (onDemand)
+	{
+		drawnBlendTiles = countExtraBlendTilesToDraw(drawStartX, drawStartY, drawEdgeX, drawEdgeY);
+		if (drawnBlendTiles == 0)
+			return;
+	}
+	Int& maxBlendTiles = onDemand ? drawnBlendTiles : m_maxExtraBlendTiles;
+#else
+	// GeneralsX @refactor cemlyn007 01/10/2026 The height map's own, grown as its draws need (PLAN-023 Phase 8, stage
+	// RR3): a member, not a function-local static every render engine's terrain grew.
+	Int& maxBlendTiles = m_maxExtraBlendTiles;
 #endif
 	if (maxBlendTiles > 10000)	//we can only fit about 10000 tiles into a single VB.
 		maxBlendTiles = 10000;
@@ -2230,15 +2434,6 @@ void HeightMapRenderObjClass::renderExtraBlendTiles()
 		const UnsignedByte* data = m_map->getDataPtr();
 
 		//Loop over visible terrain and extract all the tiles that need extra blend
-		Int drawEdgeY=m_map->getDrawOrgY()+m_map->getDrawHeight()-1;
-		Int drawEdgeX=m_map->getDrawOrgX()+m_map->getDrawWidth()-1;
-		if (drawEdgeX > (m_map->getXExtent()-1))
-			drawEdgeX = m_map->getXExtent()-1;
-		if (drawEdgeY > (m_map->getYExtent()-1))
-			drawEdgeY = m_map->getYExtent()-1;
-		Int drawStartX=m_map->getDrawOrgX();
-		Int drawStartY=m_map->getDrawOrgY();
-
 		for (Int j=0; j<m_numExtraBlendTiles; j++)
 		{
 			if (vertexCount >= (maxBlendTiles*4))
@@ -2251,7 +2446,7 @@ void HeightMapRenderObjClass::renderExtraBlendTiles()
 			Int y = m_extraBlendTilePositions[j] >> 16;
 
 			if (x >= drawStartX && x < drawEdgeX &&
-				y >= drawStartY && y < drawEdgeY &&
+				y >= drawStartY && y < drawEdgeY && isCellDrawn(x, y) &&
 				m_map->getExtraAlphaUVData(x,y,U,V,alpha,&flipState, &cliffState))
 			{	//this tile is inside visible region and has 3rd blend layer.
 

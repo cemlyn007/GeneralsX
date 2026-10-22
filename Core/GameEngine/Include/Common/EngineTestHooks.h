@@ -33,6 +33,9 @@
 // it, as engine code that catches everything would. A swallowed release crash still faults the engine: the sink has
 // latched it (Common/EngineFault.h). A swallowed foreign exception is the engine's own business, and no fault.
 // An armed quit makes the next frame ask to quit through GameEngine::setQuitting(TRUE), as the quit menu does.
+// GeneralsX @feature cemlyn007 22/10/2026 Armed whole-terrain draws make an engine that draws on demand draw every tile
+// of its whole-map terrain, as it did before it culled them per draw (W3DDevice/GameClient/HeightMap.h), until they are
+// disarmed, so that a test can compare a culled draw with a draw of the whole terrain.
 //
 // The hooks are per engine (a per-engine static, Common/EngineStatic.h), and go with the engine. Nothing in
 // GeneralsX arms one: the banned symbol check's rule "test hooks" refuses a call to an arming function from any
@@ -74,6 +77,12 @@ void armInjectedFault(TestHookPoint point, InjectedFault fault);
 
 // Arms a request to quit at the current engine's next frame. For a host's tests only.
 void armInjectedQuit();
+
+// Arms (true) or disarms (false) whole-terrain draws in the current engine. For a host's tests only.
+void armWholeTerrainDraws(bool armed);
+
+// Whether whole-terrain draws are armed in the current engine.
+bool wholeTerrainDrawsArmed();
 
 // GeneralsX's hook points: strikes what is armed at `point` in the current engine, once.
 void strikeTestHooks(TestHookPoint point);

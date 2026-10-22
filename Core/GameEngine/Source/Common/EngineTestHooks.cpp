@@ -42,6 +42,7 @@ struct TestHooks
 {
 	std::optional<rts::InjectedFault> faults[kTestHookPoints];
 	bool quitAtNextFrame;
+	bool wholeTerrainDraws;
 };
 
 // This engine's armed hooks.
@@ -70,6 +71,16 @@ void rts::armInjectedFault(TestHookPoint point, InjectedFault fault)
 void rts::armInjectedQuit()
 {
 	theTestHooks.quitAtNextFrame = true;
+}
+
+void rts::armWholeTerrainDraws(bool armed)
+{
+	theTestHooks.wholeTerrainDraws = armed;
+}
+
+bool rts::wholeTerrainDrawsArmed()
+{
+	return theTestHooks.wholeTerrainDraws;
 }
 
 void rts::strikeTestHooks(TestHookPoint point)
