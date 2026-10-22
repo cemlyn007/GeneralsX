@@ -340,7 +340,9 @@ teardown. The fault is a fatal error, raised through the real crash path, or a
 foreign exception, each optionally inside a catch-all that tries to swallow it;
 a swallowed fatal error still faults the engine, since the sink has already
 latched it. `rts::armInjectedQuit` makes the engine ask to quit at its next
-frame. The hooks are per engine, and no GeneralsX source arms one: the banned
+frame. `rts::armWholeTerrainDraws` makes an engine that draws on demand draw
+every tile of its terrain, as it did before it culled them per draw (Drawing
+on demand, below), until it is disarmed. The hooks are per engine, and no GeneralsX source arms one: the banned
 symbol check's "test hooks" rule refuses it.
 
 ### Input errors
@@ -662,9 +664,31 @@ saw, which left a pushed-aside tree out of date. Such an engine draws the
 terrain whole (`W3DView::drawsEntireTerrain`), as GlobalData's
 `m_drawEntireTerrain` asks for: the terrain and its relighting then belong to
 no camera, and no camera's far plane depends on where another view left the
-terrain. Its extra blend tiles get room for all of them at once
-(`HeightMapRenderObjClass::renderExtraBlendTiles`), rather than 16 more after
-each draw that ran out of room.
+terrain. Its extra blend tiles get room for all those a draw draws at once
+(`HeightMapRenderObjClass::renderExtraBlendTiles`, which counts them first),
+rather than 16 more after each draw that ran out of room.
+
+A draw of the whole terrain still draws only what its own camera can see
+(`HeightMapRenderObjClass::cullTiles`). The terrain's vertex buffer tiles, of
+32 by 32 cells, cover the whole map and never move; each keeps a box around
+its vertices, worked out again only after `updateBlock` rewrote them. A draw
+tests every tile's box against the frustum of the camera it draws with (the
+water's mirror pass with its reflected camera) and skips the tiles wholly
+outside it, with the extra blend tiles and the shoreline tiles of their cells.
+A tile wholly outside one of the frustum's planes holds no triangle that could
+cover a pixel, so the image is the same as a draw of every tile, and what a
+draw draws depends on its camera, the frame and its player's shroud alone. The
+terrain's frame update no longer relights the tiles under the dynamic lights
+itself: it adds the quads the lights' current and previous regions cover to
+each tile's rectangle of quads to relight, and the draw relights, from the
+static lighting and that frame update's lights, the rectangles of the tiles it
+draws (`addQuadsToRelight`, `relightTiles`), so a draw pays only for the light
+it can see and a tile drawn later shows the light it would have shown had
+every draw relit it. Scorch marks keep one buffer for the map, rebuilt only
+when a scorch is added and drawn with one call, so they are not culled. A
+host's tests can turn the culling off (`rts::armWholeTerrainDraws`,
+`Common/EngineTestHooks.h`) to compare a culled draw with a draw of every
+tile; nothing in GeneralsX turns it off.
 
 ### Per-player shrouds
 

@@ -30,6 +30,8 @@
 #include "WW3D2/dx8vertexbuffer.h"
 #include "WW3D2/dx8indexbuffer.h"
 #include "WW3D2/dx8wrapper.h"
+#include "WWMath/aabox.h"
+#include <vector>
 #include "WW3D2/shader.h"
 #include "WW3D2/vertmaterial.h"
 #include "Lib/BaseType.h"
@@ -114,7 +116,9 @@ protected:
 	Int getXWithOrigin(Int x);
 	Int getYWithOrigin(Int x);
 	///update vertex diffuse color for dynamic lights inside given rectangle
-	Int updateVBForLight(DX8VertexBufferClass *pVB, VERTEX_FORMAT *data, Int x0, Int y0, Int x1, Int y1, Int originX, Int originY, W3DDynamicLight *pLights[], Int numLights);
+	// GeneralsX @feature cemlyn007 22/10/2026 everyQuad relights every quad in the rectangle, not only those in a light's
+	// current or previous region (per-draw terrain culling's deferred relighting, below)
+	Int updateVBForLight(DX8VertexBufferClass *pVB, VERTEX_FORMAT *data, Int x0, Int y0, Int x1, Int y1, Int originX, Int originY, W3DDynamicLight *pLights[], Int numLights, Bool everyQuad = FALSE);
 	Int updateVBForLightOptimized(DX8VertexBufferClass	*pVB, VERTEX_FORMAT *data, Int x0, Int y0, Int x1, Int y1, Int originX, Int originY, W3DDynamicLight *pLights[], Int numLights);
 	///update vertex buffer vertices inside given rectangle
 	Int updateVB(DX8VertexBufferClass	*pVB, VERTEX_FORMAT *data, Int x0, Int y0, Int x1, Int y1, Int originX, Int originY, WorldHeightMap *pMap, RefRenderObjListIterator *pLightsIterator);
@@ -124,4 +128,28 @@ protected:
 	virtual Int	getNumExtraBlendTiles(Bool visible) override { return visible?m_numVisibleExtraBlendTiles:m_numExtraBlendTiles;}
 	void freeIndexVertexBuffers();
 	void renderExtraBlendTiles();	///< render 3-way blend tiles that have blend of 3 textures.
+
+	// GeneralsX @feature cemlyn007 22/10/2026 Per-draw culling of a whole-map terrain (docs/EMBEDDING.md): in an engine
+	// that draws on demand, the vertex buffer tiles never move, and each draw skips the tiles, extra blend tiles and
+	// shoreline tiles outside its own camera's frustum, so what a draw draws depends only on that draw's camera and the
+	// map, never on earlier draws.
+	std::vector<AABoxClass> m_tileBounds;	///< each VB tile's box, from its vertices.
+	std::vector<UnsignedByte> m_tileBoundsStale;	///< set when a tile's vertices change.
+	std::vector<UnsignedByte> m_tileDrawn;	///< the current draw's frustum test, per tile.
+	Bool m_cullsTiles = false;	///< whether the current draw culls tiles.
+	Bool cullsTilesPerDraw() const;
+	void cullTiles(CameraClass *camera);
+	Bool isTileDrawn(Int tileX, Int tileY) const { return !m_cullsTiles || m_tileDrawn[tileY*m_numVBTilesX+tileX]; }
+	virtual Bool isCellDrawn(Int cellX, Int cellY) const override;
+	void refreshTileBounds(Int tileX, Int tileY);
+	Int countExtraBlendTilesToDraw(Int drawStartX, Int drawStartY, Int drawEdgeX, Int drawEdgeY) const;
+	// A frame update relights no tile then: it adds the quads its dynamic lights' current and previous regions cover to
+	// each tile's rectangle of quads to relight, and the draw relights the rectangles of the tiles it draws, from the
+	// static lighting and the frame update's lights, as the frame update would have relit them.
+	std::vector<IRegion2D> m_tileQuadsToRelight;	///< per VB tile, in VB quad indices, hi exclusive; empty when none.
+	W3DDynamicLight *m_frameLights[MAX_ENABLED_DYNAMIC_LIGHTS];	///< the last frame update's dynamic lights.
+	Int m_numFrameLights = 0;
+	Bool m_frameLightsCurrent = false;	///< whether the last frame update belongs to the scene render under way.
+	void addQuadsToRelight(W3DDynamicLight *lights[], Int numLights);
+	void relightTiles(Bool drawnOnly);
 };

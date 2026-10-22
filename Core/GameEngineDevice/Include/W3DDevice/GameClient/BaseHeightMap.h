@@ -331,6 +331,9 @@ protected:
 	void initDestAlphaLUT();	///<initialize water depth LUT stored in m_destAlphaTexture
 	void renderShoreLines(CameraClass *pCamera);	///<re-render parts of terrain that need custom blending into water edge
 	void renderShoreLinesSorted(CameraClass *pCamera);	///<optimized version for game usage.
+	// GeneralsX @feature cemlyn007 22/10/2026 Whether the current draw draws the map cell at (cellX, cellY), so that its
+	// shoreline tile is drawn: every cell, unless the terrain culls its tiles per draw (HeightMap.h).
+	virtual Bool isCellDrawn(Int cellX, Int cellY) const { return TRUE; }
 
 	static Bool useCloud();
 };
