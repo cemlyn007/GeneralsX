@@ -1191,9 +1191,9 @@ UpdateSleepTime ChinookAIUpdate::update()
   {
 #if RTS_ENGINE_CONTEXT
     // GeneralsX @feature cemlyn007 22/10/2026 The rotor wash goes to the simulations of the players who see the Chinook
-    // clear, as above (ParticleViewersScope)
+    // clear, as above (EffectViewersScope)
     const Object *chinook = getObject();
-    ParticleViewersScope viewers(TheParticleSystemManager, [chinook](Int viewer)
+    EffectViewersScope viewers(TheParticleSystemManager, [chinook](Int viewer)
       { return chinook->getShroudedStatus(viewer) == OBJECTSHROUD_CLEAR; });
 #endif
     if ( m_flightStatus == CHINOOK_LANDING || m_flightStatus == CHINOOK_TAKING_OFF || m_flightStatus == CHINOOK_LANDED )

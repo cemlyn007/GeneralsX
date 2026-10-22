@@ -876,7 +876,7 @@ public:
 	UnsignedInt *getClientRandomStream() { return m_clientRandomStream; }
 	virtual ParticleSystemManager *newSimulation() const { return nullptr; }	///< a manager of this kind with no templates
 	// GeneralsX @feature cemlyn007 22/10/2026 The players whose simulations get a copy of a system the watcher's makes now,
-	// one bit per player index (ParticleViewersScope), and the players among this one's simulations that the test passes
+	// one bit per player index (EffectViewersScope), and the players among this one's simulations that the test passes
 	UnsignedInt getCreationViewers() const { return m_creationViewers; }
 	void setCreationViewers( UnsignedInt viewers ) { m_creationViewers = viewers; }
 	template <typename Sees>
@@ -1007,11 +1007,13 @@ private:
 // this scope leaves out of the copies the simulation of each player for whom sees(playerIndex) is false, as GeneralsX
 // would not make the effect were that player its local player. Scopes nest: a player must pass every test around a
 // system's making. It changes nothing without players' simulations, so an engine that does not draw asks nothing.
-class ParticleViewersScope
+// GeneralsX @feature cemlyn007 23/10/2026 The FX list's other effects (scorches, light pulses, tracers, ray effects and
+// view shakes) read the same players (effectViewers), and show only in their views
+class EffectViewersScope
 {
 public:
 	template <typename Sees>
-	ParticleViewersScope( ParticleSystemManager *manager, const Sees &sees )
+	EffectViewersScope( ParticleSystemManager *manager, const Sees &sees )
 		: m_manager(manager != nullptr && manager->getSimulationCount() > 0 ? manager : nullptr), m_previous(~0u)
 	{
 		if (m_manager != nullptr)
@@ -1020,18 +1022,25 @@ public:
 			m_manager->setCreationViewers(m_previous & m_manager->findViewers(sees));
 		}
 	}
-	~ParticleViewersScope()
+	~EffectViewersScope()
 	{
 		if (m_manager != nullptr)
 			m_manager->setCreationViewers(m_previous);
 	}
-	ParticleViewersScope( const ParticleViewersScope & ) = delete;
-	ParticleViewersScope &operator=( const ParticleViewersScope & ) = delete;
+	EffectViewersScope( const EffectViewersScope & ) = delete;
+	EffectViewersScope &operator=( const EffectViewersScope & ) = delete;
 
 private:
 	ParticleSystemManager *m_manager;
 	UnsignedInt m_previous;
 };
+
+// GeneralsX @feature cemlyn007 23/10/2026 The players who could see the effect being made now, one bit per player index
+// (EffectViewersScope): every player outside any scope, and in an engine with no players' simulations
+inline UnsignedInt effectViewers()
+{
+	return TheParticleSystemManager != nullptr ? TheParticleSystemManager->getCreationViewers() : ~0u;
+}
 #endif
 
 class DebugDisplayInterface;
