@@ -482,19 +482,48 @@ No cursor pick is made.
 
 Such an engine simulates particles though it is headless. The manager is the
 watcher's simulation. When a game starts, `beginSimulations` gives each
-slot's player a simulation of its own (`newSimulation`), which copies every
-particle system made in the watcher's, with the same ID, and every change
-made to it. Each simulation tests shroud for its own player and draws from
+slot's player a simulation of its own (`newSimulation`), which copies the
+particle systems made in the watcher's, with the same ID, and every change
+made to them. Each simulation tests shroud for its own player and draws from
 its own client random stream, so its particles are those GeneralsX shows the
 player whose view it is, and no player's emission shifts another's. The tick
 updates every simulation, and a draw renders the one that
-`ParticleSimulationScope` makes current. A load restores its particle systems
-into the watcher's simulation, and copies each of them, with its ID and its
-particles, into every player's (`copyLoadedSystemsToSimulations`), where the
-load's post-processing links each copy to the masters, slaves and controlling
-particles of its own simulation. The copying changes no client random stream,
-and each restored system that is neither a slave nor driven by a particle then
-copies its changes, as a system made outside an update does. A reset lets go of the textures the last draw left on each
+`ParticleSimulationScope` makes current.
+
+GeneralsX makes some effects only where its observed or local player can see:
+an FX list's (`FXList::doFXPos` needs the place clear, `doFXObj` the object no
+worse than partly clear), a stealth detector's ping, a Spectre gunship's
+strafing smoke, a laser's flares and a Chinook's rotor wash. The logic still
+makes them for the anchor, which sees everything, so the watcher's simulation
+gets every one; around each such test a `ParticleViewersScope` asks the same
+question of every player whose simulation exists, and a system made inside it
+is copied only into the simulations of the players who pass (scopes nest, so a
+player must pass every test around the making). A player left out makes
+nothing and draws nothing from its client random stream, as GeneralsX would
+not had that player been its local player; the placement picks of an FX
+list's particle nugget come from the client stream of the frame, which the
+test does not move. The tests read the players' cell shroud and objects'
+shrouded status, which change no logic in these engines (they have no ghost
+objects), and with no simulations (an engine with no rendering) nothing is
+asked. The other kinds of FX-list effect are not per player: terrain
+scorches, light pulses, tracers and ray effects are made once, for the anchor,
+and show in any view that draws them, and a view shake shakes the watcher's
+camera (the tactical view) alone. Nor is the particle uplink cannon's test,
+which takes its beam's effects away while its local player cannot see the
+cannon and puts them back once it can: for the anchor it never takes them
+away.
+
+A save holds the watcher's particle systems and then, since version 2 of the
+manager's block, every player's simulation as it is, with its own systems,
+particles and ID counter (`xferSimulations`); a load reads each into its own
+simulation, where the load's post-processing links each system to the
+masters, slaves and controlling particles of that simulation. A save from
+before version 2 holds the watcher's alone, and a load copies each of them,
+with its ID and its particles, into every player's simulation
+(`copyLoadedSystemsToSimulations`). Neither changes a client random stream,
+and each restored system of the watcher's that is neither a slave nor driven
+by a particle then copies its changes, as a system made outside an update
+does. A reset lets go of the textures the last draw left on each
 simulation's point group and streaks, so none outlives the render device.
 
 An engine with no rendering runs `ParticleSystemManagerDummy`, which makes no

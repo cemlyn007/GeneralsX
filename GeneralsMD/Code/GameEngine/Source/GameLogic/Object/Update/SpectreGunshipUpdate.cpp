@@ -652,6 +652,12 @@ UpdateSleepTime SpectreGunshipUpdate::update()
 			//Make sure the gunship is visible to the player before drawing effects.
 			if ( gunship->getShroudedStatus( localPlayer->getPlayerIndex() ) <= OBJECTSHROUD_PARTIAL_CLEAR )
 			{
+#if RTS_ENGINE_CONTEXT
+				// GeneralsX @feature cemlyn007 22/10/2026 The strafing smoke goes to the simulations of the players who can see
+				// the gunship, as above (ParticleViewersScope)
+				ParticleViewersScope viewers(TheParticleSystemManager, [gunship](Int viewer)
+					{ return gunship->getShroudedStatus(viewer) <= OBJECTSHROUD_PARTIAL_CLEAR; });
+#endif
 
 				// This makes the client smoke effects of the gattling cannon strafing the ground toward the attack position
 						  ParticleSystem *sys = TheParticleSystemManager->createParticleSystem(data->m_gattlingStrafeFXParticleSystem);

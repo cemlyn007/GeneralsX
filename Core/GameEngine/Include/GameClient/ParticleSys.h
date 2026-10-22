@@ -875,6 +875,21 @@ public:
 	Int getLocalPlayerIndex() const { return m_localPlayerIndex; }
 	UnsignedInt *getClientRandomStream() { return m_clientRandomStream; }
 	virtual ParticleSystemManager *newSimulation() const { return nullptr; }	///< a manager of this kind with no templates
+	// GeneralsX @feature cemlyn007 22/10/2026 The players whose simulations get a copy of a system the watcher's makes now,
+	// one bit per player index (ParticleViewersScope), and the players among this one's simulations that the test passes
+	UnsignedInt getCreationViewers() const { return m_creationViewers; }
+	void setCreationViewers( UnsignedInt viewers ) { m_creationViewers = viewers; }
+	template <typename Sees>
+	UnsignedInt findViewers( const Sees &sees ) const
+	{
+		UnsignedInt viewers = 0;
+		for (const ParticleSystemManager *simulation : m_simulations)
+		{
+			if (sees(simulation->m_localPlayerIndex))
+				viewers |= 1u << simulation->m_localPlayerIndex;
+		}
+		return viewers;
+	}
 #endif
 
 	virtual void preloadAssets( TimeOfDay timeOfDay );
@@ -894,9 +909,12 @@ protected:
 	void updateOwnSystems();
 	void resetOwnSystems();
 	ParticleSystem *createOwnSystem( const ParticleSystemTemplate *sysTemplate, Bool createSlaves );
+	void xferOwnSystems( Xfer *xfer );
+	void xferSimulations( Xfer *xfer );
 	void copyLoadedSystemsToSimulations();
 	void mirrorLoadedSystems();
 	std::vector<ParticleSystemID> m_loadedSystemIDs;	///< the systems the last load restored, in the order it restored them
+	UnsignedInt m_creationViewers = ~0u;							///< see getCreationViewers
 	std::vector<ParticleSystemManager *> m_simulations;	///< the players' simulations, owned by the watcher's
 	ParticleSystemManager *m_templateSource = nullptr;		///< for a player's simulation, the watcher's, whose templates it uses
 	UnsignedInt m_clientRandomStream[6] = {};						///< the simulation's own client random stream
@@ -979,6 +997,40 @@ private:
 	ParticleSystemManager *m_simulation;
 	Bool m_withRandomStream;
 	UnsignedInt m_savedRandomStream[6];
+};
+#endif
+
+#if RTS_ENGINE_CONTEXT
+// GeneralsX @feature cemlyn007 22/10/2026 GeneralsX makes some effects (an FX list's, a stealth detector's ping, a
+// gunship's strafing smoke and the like) only if its observed or local player can see where they are made. In the
+// watcher's simulation the logic still makes them as its observed or local player sees the game, and for its lifetime
+// this scope leaves out of the copies the simulation of each player for whom sees(playerIndex) is false, as GeneralsX
+// would not make the effect were that player its local player. Scopes nest: a player must pass every test around a
+// system's making. It changes nothing without players' simulations, so an engine that does not draw asks nothing.
+class ParticleViewersScope
+{
+public:
+	template <typename Sees>
+	ParticleViewersScope( ParticleSystemManager *manager, const Sees &sees )
+		: m_manager(manager != nullptr && manager->getSimulationCount() > 0 ? manager : nullptr), m_previous(~0u)
+	{
+		if (m_manager != nullptr)
+		{
+			m_previous = m_manager->getCreationViewers();
+			m_manager->setCreationViewers(m_previous & m_manager->findViewers(sees));
+		}
+	}
+	~ParticleViewersScope()
+	{
+		if (m_manager != nullptr)
+			m_manager->setCreationViewers(m_previous);
+	}
+	ParticleViewersScope( const ParticleViewersScope & ) = delete;
+	ParticleViewersScope &operator=( const ParticleViewersScope & ) = delete;
+
+private:
+	ParticleSystemManager *m_manager;
+	UnsignedInt m_previous;
 };
 #endif
 

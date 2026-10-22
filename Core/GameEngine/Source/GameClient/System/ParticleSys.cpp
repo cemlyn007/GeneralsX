@@ -3290,6 +3290,10 @@ ParticleSystem *ParticleSystemManager::createParticleSystem( const ParticleSyste
 		}
 		for (ParticleSystemManager *simulation : m_simulations)
 		{
+			// GeneralsX @feature cemlyn007 22/10/2026 Only for the players who would see it made (ParticleViewersScope); the
+			// simulation of a player left out makes nothing and draws nothing from its client random stream
+			if ((m_creationViewers & (1u << simulation->m_localPlayerIndex)) == 0)
+				continue;
 			ParticleSimulationScope scope(simulation, TRUE);
 			++simulation->m_creationDepth;
 			newInstance(ParticleSystem)( sysTemplate, sys->getSystemID(), createSlaves );
@@ -3601,9 +3605,29 @@ void ParticleSystemManager::xfer( Xfer *xfer )
 {
 
 	// version
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 22/10/2026 2: followed by every player's simulation, as it is (xferSimulations)
+	XferVersion currentVersion = 2;
+#else
 	XferVersion currentVersion = 1;
+#endif
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
+
+#if RTS_ENGINE_CONTEXT
+	xferOwnSystems( xfer );
+	if( version >= 2 )
+		xferSimulations( xfer );
+	else if( xfer->getXferMode() == XFER_LOAD )
+		copyLoadedSystemsToSimulations();
+}
+
+// ------------------------------------------------------------------------------------------------
+// GeneralsX @refactor cemlyn007 22/10/2026 xfer()'s body: this simulation's own systems
+// ------------------------------------------------------------------------------------------------
+void ParticleSystemManager::xferOwnSystems( Xfer *xfer )
+{
+#endif
 
 	// unique system ID counter
 	xfer->xferUser( &m_uniqueSystemID, sizeof( ParticleSystemID ) );
@@ -3698,14 +3722,37 @@ void ParticleSystemManager::xfer( Xfer *xfer )
 			m_loadedSystemIDs.push_back(system->getSystemID());
 #endif
 		}
-#if RTS_ENGINE_CONTEXT
-		// GeneralsX @feature cemlyn007 21/10/2026 Every player's simulation gets the systems the load restored
-		copyLoadedSystemsToSimulations();
-#endif
 
 	}
 
 }
+
+#if RTS_ENGINE_CONTEXT
+// ------------------------------------------------------------------------------------------------
+// GeneralsX @feature cemlyn007 22/10/2026 Every player's simulation, each as it is: a player's simulation holds only
+// the effects that player could see made (ParticleViewersScope), and only the particles its own shroud test let its
+// systems emit, which the watcher's systems do not tell. Each simulation's systems are read into it, and post-processed
+// with the rest of the load in it (ParticleSystem::loadPostProcess, Particle::loadPostProcess).
+// ------------------------------------------------------------------------------------------------
+void ParticleSystemManager::xferSimulations( Xfer *xfer )
+{
+	Int simulationCount = (Int)m_simulations.size();
+	xfer->xferInt( &simulationCount );
+	for( Int i = 0; i < simulationCount; ++i )
+	{
+		Int playerIndex = xfer->getXferMode() == XFER_SAVE ? m_simulations[i]->m_localPlayerIndex : -1;
+		xfer->xferInt( &playerIndex );
+		ParticleSystemManager *simulation = findSimulationOfPlayer( playerIndex );
+		if( simulation == this )
+		{
+			DEBUG_CRASH(( "ParticleSystemManager::xferSimulations - No simulation of player %d", playerIndex ));
+			throw SC_INVALID_DATA;
+		}
+		ParticleSimulationScope scope( simulation, FALSE );
+		simulation->xferOwnSystems( xfer );
+	}
+}
+#endif
 
 // ------------------------------------------------------------------------------------------------
 /** Load post process */
@@ -3833,6 +3880,8 @@ private:
 // with the same ID and its particles, as if it had copied them as they were made; the copy changes no client random
 // stream. The copies are post-processed with the rest of the load, which links each to its master, slaves and
 // controlling particle in its own simulation (ParticleSystem::loadPostProcess, Particle::loadPostProcess).
+// GeneralsX @feature cemlyn007 22/10/2026 Only for a save made before version 2, which holds the watcher's systems
+// alone; a later save holds every player's simulation (xferSimulations).
 // ------------------------------------------------------------------------------------------------
 void ParticleSystemManager::copyLoadedSystemsToSimulations()
 {
