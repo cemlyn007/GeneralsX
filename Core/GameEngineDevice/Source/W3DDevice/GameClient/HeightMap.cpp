@@ -1962,9 +1962,12 @@ void HeightMapRenderObjClass::Render(RenderInfoClass & rinfo)
 	DX8Wrapper::Set_Light_Environment(rinfo.light_environment);
 
 	cullTiles(&rinfo.Camera);	// GeneralsX @feature cemlyn007 22/10/2026 Per-draw terrain culling (HeightMap.h)
-	if (m_cullsTiles && m_frameLightsCurrent && !ShaderClass::Is_Backface_Culling_Inverted())
+	// GeneralsX @bugfix cemlyn007 23/10/2026 The water's mirror pass relights the tiles it draws too, and the frame's
+	// lights stay current until the main pass, the draw's last render of the terrain, ends (HeightMap.h)
+	if (m_cullsTiles && m_frameLightsCurrent)
 		relightTiles(TRUE);
-	m_frameLightsCurrent = false;
+	if (!ShaderClass::Is_Backface_Culling_Inverted())
+		m_frameLightsCurrent = false;
 
 	// Force shaders to update.
 	m_stageTwoTexture->restore();
