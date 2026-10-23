@@ -73,7 +73,14 @@ public:
 	// GeneralsX @feature cemlyn007 21/10/2026 What Render advances (the animation's frame and the hierarchy it poses), for
 	// the client tick of an engine that draws on demand. The tick runs it for every model once per logic frame, so a
 	// render after it, at the same logic time, moves nothing.
+	// GeneralsX @feature cemlyn007 23/10/2026 The tick steps the frame of a top-level model in a single, timed animation with no embedded
+	// sounds and no posed sub-objects, but leaves its pose pending (Is_Pose_Pending): the first read of a bone or a
+	// sub-object's transform, or a render, poses it at the frame the tick stepped to, without stepping again. A real
+	// change to the model (Set_Hierarchy_Valid(false)) drops the pending pose, so the next read steps and poses as it
+	// did when the tick posed every model. The pose of a frame depends only on the frame, so it is the one the tick
+	// would have posed, and a model no view draws and nothing reads is never posed.
 	void							Advance_Client_Tick();
+	bool							Is_Pose_Pending() const				{ return PosePending; }
 #endif
 
 	/////////////////////////////////////////////////////////////////////////////
@@ -124,7 +131,7 @@ public:
 	virtual void					Set_HTree(HTreeClass * htree);
 	///Generals change so we can set sub-object transforms directly without having them revert to base pose
 	///when marked dirty.  DON'T USE THIS UNLESS YOU HAVE A GOOD REASON! -MW
-	void							Friend_Set_Hierarchy_Valid(bool onoff) const  	{ IsTreeValid = onoff; }
+	void							Friend_Set_Hierarchy_Valid(bool onoff) const  	{ IsTreeValid = onoff; Drop_Pending_Pose(); }
 
 protected:
 
@@ -156,7 +163,13 @@ protected:
 
 	// flag to keep track of whether the hierarchy tree transforms are currently valid
 	bool								Is_Hierarchy_Valid() const				{ return IsTreeValid; }
-	void								Set_Hierarchy_Valid(bool onoff) const  	{ IsTreeValid = onoff; }
+	void								Set_Hierarchy_Valid(bool onoff) const  	{ IsTreeValid = onoff; if (!onoff) Drop_Pending_Pose(); }
+#if RTS_ENGINE_CONTEXT
+	void								Drop_Pending_Pose() const				{ PosePending = false; }
+	bool								Can_Pend_Pose();
+#else
+	void								Drop_Pending_Pose() const				{}
+#endif
 
 	// Progress animations for single anim (loop and once)
 	void								Single_Anim_Progress();
@@ -168,6 +181,10 @@ protected:
 
 	// Is the hierarchy tree currently valid
 	mutable bool  					IsTreeValid;
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 23/10/2026 The tick stepped the frame, and nothing has posed it since (Advance_Client_Tick)
+	mutable bool					PosePending;
+#endif
 
 	// Hierarchy Tree
 	HTreeClass *					HTree;
