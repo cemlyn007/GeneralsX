@@ -59,6 +59,10 @@ protected:
 	Real		m_targetRange;
 	Vector3 m_targetAmbient;
 	Vector3 m_targetDiffuse;
+#if RTS_ENGINE_CONTEXT
+	UnsignedInt m_viewers = ~0u;	///< GeneralsX @feature cemlyn007 23/10/2026 see setViewers
+	Bool m_hiddenForView = false;	///< GeneralsX @feature cemlyn007 23/10/2026 see hideFromViewer
+#endif
 
 
 public:
@@ -78,4 +82,28 @@ public:
 	void setDecayColor() {m_decayColor = true;};
 	// Cull returns true if the terrain vertex at x,y is outside of the light's influence.
 	Bool cull(Int x, Int y ) {return (x<m_minX||y<m_minY||x>m_maxX||y>m_maxY);}
+
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 23/10/2026 The players who could see the light made, one bit per player index
+	// (effectViewers). A draw of a player's view not among them turns the light off for that draw alone
+	// (hideFromViewer), and back on as it was once the draw ends (showAfterView), so its fade, stepped by the client
+	// tick, goes on as before.
+	void setViewers(UnsignedInt viewers) { m_viewers = viewers; }
+	void hideFromViewer(Int playerIndex)
+	{
+		if (m_enabled && playerIndex >= 0 && (m_viewers & (1u << playerIndex)) == 0)
+		{
+			m_enabled = false;
+			m_hiddenForView = true;
+		}
+	}
+	void showAfterView()
+	{
+		if (m_hiddenForView)
+		{
+			m_enabled = true;
+			m_hiddenForView = false;
+		}
+	}
+#endif
 };

@@ -201,6 +201,9 @@ public:
 	// all in full whenever it refreshes the local player's (PartitionManager::refreshPlayerShrouds). The client tick fades
 	// them all, a device reset releases and reacquires them all, and a draw for a player draws the terrain with the
 	// player's own (Display::drawPlayerView).
+	// GeneralsX @feature cemlyn007 23/10/2026 Each such player also gets scorch marks of its own, made and deleted with
+	// its shroud: a scorch goes to the terrain's own and to those of the players who could see it made (effectViewers),
+	// and a draw for a player draws the player's own with the player's shroud (setDrawnShroud)
 	void addPlayerShroud(Int playerIndex);
 	void endPlayerShrouds();
 	W3DShroud *findPlayerShroud(Int playerIndex) const;
@@ -300,6 +303,15 @@ protected:
 #if RTS_ENGINE_CONTEXT
 	std::vector<W3DShroud *> m_playerShrouds;	///< GeneralsX @feature cemlyn007 21/10/2026 each player's own, by player index
 	W3DShroud *m_drawnShroud = nullptr;	///< GeneralsX @feature cemlyn007 21/10/2026 a player's, for the draw in progress
+	std::vector<W3DScorchInterface *> m_playerScorches;	///< GeneralsX @feature cemlyn007 23/10/2026 each player's own, by player index
+	W3DScorchInterface *m_drawnScorches = nullptr;	///< GeneralsX @feature cemlyn007 23/10/2026 a player's, for the draw in progress
+	template <typename Apply>
+	void forEachPlayerScorches(const Apply &apply)
+	{
+		for (W3DScorchInterface *playerScorches : m_playerScorches)
+			if (playerScorches)
+				apply(playerScorches);
+	}
 #endif
 	struct shoreLineTileInfo
 	{	Int m_xy;	//x,y position of tile

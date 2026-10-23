@@ -393,6 +393,12 @@ public:
 		{
 			if (TheTacticalView)
 				TheTacticalView->shake(primary, m_shake);
+#if RTS_ENGINE_CONTEXT
+			// GeneralsX @feature cemlyn007 23/10/2026 And the view of each player who could see it made, in the same
+			// direction (Display::shakePlayerViews)
+			if (TheTacticalView && TheDisplay)
+				TheDisplay->shakePlayerViews(primary, m_shake, effectViewers());
+#endif
 		}
 		else
 		{
@@ -814,8 +820,8 @@ void FXList::doFXPos(const Coord3D *primary, const Matrix3D* primaryMtx, const R
 
 #if RTS_ENGINE_CONTEXT
 	// GeneralsX @feature cemlyn007 22/10/2026 Its particle systems go to the simulations of the players who can see the
-	// place, as above (ParticleViewersScope)
-	ParticleViewersScope viewers(TheParticleSystemManager, [primary](Int viewer)
+	// place, as above (EffectViewersScope)
+	EffectViewersScope viewers(TheParticleSystemManager, [primary](Int viewer)
 		{ return ThePartitionManager->getShroudStatusForPlayer(viewer, primary) == CELLSHROUD_CLEAR; });
 #endif
 
@@ -835,8 +841,8 @@ void FXList::doFXObj(const Object* primary, const Object* secondary) const
 
 #if RTS_ENGINE_CONTEXT
 	// GeneralsX @feature cemlyn007 22/10/2026 Its particle systems go to the simulations of the players for whom the
-	// primary object is no worse than partly clear, as above (ParticleViewersScope)
-	ParticleViewersScope viewers(TheParticleSystemManager, [primary](Int viewer)
+	// primary object is no worse than partly clear, as above (EffectViewersScope)
+	EffectViewersScope viewers(TheParticleSystemManager, [primary](Int viewer)
 		{ return primary == nullptr || primary->getShroudedStatus(viewer) <= OBJECTSHROUD_PARTIAL_CLEAR; });
 #endif
 

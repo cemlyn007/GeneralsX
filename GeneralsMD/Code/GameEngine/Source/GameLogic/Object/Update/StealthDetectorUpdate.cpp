@@ -374,8 +374,8 @@ UpdateSleepTime StealthDetectorUpdate::update()
 	{
 #if RTS_ENGINE_CONTEXT
 		// GeneralsX @feature cemlyn007 22/10/2026 The ping's particle systems go to the simulations of the players who can
-		// see the detector, as above (ParticleViewersScope)
-		ParticleViewersScope viewers(TheParticleSystemManager, [self](Int viewer)
+		// see the detector, as above (EffectViewersScope)
+		EffectViewersScope viewers(TheParticleSystemManager, [self](Int viewer)
 			{ return self->getShroudedStatus(viewer) <= OBJECTSHROUD_PARTIAL_CLEAR; });
 #endif
     if ( self->testStatus( OBJECT_STATUS_STEALTHED ) == FALSE || self->getControllingPlayer() == localPlayer )

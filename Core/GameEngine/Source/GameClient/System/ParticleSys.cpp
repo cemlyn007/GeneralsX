@@ -3290,7 +3290,7 @@ ParticleSystem *ParticleSystemManager::createParticleSystem( const ParticleSyste
 		}
 		for (ParticleSystemManager *simulation : m_simulations)
 		{
-			// GeneralsX @feature cemlyn007 22/10/2026 Only for the players who would see it made (ParticleViewersScope); the
+			// GeneralsX @feature cemlyn007 22/10/2026 Only for the players who would see it made (EffectViewersScope); the
 			// simulation of a player left out makes nothing and draws nothing from its client random stream
 			if ((m_creationViewers & (1u << simulation->m_localPlayerIndex)) == 0)
 				continue;
@@ -3730,7 +3730,7 @@ void ParticleSystemManager::xferOwnSystems( Xfer *xfer )
 #if RTS_ENGINE_CONTEXT
 // ------------------------------------------------------------------------------------------------
 // GeneralsX @feature cemlyn007 22/10/2026 Every player's simulation, each as it is: a player's simulation holds only
-// the effects that player could see made (ParticleViewersScope), and only the particles its own shroud test let its
+// the effects that player could see made (EffectViewersScope), and only the particles its own shroud test let its
 // systems emit, which the watcher's systems do not tell. Each simulation's systems are read into it, and post-processed
 // with the rest of the load in it (ParticleSystem::loadPostProcess, Particle::loadPostProcess).
 // ------------------------------------------------------------------------------------------------

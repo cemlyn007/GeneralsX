@@ -354,8 +354,8 @@ void LaserUpdate::initLaser( const Object *parent, const Object *target, const C
 		{
 #if RTS_ENGINE_CONTEXT
 			// GeneralsX @feature cemlyn007 22/10/2026 The flares go to the simulations of the players who can see the laser's
-			// parent, as above (ParticleViewersScope)
-			ParticleViewersScope viewers(TheParticleSystemManager, [parent](Int viewer)
+			// parent, as above (EffectViewersScope)
+			EffectViewersScope viewers(TheParticleSystemManager, [parent](Int viewer)
 				{ return !parent || parent->getShroudedStatus(viewer) <= OBJECTSHROUD_PARTIAL_CLEAR; });
 #endif
 

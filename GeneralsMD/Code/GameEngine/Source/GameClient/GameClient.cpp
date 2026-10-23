@@ -1427,13 +1427,19 @@ void GameClient::xferDrawableTOC( Xfer *xfer )
   * 2: Adding mission briefing history
 	* 3: Added block markers around drawable data, no version checking is done and therefore
 	*		 this version breaks compatibility with previous versions. (CBD)
+	* 4: GeneralsX @feature cemlyn007 23/10/2026 (RTS_ENGINE_CONTEXT) Each drawable's data is followed by the players
+	*		 who could see it made (Drawable::getEffectViewers); a load of an earlier version leaves every player
  */
 // ------------------------------------------------------------------------------------------------
 void GameClient::xfer( Xfer *xfer )
 {
 
 	// version
+#if RTS_ENGINE_CONTEXT
+	XferVersion currentVersion = 4;
+#else
 	XferVersion currentVersion = 3;
+#endif
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -1498,6 +1504,12 @@ void GameClient::xfer( Xfer *xfer )
 
 			// write snapshot data
 			xfer->xferSnapshot( draw );
+
+#if RTS_ENGINE_CONTEXT
+			// GeneralsX @feature cemlyn007 23/10/2026 Version 4
+			UnsignedInt effectViewers = draw->getEffectViewers();
+			xfer->xferUnsignedInt( &effectViewers );
+#endif
 
 			// end data block
 			xfer->endBlock();
@@ -1614,6 +1626,14 @@ void GameClient::xfer( Xfer *xfer )
 
 			// xfer the drawable data
 			xfer->xferSnapshot( draw );
+
+#if RTS_ENGINE_CONTEXT
+			// GeneralsX @feature cemlyn007 23/10/2026 Version 4
+			UnsignedInt effectViewers = ~0u;
+			if( version >= 4 )
+				xfer->xferUnsignedInt( &effectViewers );
+			draw->setEffectViewers( effectViewers );
+#endif
 
 			// end block (not necessary since this is a no-op but symettrically nice)
 			xfer->endBlock();

@@ -60,6 +60,14 @@ public:
 	virtual TracerDrawInterface* getTracerDrawInterface() override { return this; }
 	virtual const TracerDrawInterface* getTracerDrawInterface() const override { return this; }
 
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 23/10/2026 For one draw of a player's view (DrawModule::beginViewLook): the tracer is
+	// hidden while its drawable is, as for a player who could not see it made (Drawable::getEffectViewers), and shown as
+	// before after the draw (endViewLook). Like GeneralsX's, it is drawn whatever the shroud.
+	virtual void beginViewLook(Bool hidden, Bool fullyObscured) override;
+	virtual void endViewLook() override;
+#endif
+
 protected:
 
 	Line3DClass *m_theTracer;			///< the tracer render object in the W3D scene
@@ -68,5 +76,9 @@ protected:
 	RGBColor m_color;							///< color of tracer
 	Real m_speedInDistPerFrame;		///< speed of tracer (in dist/frame)
 	Real m_opacity;								///< opacity of the tracer
+#if RTS_ENGINE_CONTEXT
+	Bool m_hiddenInViewLook = FALSE;	///< GeneralsX @feature cemlyn007 23/10/2026 beginViewLook hid the tracer
+	Bool m_hiddenBeforeViewLook = FALSE;	///< GeneralsX @feature cemlyn007 23/10/2026 for endViewLook
+#endif
 
 };

@@ -654,8 +654,8 @@ UpdateSleepTime SpectreGunshipUpdate::update()
 			{
 #if RTS_ENGINE_CONTEXT
 				// GeneralsX @feature cemlyn007 22/10/2026 The strafing smoke goes to the simulations of the players who can see
-				// the gunship, as above (ParticleViewersScope)
-				ParticleViewersScope viewers(TheParticleSystemManager, [gunship](Int viewer)
+				// the gunship, as above (EffectViewersScope)
+				EffectViewersScope viewers(TheParticleSystemManager, [gunship](Int viewer)
 					{ return gunship->getShroudedStatus(viewer) <= OBJECTSHROUD_PARTIAL_CLEAR; });
 #endif
 

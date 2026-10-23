@@ -89,6 +89,11 @@ public:
 	void destroyLightsIterator(RefRenderObjListIterator * it);
 	RefRenderObjListClass *getDynamicLights() {return &m_dynamicLightList;};
 	W3DDynamicLight *getADynamicLight();
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 23/10/2026 For a draw of a player's view, every dynamic light the player could not see
+	// made (W3DDynamicLight::setViewers) is off, and on again for a player index of -1
+	void drawLightsSeenBy(Int playerIndex);
+#endif
 	void setGlobalLight(LightClass *pLight,Int lightIndex=0);
 	LightEnvironmentClass &getDefaultLightEnv() {return m_defaultLightEnv;}
 

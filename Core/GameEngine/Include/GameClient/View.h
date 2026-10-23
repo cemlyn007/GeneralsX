@@ -273,6 +273,11 @@ public:
 
 	/// Add an impulse force to shake the camera
 	virtual void shake( const Coord3D *epicenter, CameraShakeType shakeType ) { };
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 23/10/2026 Shake this view as shake does, as strongly as for its own camera, but in the
+	// direction source's last shake drew, drawing no random number (Display::shakePlayerViews)
+	virtual void shakeLike( const Coord3D *epicenter, CameraShakeType shakeType, const View *source ) { };
+#endif
 
 	virtual Real getFXPitch() const { return 1.0f; }					///< returns the FX pitch angle
 	virtual void forceCameraAreaConstraintRecalc() {}

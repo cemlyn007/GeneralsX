@@ -395,6 +395,13 @@ public:
 	// endViewLook, or -1
 	Int getViewLookPlayerIndex() const { return m_inViewLook ? m_viewLookPlayerIndex : -1; }
 
+	// GeneralsX @feature cemlyn007 23/10/2026 The players who could see the drawable made, one bit per player index: those
+	// of the effect being made when it was made (effectViewers), every player for one made outside any effect. A draw of
+	// the view of a player not among them hides it, as GeneralsX would not have made it for that player (beginViewLook).
+	// Saves keep them (GameClient::xfer).
+	UnsignedInt getEffectViewers() const { return m_effectViewers; }
+	void setEffectViewers( UnsignedInt viewers ) { m_effectViewers = viewers; }
+
 	// GeneralsX @feature cemlyn007 21/10/2026 The team colour a player sees the drawable in, and whether it sees it
 	// garrisoned, where GeneralsX works them out for its local player alone and bakes them into the model: a disguise's
 	// colour (StealthUpdate::changeVisualDisguise) and a garrison's colour and garrisoned model
@@ -751,6 +758,7 @@ private:
 	ViewLookSaved	m_viewLookSaved;
 	Bool					m_inViewLook = FALSE;	///< between beginViewLook and endViewLook
 	Int						m_viewLookPlayerIndex = -1;	///< GeneralsX @feature cemlyn007 21/10/2026 beginViewLook's viewer
+	UnsignedInt		m_effectViewers = ~0u;	///< GeneralsX @feature cemlyn007 23/10/2026 see getEffectViewers
 
 	// GeneralsX @feature cemlyn007 21/10/2026 Each player's look (setPlayerLook), made when the first is recorded
 	struct PlayerLook

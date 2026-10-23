@@ -1422,6 +1422,13 @@ void W3DView::stepView()
 	}
 	else
 	{
+#if RTS_ENGINE_CONTEXT
+		// GeneralsX @bugfix cemlyn007 23/10/2026 The camera is built again without the last offset once the shake ends.
+		// Otherwise a camera that does not move keeps the last offset of the shake for good, as update only asks for a
+		// new camera while the shake lasts.
+		if (m_shakeOffset.x != 0.0f || m_shakeOffset.y != 0.0f)
+			m_recalcCamera = true;
+#endif
 		m_shakeIntensity = 0.0f;
 		m_shakeOffset.x = 0.0f;
 		m_shakeOffset.y = 0.0f;
@@ -3706,6 +3713,29 @@ void W3DView::shake( const Coord3D *epicenter, CameraShakeType shakeType )
 	m_shakeAngleCos = (Real)cos( angle );
 	m_shakeAngleSin = (Real)sin( angle );
 
+	addShakeIntensity( epicenter, shakeType );
+}
+
+#if RTS_ENGINE_CONTEXT
+//-------------------------------------------------------------------------------------------------
+// GeneralsX @feature cemlyn007 23/10/2026 See View.h
+//-------------------------------------------------------------------------------------------------
+void W3DView::shakeLike( const Coord3D *epicenter, CameraShakeType shakeType, const View *source )
+{
+	if( const W3DView *w3dSource = dynamic_cast<const W3DView *>( source ) )
+	{
+		m_shakeAngleCos = w3dSource->m_shakeAngleCos;
+		m_shakeAngleSin = w3dSource->m_shakeAngleSin;
+	}
+	addShakeIntensity( epicenter, shakeType );
+}
+#endif
+
+//-------------------------------------------------------------------------------------------------
+/** Add the impulse of a shake of the given type at the epicenter, weaker the further the camera is from it */
+//-------------------------------------------------------------------------------------------------
+void W3DView::addShakeIntensity( const Coord3D *epicenter, CameraShakeType shakeType )
+{
 	Real intensity = 0.0f;
 	switch( shakeType )
 	{

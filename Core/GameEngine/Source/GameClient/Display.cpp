@@ -195,6 +195,19 @@ View *Display::findPlayerView( Int playerIndex ) const
 	return m_playerViews[ playerIndex ];
 }
 
+// ------------------------------------------------------------------------------------------------
+// GeneralsX @feature cemlyn007 23/10/2026 See Display.h
+// ------------------------------------------------------------------------------------------------
+void Display::shakePlayerViews( const Coord3D *epicenter, View::CameraShakeType shakeType, UnsignedInt viewers )
+{
+	for( Int playerIndex = 0; playerIndex < (Int)m_playerViews.size(); ++playerIndex )
+	{
+		View *view = m_playerViews[ playerIndex ];
+		if( view != nullptr && (viewers & (1u << playerIndex)) != 0 )
+			view->shakeLike( epicenter, shakeType, TheTacticalView );
+	}
+}
+
 namespace
 {
 

@@ -238,6 +238,9 @@ public:
 
 	/// Add an impulse force to shake the camera
 	virtual void shake( const Coord3D *epicenter, CameraShakeType shakeType ) override;
+#if RTS_ENGINE_CONTEXT
+	virtual void shakeLike( const Coord3D *epicenter, CameraShakeType shakeType, const View *source ) override;	///< GeneralsX @feature cemlyn007 23/10/2026 see View.h
+#endif
 
 	virtual Real getFXPitch() const override { return m_FXPitch; }					///< returns the FX pitch angle
 
@@ -267,6 +270,7 @@ private:
 	Coord2D m_shakeOffset;													///< the offset to add to the camera position
 	Real m_shakeAngleCos;														///< the cosine of the orientation of the oscillation
 	Real m_shakeAngleSin;														///< the sine of the orientation of the oscillation
+	void addShakeIntensity( const Coord3D *epicenter, CameraShakeType shakeType );
 	Real m_shakeIntensity;													///< the intensity of the oscillation
 	Vector3 m_shakerAngles;													//WST 11/12/2002 new multiple instance camera shaker system
 

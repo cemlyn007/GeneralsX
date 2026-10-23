@@ -67,6 +67,7 @@ static void drawFramerateBar();
 #include "GameClient/GraphDraw.h"
 #include "GameClient/Line2D.h"
 #include "GameClient/Mouse.h"
+#include "GameClient/ParticleSys.h"
 #include "GameClient/GlobalLanguage.h"
 #include "GameClient/Water.h"
 
@@ -2673,6 +2674,10 @@ void W3DDisplay::createLightPulse( const Coord3D *pos, const RGBColor *color,
 	W3DDynamicLight * theDynamicLight = m_3DScene->getADynamicLight();
 	// turn it on.
 	theDynamicLight->setEnabled(true);
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 23/10/2026 Lit only in the views of the players who could see it made (effectViewers)
+	theDynamicLight->setViewers(effectViewers());
+#endif
 
 	theDynamicLight->Set_Ambient( Vector3( color->red, color->green, color->blue ) );
 	theDynamicLight->Set_Diffuse( Vector3( color->red, color->green, color->blue) );
@@ -3584,6 +3589,9 @@ void W3DDisplay::drawWithShroudOf(Int playerIndex)
 {
 	if (TheTerrainRenderObject)
 		TheTerrainRenderObject->setDrawnShroud(playerIndex);
+	// GeneralsX @feature cemlyn007 23/10/2026 And with the light pulses the player could see made (RTS3DScene::drawLightsSeenBy)
+	if (m_3DScene)
+		m_3DScene->drawLightsSeenBy(playerIndex);
 }
 #endif
 
