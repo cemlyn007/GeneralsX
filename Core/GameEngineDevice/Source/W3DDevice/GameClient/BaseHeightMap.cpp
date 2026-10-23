@@ -60,6 +60,7 @@
 #include "Common/PerfTimer.h"
 #include "Common/Xfer.h"
 
+#include "GameClient/ParticleSys.h"
 #include "GameClient/TerrainVisual.h"
 #include "GameClient/View.h"
 #include "GameClient/Water.h"
@@ -155,6 +156,10 @@ Int BaseHeightMapRenderObjClass::freeMapResources()
 {
 	m_scorches->freeBuffers();
 	m_staticScorches->freeBuffers();
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 23/10/2026 And the players' own scorch marks (addPlayerShroud)
+	forEachPlayerScorches([](W3DScorchInterface *playerScorches) { playerScorches->freeBuffers(); });
+#endif
 
 	REF_PTR_RELEASE(m_vertexMaterialClass);
 	REF_PTR_RELEASE(m_stageZeroTexture);
@@ -177,7 +182,12 @@ void BaseHeightMapRenderObjClass::drawScorches()
 	ShaderClass::Invalidate();
 	if (m_map && Is_Hidden() == 0 && !ShaderClass::Is_Backface_Culling_Inverted()) {
 		m_staticScorches->drawScorches(*m_map);
+#if RTS_ENGINE_CONTEXT
+		// GeneralsX @feature cemlyn007 23/10/2026 The drawn player's own scorch marks (setDrawnShroud), or the terrain's own
+		(m_drawnScorches ? m_drawnScorches : m_scorches)->drawScorches(*m_map);
+#else
 		m_scorches->drawScorches(*m_map);
+#endif
 	}
 }
 
@@ -342,6 +352,10 @@ void BaseHeightMapRenderObjClass::setTextureLOD(Int lod)
 		m_map->setTextureLOD(lod);
 	m_scorches->invalidateTexture();
 	m_staticScorches->invalidateTexture();
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 23/10/2026 And the players' own scorch marks (addPlayerShroud)
+	forEachPlayerScorches([](W3DScorchInterface *playerScorches) { playerScorches->invalidateTexture(); });
+#endif
 }
 
 //=============================================================================
@@ -1893,6 +1907,10 @@ Int BaseHeightMapRenderObjClass::initHeightData(Int x, Int y, WorldHeightMap *pM
 
 	m_scorches->invalidateBuffers();
 	m_staticScorches->invalidateBuffers();
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 23/10/2026 And the players' own scorch marks (addPlayerShroud)
+	forEachPlayerScorches([](W3DScorchInterface *playerScorches) { playerScorches->invalidateBuffers(); });
+#endif
 
 	// If the textures aren't allocated (usually because of a hardware reset) need to allocate.
 	Bool needToAllocate = false;
@@ -1910,6 +1928,10 @@ Int BaseHeightMapRenderObjClass::initHeightData(Int x, Int y, WorldHeightMap *pM
 		initDestAlphaLUT();
 		m_scorches->allocateBuffers();
 		m_staticScorches->allocateBuffers();
+#if RTS_ENGINE_CONTEXT
+		// GeneralsX @feature cemlyn007 23/10/2026 And the players' own scorch marks (addPlayerShroud)
+		forEachPlayerScorches([](W3DScorchInterface *playerScorches) { playerScorches->allocateBuffers(); });
+#endif
 
 		m_vertexMaterialClass=VertexMaterialClass::Get_Preset(VertexMaterialClass::PRELIT_DIFFUSE);
 
@@ -1928,6 +1950,10 @@ void BaseHeightMapRenderObjClass::clearAllScorches()
 {
 	m_scorches->clearAllScorches();
 	m_staticScorches->clearAllScorches();
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 23/10/2026 And the players' own scorch marks (addPlayerShroud)
+	forEachPlayerScorches([](W3DScorchInterface *playerScorches) { playerScorches->clearAllScorches(); });
+#endif
 }
 
 //=============================================================================
@@ -1938,6 +1964,13 @@ void BaseHeightMapRenderObjClass::clearAllScorches()
 void BaseHeightMapRenderObjClass::addScorch(Vector3 location, Real radius, Scorches type)
 {
 	m_scorches->addScorch(location, radius, type);
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 23/10/2026 And to the scorch marks of each player who could see it made (addPlayerShroud)
+	const UnsignedInt viewers = effectViewers();
+	for (Int playerIndex = 0; playerIndex < (Int)m_playerScorches.size(); ++playerIndex)
+		if (m_playerScorches[playerIndex] && (viewers & (1u << playerIndex)) != 0)
+			m_playerScorches[playerIndex]->addScorch(location, radius, type);
+#endif
 }
 
 //=============================================================================
@@ -2243,6 +2276,10 @@ void BaseHeightMapRenderObjClass::staticLightingChanged()
 	// Cause the scorches to get updated with new lighting.
 	m_scorches->invalidateBuffers();
 	m_staticScorches->invalidateBuffers();
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 23/10/2026 And the players' own scorch marks (addPlayerShroud)
+	forEachPlayerScorches([](W3DScorchInterface *playerScorches) { playerScorches->invalidateBuffers(); });
+#endif
 
 	if (m_roadBuffer)
 		m_roadBuffer->updateLighting();
@@ -2901,6 +2938,19 @@ void BaseHeightMapRenderObjClass::addPlayerShroud(Int playerIndex)
 	playerShroud->init(m_map,TheGlobalData->m_partitionCellSize,TheGlobalData->m_partitionCellSize,FALSE);
 	playerShroud->setBorderShroudLevel(m_shroud->getBorderShroudLevel());
 	m_playerShrouds[playerIndex] = playerShroud;
+	// GeneralsX @feature cemlyn007 23/10/2026 And scorch marks of the player's own, none yet, made as the terrain's own are
+	if ((Int)m_playerScorches.size() <= playerIndex)
+		m_playerScorches.resize(playerIndex + 1, nullptr);
+	if (m_drawnScorches == m_playerScorches[playerIndex])
+		m_drawnScorches = nullptr;
+	delete m_playerScorches[playerIndex];
+#if DO_SCORCH
+	W3DScorchInterface *playerScorches = NEW W3DScorch(true);
+#else
+	W3DScorchInterface *playerScorches = NEW W3DScorchDummy;
+#endif
+	playerScorches->allocateBuffers();
+	m_playerScorches[playerIndex] = playerScorches;
 }
 
 //=============================================================================
@@ -2913,6 +2963,12 @@ void BaseHeightMapRenderObjClass::endPlayerShrouds()
 	playerShrouds.swap(m_playerShrouds);
 	for (W3DShroud *playerShroud : playerShrouds)
 		delete playerShroud;
+	// GeneralsX @feature cemlyn007 23/10/2026 And every player's own scorch marks
+	m_drawnScorches = nullptr;
+	std::vector<W3DScorchInterface *> playerScorches;
+	playerScorches.swap(m_playerScorches);
+	for (W3DScorchInterface *scorches : playerScorches)
+		delete scorches;
 }
 
 //=============================================================================
@@ -2944,6 +3000,8 @@ Int BaseHeightMapRenderObjClass::playerShroudCount() const
 void BaseHeightMapRenderObjClass::setDrawnShroud(Int playerIndex)
 {
 	m_drawnShroud = findPlayerShroud(playerIndex);
+	// GeneralsX @feature cemlyn007 23/10/2026 And with the player's own scorch marks (addPlayerShroud)
+	m_drawnScorches = playerIndex >= 0 && playerIndex < (Int)m_playerScorches.size() ? m_playerScorches[playerIndex] : nullptr;
 	DEBUG_ASSERTCRASH(playerIndex < 0 || m_drawnShroud != nullptr || m_shroud == nullptr,
 		("BaseHeightMapRenderObjClass::setDrawnShroud - player %d has no shroud", playerIndex));
 }
