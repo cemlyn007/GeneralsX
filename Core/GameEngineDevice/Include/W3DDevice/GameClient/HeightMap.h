@@ -146,10 +146,13 @@ protected:
 	// A frame update relights no tile then: it adds the quads its dynamic lights' current and previous regions cover to
 	// each tile's rectangle of quads to relight, and the draw relights the rectangles of the tiles it draws, from the
 	// static lighting and the frame update's lights, as the frame update would have relit them.
+	// GeneralsX @bugfix cemlyn007 23/10/2026 The draw runs the frame update once, before any pass renders the terrain
+	// (W3DDisplay::draw), and every render of the terrain in the draw, the water's mirror pass included, relights the
+	// tiles it draws, so the mirror shows the draw's own lights. The lights stay current until the main pass ends.
 	std::vector<IRegion2D> m_tileQuadsToRelight;	///< per VB tile, in VB quad indices, hi exclusive; empty when none.
 	W3DDynamicLight *m_frameLights[MAX_ENABLED_DYNAMIC_LIGHTS];	///< the last frame update's dynamic lights.
 	Int m_numFrameLights = 0;
-	Bool m_frameLightsCurrent = false;	///< whether the last frame update belongs to the scene render under way.
+	Bool m_frameLightsCurrent = false;	///< whether the last frame update belongs to the draw under way.
 	void addQuadsToRelight(W3DDynamicLight *lights[], Int numLights);
 	void relightTiles(Bool drawnOnly);
 };

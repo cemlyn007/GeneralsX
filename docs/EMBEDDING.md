@@ -705,7 +705,10 @@ each tile's rectangle of quads to relight, and the draw relights, from the
 static lighting and that frame update's lights, the rectangles of the tiles it
 draws (`addQuadsToRelight`, `relightTiles`), so a draw pays only for the light
 it can see and a tile drawn later shows the light it would have shown had
-every draw relit it. Scorch marks keep one buffer for the map, rebuilt only
+every draw relit it. The draw runs the terrain's frame update once, before
+reflective water's mirror pass renders the scene, and the mirror pass relights
+the tiles it draws as the main pass does, so a reflection shows the draw's own
+lights, not those of an earlier draw of another view. Scorch marks keep one buffer for the map, rebuilt only
 when a scorch is added and drawn with one call, so they are not culled. A
 host's tests can turn the culling off (`rts::armWholeTerrainDraws`,
 `Common/EngineTestHooks.h`) to compare a culled draw with a draw of every

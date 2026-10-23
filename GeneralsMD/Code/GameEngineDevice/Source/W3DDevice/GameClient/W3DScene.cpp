@@ -1220,9 +1220,10 @@ void RTS3DScene::Customized_Render( RenderInfoClass &rinfo )
 			// we get 2 frame updates per frame, and it screws up the particle emitters.
 #if RTS_ENGINE_CONTEXT
 			// GeneralsX @feature cemlyn007 21/10/2026 An engine that draws on demand runs every other object's frame
-			// update in its client tick (tickClient). The terrain's relights it for the dynamic lights in the drawn
-			// region, which advances nothing, so it stays.
-			if (!rts::drawsOnDemand() || robj->Class_ID() == RenderObjClass::CLASSID_TILEMAP)
+			// update in its client tick (tickClient).
+			// GeneralsX @bugfix cemlyn007 23/10/2026 And the terrain's in the draw, before the water's mirror pass
+			// renders the scene (W3DDisplay::draw), so that the mirror shows the terrain lit by the draw's own lights.
+			if (!rts::drawsOnDemand())
 #endif
 			it.Peek_Obj()->On_Frame_Update();
 		}
