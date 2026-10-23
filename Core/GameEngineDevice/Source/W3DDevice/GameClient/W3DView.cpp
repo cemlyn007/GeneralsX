@@ -1422,6 +1422,13 @@ void W3DView::stepView()
 	}
 	else
 	{
+#if RTS_ENGINE_CONTEXT
+		// GeneralsX @bugfix cemlyn007 23/10/2026 The camera is built again without the last offset once the shake ends.
+		// Otherwise a camera that does not move keeps the last offset of the shake for good, as update only asks for a
+		// new camera while the shake lasts.
+		if (m_shakeOffset.x != 0.0f || m_shakeOffset.y != 0.0f)
+			m_recalcCamera = true;
+#endif
 		m_shakeIntensity = 0.0f;
 		m_shakeOffset.x = 0.0f;
 		m_shakeOffset.y = 0.0f;
