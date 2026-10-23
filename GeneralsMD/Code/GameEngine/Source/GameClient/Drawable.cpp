@@ -448,6 +448,8 @@ Drawable::Drawable( const ThingTemplate *thingTemplate, DrawableStatusBits statu
 #if RTS_ENGINE_CONTEXT
 	for (i = 0; i < MAX_PLAYER_COUNT; ++i)
 		m_shroudClearFrameFor[i] = InvalidShroudClearFrame;
+	// GeneralsX @feature cemlyn007 23/10/2026 See getEffectViewers
+	m_effectViewers = effectViewers();
 #endif
 
 	for (i = 0; i < NUM_DRAWABLE_MODULE_TYPES; ++i)
@@ -2708,7 +2710,11 @@ void Drawable::beginViewLook( const Player *viewer )
 
 	m_drawableFullyObscuredByShroud = m_drawableFullyObscuredByShroud || isFullyObscuredByShroudFor( viewer->getPlayerIndex() );
 
-	const Bool hidden = isDrawableEffectivelyHidden();
+	// GeneralsX @feature cemlyn007 23/10/2026 Hidden from a player who could not see it made (getEffectViewers)
+	const Bool unseenMade = (m_effectViewers & (1u << viewer->getPlayerIndex())) == 0;
+	m_drawableFullyObscuredByShroud = m_drawableFullyObscuredByShroud || unseenMade;
+
+	const Bool hidden = isDrawableEffectivelyHidden() || unseenMade;
 	for (DrawModule** dm = getDrawModules(); *dm; ++dm)
 		(*dm)->beginViewLook( hidden, m_drawableFullyObscuredByShroud );
 }

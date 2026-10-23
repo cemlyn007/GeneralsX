@@ -151,6 +151,29 @@ void W3DTracerDraw::doDrawModule(const Matrix3D* transformMtx)
 
 }
 
+#if RTS_ENGINE_CONTEXT
+//-------------------------------------------------------------------------------------------------
+// GeneralsX @feature cemlyn007 23/10/2026 See W3DTracerDraw.h
+//-------------------------------------------------------------------------------------------------
+void W3DTracerDraw::beginViewLook(Bool hidden, Bool)
+{
+	m_hiddenInViewLook = hidden && m_theTracer != nullptr;
+	if (!m_hiddenInViewLook)
+		return;
+	m_hiddenBeforeViewLook = m_theTracer->Is_Hidden() != 0;
+	m_theTracer->Set_Hidden(TRUE);
+}
+
+//-------------------------------------------------------------------------------------------------
+void W3DTracerDraw::endViewLook()
+{
+	if (!m_hiddenInViewLook)
+		return;
+	m_theTracer->Set_Hidden(m_hiddenBeforeViewLook);
+	m_hiddenInViewLook = FALSE;
+}
+#endif
+
 // ------------------------------------------------------------------------------------------------
 /** CRC */
 // ------------------------------------------------------------------------------------------------
