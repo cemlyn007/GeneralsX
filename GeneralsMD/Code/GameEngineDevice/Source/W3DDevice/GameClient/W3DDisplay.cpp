@@ -2188,7 +2188,13 @@ AGAIN:
 	{
 		primaryW3DView->prepareForDrawOnDemand();
 		if (TheTerrainRenderObject)
+		{
 			TheTerrainRenderObject->notifyShroudChanged();
+			// GeneralsX @bugfix cemlyn007 23/10/2026 The terrain's frame update, once per draw and before any pass
+			// renders the terrain, so that the water's mirror pass shows it lit by the draw's own dynamic lights rather
+			// than as an earlier draw, perhaps of another view, left it (RTS3DScene::Customized_Render)
+			TheTerrainRenderObject->On_Frame_Update();
+		}
 	}
 #endif
 
