@@ -393,6 +393,12 @@ public:
 		{
 			if (TheTacticalView)
 				TheTacticalView->shake(primary, m_shake);
+#if RTS_ENGINE_CONTEXT
+			// GeneralsX @feature cemlyn007 23/10/2026 And the view of each player who could see it made, in the same
+			// direction (Display::shakePlayerViews)
+			if (TheTacticalView && TheDisplay)
+				TheDisplay->shakePlayerViews(primary, m_shake, effectViewers());
+#endif
 		}
 		else
 		{

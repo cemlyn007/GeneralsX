@@ -148,11 +148,17 @@ public:
 	void addPlayerView( Int playerIndex, View *view );
 	View *findPlayerView( Int playerIndex ) const;
 	void drawPlayerView( Int playerIndex );
+	// GeneralsX @feature cemlyn007 23/10/2026 GeneralsX shakes its tactical view where its observed or local player can see
+	// the shake made (ViewShakeFXNugget). After the tactical view's shake, this shakes the view of each player among
+	// viewers, one bit per player index (effectViewers), in the tactical view's direction (View::shakeLike)
+	void shakePlayerViews( const Coord3D *epicenter, View::CameraShakeType shakeType, UnsignedInt viewers );
 
 	// GeneralsX @feature cemlyn007 21/10/2026 Per-player terrain shrouds, beside the per-player views: a display that draws
 	// gives every slot's player a terrain shroud of its own at each game's start (W3DDevice/GameClient/BaseHeightMap.h,
 	// addPlayerShroud), which the partition manager keeps up to date (setPlayerShroudLevel) and drawPlayerView draws the
 	// player's view with (drawWithShroudOf). A display that does not draw keeps none.
+	// GeneralsX @feature cemlyn007 23/10/2026 A draw with a player's shroud also draws the player's own scorch marks and
+	// only the light pulses the player could see made (effectViewers)
 	virtual void addPlayerShroud( Int playerIndex ) {}
 	virtual void endPlayerShrouds() {}
 	virtual Bool hasPlayerShroud( Int playerIndex ) const { return FALSE; }
