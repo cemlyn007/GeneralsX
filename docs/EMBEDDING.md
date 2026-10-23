@@ -497,23 +497,44 @@ an FX list's (`FXList::doFXPos` needs the place clear, `doFXObj` the object no
 worse than partly clear), a stealth detector's ping, a Spectre gunship's
 strafing smoke, a laser's flares and a Chinook's rotor wash. The logic still
 makes them for the anchor, which sees everything, so the watcher's simulation
-gets every one; around each such test a `ParticleViewersScope` asks the same
+gets every one. Around each such test an `EffectViewersScope` asks the same
 question of every player whose simulation exists, and a system made inside it
 is copied only into the simulations of the players who pass (scopes nest, so a
 player must pass every test around the making). A player left out makes
 nothing and draws nothing from its client random stream, as GeneralsX would
-not had that player been its local player; the placement picks of an FX
+not had that player been its local player. The placement picks of an FX
 list's particle nugget come from the client stream of the frame, which the
 test does not move. The tests read the players' cell shroud and objects'
 shrouded status, which change no logic in these engines (they have no ghost
-objects), and with no simulations (an engine with no rendering) nothing is
-asked. The other kinds of FX-list effect are not per player: terrain
-scorches, light pulses, tracers and ray effects are made once, for the anchor,
-and show in any view that draws them, and a view shake shakes the watcher's
-camera (the tactical view) alone. Nor is the particle uplink cannon's test,
-which takes its beam's effects away while its local player cannot see the
-cannon and puts them back once it can: for the anchor it never takes them
-away.
+objects). With no simulations (an engine with no rendering) nothing is asked.
+
+The FX list's other effects read the same players (`effectViewers`, every
+player outside any scope):
+
+- **Scorch marks.** Every player with a view has scorch marks of its own,
+  made and deleted with its terrain shroud (`BaseHeightMapRenderObjClass::
+  addPlayerShroud`). A scorch goes to the terrain's own marks, which are the
+  watcher's, and to those of the players who could see it made. A draw for a
+  player draws its own. Each player's marks keep GeneralsX's limit and
+  duplicate rule on their own.
+- **Light pulses.** Each light pulse's light keeps the players who could see it
+  made. A draw for any other player turns the light off for that draw alone
+  (`RTS3DScene::drawLightsSeenBy`), and the client tick fades it as before.
+- **Tracers and ray effects.** A drawable made inside a scope keeps the
+  players who could see it made (`Drawable::getEffectViewers`, saved with the
+  drawables by the game client's block, version 4). A draw for any other
+  player hides it, the tracer's line included.
+- **View shakes.** A view shake shakes the tactical view and then each player
+  view of a player who could see it made, in the direction the tactical
+  view's shake drew (`Display::shakePlayerViews`). That draws no further
+  random number, so no player's shake moves the frame's client stream.
+
+Effects made outside any FX list, such as the scorch marks of the particle
+uplink cannon, a firestorm or a nuke, go to every player, as GeneralsX makes
+them whatever its local player can see. The particle uplink cannon's own test
+is not per player: it takes its beam's effects away while its local player
+cannot see the cannon and puts them back once it can, and for the anchor it
+never takes them away.
 
 A save holds the watcher's particle systems and then, since version 2 of the
 manager's block, every player's simulation as it is, with its own systems,
