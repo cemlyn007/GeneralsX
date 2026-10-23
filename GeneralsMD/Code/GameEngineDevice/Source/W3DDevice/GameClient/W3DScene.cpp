@@ -1816,6 +1816,24 @@ W3DDynamicLight * RTS3DScene::getADynamicLight()
 	return(pLight);
 }
 
+#if RTS_ENGINE_CONTEXT
+//=============================================================================
+// GeneralsX @feature cemlyn007 23/10/2026 See W3DScene.h
+//=============================================================================
+void RTS3DScene::drawLightsSeenBy(Int playerIndex)
+{
+	RefRenderObjListIterator dynaLightIt(&m_dynamicLightList);
+	for (dynaLightIt.First(); !dynaLightIt.Is_Done(); dynaLightIt.Next())
+	{
+		W3DDynamicLight *pLight = (W3DDynamicLight*)dynaLightIt.Peek_Obj();
+		if (playerIndex < 0)
+			pLight->showAfterView();
+		else
+			pLight->hideFromViewer(playerIndex);
+	}
+}
+#endif
+
 //=============================================================================
 // RTS3DScene::removeDynamicLight
 //=============================================================================
