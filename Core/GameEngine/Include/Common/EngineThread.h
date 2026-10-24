@@ -140,6 +140,20 @@ public:
 // any other thread.
 std::stop_token currentEngineThreadStop() noexcept;
 
+// Makes `stop` the current engine thread's stop token while it exists. The thread layer sets it around an engine
+// thread's body; nothing else should.
+class CurrentEngineThreadStop
+{
+public:
+	explicit CurrentEngineThreadStop(const std::stop_token& stop) noexcept;
+	~CurrentEngineThreadStop();
+	CurrentEngineThreadStop(const CurrentEngineThreadStop&) = delete;
+	CurrentEngineThreadStop& operator=(const CurrentEngineThreadStop&) = delete;
+
+private:
+	const std::stop_token* m_previous;
+};
+
 // A lock on a mutex that an engine thread can wait on, held until it is destroyed. On an engine thread it tries the
 // mutex again every millisecond while it is held, and throws EngineThreadStopped at a stop request; on any other
 // thread it waits as std::mutex::lock does. It is BasicLockable, so that an EngineCondition can release it while it
