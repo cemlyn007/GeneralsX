@@ -28,10 +28,12 @@ typedef int MMRESULT;
 // Only define if old header hasn't been included yet
 #ifndef __TIME_COMPAT_OLD_INCLUDED
 #ifndef timeBeginPeriod
-static MMRESULT timeBeginPeriod(int) { return TIMERR_NOERROR; }
+// GeneralsX @bugfix cemlyn007 24/10/2026 Stubs defined in this header are static inline, so a source that includes it
+// without calling them gets no unused-function warning.
+static inline MMRESULT timeBeginPeriod(int) { return TIMERR_NOERROR; }
 #endif
 #ifndef timeEndPeriod
-static MMRESULT timeEndPeriod(int) { return TIMERR_NOERROR; }
+static inline MMRESULT timeEndPeriod(int) { return TIMERR_NOERROR; }
 #endif
 #ifndef timeGetTime
 DWORD timeGetTime(void);
