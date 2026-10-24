@@ -17,6 +17,8 @@
 */
 // FILE: EngineSockets.cpp
 // GeneralsX @feature cemlyn007 16/10/2026 The engine's socket layer (see Common/EngineSockets.h)
+// GeneralsX @feature cemlyn007 24/10/2026 An engine thread takes the open sockets' lock with an EngineLock, so that a
+// stop request ends its wait (Common/EngineThread.h).
 
 #include "PreRTS.h"
 
@@ -25,6 +27,7 @@
 #include "Common/EngineSockets.h"
 
 #include "Common/EmbeddingContract.h"
+#include "Common/EngineThread.h"
 
 #pragma push_macro("min")
 #pragma push_macro("max")
@@ -40,6 +43,7 @@
 #include <cstdint>
 #include <cstring>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #pragma pop_macro("max")
@@ -72,16 +76,19 @@ ResourceLedger& engineLedger()
 
 int recordSocket(ResourceLedger& ledger, int socket, const char* what)
 {
+	std::optional<ResourceLedger::Id> recorded;
 	try
 	{
-		const ResourceLedger::Id id = ledger.record(std::string("socket ") + (what != nullptr ? what : ""),
+		recorded = ledger.record(std::string("socket ") + (what != nullptr ? what : ""),
 			static_cast<std::uintptr_t>(socket), [](std::uintptr_t handle) { ::close(static_cast<int>(handle)); });
 		OpenEngineSockets& sockets = openEngineSockets();
-		const std::scoped_lock lock(sockets.mutex);
-		sockets.ids[socket] = id;
+		const EngineLock lock(sockets.mutex);
+		sockets.ids[socket] = *recorded;
 	}
 	catch (...)
 	{
+		if (recorded)
+			ledger.forget(*recorded);
 		::close(socket);
 		throw;
 	}
@@ -290,7 +297,7 @@ int closeEngineSocket(int socket)
 	OpenEngineSockets& sockets = openEngineSockets();
 	ResourceLedger::Id id = 0;
 	{
-		const std::scoped_lock lock(sockets.mutex);
+		const EngineLock lock(sockets.mutex);
 		const auto found = sockets.ids.find(socket);
 		if (found == sockets.ids.end())
 		{

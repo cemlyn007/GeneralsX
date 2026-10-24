@@ -17,6 +17,7 @@
 */
 // FILE: EngineThread.cpp
 // GeneralsX @feature cemlyn007 15/10/2026 GeneralsX's thread layer (see Common/EngineThread.h)
+// GeneralsX @feature cemlyn007 24/10/2026 Stop-aware locks and conditions for engine threads (see Common/EngineThread.h)
 
 #include "PreRTS.h"
 
@@ -38,6 +39,28 @@ struct EngineThreadList
 {
 	std::mutex mutex;
 	std::vector<std::shared_ptr<EngineThread>> threads;
+};
+
+// How long an engine thread's EngineLock waits before it tries a held mutex again.
+constexpr std::chrono::milliseconds contendedLockRetry(1);
+
+// The stop token of the engine thread running on this thread, while its body runs.
+constinit thread_local const std::stop_token* t_engineThreadStop = nullptr;
+
+// Makes `stop` the current engine thread's stop token while it exists.
+class CurrentEngineThreadStop
+{
+public:
+	explicit CurrentEngineThreadStop(const std::stop_token& stop) noexcept : m_previous(t_engineThreadStop)
+	{
+		t_engineThreadStop = &stop;
+	}
+	~CurrentEngineThreadStop() { t_engineThreadStop = m_previous; }
+	CurrentEngineThreadStop(const CurrentEngineThreadStop&) = delete;
+	CurrentEngineThreadStop& operator=(const CurrentEngineThreadStop&) = delete;
+
+private:
+	const std::stop_token* m_previous;
 };
 
 } // namespace
@@ -67,8 +90,17 @@ public:
 			EngineThread& thread;
 			~FinishOnExit() { thread.finish(); }
 		} finishOnExit{thread};
-		if (!thread.stopRequested())
-			m_body(thread.m_stop.get_token());
+		if (thread.stopRequested())
+			return;
+		const std::stop_token stop = thread.m_stop.get_token();
+		const CurrentEngineThreadStop current(stop);
+		try
+		{
+			m_body(stop);
+		}
+		catch (const EngineThreadStopped&)
+		{
+		}
 	}
 
 private:
@@ -189,6 +221,74 @@ void stopEngineThreads()
 		thread->requestStop();
 	for (const std::shared_ptr<EngineThread>& thread : threads)
 		thread->waitUntilFinished();
+}
+
+const char* EngineThreadStopped::what() const noexcept
+{
+	return "the engine thread was asked to stop while it waited";
+}
+
+std::stop_token currentEngineThreadStop() noexcept
+{
+	return t_engineThreadStop != nullptr ? *t_engineThreadStop : std::stop_token();
+}
+
+EngineLock::EngineLock(std::mutex& mutex) : m_mutex(mutex)
+{
+	lock();
+}
+
+EngineLock::~EngineLock()
+{
+	unlock();
+}
+
+void EngineLock::lock()
+{
+	const std::stop_token* const stop = t_engineThreadStop;
+	if (stop == nullptr)
+	{
+		m_mutex.lock();
+		m_owned = true;
+		return;
+	}
+	while (!m_mutex.try_lock())
+	{
+		if (!sleepUnlessStopped(*stop, contendedLockRetry))
+			throw EngineThreadStopped();
+	}
+	m_owned = true;
+}
+
+void EngineLock::lockToFinish()
+{
+	m_mutex.lock();
+	m_owned = true;
+}
+
+void EngineLock::unlock() noexcept
+{
+	if (!m_owned)
+		return;
+	m_owned = false;
+	m_mutex.unlock();
+}
+
+void EngineCondition::notifyAll() noexcept
+{
+	m_changed.notify_all();
+}
+
+void EngineCondition::wait(EngineLock& lock, const std::function<bool()>& ready)
+{
+	const std::stop_token* const stop = t_engineThreadStop;
+	if (stop == nullptr)
+	{
+		m_changed.wait(lock, ready);
+		return;
+	}
+	if (!m_changed.wait(lock, *stop, ready))
+		throw EngineThreadStopped();
 }
 
 } // namespace rts
