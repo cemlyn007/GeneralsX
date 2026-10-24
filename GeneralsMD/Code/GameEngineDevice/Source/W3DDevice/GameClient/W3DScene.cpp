@@ -460,7 +460,11 @@ void RTS3DScene::tickClient()
 		RenderObjClass *robj = objects.Peek_Obj();
 		if (robj->Class_ID() == RenderObjClass::CLASSID_TILEMAP)
 			continue;
-		robj->Get_Bounding_Sphere();
+		// GeneralsX @feature cemlyn007 23/10/2026 Not for a model whose pose is pending
+		// (Animatable3DObjClass::Advance_Client_Tick): its sphere would pose it now, and a later read computes the same one
+		const Bool posePending = robj->Class_ID() == RenderObjClass::CLASSID_HLOD && static_cast<HLodClass *>(robj)->Is_Pose_Pending();
+		if (!posePending)
+			robj->Get_Bounding_Sphere();
 		advanceRenderObjectForClientTick(robj);
 	}
 }

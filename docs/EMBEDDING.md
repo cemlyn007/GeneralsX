@@ -482,6 +482,21 @@ flushed from the tracks that are visible now; shadow volumes are rebuilt
 exactly every time; and the terrain shader resets the sampler states it set.
 No cursor pick is made.
 
+The tick steps every model's animation clock, but poses a model's hierarchy
+only when something needs the pose (`Animatable3DObjClass::Advance_Client_Tick`).
+For a top-level model in a single, timed animation, with no embedded sounds and
+no posed sub-objects, the tick steps the frame and leaves the pose pending
+(`Is_Pose_Pending`). The first read of a bone (`Get_Bone_Transform`) or of a
+sub-object's transform, or a render, poses it at the frame the tick stepped to,
+without stepping again. A real change to the model, such as a new transform, a
+new animation or a captured bone (`Set_Hierarchy_Valid(false)`), drops the
+pending pose, so the next read steps and poses as it did when the tick posed
+every model. The tick's bounding-volume pass also skips a model whose pose is
+pending, since its sphere would pose it. A pose depends only on its frame, so
+it is the pose the tick would have posed, and a model that no view draws and
+nothing reads is never posed. In a busy game of eight computer players this
+takes the scene's per-frame step from about 1 ms to 0.3 ms.
+
 Such an engine simulates particles though it is headless. The manager is the
 watcher's simulation. When a game starts, `beginSimulations` gives each
 slot's player a simulation of its own (`newSimulation`), which copies the

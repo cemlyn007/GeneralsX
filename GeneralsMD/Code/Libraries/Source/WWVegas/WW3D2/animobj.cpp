@@ -83,6 +83,9 @@
  *=============================================================================================*/
 Animatable3DObjClass::Animatable3DObjClass(const char * htree_name) :
 	IsTreeValid(0),
+#if RTS_ENGINE_CONTEXT
+	PosePending(false),
+#endif
 	CurMotionMode(BASE_POSE)
 {
 	// Inline struct members can't be initialized in init list for some reason...
@@ -138,6 +141,9 @@ Animatable3DObjClass::Animatable3DObjClass(const char * htree_name) :
 Animatable3DObjClass::Animatable3DObjClass(const Animatable3DObjClass & src) :
 	CompositeRenderObjClass(src),
 	IsTreeValid(0),
+#if RTS_ENGINE_CONTEXT
+	PosePending(false),
+#endif
 	CurMotionMode(BASE_POSE),
 	HTree(nullptr)
 {
@@ -201,6 +207,7 @@ Animatable3DObjClass & Animatable3DObjClass::operator = (const Animatable3DObjCl
 		CompositeRenderObjClass::operator = (that);
 
 		IsTreeValid = 0;
+		Drop_Pending_Pose();
 		CurMotionMode = BASE_POSE;
 		ModeAnim.Motion = nullptr;
 		ModeAnim.Frame = 0.0f;
@@ -312,9 +319,39 @@ void Animatable3DObjClass::Advance_Client_Tick()
 
 	const bool isSingleAnim = CurMotionMode == SINGLE_ANIM && ModeAnim.AnimMode != ANIM_MODE_MANUAL;
 
+	// GeneralsX @feature cemlyn007 23/10/2026 Step the frame and leave the pose pending, where nothing else needs the pose posed now
+	if (isSingleAnim && Can_Pend_Pose()) {
+		Single_Anim_Progress();
+		PosePending = true;
+		Set_Sub_Object_Transforms_Dirty(true);
+		return;
+	}
+
 	if (isSingleAnim || !Is_Hierarchy_Valid() || Are_Sub_Object_Transforms_Dirty()) {
 		Update_Sub_Object_Transforms();
 	}
+}
+
+// GeneralsX @feature cemlyn007 23/10/2026 Whether the tick may leave this model's pose pending (Advance_Client_Tick): a top-level model whose
+// animation plays no sound, which needs the pose, and with no sub-object that is posed in turn, whose own frame the
+// pose would step
+bool Animatable3DObjClass::Can_Pend_Pose()
+{
+	if (Get_Container() != nullptr || ModeAnim.Motion == nullptr || ModeAnim.Motion->Has_Embedded_Sounds())
+		return false;
+	const int subObjects = Get_Num_Sub_Objects();
+	for (int i = 0; i < subObjects; ++i) {
+		RenderObjClass *sub = Get_Sub_Object(i);
+		if (sub == nullptr)
+			continue;
+		const int classId = sub->Class_ID();
+		const bool posed = sub->Get_Num_Sub_Objects() > 0 || classId == CLASSID_HLOD || classId == CLASSID_HMODEL ||
+			classId == CLASSID_DISTLOD || classId == CLASSID_COLLECTION;
+		sub->Release_Ref();
+		if (posed)
+			return false;
+	}
+	return true;
 }
 #endif
 
@@ -677,7 +714,11 @@ const Matrix3D &	Animatable3DObjClass::Get_Bone_Transform(int boneindex)
 		** If our hierarchy isn't valid, we just need to evaluate our animation
 		** state.
 		*/
-		if (!Is_Hierarchy_Valid()) {
+		if (!Is_Hierarchy_Valid()
+#if RTS_ENGINE_CONTEXT
+				|| PosePending
+#endif
+				) {
 			Update_Sub_Object_Transforms();
 		}
 
@@ -809,7 +850,12 @@ void Animatable3DObjClass::Update_Sub_Object_Transforms()
 
 		case SINGLE_ANIM:
 
-			if ( ModeAnim.AnimMode != ANIM_MODE_MANUAL ) {
+			// GeneralsX @feature cemlyn007 23/10/2026 A pending pose's frame is the one the tick stepped to (Advance_Client_Tick)
+			if ( ModeAnim.AnimMode != ANIM_MODE_MANUAL
+#if RTS_ENGINE_CONTEXT
+					&& !PosePending
+#endif
+					) {
 				Single_Anim_Progress();
 			}
 			Anim_Update(Transform,ModeAnim.Motion,ModeAnim.Frame);
@@ -864,6 +910,7 @@ void Animatable3DObjClass::Update_Sub_Object_Transforms()
 			break;
 	}
 	Set_Hierarchy_Valid(true);
+	Drop_Pending_Pose();
 }
 
 
