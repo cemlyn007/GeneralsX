@@ -342,7 +342,11 @@ a swallowed fatal error still faults the engine, since the sink has already
 latched it. `rts::armInjectedQuit` makes the engine ask to quit at its next
 frame. `rts::armWholeTerrainDraws` makes an engine that draws on demand draw
 every tile of its terrain, as it did before it culled them per draw (Drawing
-on demand, below), until it is disarmed. The hooks are per engine, and no GeneralsX source arms one: the banned
+on demand, below), until it is disarmed. `rts::startBlockedEngineThreads`
+starts test-only engine threads that wait until they are asked to stop: a lock
+holder with a waiter on its lock, or a reader on a pipe nobody writes to, so
+that a test can fault the engine while they wait and check that every one of
+them stops. The hooks are per engine, and no GeneralsX source arms one: the banned
 symbol check's "test hooks" rule refuses it.
 
 ### Input errors
@@ -377,6 +381,32 @@ the thread is recorded in the ledger as `thread <name>`, and releasing that
 record stops it and waits for its body to return. The engine's teardown stops
 every thread it started before it frees what they use. No GeneralsX source
 creates a thread itself.
+
+No engine thread is left behind after a fault, so every wait an engine thread
+makes ends at a stop request:
+
+- A GeneralsX lock that an engine thread can wait on is taken with an
+  `rts::EngineLock`, and a condition it waits on is an `rts::EngineCondition`.
+  On an engine thread, an `rts::EngineLock` that finds its mutex held tries it
+  again every millisecond until it gets it or a stop is requested, so a lock
+  that another thread holds, or that a frame the fault unwound left held, never
+  traps the thread. A stopped acquisition or condition wait throws
+  `rts::EngineThreadStopped`, which the layer catches where the body returns;
+  a body that catches everything rethrows it. On any other thread both wait as
+  `std::mutex` and `std::condition_variable_any` do.
+- A device or network wait polls with a short timeout and checks the stop
+  token between polls, as the socket layer's name lookups do (below). No
+  engine thread calls the C library's host name lookup, which nothing can
+  interrupt.
+- The layer's own bookkeeping locks are held for a few instructions, never
+  across a wait or a call into other code.
+
+The code that runs on engine threads is the screenshot writer, the GameSpy and
+FTP host name lookups, the file and socket layers, the per-engine statics and
+the test hooks' blocked threads (below). A host's banned symbol check can hold
+it to this rule: none of it calls a blocking lock or condition wait of its own.
+`rts::currentEngineThreadStop` gives the stop token of the engine thread the
+caller runs on.
 
 ### Files
 
@@ -825,6 +855,8 @@ write them, and every engine reads the same values.
 Writable storage outside every context holds only:
 
 - the current-context pointer, `rts::t_engine`, one per thread;
+- the stop token of the engine thread that runs on a thread
+  (`rts::currentEngineThreadStop`), one pointer per thread;
 - third-party libraries' own state, which GeneralsX does not write: gli's
   lookup tables, stb_image_write's settings and tables, and libstdc++'s wait
   pool for `std::atomic::wait`.

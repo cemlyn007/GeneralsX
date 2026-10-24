@@ -17,6 +17,9 @@
 */
 // FILE: EngineContext.cpp
 // GeneralsX @feature cemlyn007 28/09/2026 The engine context (PLAN-023 Phase 1; see Common/EngineContext.h)
+// GeneralsX @feature cemlyn007 24/10/2026 The per-engine statics' lock is an EngineLock and their condition an
+// EngineCondition, so that an engine thread waiting for another thread to make a static stops when asked
+// (Common/EngineThread.h).
 
 #include "PreRTS.h"
 
@@ -25,11 +28,11 @@
 #include "Common/EngineContext.h"
 
 #include "Common/EmbeddingContract.h"
+#include "Common/EngineThread.h"
 
 #include <algorithm>
 #include <atomic>
 #include <cfenv>
-#include <condition_variable>
 #include <cstdio>
 #include <cstring>
 #include <memory>
@@ -196,11 +199,11 @@ struct EngineStatics
 	{
 		inConstruction.erase(std::find_if(inConstruction.begin(), inConstruction.end(),
 			[&key](const auto& building) { return building.first == &key; }));
-		madeOrFailed.notify_all();
+		madeOrFailed.notifyAll();
 	}
 
 	mutable std::mutex mutex;
-	std::condition_variable madeOrFailed;
+	EngineCondition madeOrFailed;
 	std::atomic<Table*> table{nullptr};
 	std::vector<std::unique_ptr<Table>> tables;
 	std::vector<Made> inCreationOrder;
@@ -379,7 +382,7 @@ void* EngineContext::makeStatic(const EngineStaticKey& key, const EngineStaticTy
 		throw std::logic_error(std::string("the per-engine static ") + key.name + " is used with no engine current");
 	}
 	EngineStatics& statics = this->statics();
-	std::unique_lock<std::mutex> lock(statics.mutex);
+	EngineLock lock(statics.mutex);
 	for (;;)
 	{
 		if (void* const made = statics.findLocked(key))
@@ -392,7 +395,10 @@ void* EngineContext::makeStatic(const EngineStaticKey& key, const EngineStaticTy
 			DEBUG_CRASH(("the per-engine static %s is used by its own initialiser", key.name));
 			throw std::logic_error(std::string("the per-engine static ") + key.name + " is used by its own initialiser");
 		}
-		statics.madeOrFailed.wait(lock);
+		statics.madeOrFailed.wait(lock, [&statics, &key] {
+			std::thread::id stillBuilding;
+			return !statics.inConstructionLocked(key, &stillBuilding);
+		});
 	}
 	statics.inConstruction.emplace_back(&key, std::this_thread::get_id());
 	lock.unlock();
@@ -408,12 +414,12 @@ void* EngineContext::makeStatic(const EngineStaticKey& key, const EngineStaticTy
 	{
 		if (storage != nullptr)
 			::operator delete(storage, std::align_val_t(type.alignment));
-		lock.lock();
+		lock.lockToFinish();
 		statics.endConstructionLocked(key);
 		throw;
 	}
 
-	lock.lock();
+	lock.lockToFinish();
 	statics.insertLocked(key, storage);
 	statics.inCreationOrder.push_back(EngineStatics::Made{&key, storage, &type});
 	statics.endConstructionLocked(key);
@@ -437,7 +443,7 @@ void EngineContext::destroyStatics()
 	{
 		EngineStatics::Made made;
 		{
-			std::lock_guard<std::mutex> lock(statics->mutex);
+			const EngineLock lock(statics->mutex);
 			if (statics->inCreationOrder.empty())
 				break;
 			auto next = std::find_if(statics->inCreationOrder.rbegin(), statics->inCreationOrder.rend(),
@@ -449,7 +455,7 @@ void EngineContext::destroyStatics()
 		}
 		made.type->destroy(made.storage);
 		{
-			std::lock_guard<std::mutex> lock(statics->mutex);
+			const EngineLock lock(statics->mutex);
 			statics->insertLocked(*made.key, nullptr);
 		}
 		::operator delete(made.storage, std::align_val_t(made.type->alignment));
@@ -461,7 +467,7 @@ std::size_t EngineContext::countStatics() const
 	const EngineStatics* const statics = m_statics.load(std::memory_order_acquire);
 	if (statics == nullptr)
 		return 0;
-	std::lock_guard<std::mutex> lock(statics->mutex);
+	const EngineLock lock(statics->mutex);
 	return statics->inCreationOrder.size();
 }
 
@@ -472,7 +478,7 @@ void EngineContext::forEachStatic(void (*visit)(const char* name, void* user), v
 		return;
 	std::vector<const char*> names;
 	{
-		std::lock_guard<std::mutex> lock(statics->mutex);
+		const EngineLock lock(statics->mutex);
 		names.reserve(statics->inCreationOrder.size());
 		for (const EngineStatics::Made& made : statics->inCreationOrder)
 			names.push_back(made.key->name);

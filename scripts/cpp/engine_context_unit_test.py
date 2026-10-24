@@ -15,6 +15,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
 INCLUDE = os.path.join(ROOT, "Core", "GameEngine", "Include")
 SOURCE = os.path.join(ROOT, "Core", "GameEngine", "Source", "Common", "EngineContext.cpp")
+# GeneralsX @bugfix cemlyn007 24/10/2026 EngineContext.cpp takes its locks through the thread layer's stop-aware waits.
+STOP_AWARE_WAITS = os.path.join(ROOT, "Core", "GameEngine", "Source", "Common", "EngineLock.cpp")
 
 STUB_PRERTS = """#pragma once
 #include <cassert>
@@ -34,7 +36,7 @@ class EngineContextUnitTest(unittest.TestCase):
                 [
                     "g++", "-std=c++20", "-g", "-fsanitize=address,undefined", "-fno-sanitize-recover=all", "-DRTS_ENGINE_CONTEXT=1",
                     "-I" + work, "-I" + INCLUDE, "-I" + os.path.join(INCLUDE, "Common"),
-                    os.path.join(HERE, "engine_context_unit_test.cpp"), SOURCE, "-o", binary,
+                    os.path.join(HERE, "engine_context_unit_test.cpp"), SOURCE, STOP_AWARE_WAITS, "-o", binary,
                 ],
                 check=True,
             )

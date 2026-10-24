@@ -17,6 +17,8 @@
 */
 // FILE: EngineFiles.cpp
 // GeneralsX @feature cemlyn007 15/10/2026 The engine's file layer (see Common/EngineFiles.h)
+// GeneralsX @feature cemlyn007 24/10/2026 An engine thread takes the open files' lock with an EngineLock, so that a stop
+// request ends its wait (Common/EngineThread.h).
 
 #include "PreRTS.h"
 
@@ -25,12 +27,14 @@
 #include "Common/EngineFiles.h"
 
 #include "Common/EmbeddingContract.h"
+#include "Common/EngineThread.h"
 
 #include <algorithm>
 #include <cerrno>
 #include <cstdint>
 #include <cstring>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <unordered_map>
 
@@ -132,16 +136,19 @@ std::FILE* openEngineFile(const char* path, const char* mode)
 	if (file == nullptr)
 		return nullptr;
 
+	std::optional<ResourceLedger::Id> recorded;
 	try
 	{
-		const ResourceLedger::Id id = ledger.record("file " + resolved.string(), reinterpret_cast<std::uintptr_t>(file),
+		recorded = ledger.record("file " + resolved.string(), reinterpret_cast<std::uintptr_t>(file),
 			[](std::uintptr_t handle) { std::fclose(reinterpret_cast<std::FILE*>(handle)); });
 		OpenEngineFiles& files = openEngineFiles();
-		const std::scoped_lock lock(files.mutex);
-		files.ids[file] = id;
+		const EngineLock lock(files.mutex);
+		files.ids[file] = *recorded;
 	}
 	catch (...)
 	{
+		if (recorded)
+			ledger.forget(*recorded);
 		std::fclose(file);
 		throw;
 	}
@@ -158,7 +165,7 @@ int closeEngineFile(std::FILE* file)
 	bool recorded = false;
 	ResourceLedger::Id id = 0;
 	{
-		const std::scoped_lock lock(files.mutex);
+		const EngineLock lock(files.mutex);
 		const auto found = files.ids.find(file);
 		if (found != files.ids.end())
 		{

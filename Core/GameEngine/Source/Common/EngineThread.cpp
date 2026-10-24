@@ -17,6 +17,8 @@
 */
 // FILE: EngineThread.cpp
 // GeneralsX @feature cemlyn007 15/10/2026 GeneralsX's thread layer (see Common/EngineThread.h)
+// GeneralsX @feature cemlyn007 24/10/2026 Stop-aware locks and conditions for engine threads live in EngineLock.cpp, which
+// needs nothing else of the engine (see Common/EngineThread.h)
 
 #include "PreRTS.h"
 
@@ -67,8 +69,17 @@ public:
 			EngineThread& thread;
 			~FinishOnExit() { thread.finish(); }
 		} finishOnExit{thread};
-		if (!thread.stopRequested())
-			m_body(thread.m_stop.get_token());
+		if (thread.stopRequested())
+			return;
+		const std::stop_token stop = thread.m_stop.get_token();
+		const CurrentEngineThreadStop current(stop);
+		try
+		{
+			m_body(stop);
+		}
+		catch (const EngineThreadStopped&)
+		{
+		}
 	}
 
 private:
@@ -166,15 +177,6 @@ std::shared_ptr<EngineThread> startEngineLoop(std::string name, std::chrono::mil
 		{
 		}
 	});
-}
-
-bool sleepUnlessStopped(const std::stop_token& stop, std::chrono::milliseconds duration)
-{
-	std::mutex mutex;
-	std::condition_variable_any wake;
-	std::unique_lock<std::mutex> lock(mutex);
-	wake.wait_for(lock, stop, duration, [] { return false; });
-	return !stop.stop_requested();
 }
 
 void stopEngineThreads()

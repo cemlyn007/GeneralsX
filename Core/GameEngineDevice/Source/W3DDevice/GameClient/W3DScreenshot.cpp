@@ -114,6 +114,11 @@ static void screenshotThreadFunc(ScreenshotThreadData* data)
 
 	// Convert to R8G8B8 for stb_image_write.
 	unsigned char* image = new unsigned char[3 * width * height];
+#if RTS_ENGINE_CONTEXT
+	// GeneralsX @feature cemlyn007 24/10/2026 The image is owned here, so that a stop request that ends one of the
+	// thread's waits with rts::EngineThreadStopped (Common/EngineThread.h) frees it too.
+	const std::unique_ptr<unsigned char[]> ownedImage(image);
+#endif
 
 	if (!data->is16Bit)
 	{
@@ -151,10 +156,7 @@ static void screenshotThreadFunc(ScreenshotThreadData* data)
 	int success = 0;
 #if RTS_ENGINE_CONTEXT
 	if (stop.stop_requested())
-	{
-		delete[] image;
 		return;
-	}
 	if (FILE* const file = rts::openEngineFile(pathname, "wb"))
 	{
 		const auto writeToFile = [](void* context, void* bytes, int size) {
@@ -188,17 +190,26 @@ static void screenshotThreadFunc(ScreenshotThreadData* data)
 
 	if (success)
 	{
+#if RTS_ENGINE_CONTEXT
+		// GeneralsX @feature cemlyn007 24/10/2026 The queue, a per-engine static, is reached before the message is made,
+		// so that a stop request that ends the wait for it leaks nothing.
+		MPSCIntrusiveQueue<ScreenshotWrittenMessage>& writtenQueue = s_screenshotWrittenQueue;
+		ScreenshotWrittenMessage* message = new ScreenshotWrittenMessage;
+		strlcpy(message->leafname, data->leafname, ARRAY_SIZE(message->leafname));
+		writtenQueue.Push(message);
+#else
 		ScreenshotWrittenMessage* message = new ScreenshotWrittenMessage;
 		strlcpy(message->leafname, data->leafname, ARRAY_SIZE(message->leafname));
 		s_screenshotWrittenQueue.Push(message);
+#endif
 	}
 	else
 	{
 		DEBUG_LOG(("Failed to write screenshot %s", pathname));
 	}
 
-	delete[] image;
 #if !RTS_ENGINE_CONTEXT
+	delete[] image;
 	delete data;
 #endif
 

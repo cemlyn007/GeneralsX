@@ -30,8 +30,22 @@
 //   runs, so that releasing the ledger after a fault stops the thread and waits for its body to return.
 //
 // A body that waits (a sleep, a condition wait) waits with sleepUnlessStopped or a stop-aware condition wait, so that
-// a stop request wakes it. A body blocked in a call nothing can interrupt (a host name lookup) returns when that call
-// does; it checks the stop request then, before it touches engine state.
+// a stop request wakes it. A body blocked in a call nothing can interrupt returns when that call does; it checks the
+// stop request then, before it touches engine state. No engine thread makes such a call (below).
+// GeneralsX @feature cemlyn007 24/10/2026 No engine thread is left behind after a fault: every wait an engine thread can
+// make ends at a stop request.
+// - A GeneralsX lock that an engine thread can wait on is taken with an EngineLock, and a condition such a thread waits
+//   on is an EngineCondition. On an engine thread, an EngineLock that finds its mutex held tries again until it gets
+//   it or a stop is requested, so a lock that another thread holds, or that a frame the fault unwound left held, never
+//   traps it; a stopped acquisition or condition wait throws EngineThreadStopped, which the layer catches where the
+//   body returns. On any other thread both block as std::mutex and std::condition_variable_any do. The banned symbol
+//   check's rule "engine-thread waits" refuses a blocking lock or condition wait in the sources whose code runs on
+//   engine threads (docs/checks.md).
+// - A device or network wait polls with a short timeout and checks the stop token between polls, as the socket layer's
+//   own name lookups do (rts::resolveEngineHostName, Common/EngineSockets.h). No engine thread calls the C library's
+//   host name lookup, which nothing can interrupt.
+// - The layer's own bookkeeping locks (an EngineThread's state, an engine's list of threads) are held only for a few
+//   instructions, never across a wait or a call into other code, so they need neither.
 #pragma once
 
 #if RTS_ENGINE_CONTEXT
@@ -46,6 +60,7 @@
 #include <chrono>
 #include <condition_variable>
 #include <cstdint>
+#include <exception>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -112,6 +127,70 @@ bool sleepUnlessStopped(const std::stop_token& stop, std::chrono::milliseconds d
 // Asks every thread the current engine started to stop and waits until each body has returned: the engine's teardown
 // calls it before it frees the state those threads use. The host still joins the threads.
 void stopEngineThreads();
+
+// Thrown on an engine thread when a stop request ends an EngineLock's acquisition or an EngineCondition's wait. The
+// layer catches it where the body returns, so a body lets it pass: one that catches everything rethrows it.
+class EngineThreadStopped : public std::exception
+{
+public:
+	const char* what() const noexcept override;
+};
+
+// The stop token of the engine thread this code runs on, or a token no stop can reach (stop_possible() is false) on
+// any other thread.
+std::stop_token currentEngineThreadStop() noexcept;
+
+// Makes `stop` the current engine thread's stop token while it exists. The thread layer sets it around an engine
+// thread's body; nothing else should.
+class CurrentEngineThreadStop
+{
+public:
+	explicit CurrentEngineThreadStop(const std::stop_token& stop) noexcept;
+	~CurrentEngineThreadStop();
+	CurrentEngineThreadStop(const CurrentEngineThreadStop&) = delete;
+	CurrentEngineThreadStop& operator=(const CurrentEngineThreadStop&) = delete;
+
+private:
+	const std::stop_token* m_previous;
+};
+
+// A lock on a mutex that an engine thread can wait on, held until it is destroyed. On an engine thread it tries the
+// mutex again every millisecond while it is held, and throws EngineThreadStopped at a stop request; on any other
+// thread it waits as std::mutex::lock does. It is BasicLockable, so that an EngineCondition can release it while it
+// waits.
+class EngineLock
+{
+public:
+	explicit EngineLock(std::mutex& mutex);
+	~EngineLock();
+	EngineLock(const EngineLock&) = delete;
+	EngineLock& operator=(const EngineLock&) = delete;
+
+	// Takes the mutex again, as the constructor does.
+	void lock();
+	// Takes the mutex again, waiting as std::mutex::lock does even on an engine thread, for a thread that must finish
+	// what it began under the lock, such as publishing a result that other threads wait for. Only for a mutex that
+	// every holder holds for a few instructions.
+	void lockToFinish();
+	void unlock() noexcept;
+
+private:
+	std::mutex& m_mutex;
+	bool m_owned = false;
+};
+
+// A condition that an engine thread can wait on.
+class EngineCondition
+{
+public:
+	void notifyAll() noexcept;
+	// Waits until `ready` returns true, releasing `lock` while it waits and holding it whenever it calls `ready`. On
+	// an engine thread a stop request ends the wait with EngineThreadStopped.
+	void wait(EngineLock& lock, const std::function<bool()>& ready);
+
+private:
+	std::condition_variable_any m_changed;
+};
 
 } // namespace rts
 

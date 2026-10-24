@@ -36,18 +36,25 @@
 // GeneralsX @feature cemlyn007 22/10/2026 Armed whole-terrain draws make an engine that draws on demand draw every tile
 // of its whole-map terrain, as it did before it culled them per draw (W3DDevice/GameClient/HeightMap.h), until they are
 // disarmed, so that a test can compare a culled draw with a draw of the whole terrain.
+// GeneralsX @feature cemlyn007 24/10/2026 Blocked engine threads are test-only engine threads, started through the
+// thread layer (Common/EngineThread.h), that wait until they are asked to stop, so that a host's tests can fault an
+// engine while its threads are blocked and check that every one of them stops.
 //
 // The hooks are per engine (a per-engine static, Common/EngineStatic.h), and go with the engine. Nothing in
-// GeneralsX arms one: the banned symbol check's rule "test hooks" refuses a call to an arming function from any
-// GeneralsX source.
+// GeneralsX arms one: the banned symbol check's rule "test hooks" refuses a call to an arming function, or to
+// startBlockedEngineThreads, from any GeneralsX source.
 #pragma once
 
 #if RTS_ENGINE_CONTEXT
 
+#include <memory>
 #include <string>
+#include <vector>
 
 namespace rts
 {
+
+class EngineThread;
 
 enum class TestHookPoint
 {
@@ -86,6 +93,20 @@ bool wholeTerrainDrawsArmed();
 
 // GeneralsX's hook points: strikes what is armed at `point` in the current engine, once.
 void strikeTestHooks(TestHookPoint point);
+
+enum class BlockedEngineThreads
+{
+	// A holder that takes a lock and keeps it for as long as its waiter waits, and a waiter that waits for that lock
+	// with an EngineLock.
+	lockPair,
+	// A reader that waits in a stop-aware read on a pipe nobody writes to, as a thread waits for a device or the
+	// network to answer.
+	deviceRead,
+};
+
+// Starts `threads` in the current engine, and returns them once each has reached its wait. A pipe the reader reads is
+// recorded in the engine's ledger. For a host's tests only.
+std::vector<std::shared_ptr<EngineThread>> startBlockedEngineThreads(BlockedEngineThreads threads);
 
 } // namespace rts
 
