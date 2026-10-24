@@ -293,6 +293,9 @@ inline int GetDateFormat(unsigned long locale, unsigned long flags, const SYSTEM
   return (result > 0) ? static_cast<int>(result) : 0;
 }
 
+// GeneralsX @bugfix cemlyn007 24/10/2026 types_compat.h may already define it.
+#ifndef INVALID_HANDLE_VALUE
 #define INVALID_HANDLE_VALUE ((void*)-1)
+#endif
 
 #endif // !_WIN32

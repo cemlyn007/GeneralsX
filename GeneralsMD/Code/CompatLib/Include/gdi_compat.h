@@ -148,12 +148,14 @@ static inline HFONT CreateFont(int cHeight, int cWidth, int cEscapement, int cOr
     return nullptr;
 }
 
-static HFONT CreateFontA(int nHeight, int nWidth, int nEscapement, int nOrientation, int fnWeight, DWORD fdwItalic, DWORD fdwUnderline, DWORD fdwStrikeOut, DWORD fdwCharSet, DWORD fdwOutputPrecision, DWORD fdwClipPrecision, DWORD fdwQuality, DWORD fdwPitchAndFamily, LPCSTR lpszFace)
+// GeneralsX @bugfix cemlyn007 24/10/2026 Stubs defined in this header are static inline, so a source that includes it
+// without calling them gets no unused-function warning.
+static inline HFONT CreateFontA(int nHeight, int nWidth, int nEscapement, int nOrientation, int fnWeight, DWORD fdwItalic, DWORD fdwUnderline, DWORD fdwStrikeOut, DWORD fdwCharSet, DWORD fdwOutputPrecision, DWORD fdwClipPrecision, DWORD fdwQuality, DWORD fdwPitchAndFamily, LPCSTR lpszFace)
 {
   return nullptr;
 }
 
-static void ExtTextOutW(HDC hdc, int x, int y, UINT fuOptions, const struct RECT *lprc, wchar_t *lpString, UINT cbCount, const int *lpDx)
+static inline void ExtTextOutW(HDC hdc, int x, int y, UINT fuOptions, const struct RECT *lprc, wchar_t *lpString, UINT cbCount, const int *lpDx)
 {
 }
 
@@ -208,7 +210,7 @@ static inline COLORREF SetTextColor(HDC hdc, COLORREF color) {
 // Font resource management
 // GeneralsX @build BenderAI 12/02/2026 - Dynamic font loading stubs
 // Used by GlobalLanguage for localized font support (e.g., Chinese, Arabic fonts)
-// On Windows: Loads TrueType fonts from Data\<language>\Fonts\
+// On Windows: Loads TrueType fonts from Data\<language>\Fonts (a trailing backslash here would continue this comment)
 // On Linux: No-op stubs (system fonts used instead, SDL_ttf handles rendering)
 static inline int AddFontResource(const char* lpszFilename) {
     (void)lpszFilename;
