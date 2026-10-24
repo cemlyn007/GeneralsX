@@ -342,7 +342,11 @@ a swallowed fatal error still faults the engine, since the sink has already
 latched it. `rts::armInjectedQuit` makes the engine ask to quit at its next
 frame. `rts::armWholeTerrainDraws` makes an engine that draws on demand draw
 every tile of its terrain, as it did before it culled them per draw (Drawing
-on demand, below), until it is disarmed. The hooks are per engine, and no GeneralsX source arms one: the banned
+on demand, below), until it is disarmed. `rts::startBlockedEngineThreads`
+starts test-only engine threads that wait until they are asked to stop: a lock
+holder with a waiter on its lock, or a reader on a pipe nobody writes to, so
+that a test can fault the engine while they wait and check that every one of
+them stops. The hooks are per engine, and no GeneralsX source arms one: the banned
 symbol check's "test hooks" rule refuses it.
 
 ### Input errors
@@ -398,8 +402,8 @@ makes ends at a stop request:
   across a wait or a call into other code.
 
 The code that runs on engine threads is the screenshot writer, the GameSpy and
-FTP host name lookups, the file and socket layers and the per-engine statics.
-A host's banned symbol check can hold
+FTP host name lookups, the file and socket layers, the per-engine statics and
+the test hooks' blocked threads (below). A host's banned symbol check can hold
 it to this rule: none of it calls a blocking lock or condition wait of its own.
 `rts::currentEngineThreadStop` gives the stop token of the engine thread the
 caller runs on.
