@@ -99,6 +99,7 @@ Bool SupplyCenterDockUpdate::action( Object* docker, Object *drone )
 		Money *ownerPlayerMoney = ownerPlayer->getMoney();
 		ownerPlayerMoney->deposit(value);
 		ownerPlayer->getScoreKeeper()->addMoneyEarned(value);
+		ownerPlayer->getScoreKeeper()->addMoneyHarvested(value);
 
 		// Setup info for adding a floating text
 		Coord3D pos;

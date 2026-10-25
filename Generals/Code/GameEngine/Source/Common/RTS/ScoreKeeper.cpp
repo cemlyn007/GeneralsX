@@ -100,6 +100,7 @@ void ScoreKeeper::reset( Int playerIdx )
 	scoringBuildingDestroyMask.set(KINDOF_SCORE_DESTROY);
 
 	m_totalMoneyEarned = m_totalMoneySpent = 0;
+	m_totalMoneyHarvested = 0;
 	m_totalUnitsLost = m_totalUnitsBuilt = 0;
 	m_totalBuildingsLost = m_totalBuildingsBuilt = 0;
 	m_totalFactionBuildingsCaptured = m_totalTechBuildingsCaptured = 0;
@@ -481,13 +482,14 @@ void ScoreKeeper::xferObjectCountMap( Xfer *xfer, ObjectCountMap *map )
 // ------------------------------------------------------------------------------------------------
 /** Xfer method
 	* Version Info:
-	* 1: Initial version */
+	* 1: Initial version
+	* 2: The money harvesters delivered */
 // ------------------------------------------------------------------------------------------------
 void ScoreKeeper::xfer( Xfer *xfer )
 {
 
 	// version
-	XferVersion currentVersion = 1;
+	XferVersion currentVersion = 2;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -553,6 +555,12 @@ void ScoreKeeper::xfer( Xfer *xfer )
 
 	// objects captured
 	xferObjectCountMap( xfer, &m_objectsCaptured );
+
+	// money harvested
+	if( version >= 2 )
+		xfer->xferInt( &m_totalMoneyHarvested );
+	else
+		m_totalMoneyHarvested = 0;
 
 }
 

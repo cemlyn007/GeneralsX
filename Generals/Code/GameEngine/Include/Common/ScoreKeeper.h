@@ -73,6 +73,7 @@ public:
 
 	void addMoneySpent( Int money );								///< Adds money to the amount spent
 	void addMoneyEarned( Int money );								///< Adds money to the earned amount
+	void addMoneyHarvested( Int money );						///< Adds money harvesters delivered to a supply centre
 
 	void addObjectBuilt( const Object *o );
 	void addObjectDestroyed( const Object *o );
@@ -82,6 +83,7 @@ public:
 	void removeObjectBuilt( const Object *o );
 
 	Int getTotalMoneyEarned() { return m_totalMoneyEarned; }
+	Int getTotalMoneyHarvested() const { return m_totalMoneyHarvested; }
 	Int getTotalMoneySpent() { return m_totalMoneySpent; }
 	Int getTotalUnitsDestroyed();
 	Int getTotalUnitsBuilt() { return m_totalUnitsBuilt; }
@@ -105,6 +107,7 @@ protected:
 
 private:
 
+	Int m_totalMoneyHarvested;				///< The money harvesters delivered to supply centres, and nothing else
 	Int m_totalMoneyEarned;						///< The total money that was harvested, refined, received in crates
 	Int m_totalMoneySpent;						///< The total money spent on units, buildings, repairs
 	Int m_totalUnitsDestroyed[MAX_PLAYER_COUNT];				///< The total number of enemies that we've killed
@@ -134,6 +137,7 @@ private:
 //-----------------------------------------------------------------------------
 inline void ScoreKeeper::addMoneySpent( Int money )							{	m_totalMoneySpent += money; }
 inline void ScoreKeeper::addMoneyEarned( Int money )						{	m_totalMoneyEarned += money; }
+inline void ScoreKeeper::addMoneyHarvested( Int money )					{	m_totalMoneyHarvested += money; }
 
 //-----------------------------------------------------------------------------
 // EXTERNALS //////////////////////////////////////////////////////////////////
