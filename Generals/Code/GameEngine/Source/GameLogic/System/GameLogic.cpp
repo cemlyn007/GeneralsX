@@ -1997,7 +1997,11 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 	}
 
 	// if we're in a load game, don't fade yet
-	if(loadingSaveGame == FALSE && TheTransitionHandler != nullptr && m_loadScreen)
+	// GeneralsX @performance cemlyn007 25/10/2026 The fade is paced by the wall clock, so it held every start of a
+	// headless engine that draws nothing for about a second, nearly all of a skirmish start's time. It draws to the
+	// display only and runs no logic frame, so an engine that renders nothing skips it.
+	const Bool drawsNothing = TheGlobalData->m_headless && !TheGlobalData->m_headlessRender;
+	if(loadingSaveGame == FALSE && TheTransitionHandler != nullptr && m_loadScreen && !drawsNothing)
 	{
 		TheFramePacer->reset();
 		TheTransitionHandler->setGroup("FadeWholeScreen");
