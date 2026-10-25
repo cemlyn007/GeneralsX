@@ -124,6 +124,7 @@ Bool SupplyCenterDockUpdate::action( Object* docker, Object *drone )
 		Money *ownerPlayerMoney = ownerPlayer->getMoney();
 		ownerPlayerMoney->deposit(value);
 		ownerPlayer->getScoreKeeper()->addMoneyEarned(value);
+		ownerPlayer->getScoreKeeper()->addMoneyHarvested(value);
 
 
 		if( data->m_grantTemporaryStealthFrames > 0 )
